@@ -1,0 +1,55 @@
+<section class="chat">
+  <p class="notice">
+    開發模式：呼叫 <code>/api/dev/agent-stream</code>。預設使用示範 Agent；設定
+    <code>VibeMaker__Harness=Pi</code> 可接上真正的 Pi + Fake LLM（訊息加上
+    <code>[create-file]</code>、<code>[slow]</code>、<code>[fail]</code> 試不同情境）。
+  </p>
+
+  <ol class="turns">
+    @for (turn of turns(); track $index) {
+      <li class="turn">
+        <div class="bubble user">{{ turn.prompt }}</div>
+        <div class="bubble assistant" [attr.data-status]="turn.view.status">
+          @if (turn.view.statusText) {
+            <p class="status">{{ turn.view.statusText }}</p>
+          }
+          @for (tool of turn.view.tools; track tool.callId) {
+            <p class="tool" [attr.data-state]="tool.state">
+              <span class="tool-name">{{ tool.tool }}</span>
+              <code>{{ tool.summary }}</code>
+            </p>
+          }
+          <p class="text">{{ turn.view.text }}</p>
+          @switch (turn.view.status) {
+            @case ('cancelled') {
+              <p class="meta">已中止</p>
+            }
+            @case ('failed') {
+              <p class="meta error">
+                {{ turn.view.error?.message }}（{{ turn.view.error?.code }}）
+              </p>
+            }
+          }
+        </div>
+      </li>
+    } @empty {
+      <li class="empty">輸入訊息開始對話</li>
+    }
+  </ol>
+
+  <form class="composer" (ngSubmit)="send()">
+    <input
+      name="prompt"
+      [ngModel]="prompt()"
+      (ngModelChange)="prompt.set($event)"
+      placeholder="例如：幫我建立一個 Todo List 網站"
+      autocomplete="off"
+      aria-label="訊息"
+    />
+    @if (running()) {
+      <button type="button" class="secondary" (click)="stop()">停止</button>
+    } @else {
+      <button type="submit" [disabled]="!prompt().trim()">送出</button>
+    }
+  </form>
+</section>
