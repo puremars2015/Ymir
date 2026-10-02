@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Ymir.Api/Ymir.Api.csproj" />
+    <Project Path="src/Ymir.AppHost/Ymir.AppHost.csproj" />
+    <Project Path="src/Ymir.ServiceDefaults/Ymir.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/Platform/">
+    <Project Path="src/Platform/Ymir.Platform/Ymir.Platform.csproj" />
+    <Project Path="src/Platform/Ymir.Platform.Infrastructure/Ymir.Platform.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/VibeMaker/">
+    <Project Path="src/Modules/VibeMaker/Ymir.VibeMaker/Ymir.VibeMaker.csproj" />
+    <Project Path="src/Modules/VibeMaker/Ymir.VibeMaker.Contracts/Ymir.VibeMaker.Contracts.csproj" />
+    <Project Path="src/Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/Ymir.VibeMaker.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Ymir.IntegrationTests/Ymir.IntegrationTests.csproj" />
+    <Project Path="tests/Ymir.Testing.FakeLlm/Ymir.Testing.FakeLlm.csproj" />
+    <Project Path="tests/Ymir.UnitTests/Ymir.UnitTests.csproj" />
+  </Folder>
+  <Folder Name="/spikes/">
+    <Project Path="spikes/pi-rpc-poc/PiRpcPoc.csproj" />
+  </Folder>
+</Solution>

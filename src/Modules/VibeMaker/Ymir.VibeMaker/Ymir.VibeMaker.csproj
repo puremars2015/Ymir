@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\Platform\Ymir.Platform\Ymir.Platform.csproj" />
+    <ProjectReference Include="..\Ymir.VibeMaker.Contracts\Ymir.VibeMaker.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ymir.UnitTests" />
+  </ItemGroup>
+</Project>

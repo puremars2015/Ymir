@@ -1,0 +1,15 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.0">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <UserSecretsId>ymir-apphost-8c1f2d4e</UserSecretsId>
+    <!-- 不使用 Aspire CLI bundle，改用 NuGet 的 DCP / Dashboard 套件，讓 dotnet run 即可啟動 -->
+    <MSBuildWarningsAsMessages>$(MSBuildWarningsAsMessages);ASPIRE010</MSBuildWarningsAsMessages>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.JavaScript" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Ymir.Api\Ymir.Api.csproj" />
+    <ProjectReference Include="..\..\tests\Ymir.Testing.FakeLlm\Ymir.Testing.FakeLlm.csproj" />
+  </ItemGroup>
+</Project>
