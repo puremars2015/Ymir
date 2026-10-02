@@ -11,6 +11,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
 | `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻** |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
+| `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
 ## 專案結構
 
@@ -82,3 +83,4 @@ Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真
 - 測試：xUnit v3（`TestContext.Current.CancellationToken`）；外部依賴用 Fake LLM / Scripted harness，不要在測試中呼叫真實模型。
 - Angular：standalone component、signals、`ChangeDetectionStrategy.OnPush`、新的控制流程語法（`@if` / `@for`）；狀態轉換寫成純函式並加上 Vitest 測試。
 - Commit 一次一個垂直切片；改動前後都要跑 build、test、lint。
+- 每次工作結束前，在 `docs/progress/` 目前 Sprint 的看板留言（做了什麼、實際跑過的驗證、卡關與待決定事項），並更新置頂區的工作項目狀態。

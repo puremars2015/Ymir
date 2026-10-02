@@ -43,6 +43,7 @@ VibeMaker__Harness=Pi dotnet run --project src/Ymir.Api   # 搭配 dotnet run --
 | [`docs/sa/vibe-maker-core-mvp-sa.md`](docs/sa/vibe-maker-core-mvp-sa.md) | 系統分析文件（原始檔：`documents/Vibe_Maker_Core_MVP_SA_v1.0.docx`） |
 | [`docs/planning/development-plan.md`](docs/planning/development-plan.md) | 開發規劃、對 SA 的修訂建議、待確認事項 |
 | [`docs/adr/`](docs/adr/) | 架構決策紀錄 |
+| [`docs/progress/`](docs/progress/) | 開發進度留言版（每個 Sprint 一個看板） |
 | [`runtime/agent/README.md`](runtime/agent/README.md) | Agent container image 與部署主機需求 |
 | [`CLAUDE.md`](CLAUDE.md) | AI 開發規則（專案結構、指令、安全紅線） |
 | `documents/` | 原始 SA 文件與架構圖 |
