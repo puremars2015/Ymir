@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Ymir.VibeMaker.Domain;
 
 namespace Ymir.VibeMaker.Application.Persistence;
@@ -22,6 +23,9 @@ public interface IVibeMakerDbContext
     DbSet<AgentExecution> AgentExecutions { get; }
 
     DbSet<ExecutionEventRecord> ExecutionEvents { get; }
+
+    EntityEntry<TEntity> Entry<TEntity>(TEntity entity)
+        where TEntity : class;
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -19,7 +19,7 @@ public sealed class PiHarnessFixture : IAsyncLifetime
 
     public IAgentRuntimeManager RuntimeManager { get; private set; } = null!;
 
-    public bool PiAvailable { get; } = IsOnPath("pi");
+    public bool PiAvailable { get; } = IsPiOnPath();
 
     public async ValueTask InitializeAsync()
     {
@@ -50,6 +50,8 @@ public sealed class PiHarnessFixture : IAsyncLifetime
             Directory.Delete(WorkspaceRoot, recursive: true);
         }
     }
+
+    public static bool IsPiOnPath() => IsOnPath("pi");
 
     private static bool IsOnPath(string executable) =>
         (Environment.GetEnvironmentVariable("PATH") ?? string.Empty)

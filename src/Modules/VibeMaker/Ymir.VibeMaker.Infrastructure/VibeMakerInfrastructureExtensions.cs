@@ -2,9 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Ymir.VibeMaker.Application.Agents;
+using Ymir.VibeMaker.Application.Executions;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Infrastructure.Dev;
+using Ymir.VibeMaker.Infrastructure.Executions;
 using Ymir.VibeMaker.Infrastructure.Persistence;
 using Ymir.VibeMaker.Infrastructure.PiAgent;
 using Ymir.VibeMaker.Infrastructure.Podman;
@@ -23,6 +25,19 @@ public static class VibeMakerInfrastructureExtensions
     {
         services.AddDbContext<VibeMakerDbContext>(options => options.UseSqlServer(connectionString, VibeMakerSqlServerOptions.Configure));
         services.AddScoped<IVibeMakerDbContext>(sp => sp.GetRequiredService<VibeMakerDbContext>());
+
+        services.AddSingleton<IExecutionDispatcher, ChannelExecutionDispatcher>();
+        services.AddSingleton<IExecutionEventBus, InMemoryExecutionEventBus>();
+        services.AddSingleton<IExecutionCancellationRegistry, ExecutionCancellationRegistry>();
+        services.AddHostedService<ExecutionWorker>();
+        services.Configure<ExecutionOptions>(options =>
+        {
+            var minutes = configuration.GetSection(RuntimeOptions.SectionName).GetValue<double?>(nameof(RuntimeOptions.ExecutionTimeoutMinutes));
+            if (minutes is > 0)
+            {
+                options.Timeout = TimeSpan.FromMinutes(minutes.Value);
+            }
+        });
         return services.AddVibeMakerAgentRuntime(configuration, isDevelopment);
     }
 

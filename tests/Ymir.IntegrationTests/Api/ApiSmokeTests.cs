@@ -17,7 +17,7 @@ public class ApiSmokeTests(ApiFactory factory) : IClassFixture<ApiFactory>
     {
         using var client = factory.CreateClient();
         var json = await client.GetStringAsync(new Uri("/openapi/v1.json", UriKind.Relative), TestContext.Current.CancellationToken);
-        Assert.Contains("/api/dev/agent-stream", json, StringComparison.Ordinal);
+        Assert.Contains("/api/conversations/{conversationId}/messages", json, StringComparison.Ordinal);
     }
 
     [Fact]

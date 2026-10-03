@@ -40,12 +40,12 @@ app.UseXsrfTokenCookie();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi().AllowAnonymous();
-    app.MapDevAgentEndpoints();
 }
 
 app.MapAuthEndpoints(app.Environment);
 app.MapWorkspaceEndpoints();
 app.MapConversationEndpoints();
+app.MapExecutionEndpoints();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();

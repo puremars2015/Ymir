@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Ymir.IntegrationTests.Api;
+using Ymir.IntegrationTests.Executions;
 using Ymir.VibeMaker.Contracts.Conversations;
 
 namespace Ymir.IntegrationTests.Authorization;
@@ -27,6 +28,12 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         {
             Content = JsonContent.Create(new CreateConversationRequest(r.WorkspaceId, "intrusion")),
         },
+        ["POST /api/conversations/{conversationId:guid}/messages"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/messages")
+        {
+            Content = JsonContent.Create(new SendMessageRequest("intrusion", Guid.NewGuid())),
+        },
+        ["GET /api/executions/{executionId:guid}/events"] = r => Get($"/api/executions/{r.ExecutionId}/events"),
+        ["POST /api/executions/{executionId:guid}/cancel"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/executions/{r.ExecutionId}/cancel"),
     };
 
     /// <summary>不以資源 id 存取的端點（只會操作目前使用者自己的資料，或是匿名端點）。</summary>
@@ -37,10 +44,9 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "POST /api/dev/login",
         "GET /api/workspaces/",
         "POST /api/workspaces/",
-        "GET /api/dev/agent-stream",
     ];
 
-    private sealed record OwnedResources(Guid WorkspaceId, Guid ConversationId);
+    private sealed record OwnedResources(Guid WorkspaceId, Guid ConversationId, Guid ExecutionId);
 
     private static HttpRequestMessage Get(string url) => new(HttpMethod.Get, url);
 
@@ -66,7 +72,9 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         using var intruder = await factory.LoginAsync("matrix-intruder");
         var workspace = await owner.CreateWorkspaceAsync("secret");
         var conversation = await owner.CreateConversationAsync(workspace.Id, "secret chat");
-        var resources = new OwnedResources(workspace.Id, conversation.Id);
+        var (_, sent) = await owner.SendMessageAsync(conversation.Id, "secret prompt");
+        await owner.ReadEventsAsync(sent!.EventStreamUrl); // 等執行結束，擁有者之後才能再送訊息
+        var resources = new OwnedResources(workspace.Id, conversation.Id, sent.ExecutionId);
 
         var failures = new List<string>();
         foreach (var (endpoint, createRequest) in ResourceRequests)
@@ -95,7 +103,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     {
         var ct = TestContext.Current.CancellationToken;
         using var anonymous = factory.CreateBrowserClient();
-        var resources = new OwnedResources(Guid.NewGuid(), Guid.NewGuid());
+        var resources = new OwnedResources(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
 
         foreach (var (endpoint, createRequest) in ResourceRequests)
         {
