@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Ymir.Spikes.PiRpcPoc</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Modules\VibeMaker\Ymir.VibeMaker.Infrastructure\Ymir.VibeMaker.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\tests\Ymir.Testing.FakeLlm\Ymir.Testing.FakeLlm.csproj" />
+  </ItemGroup>
+</Project>

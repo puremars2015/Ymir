@@ -1,0 +1,91 @@
+using System.Text.Json.Nodes;
+
+namespace Ymir.Testing.FakeLlm;
+
+/// <summary>
+/// 依照最後一則訊息決定假模型的回應，讓測試可以腳本化 Agent 行為：
+/// <list type="bullet">
+/// <item>最後一則是 tool 結果 → 回覆「完成」文字。</item>
+/// <item>使用者訊息含 <c>[create-file]</c> → 呼叫 <c>bash</c> 工具在 workspace 建立 <c>hello.txt</c>。</item>
+/// <item>使用者訊息含 <c>[slow]</c> → 緩慢串流很多段文字（用來測 abort）。</item>
+/// <item>使用者訊息含 <c>[fail]</c> → 回傳 HTTP 500（測模型端錯誤）。</item>
+/// <item>其他 → 回覆「收到第 N 則使用者訊息：...」，N 可用來驗證 session 續接。</item>
+/// </list>
+/// </summary>
+public static class FakeLlmScript
+{
+    public const string CreateFileMarker = "[create-file]";
+    public const string SlowMarker = "[slow]";
+    public const string FailMarker = "[fail]";
+    public const string CreatedFileName = "hello.txt";
+    public const string CreatedFileContent = "Hello from Ymir";
+
+    public static FakeLlmReply Decide(JsonObject request)
+    {
+        var messages = request["messages"]?.AsArray() ?? [];
+        var last = messages.LastOrDefault()?.AsObject();
+        var lastRole = last?["role"]?.GetValue<string>();
+        var userMessages = messages.Where(m => m?["role"]?.GetValue<string>() == "user").ToList();
+        var lastUserText = userMessages.Count > 0 ? ExtractText(userMessages[^1]) : string.Empty;
+
+        if (lastRole == "tool")
+        {
+            return FakeLlmReply.Text(["已完成，", $"檔案 {CreatedFileName} 已建立。"]);
+        }
+
+        if (lastUserText.Contains(FailMarker, StringComparison.Ordinal))
+        {
+            return FakeLlmReply.Error(500, "fake upstream failure");
+        }
+
+        if (lastUserText.Contains(CreateFileMarker, StringComparison.Ordinal))
+        {
+            return FakeLlmReply.ToolCall(
+                "bash",
+                new JsonObject { ["command"] = $"printf '{CreatedFileContent}' > {CreatedFileName}" },
+                preamble: "我來建立檔案。");
+        }
+
+        if (lastUserText.Contains(SlowMarker, StringComparison.Ordinal))
+        {
+            return FakeLlmReply.Text([.. Enumerable.Range(1, 200).Select(i => $"第{i}段 ")], delayPerChunk: TimeSpan.FromMilliseconds(100));
+        }
+
+        return FakeLlmReply.Text([$"收到第 {userMessages.Count} 則使用者訊息：", lastUserText]);
+    }
+
+    private static string ExtractText(JsonNode? message)
+    {
+        var content = message?["content"];
+        return content switch
+        {
+            JsonValue value => value.GetValue<string>(),
+            JsonArray parts => string.Concat(parts.Select(p => p?["text"]?.GetValue<string>() ?? string.Empty)),
+            _ => string.Empty,
+        };
+    }
+}
+
+public sealed record FakeLlmReply
+{
+    public IReadOnlyList<string> TextChunks { get; init; } = [];
+
+    public TimeSpan DelayPerChunk { get; init; }
+
+    public string? ToolName { get; init; }
+
+    public JsonObject? ToolArguments { get; init; }
+
+    public int? ErrorStatusCode { get; init; }
+
+    public string? ErrorMessage { get; init; }
+
+    public static FakeLlmReply Text(IReadOnlyList<string> chunks, TimeSpan delayPerChunk = default) =>
+        new() { TextChunks = chunks, DelayPerChunk = delayPerChunk };
+
+    public static FakeLlmReply ToolCall(string toolName, JsonObject arguments, string? preamble = null) =>
+        new() { ToolName = toolName, ToolArguments = arguments, TextChunks = preamble is null ? [] : [preamble] };
+
+    public static FakeLlmReply Error(int statusCode, string message) =>
+        new() { ErrorStatusCode = statusCode, ErrorMessage = message };
+}
