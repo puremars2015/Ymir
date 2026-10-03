@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-03 23:04 ・ 狀態：**🚧 進行中**
+> 最後更新：2026-10-03 23:12 ・ 狀態：**🚧 進行中**
 
 **目標**：打通最細的端到端鏈路 —— Dev 登入 → 建立 Workspace / Conversation → 送訊息 → Container 內的 Pi → SSE 顯示在 Angular。
 之後的 Sprint 只在這條鏈路上「加厚」，不再改結構（[開發規劃](../planning/development-plan.md#修訂後的路線圖)）。
@@ -22,7 +22,7 @@
 | Execution pipeline：背景 worker、狀態機（QUEUED→RUNNING→終止）、cancel、timeout | ✅ | SA §14；含啟動 reconciliation；見 [#005](#005--s4s5-execution-pipeline-與-sse-完成) |
 | `POST /messages` 冪等（`client_request_id`）+ 同 Conversation 只能有一個執行中 | ✅ | filtered unique index |
 | SSE 端點 `/api/executions/{id}/events`（事件持久化、`Last-Event-ID` 續傳） | ✅ | 開發規劃 §5；心跳尚未實作 |
-| Angular：Workspace / Conversation 列表、Chat 頁改用正式 API | ⏳ | OpenAPI 產生 TypeScript client |
+| Angular：Workspace / Conversation 列表、Chat 頁改用正式 API | ✅ | OpenAPI 產生 TypeScript 型別；見 [#006](#006--s6-angular-正式流程完成done-definition-端對端通過) |
 | 授權矩陣測試（非擁有者 → 403/404） | ✅ | 驗收條件 #2；涵蓋全部 `/api` 端點 |
 | 正式主機用完整 Containerfile 重跑 Podman 驗證 | ⏳ | 從 Sprint 0 移入，見 [Sprint 0 #003](board-sprint-0.md#003--驗證中的發現與環境限制) |
 
@@ -31,6 +31,39 @@
 ---
 
 ## 💬 留言區
+
+### #006 · S6 Angular 正式流程完成，Done Definition 端對端通過
+
+> 👤 **Claude（AI）** · 🕒 2026-10-03 23:12 · `✅完成`
+
+- **API 契約快照**：`src/Ymir.Api/openapi/v1.json` 由整合測試把關（API 改了沒更新就失敗）；Angular 以 `npm run api:generate` 從它產生 TypeScript 型別，CI 檢查兩邊沒有漂移。
+- 頁面：Dev 登入 → Workspace 列表 / 建立 → 對話列表 / 建立 → 對話頁（歷史訊息、即時串流、停止、完成後以後端保存的訊息為準）。
+- 未登入自動導向登入頁並記住原本的位置；cookie 過期（401）也會導回登入頁；POST 自動帶 XSRF header。
+- 新增 Playwright 腳本 `web/e2e/sprint1-walking-skeleton.mjs`（`npm run e2e:sprint1`，尚未進 CI）。
+
+**端對端驗證**（SQL Server + API + 真實 Pi + Fake LLM + Angular，瀏覽器操作）：
+1. ✅ 未登入導向登入頁，Dev 登入
+2. ✅ 建立 Workspace 與對話
+3. ✅ 送出 `[create-file]` → 串流回應 → `hello.txt` 出現在該 Workspace 的目錄
+4. ✅ 重新整理後歷史訊息仍在
+5. ✅ 執行中按「停止」→ 正確結束，保留已產生的部分文字
+6. ✅ 同一對話繼續 → Agent 記得前文（模型收到第 3 則使用者訊息）
+
+截圖：[sprint1-chat-history.png](../planning/sprint1-chat-history.png)
+
+其他驗證：.NET 85 個測試 ✅、`dotnet format` ✅、Angular lint ✅ / 10 個 Vitest ✅ / build ✅。
+
+📝 小發現：openapi-typescript 7 只支援 TypeScript 5，但 Angular 22 用 TypeScript 6，所以改用固定版本的 `npx` 執行，不加進專案依賴。
+📝 逾時情境由整合測試驗證（`AGENT_TIMEOUT`），沒有放進瀏覽器腳本。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #005 · S4+S5 Execution pipeline 與 SSE 完成
 
