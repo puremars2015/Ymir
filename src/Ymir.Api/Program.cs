@@ -2,6 +2,8 @@ using System.Text.Json.Serialization;
 using Ymir.Api.Auth;
 using Ymir.Api.Endpoints;
 using Ymir.Api.Infrastructure;
+using Ymir.Api.Problems;
+using Ymir.VibeMaker;
 using Ymir.Platform.Infrastructure;
 using Ymir.VibeMaker.Infrastructure;
 
@@ -12,10 +14,12 @@ var connectionString = builder.Configuration.GetConnectionString("ymir")
 
 builder.AddServiceDefaults();
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddOpenApi();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddYmirAuth(builder.Environment);
 builder.Services.AddPlatformInfrastructure(connectionString);
+builder.Services.AddVibeMakerApplication();
 builder.Services.AddVibeMakerInfrastructure(builder.Configuration, connectionString, builder.Environment.IsDevelopment());
 
 var app = builder.Build();
@@ -40,6 +44,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapAuthEndpoints(app.Environment);
+app.MapWorkspaceEndpoints();
+app.MapConversationEndpoints();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();
