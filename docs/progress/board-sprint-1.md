@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-03 22:51 ・ 狀態：**🚧 進行中**
+> 最後更新：2026-10-03 22:54 ・ 狀態：**🚧 進行中**
 
 **目標**：打通最細的端到端鏈路 —— Dev 登入 → 建立 Workspace / Conversation → 送訊息 → Container 內的 Pi → SSE 顯示在 Angular。
 之後的 Sprint 只在這條鏈路上「加厚」，不再改結構（[開發規劃](../planning/development-plan.md#修訂後的路線圖)）。
@@ -18,12 +18,12 @@
 |---|---|---|
 | EF Core + SQL Server（`platform` / `vibemaker` schema）、migrations、Aspire 加入 SQL Server | ✅ | 資料模型補強見開發規劃 §9；見 [#002](#002--s1-資料層完成) |
 | Dev Authentication Handler（只在 Development）+ `/api/me` | ✅ | 正式 OIDC 在 Sprint 2（ADR-0002）；見 [#003](#003--s2-dev-登入cookie--antiforgery完成) |
-| Workspace / Conversation / Message API（server 端擁有者檢查） | ⏳ | SA §9 |
+| Workspace / Conversation / Message API（server 端擁有者檢查） | ✅ | SA §9；`POST runtime/stop` 移到 Sprint 4；見 [#004](#004--s3-workspace--conversation-api-與授權矩陣完成) |
 | Execution pipeline：背景 worker、狀態機（QUEUED→RUNNING→終止）、cancel、timeout | ⏳ | SA §14；不要放到 Sprint 5 |
 | `POST /messages` 冪等（`client_request_id`）+ 同 Conversation 只能有一個執行中 | ⏳ | filtered unique index |
 | SSE 端點 `/api/executions/{id}/events`（事件持久化、`Last-Event-ID` 續傳） | ⏳ | 開發規劃 §5 |
 | Angular：Workspace / Conversation 列表、Chat 頁改用正式 API | ⏳ | OpenAPI 產生 TypeScript client |
-| 授權矩陣測試（非擁有者 → 403/404） | ⏳ | 驗收條件 #2 |
+| 授權矩陣測試（非擁有者 → 403/404） | 🚧 | 驗收條件 #2；目前涵蓋 S3 端點，S4/S5 端點加入後完成 |
 | 正式主機用完整 Containerfile 重跑 Podman 驗證 | ⏳ | 從 Sprint 0 移入，見 [Sprint 0 #003](board-sprint-0.md#003--驗證中的發現與環境限制) |
 
 **開工前要先有的決定**：無（Sprint 0 [#005](board-sprint-0.md#005--需要決定的四件事) 的四件事影響 Sprint 2～4，不擋 Sprint 1）。
@@ -31,6 +31,28 @@
 ---
 
 ## 💬 留言區
+
+### #004 · S3 Workspace / Conversation API 與授權矩陣完成
+
+> 👤 **Claude（AI）** · 🕒 2026-10-03 22:54 · `✅完成`
+
+- SA §9 端點：`GET/POST /api/workspaces`、`GET /api/workspaces/{id}`、`GET /api/workspaces/{id}/runtime`、`GET/POST /api/conversations`（可依 workspaceId 篩選）、`GET /api/conversations/{id}`、`GET /api/conversations/{id}/messages`。
+- 所有查詢都限定目前使用者；**別人的資源一律回 404**（不讓人知道它存在），錯誤帶 SA §13 錯誤碼（例如 `CONVERSATION_NOT_FOUND`）。
+- 領域驗證錯誤（例如空白名稱）回 400 `VALIDATION_FAILED`。
+- **授權矩陣測試**：列舉所有 `/api` 端點，沒有分類的端點會讓測試失敗；對每個資源端點驗證「入侵者 404、擁有者成功、匿名 401」。
+
+驗證：整合測試 30 個 ✅（新增 5 個功能測試 + 3 個授權矩陣測試）；`dotnet format` ✅。
+
+📝 範圍調整：`POST /api/workspaces/{id}/runtime/stop` 需要 runtime id 與資料庫一致的生命週期管理，移到 Sprint 4（Runtime 完整生命週期）一起做。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #003 · S2 Dev 登入（Cookie + antiforgery）完成
 
