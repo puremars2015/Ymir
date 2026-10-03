@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-03 00:04 ・ 狀態：**⏳ 尚未開始**
+> 最後更新：2026-10-03 22:48 ・ 狀態：**🚧 進行中**
 
 **目標**：打通最細的端到端鏈路 —— Dev 登入 → 建立 Workspace / Conversation → 送訊息 → Container 內的 Pi → SSE 顯示在 Angular。
 之後的 Sprint 只在這條鏈路上「加厚」，不再改結構（[開發規劃](../planning/development-plan.md#修訂後的路線圖)）。
@@ -16,7 +16,7 @@
 
 | 工作項目 | 狀態 | 備註 |
 |---|---|---|
-| EF Core + SQL Server（`platform` / `vibemaker` schema）、migrations、Aspire 加入 SQL Server | ⏳ | 資料模型補強見開發規劃 §9 |
+| EF Core + SQL Server（`platform` / `vibemaker` schema）、migrations、Aspire 加入 SQL Server | ✅ | 資料模型補強見開發規劃 §9；見 [#002](#002--s1-資料層完成) |
 | Dev Authentication Handler（只在 Development）+ `/api/me` | ⏳ | 正式 OIDC 在 Sprint 2（ADR-0002） |
 | Workspace / Conversation / Message API（server 端擁有者檢查） | ⏳ | SA §9 |
 | Execution pipeline：背景 worker、狀態機（QUEUED→RUNNING→終止）、cancel、timeout | ⏳ | SA §14；不要放到 Sprint 5 |
@@ -31,6 +31,37 @@
 ---
 
 ## 💬 留言區
+
+### #002 · S1 資料層完成
+
+> 👤 **Claude（AI）** · 🕒 2026-10-03 22:48 · `✅完成`
+
+Sprint 1 開工，第一個切片（資料層）完成：
+
+- EF Core 10 + SQL Server：`PlatformDbContext`（schema `platform`：users、audit_log）與 `VibeMakerDbContext`（schema `vibemaker`：workspaces、conversations、messages、agent_sessions、agent_runtimes、agent_executions、execution_events），兩組各自的 migrations。
+- 依開發規劃 §9 補強：execution 加 `client_request_id`、`user_id`、`runtime_id`；message 加 `execution_id`；新增 `execution_events`（SSE 續傳用）。
+- **並行規則由資料庫保證**：同 Conversation 只能有一個 QUEUED/RUNNING、`(user_id, client_request_id)` 唯一、每個 workspace 只有一個未刪除 runtime（filtered unique index）。
+- `AgentExecution` 狀態轉移有防呆，非法轉移直接拋例外。
+- Audit log 與使用者 upsert（issuer + subject）改寫資料庫。
+- Development 啟動時自動 migrate；Aspire AppHost、CI（service container）、雲端 session hook 都會提供 SQL Server。
+
+驗證：
+- `dotnet build`、`dotnet format --verify-no-changes` ✅
+- 單元測試 46 個 ✅（新增狀態機、命名轉換）
+- 整合測試 15 個 ✅（對真實 SQL Server 2022：filtered index 擋住第二個執行中 execution、冪等鍵、enum 存成 `QUEUED`、使用者 upsert）；測試資料庫結束後確認已刪除
+
+⚠️ 發現：沙箱的 rootful podman 沒有 bridge 網路（port mapping 不通），所以 **Testcontainers 不能用**。改成測試讀 `YMIR_TEST_SQLSERVER` 連線字串、每個 fixture 自建自刪資料庫；沙箱用 `--network host` 跑 SQL Server，CI 用 GitHub Actions service container。
+
+下一步：S2 Dev 登入（Cookie + antiforgery）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #001 · Sprint 1 看板開張
 
