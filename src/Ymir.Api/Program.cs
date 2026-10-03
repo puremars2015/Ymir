@@ -3,8 +3,8 @@ using Ymir.Api.Auth;
 using Ymir.Api.Endpoints;
 using Ymir.Api.Infrastructure;
 using Ymir.Api.Problems;
-using Ymir.VibeMaker;
 using Ymir.Platform.Infrastructure;
+using Ymir.VibeMaker;
 using Ymir.VibeMaker.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
