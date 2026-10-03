@@ -78,6 +78,9 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - run: npm ci
+      # TypeScript 型別必須與 API 契約快照（src/Ymir.Api/openapi/v1.json）一致
+      - name: API types are up to date
+        run: npm run api:generate && git diff --exit-code src/app/core/api/schema.ts
       - run: npm run lint
       - run: npm test -- --watch=false
       - run: npm run build

@@ -1,8 +1,11 @@
 <header class="app-header">
   <a routerLink="/" class="brand"><strong>Ymir</strong> · Vibe Maker</a>
-  <nav>
-    <a routerLink="/login">登入</a>
-  </nav>
+  @if (auth.user(); as user) {
+    <nav class="user">
+      <span>{{ user.displayName }}</span>
+      <button type="button" class="link" (click)="logout()">登出</button>
+    </nav>
+  }
 </header>
 <main class="app-main">
   <router-outlet />

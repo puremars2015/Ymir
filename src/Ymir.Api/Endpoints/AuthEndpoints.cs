@@ -17,14 +17,14 @@ internal static class AuthEndpoints
 
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder endpoints, IHostEnvironment environment)
     {
-        endpoints.MapGet("/api/me", GetMeAsync).WithName("GetMe").WithTags("Auth");
+        endpoints.MapGet("/api/me", GetMeAsync).WithName("GetMe").WithTags("Auth").Produces<MeResponse>();
 
-        endpoints.MapPost("/api/auth/logout", LogoutAsync).WithName("Logout").WithTags("Auth").RequireAntiforgeryHeader();
+        endpoints.MapPost("/api/auth/logout", LogoutAsync).WithName("Logout").WithTags("Auth").RequireAntiforgeryHeader().Produces(StatusCodes.Status204NoContent);
 
         if (environment.IsDevelopment())
         {
             // 只在 Development 註冊：以帳號名稱直接登入，不需要企業 IdP（ADR-0002）。
-            endpoints.MapPost("/api/dev/login", DevLoginAsync).WithName("DevLogin").WithTags("Auth").AllowAnonymous();
+            endpoints.MapPost("/api/dev/login", DevLoginAsync).WithName("DevLogin").WithTags("Auth").AllowAnonymous().Produces<MeResponse>();
         }
 
         return endpoints;

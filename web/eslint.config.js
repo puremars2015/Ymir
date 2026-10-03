@@ -5,6 +5,8 @@ const tseslint = require('typescript-eslint');
 const angular = require('angular-eslint');
 
 module.exports = defineConfig([
+  // OpenAPI 產生的型別（npm run api:generate），不套用 lint 規則
+  { ignores: ["src/app/core/api/schema.ts"] },
   {
     files: ['**/*.ts'],
     extends: [

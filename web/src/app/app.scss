@@ -20,6 +20,12 @@
   .brand strong {
     color: var(--accent);
   }
+
+  .user {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+  }
 }
 
 .app-main {
