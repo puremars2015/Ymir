@@ -17,18 +17,18 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 
 ```
 src/
-  Ymir.Api/                          ASP.NET Core Host（composition root）
+  Ymir.Api/                          ASP.NET Core Host：Endpoints/、Auth/（Cookie + XSRF）、openapi/v1.json（API 契約快照）
   Ymir.AppHost/                      .NET Aspire 本機開發編排
   Ymir.ServiceDefaults/              OpenTelemetry、health check
-  Platform/Ymir.Platform[.Infrastructure]/         共用核心：身份、使用者、稽核
-  Modules/VibeMaker/Ymir.VibeMaker/                Domain/ + Application/（介面：IAgentHarness、IAgentRuntimeManager、IModelGateway）
-  Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/ PiAgent/、Podman/、Runtime/（Local，開發用）、Dev/（Scripted harness）
+  Platform/Ymir.Platform[.Infrastructure]/         共用核心：使用者、身份（ICurrentUser）、稽核；schema platform
+  Modules/VibeMaker/Ymir.VibeMaker/                Domain/（實體、狀態機）+ Application/（Workspaces、Conversations、Executions 用例；IAgentHarness、IAgentRuntimeManager、IModelGateway）
+  Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/ Persistence/（EF Core，schema vibemaker）、Executions/（背景 worker、事件 bus）、PiAgent/、Podman/、Runtime/（Local，開發用）、Dev/（Scripted harness）
   Modules/VibeMaker/Ymir.VibeMaker.Contracts/      API DTO、SSE 事件契約
 tests/
   Ymir.UnitTests/                    含 Fixtures/pi-rpc/：Pi 1.0.0 的真實 RPC 錄製
-  Ymir.IntegrationTests/             WebApplicationFactory + 真實 Pi 程序（PATH 上沒有 pi 會自動略過）
+  Ymir.IntegrationTests/             WebApplicationFactory + SQL Server（每個 fixture 獨立資料庫）+ 真實 Pi；含授權矩陣、OpenAPI 快照
   Ymir.Testing.FakeLlm/              OpenAI 相容假模型（[create-file] / [slow] / [fail] 腳本）
-web/                                 Angular 22（standalone、signals、zoneless、Vitest、ESLint）
+web/                                 Angular 22（standalone、signals、zoneless、Vitest、ESLint）；src/app/core/api/schema.ts 由 OpenAPI 產生；e2e/ Playwright 腳本
 runtime/agent/                       Agent runtime Containerfile
 spikes/pi-rpc-poc/                   技術驗證主控台程式
 ```
@@ -56,6 +56,13 @@ npm install -g @earendil-works/pi-coding-agent@1.0.0
 # 前端（Node 24 LTS；Angular 22 需要 Node >= 22.22.3 或 >= 24.15）
 cd web && npm ci && npm run lint && npm test -- --watch=false && npm run build
 
+# API 契約有變更時（整合測試 OpenApiSnapshotTests 會失敗提醒）
+YMIR_UPDATE_OPENAPI=1 dotnet test --project tests/Ymir.IntegrationTests -- --filter-method "*OpenApiDocument_MatchesCommittedSnapshot*"
+cd web && npm run api:generate
+
+# 端對端驗證（需先啟動 SQL Server、Fake LLM、API（VibeMaker__Harness=Pi）、npm start）
+cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:sprint1 -- <截圖目錄>
+
 # 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
 dotnet run --project src/Ymir.AppHost
 
@@ -72,7 +79,9 @@ Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真
 - **分層**：`Api → *.Infrastructure → 模組核心（Domain + Application）→ Contracts`。Application 層不得直接呼叫 podman、不得解析 Pi 協定（SA §19）。模組之間不得互相參考。
 - **Runtime 與 Harness 分離**：`IAgentRuntimeManager` 只負責「在隔離環境啟動程序並提供 stdio」；Pi 協定全部在 `PiAgentHarness` / `PiRpcEventMapper`（ADR-0003）。
 - **Harness 的事件保證**：每次 run 最後一個事件必定是 `AgentCompleted` / `AgentFailed` / `AgentCancelled`；取消時不拋例外。
-- **SSE 契約**以 `Ymir.VibeMaker.Contracts.Executions` 與 `web/src/app/core/executions/execution-events.ts` 為準，兩邊必須同步修改。
+- **SSE 契約**以 `Ymir.VibeMaker.Contracts.Executions` 與 `web/src/app/core/executions/execution-events.ts` 為準，兩邊必須同步修改。其他 API 型別一律由 OpenAPI 產生，不要手寫 DTO。
+- **Execution**：與 HTTP request 解耦，由 `ExecutionWorker` 背景執行；事件**先寫 `execution_events` 再發佈**；任何結束路徑（完成、失敗、取消、逾時、例外）都必須寫終止事件並推進狀態（`ExecutionRunner`）。
+- **授權預設拒絕**：fallback policy 要求登入；匿名端點必須明確 `AllowAnonymous`。狀態變更端點加 `RequireAntiforgeryHeader()`。新 `/api` 端點必須加入 `AuthorizationMatrixTests`，否則測試失敗。
 - **認證**採 BFF + HttpOnly Cookie（ADR-0002）：前端不得保存 token，SSE 使用原生 `EventSource`。
 - **資料存取**：Application 層透過 `IVibeMakerDbContext`（EF Core DbSet）存取；跨模組只存 id、不建 FK（ADR-0001）。並行規則（同 Conversation 單一執行中、冪等鍵）由 filtered unique index 保證，不要改成先查再寫。
 - **Pi 版本鎖定**在 `runtime/agent/Containerfile` 與 CI；升級時必須重新錄製 `tests/Ymir.UnitTests/Fixtures/pi-rpc/` 並重跑整合測試。

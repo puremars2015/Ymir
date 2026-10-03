@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-03 23:12 ・ 狀態：**🚧 進行中**
+> 最後更新：2026-10-03 23:13 ・ 狀態：**✅ 已完成**
 
 **目標**：打通最細的端到端鏈路 —— Dev 登入 → 建立 Workspace / Conversation → 送訊息 → Container 內的 Pi → SSE 顯示在 Angular。
 之後的 Sprint 只在這條鏈路上「加厚」，不再改結構（[開發規劃](../planning/development-plan.md#修訂後的路線圖)）。
@@ -24,13 +24,47 @@
 | SSE 端點 `/api/executions/{id}/events`（事件持久化、`Last-Event-ID` 續傳） | ✅ | 開發規劃 §5；心跳尚未實作 |
 | Angular：Workspace / Conversation 列表、Chat 頁改用正式 API | ✅ | OpenAPI 產生 TypeScript 型別；見 [#006](#006--s6-angular-正式流程完成done-definition-端對端通過) |
 | 授權矩陣測試（非擁有者 → 403/404） | ✅ | 驗收條件 #2；涵蓋全部 `/api` 端點 |
-| 正式主機用完整 Containerfile 重跑 Podman 驗證 | ⏳ | 從 Sprint 0 移入，見 [Sprint 0 #003](board-sprint-0.md#003--驗證中的發現與環境限制) |
+| 正式主機用完整 Containerfile 重跑 Podman 驗證 | ➡️ 移到 Sprint 2 | 沙箱無法驗證（沒有 bridge 網路、cgroups v1）；需要實際主機 |
 
 **開工前要先有的決定**：無（Sprint 0 [#005](board-sprint-0.md#005--需要決定的四件事) 的四件事影響 Sprint 2～4，不擋 Sprint 1）。
 
 ---
 
 ## 💬 留言區
+
+### #007 · Sprint 1 完成
+
+> 👤 **Claude（AI）** · 🕒 2026-10-03 23:13 · `📢公告`
+
+**Done Definition 達成**：Dev 登入 → 建立 Workspace / 對話 → 送出 `[create-file]` → 串流回應、檔案寫入 Workspace → 重新整理歷史仍在；取消與逾時都會正確結束 execution（[#006](#006--s6-angular-正式流程完成done-definition-端對端通過)）。
+
+| 切片 | 結果 |
+|---|---|
+| S1 資料層 | [#002](#002--s1-資料層完成) |
+| S2 Dev 登入 | [#003](#003--s2-dev-登入cookie--antiforgery完成) |
+| S3 Workspace / Conversation API、授權矩陣 | [#004](#004--s3-workspace--conversation-api-與授權矩陣完成) |
+| S4+S5 Execution pipeline、SSE | [#005](#005--s4s5-execution-pipeline-與-sse-完成) |
+| S6 Angular、OpenAPI 型別 | [#006](#006--s6-angular-正式流程完成done-definition-端對端通過) |
+
+收尾：`CLAUDE.md`（新的架構規則與指令）、`README`、開發規劃都已更新。
+
+**移到後續 Sprint**：
+- 正式主機重跑 Podman 驗證 → Sprint 2（需要實際主機）
+- `POST /api/workspaces/{id}/runtime/stop` → Sprint 4
+- SSE 心跳 → Sprint 3
+
+**GitHub CI**：這個分支還沒開 PR，所以新的 CI 步驟（SQL Server service、型別漂移檢查）尚未在 GitHub 上跑過；開 PR 或合併時會執行。
+
+下一步：[Sprint 2 看板](board-sprint-2.md)。開工前需要先確認**企業 IdP 類型**（[Sprint 0 #005](board-sprint-0.md#005--需要決定的四件事) 第 3 點）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #006 · S6 Angular 正式流程完成，Done Definition 端對端通過
 

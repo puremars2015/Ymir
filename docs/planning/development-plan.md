@@ -116,6 +116,13 @@ SA §19 建議 5 個專案。改為**模組化單體**：每個模組一個「Do
 
 ![Sprint 0 開發用聊天頁](sprint0-dev-chat.png)
 
+## Sprint 1 成果
+
+Walking Skeleton 打通：Dev 登入（Cookie + XSRF）→ Workspace / 對話 → 背景執行 Agent → SSE（可續傳）→ 歷史保存；
+資料庫保證並行規則、授權矩陣涵蓋所有 API、啟動時 reconciliation。紀錄見 [Sprint 1 看板](../progress/board-sprint-1.md)。
+
+![Sprint 1 對話頁](sprint1-chat-history.png)
+
 ---
 
 ## 修訂後的路線圖
