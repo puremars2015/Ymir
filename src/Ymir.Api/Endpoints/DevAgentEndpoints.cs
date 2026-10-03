@@ -20,7 +20,8 @@ internal static class DevAgentEndpoints
     {
         endpoints.MapGet("/api/dev/agent-stream", StreamAsync)
             .WithName("DevAgentStream")
-            .WithSummary("（開發用）執行一次 Agent prompt，並以 SSE 串流 execution 事件。");
+            .WithSummary("（開發用）執行一次 Agent prompt，並以 SSE 串流 execution 事件。")
+            .AllowAnonymous(); // Sprint 1 S5 以正式的 /api/executions/{id}/events 取代後移除
         return endpoints;
     }
 
