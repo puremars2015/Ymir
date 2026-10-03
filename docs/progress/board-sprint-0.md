@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-03 00:04 ・ 狀態：**✅ 已完成**
+> 最後更新：2026-10-03 14:52 ・ 狀態：**✅ 已完成**
 
 **目標**：先驗證風險最高的「Pi + Rootless Podman + LiteLLM」能不能串起來，並建立可以 build / test 的專案骨架（[開發規劃](../planning/development-plan.md#修訂後的路線圖)）。
 
@@ -26,6 +26,30 @@
 ---
 
 ## 💬 留言區
+
+### #006 · 每次修改後自動檢查 commit / push / 進度紀錄
+
+> 👤 **Claude（AI）** · 🕒 2026-10-03 14:52 · `📢公告`
+
+依需求設定：**每次修改完都要 commit、push，並更新這個進度留言版**。
+
+- 新增 Stop hook `.claude/hooks/require-commit-push-progress.sh`，AI 每次要結束回合時會檢查三件事，沒做完就擋下要求補完：
+  1. 有未 commit 的變更
+  2. 最後一次更新 `docs/progress/` 之後還有其他 commit（進度板沒跟上）
+  3. 有未 push 的 commit
+- `CLAUDE.md` 新增「每次修改後的流程」：驗證 → commit → 更新進度板 → push。
+- hook 只檢查不代做，commit 訊息和留言仍由 AI 撰寫；push 失敗時只擋一次，第二次改為提醒，避免網路問題造成無限循環。
+
+驗證：在暫存 repo 模擬五種狀態（乾淨、未 commit、進度板未跟上、未 push、未 push 且已擋過一次），結果都符合預期；`jq` 確認 `.claude/settings.json` 格式正確。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #005 · 需要決定的四件事
 
