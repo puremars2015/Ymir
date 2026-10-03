@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-03 22:48 ・ 狀態：**🚧 進行中**
+> 最後更新：2026-10-03 22:51 ・ 狀態：**🚧 進行中**
 
 **目標**：打通最細的端到端鏈路 —— Dev 登入 → 建立 Workspace / Conversation → 送訊息 → Container 內的 Pi → SSE 顯示在 Angular。
 之後的 Sprint 只在這條鏈路上「加厚」，不再改結構（[開發規劃](../planning/development-plan.md#修訂後的路線圖)）。
@@ -17,7 +17,7 @@
 | 工作項目 | 狀態 | 備註 |
 |---|---|---|
 | EF Core + SQL Server（`platform` / `vibemaker` schema）、migrations、Aspire 加入 SQL Server | ✅ | 資料模型補強見開發規劃 §9；見 [#002](#002--s1-資料層完成) |
-| Dev Authentication Handler（只在 Development）+ `/api/me` | ⏳ | 正式 OIDC 在 Sprint 2（ADR-0002） |
+| Dev Authentication Handler（只在 Development）+ `/api/me` | ✅ | 正式 OIDC 在 Sprint 2（ADR-0002）；見 [#003](#003--s2-dev-登入cookie--antiforgery完成) |
 | Workspace / Conversation / Message API（server 端擁有者檢查） | ⏳ | SA §9 |
 | Execution pipeline：背景 worker、狀態機（QUEUED→RUNNING→終止）、cancel、timeout | ⏳ | SA §14；不要放到 Sprint 5 |
 | `POST /messages` 冪等（`client_request_id`）+ 同 Conversation 只能有一個執行中 | ⏳ | filtered unique index |
@@ -31,6 +31,30 @@
 ---
 
 ## 💬 留言區
+
+### #003 · S2 Dev 登入（Cookie + antiforgery）完成
+
+> 👤 **Claude（AI）** · 🕒 2026-10-03 22:51 · `✅完成`
+
+- 依 ADR-0002 採 HttpOnly、SameSite=Lax 的登入 cookie；API 未登入回 401、無權限回 403（ProblemDetails，帶 `code`），不做 redirect。
+- **所有端點預設都要登入**（fallback policy），只有 health、OpenAPI、Dev 登入明確標成匿名。
+- `POST /api/dev/login`（只在 Development 註冊）、`POST /api/auth/logout`、`GET /api/me`；登入與登出寫入 audit log。
+- Antiforgery：GET `/api/*` 會發 `XSRF-TOKEN` cookie，所有 POST 必須帶 `X-XSRF-TOKEN` header（Angular 會自動處理）。
+- API JSON 的 enum 改成字串（例如 `"role":"User"`）。
+
+驗證：全部 68 個測試 ✅（新增 7 個認證測試：未登入 401 帶 `AUTH_REQUIRED`、重複登入同一使用者、cookie 是 HttpOnly、缺 XSRF header 被擋、登出後 401、空帳號 400、已登入打不存在的路由回 404）；`dotnet format` ✅。
+
+📝 行為變更：未登入時打不存在的路由回 **401** 而不是 404（不讓匿名者探測有哪些路由），測試已更新。
+📝 暫時保留：Sprint 0 的 `/api/dev/agent-stream` 暫時標為匿名，S5 換成正式 SSE 端點時移除。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #002 · S1 資料層完成
 
