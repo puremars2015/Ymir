@@ -82,5 +82,14 @@ Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真
 - 分析器等級 `latest-recommended` 且警告視為錯誤；確實需要壓制時以 `#pragma warning disable` 加上理由。
 - 測試：xUnit v3（`TestContext.Current.CancellationToken`）；外部依賴用 Fake LLM / Scripted harness，不要在測試中呼叫真實模型。
 - Angular：standalone component、signals、`ChangeDetectionStrategy.OnPush`、新的控制流程語法（`@if` / `@for`）；狀態轉換寫成純函式並加上 Vitest 測試。
-- Commit 一次一個垂直切片；改動前後都要跑 build、test、lint。
-- 每次工作結束前，在 `docs/progress/` 目前 Sprint 的看板留言（做了什麼、實際跑過的驗證、卡關與待決定事項），並更新置頂區的工作項目狀態。
+
+## 每次修改後的流程（必做）
+
+任何檔案修改完成後，結束回合前依序完成：
+
+1. **驗證**：跑相關的 build、test、lint，確認通過。
+2. **Commit**：一次一個垂直切片，訊息說明做了什麼與為什麼，結尾附 attribution trailer。
+3. **更新進度紀錄**：在 `docs/progress/` 目前 Sprint 的看板留言（做了什麼、實際跑過的驗證、卡關與待決定事項），更新置頂區的工作項目狀態，然後 commit。
+4. **Push**：`git push -u origin <目前分支>`；網路失敗依 2 / 4 / 8 / 16 秒重試。不要推到其他分支。
+
+`.claude/hooks/require-commit-push-progress.sh`（Stop hook）會在回合結束時檢查：有未 commit 的變更、最後一次更新 `docs/progress/` 之後還有其他 commit、或有未 push 的 commit，都會擋下要求補完。
