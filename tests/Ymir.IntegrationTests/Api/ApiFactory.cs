@@ -3,25 +3,41 @@ using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Ymir.IntegrationTests.Api;
 
-/// <summary>Development 環境 + Scripted harness + Local runtime，不需要 Pi / Podman / LLM。</summary>
-public sealed class ApiFactory : WebApplicationFactory<Program>
+/// <summary>
+/// Development 環境 + 獨立的測試資料庫（啟動時自動 migrate）+ Scripted harness + Local runtime。
+/// 可透過 <see cref="Configure"/> 覆寫設定（例如改用真正的 Pi）。
+/// </summary>
+public class ApiFactory : WebApplicationFactory<Program>
 {
-    private readonly string _workspaceRoot = Path.Combine(Path.GetTempPath(), "ymir-it-" + Guid.NewGuid().ToString("N"));
+    private readonly TestDatabase _database = new();
+
+    public string WorkspaceRoot { get; } = Path.Combine(Path.GetTempPath(), "ymir-it-" + Guid.NewGuid().ToString("N"));
+
+    internal string DatabaseConnectionString => _database.ConnectionString;
+
+    protected virtual void Configure(IWebHostBuilder builder)
+    {
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
+        builder.UseSetting("ConnectionStrings:ymir", _database.ConnectionString);
         builder.UseSetting("VibeMaker:Harness", "Scripted");
         builder.UseSetting("VibeMaker:Runtime:Provider", "Local");
-        builder.UseSetting("VibeMaker:Runtime:WorkspaceRoot", _workspaceRoot);
+        builder.UseSetting("VibeMaker:Runtime:WorkspaceRoot", WorkspaceRoot);
+        Configure(builder);
     }
 
     public override async ValueTask DisposeAsync()
     {
         await base.DisposeAsync();
-        if (Directory.Exists(_workspaceRoot))
+        await _database.DisposeAsync();
+        if (Directory.Exists(WorkspaceRoot))
         {
-            Directory.Delete(_workspaceRoot, recursive: true);
+            Directory.Delete(WorkspaceRoot, recursive: true);
         }
+
+        GC.SuppressFinalize(this);
     }
 }

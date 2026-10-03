@@ -7,6 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.JavaScript" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ymir.Api\Ymir.Api.csproj" />

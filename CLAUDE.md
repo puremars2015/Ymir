@@ -41,18 +41,27 @@ dotnet build Ymir.slnx                    # 警告視為錯誤
 dotnet test --solution Ymir.slnx          # 單元 + 整合測試（Microsoft Testing Platform）
 dotnet test --project tests/Ymir.UnitTests
 
+# 整合測試與本機 API 需要 SQL Server（雲端 session 的啟動 hook 會自動啟動）
+podman run -d --name ymir-sql --network host -e ACCEPT_EULA=Y \
+  -e 'MSSQL_SA_PASSWORD=Ymir_Dev_Passw0rd!' mcr.microsoft.com/mssql/server:2022-latest
+# 測試預設連 localhost,1433；其他位址設定 YMIR_TEST_SQLSERVER（不含 Database，每個 fixture 自建自刪資料庫）
+
+# 新增 migration（每個模組各自一組，schema：platform / vibemaker）
+dotnet tool restore
+dotnet ef migrations add <Name> --project src/Modules/VibeMaker/Ymir.VibeMaker.Infrastructure --context VibeMakerDbContext --output-dir Persistence/Migrations
+
 # Pi 整合測試需要（CI 會安裝）
 npm install -g @earendil-works/pi-coding-agent@1.0.0
 
 # 前端（Node 24 LTS；Angular 22 需要 Node >= 22.22.3 或 >= 24.15）
 cd web && npm ci && npm run lint && npm test -- --watch=false && npm run build
 
-# 本機一鍵啟動（Fake LLM + API + Angular，不需要 container runtime）
+# 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
 dotnet run --project src/Ymir.AppHost
 
 # 個別啟動
 dotnet run --project tests/Ymir.Testing.FakeLlm      # http://127.0.0.1:5199/v1
-dotnet run --project src/Ymir.Api                    # http://localhost:5080（Development：Scripted harness + Local runtime）
+dotnet run --project src/Ymir.Api                    # http://localhost:5080（Development：自動 migrate、Scripted harness、Local runtime）
 cd web && npm start                                  # http://localhost:4200，/api 轉給 5080
 ```
 
@@ -65,6 +74,7 @@ Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真
 - **Harness 的事件保證**：每次 run 最後一個事件必定是 `AgentCompleted` / `AgentFailed` / `AgentCancelled`；取消時不拋例外。
 - **SSE 契約**以 `Ymir.VibeMaker.Contracts.Executions` 與 `web/src/app/core/executions/execution-events.ts` 為準，兩邊必須同步修改。
 - **認證**採 BFF + HttpOnly Cookie（ADR-0002）：前端不得保存 token，SSE 使用原生 `EventSource`。
+- **資料存取**：Application 層透過 `IVibeMakerDbContext`（EF Core DbSet）存取；跨模組只存 id、不建 FK（ADR-0001）。並行規則（同 Conversation 單一執行中、冪等鍵）由 filtered unique index 保證，不要改成先查再寫。
 - **Pi 版本鎖定**在 `runtime/agent/Containerfile` 與 CI；升級時必須重新錄製 `tests/Ymir.UnitTests/Fixtures/pi-rpc/` 並重跑整合測試。
 
 ## 安全紅線（違反即退回）

@@ -21,6 +21,20 @@ jobs:
   backend:
     name: .NET build & test
     runs-on: ubuntu-24.04
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: Ymir_Ci_Passw0rd!
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'Ymir_Ci_Passw0rd!' -Q 'SELECT 1' -b"
+          --health-interval 10s --health-timeout 5s --health-retries 12
+    env:
+      # 整合測試為每個 fixture 建立獨立資料庫（tests/Ymir.IntegrationTests/TestDatabase.cs）
+      YMIR_TEST_SQLSERVER: Server=localhost,1433;User Id=sa;Password=Ymir_Ci_Passw0rd!;TrustServerCertificate=True
     steps:
       - uses: actions/checkout@v5
 
