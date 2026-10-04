@@ -27,3 +27,8 @@ dotnet_diagnostic.CA1848.severity = none
 dotnet_diagnostic.CA1873.severity = none
 # 測試方法名稱使用底線分隔
 dotnet_diagnostic.CA1707.severity = none
+
+# EF Core 產生的 migration：視為產生的程式碼，不套用分析器與風格規則
+[**/Persistence/Migrations/*.cs]
+generated_code = true
+dotnet_analyzer_diagnostic.severity = none

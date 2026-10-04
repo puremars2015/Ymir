@@ -1,9 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\..\Platform\Ymir.Platform\Ymir.Platform.csproj" />
     <ProjectReference Include="..\Ymir.VibeMaker.Contracts\Ymir.VibeMaker.Contracts.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Ymir.UnitTests" />
+    <InternalsVisibleTo Include="Ymir.IntegrationTests" />
   </ItemGroup>
 </Project>

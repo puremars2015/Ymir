@@ -9,12 +9,17 @@
 Angular ──REST/SSE──> .NET 10 API ──> Runtime Manager ──podman exec──> Workspace Container（Pi Agent）──> LiteLLM ──> LLM
 ```
 
-## 目前進度：Sprint 0（技術驗證 + 骨架）✅
+## 目前進度：Sprint 1（Walking Skeleton）✅
+
+以 Dev 帳號登入 → 建立 Workspace / 對話 → 送出訊息 → Agent（Pi）在 Workspace 中執行並即時串流 → 歷史保存，已端對端打通。
+進度與驗證紀錄見 [`docs/progress/`](docs/progress/)。
+
+### Sprint 0（技術驗證 + 骨架）✅
 
 - Pi Agent（RPC 模式）、Rootless Podman、LiteLLM 串接已實測通過，結果見 [`spikes/pi-rpc-poc/README.md`](spikes/pi-rpc-poc/README.md)
 - .NET 10 模組化單體骨架、Angular 22 骨架、單元 / 整合測試、CI
 
-下一步：Sprint 1 Walking Skeleton（Dev 登入 → Workspace / Conversation → Container 內 Pi → SSE），路線圖見 [`docs/planning/development-plan.md`](docs/planning/development-plan.md)。
+下一步：Sprint 2 正式認證（OIDC + BFF），需要先確認企業 IdP 類型；路線圖見 [`docs/planning/development-plan.md`](docs/planning/development-plan.md)。
 
 ## 快速開始
 

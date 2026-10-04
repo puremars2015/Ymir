@@ -43,6 +43,21 @@ if [ "$(pi --version 2>/dev/null || true)" != "${PI_VERSION}" ]; then
   npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@${PI_VERSION}"
 fi
 
+# 開發 / 整合測試用 SQL Server（盡力而為：沙箱沒有 bridge 網路，所以用 host network；失敗不中斷）
+if ! command -v podman >/dev/null 2>&1; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq podman >/dev/null 2>&1 || true
+fi
+if command -v podman >/dev/null 2>&1; then
+  if ! podman container exists ymir-sql 2>/dev/null; then
+    podman run -d --name ymir-sql --network host \
+      -e ACCEPT_EULA=Y -e 'MSSQL_SA_PASSWORD=Ymir_Dev_Passw0rd!' -e MSSQL_PID=Developer \
+      mcr.microsoft.com/mssql/server:2022-latest >/dev/null 2>&1 || echo "warning: SQL Server container failed to start" >&2
+  else
+    podman start ymir-sql >/dev/null 2>&1 || true
+  fi
+fi
+
 # 相依套件
+dotnet tool restore
 dotnet restore Ymir.slnx
 (cd web && npm install --no-audit --no-fund)

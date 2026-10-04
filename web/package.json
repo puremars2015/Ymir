@@ -7,7 +7,9 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "lint": "ng lint"
+    "lint": "ng lint",
+    "api:generate": "npx -y -p typescript@5.9 -p openapi-typescript@7.13.0 openapi-typescript ../src/Ymir.Api/openapi/v1.json -o src/app/core/api/schema.ts && prettier --write src/app/core/api/schema.ts",
+    "e2e:sprint1": "node e2e/sprint1-walking-skeleton.mjs"
   },
   "private": true,
   "packageManager": "npm@11.19.0",
@@ -29,6 +31,7 @@
     "angular-eslint": "22.5.0",
     "eslint": "^10.9.1",
     "jsdom": "^30.0.0",
+    "playwright": "^1.63.0",
     "prettier": "^3.8.1",
     "typescript": "~6.0.2",
     "typescript-eslint": "8.69.0",

@@ -7,7 +7,8 @@
 
 | 看板 | 狀態 | 說明 |
 |---|---|---|
-| [Sprint 1 · Walking Skeleton](board-sprint-1.md) | ⏳ 尚未開始 | Dev 登入 → Workspace / Conversation → Container 內 Pi → SSE |
+| [Sprint 2 · 正式認證](board-sprint-2.md) | ⏳ 等待決定 | 企業帳號登入（OIDC + BFF）、Admin / 帳號停用 |
+| [Sprint 1 · Walking Skeleton](board-sprint-1.md) | ✅ 已完成 | Dev 登入 → Workspace / Conversation → Container 內 Pi → SSE |
 | [Sprint 0 · 技術驗證 + 骨架](board-sprint-0.md) | ✅ 已完成 | Pi / Podman / LiteLLM 實測、.NET 與 Angular 骨架 |
 
 ## 留言規則

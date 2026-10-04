@@ -43,7 +43,7 @@ internal static class Program
 
         var services = new ServiceCollection()
             .AddLogging(logging => logging.AddSimpleConsole(o => o.SingleLine = true).SetMinimumLevel(LogLevel.Information))
-            .AddVibeMakerInfrastructure(configuration, isDevelopment: true)
+            .AddVibeMakerAgentRuntime(configuration, isDevelopment: true)
             .BuildServiceProvider();
         await using var _ = services;
 

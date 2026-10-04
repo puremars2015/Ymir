@@ -30,7 +30,8 @@ public sealed class RuntimeOptions
 
     public int IdleTimeoutMinutes { get; set; } = 30;
 
-    public int ExecutionTimeoutMinutes { get; set; } = 30;
+    /// <summary>單次 Agent execution 逾時（分鐘，可為小數）。</summary>
+    public double ExecutionTimeoutMinutes { get; set; } = 30;
 
     public string PodmanExecutable { get; set; } = "podman";
 }
