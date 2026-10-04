@@ -5,11 +5,11 @@ using Ymir.VibeMaker.Application.Agents;
 using Ymir.VibeMaker.Application.Executions;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Application.Runtime;
+using Ymir.VibeMaker.Infrastructure.Containers;
 using Ymir.VibeMaker.Infrastructure.Dev;
 using Ymir.VibeMaker.Infrastructure.Executions;
 using Ymir.VibeMaker.Infrastructure.Persistence;
 using Ymir.VibeMaker.Infrastructure.PiAgent;
-using Ymir.VibeMaker.Infrastructure.Podman;
 using Ymir.VibeMaker.Infrastructure.Runtime;
 
 namespace Ymir.VibeMaker.Infrastructure;
@@ -43,7 +43,7 @@ public static class VibeMakerInfrastructureExtensions
 
     /// <summary>
     /// 只註冊 Agent runtime 與 harness（PoC 等不需要資料庫的程式使用）。設定：
-    /// <c>VibeMaker:Runtime:Provider</c> = Podman | Local；<c>VibeMaker:Harness</c> = Pi | Scripted。
+    /// <c>VibeMaker:Runtime:Provider</c> = Podman | Docker | Local；<c>VibeMaker:Harness</c> = Pi | Scripted。
     /// Local runtime 沒有隔離，非 Development 環境會拒絕啟動。
     /// </summary>
     public static IServiceCollection AddVibeMakerAgentRuntime(
@@ -59,11 +59,14 @@ public static class VibeMakerInfrastructureExtensions
         {
             case RuntimeProvider.Local when !isDevelopment:
                 throw new InvalidOperationException("VibeMaker:Runtime:Provider=Local has no isolation and is only allowed in Development.");
+            case RuntimeProvider.Local when OperatingSystem.IsWindows():
+                // Local runtime 需要 sh 與 Linux 路徑；Windows 請改用 Provider=Docker（docs/guides/windows-docker.md）。
+                throw new InvalidOperationException("VibeMaker:Runtime:Provider=Local is not supported on Windows; use Provider=Docker.");
             case RuntimeProvider.Local:
                 services.AddSingleton<IAgentRuntimeManager, LocalRuntimeManager>();
                 break;
             default:
-                services.AddSingleton<IAgentRuntimeManager, PodmanRuntimeManager>();
+                services.AddSingleton<IAgentRuntimeManager, ContainerRuntimeManager>();
                 break;
         }
 

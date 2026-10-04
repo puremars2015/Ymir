@@ -6,17 +6,15 @@ using Ymir.VibeMaker.Domain;
 using Ymir.VibeMaker.Infrastructure.Processes;
 using Ymir.VibeMaker.Infrastructure.Runtime;
 
-namespace Ymir.VibeMaker.Infrastructure.Podman;
+namespace Ymir.VibeMaker.Infrastructure.Containers;
 
 /// <summary>
-/// Rootless Podman runtime：一個 workspace 一個長駐 container（主程序 <c>sleep infinity</c>），
-/// Agent 以 <c>podman exec -i</c> 執行（ADR-0003）。
+/// Container runtime（Rootless Podman；開發 / 驗證時可用 Docker，ADR-0005）：一個 workspace 一個長駐 container（主程序 <c>sleep infinity</c>），
+/// Agent 以 <c>exec -i</c> 執行（ADR-0003）。
 /// Sprint 0 狀態只存在記憶體；Sprint 1/4 改存 AGENT_RUNTIME 並加入 idle stop 與 reconciliation。
 /// </summary>
-internal sealed class PodmanRuntimeManager(IOptions<RuntimeOptions> options, ILogger<PodmanRuntimeManager> logger) : IAgentRuntimeManager
+internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, ILogger<ContainerRuntimeManager> logger) : IAgentRuntimeManager
 {
-    private const string ProviderName = "PODMAN";
-
     private readonly RuntimeOptions _options = options.Value;
     private readonly ConcurrentDictionary<Guid, RuntimeInfo> _runtimesByWorkspace = new();
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _workspaceLocks = new();
@@ -35,19 +33,25 @@ internal sealed class PodmanRuntimeManager(IOptions<RuntimeOptions> options, ILo
                 case null:
                     var directories = WorkspaceDirectories.For(_options.WorkspaceRoot, workspaceId);
                     directories.EnsureCreated();
-                    await RunPodmanAsync(PodmanCommandBuilder.BuildRunArguments(_options, workspaceId, runtimeId, directories), cancellationToken)
+                    if (_options.Provider == RuntimeProvider.Docker)
+                    {
+                        await RunContainerCliAsync(ContainerCommandBuilder.BuildDockerPrepareMountsArguments(_options, directories), cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+
+                    await RunContainerCliAsync(ContainerCommandBuilder.BuildRunArguments(_options, workspaceId, runtimeId, directories), cancellationToken)
                         .ConfigureAwait(false);
                     logger.LogInformation("Created runtime container for workspace {WorkspaceId}", workspaceId);
                     break;
                 case "running":
                     break;
                 default:
-                    await RunPodmanAsync(PodmanCommandBuilder.BuildStartArguments(workspaceId), cancellationToken).ConfigureAwait(false);
+                    await RunContainerCliAsync(ContainerCommandBuilder.BuildStartArguments(workspaceId), cancellationToken).ConfigureAwait(false);
                     logger.LogInformation("Started runtime container for workspace {WorkspaceId} (was {State})", workspaceId, state);
                     break;
             }
 
-            var runtime = new RuntimeInfo(runtimeId, workspaceId, ProviderName, PodmanCommandBuilder.ContainerName(workspaceId), _options.Image, RuntimeStatus.Running);
+            var runtime = new RuntimeInfo(runtimeId, workspaceId, ProviderName(), ContainerCommandBuilder.ContainerName(workspaceId), _options.Image, RuntimeStatus.Running);
             _runtimesByWorkspace[workspaceId] = runtime;
             return runtime;
         }
@@ -60,14 +64,14 @@ internal sealed class PodmanRuntimeManager(IOptions<RuntimeOptions> options, ILo
     public async Task StartAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
         var runtime = Find(runtimeId);
-        await RunPodmanAsync(PodmanCommandBuilder.BuildStartArguments(runtime.WorkspaceId), cancellationToken).ConfigureAwait(false);
+        await RunContainerCliAsync(ContainerCommandBuilder.BuildStartArguments(runtime.WorkspaceId), cancellationToken).ConfigureAwait(false);
         _runtimesByWorkspace[runtime.WorkspaceId] = runtime with { Status = RuntimeStatus.Running };
     }
 
     public async Task StopAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
         var runtime = Find(runtimeId);
-        await RunPodmanAsync(PodmanCommandBuilder.BuildStopArguments(runtime.WorkspaceId), cancellationToken).ConfigureAwait(false);
+        await RunContainerCliAsync(ContainerCommandBuilder.BuildStopArguments(runtime.WorkspaceId), cancellationToken).ConfigureAwait(false);
         _runtimesByWorkspace[runtime.WorkspaceId] = runtime with { Status = RuntimeStatus.Stopped };
     }
 
@@ -75,7 +79,7 @@ internal sealed class PodmanRuntimeManager(IOptions<RuntimeOptions> options, ILo
     {
         var runtime = Find(runtimeId);
         // 只移除 container；workspace 與 agent-state 目錄保留（SA §15）。
-        await RunPodmanAsync(PodmanCommandBuilder.BuildRemoveArguments(runtime.WorkspaceId), cancellationToken).ConfigureAwait(false);
+        await RunContainerCliAsync(ContainerCommandBuilder.BuildRemoveArguments(runtime.WorkspaceId), cancellationToken).ConfigureAwait(false);
         _runtimesByWorkspace.TryRemove(runtime.WorkspaceId, out _);
     }
 
@@ -99,8 +103,8 @@ internal sealed class PodmanRuntimeManager(IOptions<RuntimeOptions> options, ILo
         cancellationToken.ThrowIfCancellationRequested();
         var runtime = Find(runtimeId);
         IRuntimeProcess process = HostProcess.Start(
-            _options.PodmanExecutable,
-            PodmanCommandBuilder.BuildExecArguments(runtime.WorkspaceId, spec),
+            _options.ResolvedExecutable,
+            ContainerCommandBuilder.BuildExecArguments(runtime.WorkspaceId, spec),
             workingDirectory: null,
             environment: spec.Environment);
         return Task.FromResult(process);
@@ -108,24 +112,24 @@ internal sealed class PodmanRuntimeManager(IOptions<RuntimeOptions> options, ILo
 
     private async Task<string?> InspectAsync(Guid workspaceId, CancellationToken cancellationToken)
     {
-        var (exitCode, output, _) = await ExecutePodmanAsync(PodmanCommandBuilder.BuildInspectStatusArguments(workspaceId), cancellationToken)
+        var (exitCode, output, _) = await ExecuteContainerCliAsync(ContainerCommandBuilder.BuildInspectStatusArguments(workspaceId), cancellationToken)
             .ConfigureAwait(false);
         return exitCode == 0 ? output.Trim() : null;
     }
 
-    private async Task RunPodmanAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    private async Task RunContainerCliAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
-        var (exitCode, _, error) = await ExecutePodmanAsync(arguments, cancellationToken).ConfigureAwait(false);
+        var (exitCode, _, error) = await ExecuteContainerCliAsync(arguments, cancellationToken).ConfigureAwait(false);
         if (exitCode != 0)
         {
-            logger.LogError("podman {Command} failed ({ExitCode}): {Error}", arguments[0], exitCode, error);
-            throw new InvalidOperationException($"podman {arguments[0]} failed with exit code {exitCode}.");
+            logger.LogError("{Cli} {Command} failed ({ExitCode}): {Error}", _options.ResolvedExecutable, arguments[0], exitCode, error);
+            throw new InvalidOperationException($"{_options.ResolvedExecutable} {arguments[0]} failed with exit code {exitCode}.");
         }
     }
 
-    private async Task<(int ExitCode, string Output, string Error)> ExecutePodmanAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
+    private async Task<(int ExitCode, string Output, string Error)> ExecuteContainerCliAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {
-        var process = HostProcess.Start(_options.PodmanExecutable, arguments, workingDirectory: null, environment: null);
+        var process = HostProcess.Start(_options.ResolvedExecutable, arguments, workingDirectory: null, environment: null);
         await using (process.ConfigureAwait(false))
         {
             process.CloseStandardInput();
@@ -135,6 +139,8 @@ internal sealed class PodmanRuntimeManager(IOptions<RuntimeOptions> options, ILo
             return (exitCode, output, process.GetStandardErrorTail());
         }
     }
+
+    private string ProviderName() => _options.Provider == RuntimeProvider.Docker ? "DOCKER" : "PODMAN";
 
     private RuntimeInfo Find(Guid runtimeId) =>
         _runtimesByWorkspace.Values.FirstOrDefault(r => r.RuntimeId == runtimeId)

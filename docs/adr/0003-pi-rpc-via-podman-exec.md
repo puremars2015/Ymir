@@ -44,7 +44,7 @@ SA §23 把「Pi 的實際啟動 / Session / streaming protocol」列為待確�
    | 程序異常結束、`stopReason = error` | `execution.failed` |
 
 7. Container 內設定 `PI_OFFLINE=1`、`PI_SKIP_VERSION_CHECK=1`、`PI_TELEMETRY=0`，避免對外連線；Pi 版本在 image 內鎖定。
-8. .NET 端以 `System.Diagnostics.Process` 呼叫 podman CLI（互動式 stdin/stdout 直接用 Process 最單純），封裝在 `PodmanRuntimeManager`；Application 層只看到 `IAgentRuntimeManager` / `IAgentHarness`。
+8. .NET 端以 `System.Diagnostics.Process` 呼叫 podman CLI（互動式 stdin/stdout 直接用 Process 最單純），封裝在 `ContainerRuntimeManager`（開發 / 驗證時也可用 Docker，見 [ADR-0005](0005-docker-for-development.md)）；Application 層只看到 `IAgentRuntimeManager` / `IAgentHarness`。
 9. **與 SA §6.3 的介面差異**：`IAgentRuntimeManager.ExecuteAsync` 改為 `StartProcessAsync(runtimeId, RuntimeProcessSpec)`。Runtime Manager 只負責「在隔離環境啟動程序並提供 stdio」，Pi 協定完全由 `IAgentHarness`（`PiAgentHarness`）處理，兩者可以分別替換（例如 Kubernetes runtime + Pi，或 Podman + 其他 harness）。
 10. 開發用 `LocalRuntimeManager` 直接在 host 執行（無隔離），只允許 Development 環境，用於整合測試與沒有 Podman 的開發機。
 

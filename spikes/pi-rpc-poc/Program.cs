@@ -9,7 +9,7 @@ using Ymir.VibeMaker.Infrastructure;
 namespace Ymir.Spikes.PiRpcPoc;
 
 /// <summary>
-/// Sprint 0 技術驗證：Runtime（Local / Podman）→ Pi RPC → 模型端點，印出映射後的 SSE 事件。
+/// Sprint 0 技術驗證：Runtime（Local / Podman / Docker）→ Pi RPC → 模型端點，印出映射後的 SSE 事件。
 /// 用法見 spikes/pi-rpc-poc/README.md。
 /// </summary>
 internal static class Program
@@ -112,7 +112,7 @@ internal static class Program
         string ApiKey,
         string WorkspaceRoot,
         string Image,
-        string Network,
+        string? Network,
         Guid WorkspaceId,
         Guid SessionId,
         List<string> Prompts)
@@ -142,7 +142,7 @@ internal static class Program
                 ApiKey: Value("--api-key") ?? Environment.GetEnvironmentVariable("LITELLM_API_KEY") ?? "dev-key",
                 WorkspaceRoot: Value("--workspace-root") ?? Path.Combine(Path.GetTempPath(), "ymir-poc-workspaces"),
                 Image: Value("--image") ?? "localhost/ymir/agent-runtime:dev",
-                Network: Value("--network") ?? "slirp4netns",
+                Network: Value("--network"),
                 WorkspaceId: Guid.TryParse(Value("--workspace"), out var workspaceId) ? workspaceId : DefaultWorkspaceId,
                 SessionId: Guid.TryParse(Value("--session"), out var sessionId) ? sessionId : DefaultSessionId,
                 Prompts: prompts);
