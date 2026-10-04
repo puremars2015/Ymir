@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-04 10:14 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-04 18:02 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -20,13 +20,55 @@
 | Admin API：使用者列表、停用 / 啟用、角色設定（寫 audit） | ⏳ | SA §4 |
 | Angular：企業帳號登入按鈕、Admin 使用者管理頁 | ⏳ | |
 | 授權矩陣加入角色維度（User 不能呼叫 Admin API） | ⏳ | |
-| 正式主機用完整 Containerfile 重跑 Podman 驗證 | ⏳ | 從 Sprint 1 移入；需要實際主機（見 [runtime/agent/README](../../runtime/agent/README.md#手動驗證)） |
+| Docker 作為開發 / 驗證用 runtime（Windows Docker Desktop） | ✅ | ADR-0005；見 [#003](#003--新增-docker-runtime可用-windows-docker-desktop-開發與驗證) |
+| 使用者在 Windows 上依指南實機驗證 | ⏳ | [docs/guides/windows-docker.md](../guides/windows-docker.md) 第 6 節驗證清單 |
+| 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
 **開工前要先有的決定**：企業 IdP 類型（Entra ID / ADFS / 純 LDAP）與測試用的 App 註冊資訊（client id、redirect URI）。
 
 ---
 
 ## 💬 留言區
+
+### #003 · 新增 Docker runtime，可用 Windows Docker Desktop 開發與驗證
+
+> 👤 **Claude（AI）** · 🕒 2026-10-04 18:02 · `✅完成`
+
+回覆 [#001](#001--sprint-2-看板開張) 第 3 點：目前沒有 Linux 主機，改用 **Windows 上的 Docker** 代替做開發與驗證；**正式環境仍是 Rootless Podman**（[ADR-0005](../adr/0005-docker-for-development.md)）。
+
+- `VibeMaker:Runtime:Provider` 新增 `Docker`（`Podman` / `Docker` / `Local`），兩種 container engine 共用同一套程式與安全設定。
+- 差異只有使用者對應：Podman 用 `keep-id`；Docker 用 `--user 1000:1000`，建立 container 前以一次性 container（不連網路、只掛兩個目錄）把掛載目錄改成 uid 1000。
+- 掛載改用 `--mount`，Windows 路徑（`C:\...`）不會被冒號誤判。
+- Windows 上不能用 `Local` runtime（需要 `sh`），API 會拒絕啟動並提示改用 `Docker`。
+- 新增 [Windows 指南](../guides/windows-docker.md)：SQL Server、image、Fake LLM、API 設定、驗證清單、疑難排解。
+
+**沙箱實測（Docker 29.6.2，PoC 走 Docker provider）**：
+| 項目 | 結果 |
+|---|---|
+| Agent 在 Workspace 建立檔案 | ✅ 檔案擁有者 uid 1000 |
+| 同一對話續接 | ✅ 收到第 2 則使用者訊息 |
+| Container 刪除重建後續接 | ✅ 收到第 3 則 |
+| 安全設定 | ✅ `User=1000:1000`、唯讀 root fs、`CapDrop=[ALL]`、`no-new-privileges`、`--init` |
+| 資源限制 | ✅ `PidsLimit=512`、`Memory=2GiB`、`NanoCpus=1e9`（root daemon 有套用） |
+| Workspace 隔離 | ✅ 另一個 Workspace 看不到檔案 |
+| Podman 回歸（改用 `--mount` 後） | ✅ rootless Podman 仍可建檔 |
+
+⚠️ 實測中發現並修正：Docker 沒有 `keep-id`，第一次跑時 container 內的 agent 無法寫入 `/agent-state`（Permission denied）→ 加上 chown 步驟後通過。
+⚠️ 另一個發現：雲端 session 重啟後，podman 仍顯示 SQL Server container 為 Up 但程序已不在，造成整合測試全部連不上 → 啟動 hook 改為以 1433 port 判斷並重啟。
+
+驗證：全部 94 個測試 ✅（單元 55：兩種 engine 的安全旗標、chown 輔助 container；整合 39）、`dotnet format` ✅。
+
+📝 沒驗證到（Docker 本質上做不到）：rootless、`keep-id`、SELinux、正式主機 cgroups delegation。
+💡 建議：在 WSL 2 Ubuntu 裡裝 Podman，就能在不需要額外主機的情況下驗證 rootless Podman。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #002 · Sprint 1 合併到 main，GitHub CI 全綠
 
