@@ -63,6 +63,11 @@ dist/
 coverage/
 *.tsbuildinfo
 
+# Cloudflare Tunnel 憑證（ADR-0006）
+deploy/cloudflared/config.yml
+deploy/cloudflared/*.json
+cert.pem
+
 # IDE
 .vs/
 .idea/

@@ -1,0 +1,21 @@
+# Cloudflare Tunnel（Named tunnel）設定範本，ADR-0006；步驟見 docs/guides/cloudflare-tunnel.md。
+# 複製成 config.yml 後替換 <TUNNEL-UUID> 與 ymir.example.com。
+# 憑證檔（<TUNNEL-UUID>.json、cert.pem）不得放進版控（.gitignore 已排除）。
+
+tunnel: <TUNNEL-UUID>
+# Windows：C:\Users\<帳號>\.cloudflared\<TUNNEL-UUID>.json；Linux：/etc/cloudflared/<TUNNEL-UUID>.json
+credentials-file: /etc/cloudflared/<TUNNEL-UUID>.json
+
+ingress:
+  # health check 只給本機監控使用，不對外。
+  - hostname: ymir.example.com
+    path: ^/(health|alive)$
+    service: http_status:404
+
+  # API 同時提供 Angular build（Ymir:Web:RootPath）與 /api，單一同源入口（ADR-0002）。
+  # 用 127.0.0.1 而不是 localhost：API 只信任 loopback 送來的 X-Forwarded-*（Ymir:PublicEdge:KnownProxies）。
+  - hostname: ymir.example.com
+    service: http://127.0.0.1:5080
+
+  # 其他主機名稱一律拒絕。
+  - service: http_status:404
