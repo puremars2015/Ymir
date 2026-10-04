@@ -1,7 +1,8 @@
 # Agent Runtime Image
 
 每個 Workspace 一個長駐 container，API 以 `podman exec -i` 啟動 `pi --mode rpc`（[ADR-0003](../../docs/adr/0003-pi-rpc-via-podman-exec.md)）。
-參數的唯一來源是 `src/Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/Podman/PodmanCommandBuilder.cs`，並有單元測試保護。
+參數的唯一來源是 `src/Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/Containers/ContainerCommandBuilder.cs`，並有單元測試保護。
+正式環境使用 Rootless Podman；沒有 Linux 主機時可以用 Docker 開發與驗證（[ADR-0005](../../docs/adr/0005-docker-for-development.md)、[Windows 指南](../../docs/guides/windows-docker.md)）。
 
 ## 建置
 
@@ -31,7 +32,7 @@ Host 路徑只由 workspace id 推導（`WorkspaceDirectories`），API 不接�
 | `--read-only` + tmpfs | root filesystem 唯讀，只有 `/workspace`、`/agent-state`、tmpfs 可寫 |
 | `--pids-limit`、`--memory`、`--cpus` | 資源限制（**需要 cgroups v2 + delegation，見下方**） |
 | `--init` | `sleep infinity` 不處理 SIGTERM；用 catatonit 當 PID 1，`podman stop` 才能立即結束 |
-| 不掛載 podman socket、不使用 `--privileged` | 由單元測試 `PodmanCommandBuilderTests` 檢查 |
+| 不掛載 container runtime socket、不使用 `--privileged` | 由單元測試 `ContainerCommandBuilderTests` 檢查 |
 | `podman exec --env NAME`（只傳名稱） | LiteLLM key 不會出現在 host 的 `ps` 輸出 |
 
 ## 部署主機需求（Sprint 0 驗證後的發現）
@@ -45,7 +46,7 @@ Host 路徑只由 workspace id 推導（`WorkspaceDirectories`），API 不接�
    ```
 
    驗證：`podman info --format '{{.Host.CgroupsVersion}} {{.Host.CgroupControllers}}'` 應顯示 `v2` 且包含 `memory pids cpu`。
-   Sprint 4 會在 `PodmanRuntimeManager` 啟動時檢查並拒絕在不支援的主機上執行。
+   Sprint 4 會在 `ContainerRuntimeManager` 啟動時檢查並拒絕在不支援的主機上執行。
 2. **網路**：rootless 預設 `slirp4netns`（或 Podman 5 的 `pasta`），需要 `/dev/net/tun`。Container 必須能連到 LiteLLM；
    LiteLLM 若在同一台主機，使用 `host.containers.internal`，或改用專用的 Podman network。
 3. **套件下載**：Agent 執行 `npm install` / `pip install` 需要對外或內部鏡像（見開發規劃「開發前待確認項目」）。

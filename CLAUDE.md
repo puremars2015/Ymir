@@ -22,7 +22,7 @@ src/
   Ymir.ServiceDefaults/              OpenTelemetry、health check
   Platform/Ymir.Platform[.Infrastructure]/         共用核心：使用者、身份（ICurrentUser）、稽核；schema platform
   Modules/VibeMaker/Ymir.VibeMaker/                Domain/（實體、狀態機）+ Application/（Workspaces、Conversations、Executions 用例；IAgentHarness、IAgentRuntimeManager、IModelGateway）
-  Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/ Persistence/（EF Core，schema vibemaker）、Executions/（背景 worker、事件 bus）、PiAgent/、Podman/、Runtime/（Local，開發用）、Dev/（Scripted harness）
+  Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/ Persistence/（EF Core，schema vibemaker）、Executions/（背景 worker、事件 bus）、PiAgent/、Containers/（Podman / Docker）、Runtime/（Local，開發用）、Dev/（Scripted harness）
   Modules/VibeMaker/Ymir.VibeMaker.Contracts/      API DTO、SSE 事件契約
 tests/
   Ymir.UnitTests/                    含 Fixtures/pi-rpc/：Pi 1.0.0 的真實 RPC 錄製
@@ -74,6 +74,8 @@ cd web && npm start                                  # http://localhost:4200，/
 
 Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真正的 Pi：設定 `VibeMaker__Harness=Pi` 並啟動 Fake LLM。
 
+Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用於開發 / 驗證，例如 Windows，ADR-0005；指南 `docs/guides/windows-docker.md`）| `Local`（Linux / macOS 開發用，無隔離）。
+
 ## 架構規則
 
 - **分層**：`Api → *.Infrastructure → 模組核心（Domain + Application）→ Contracts`。Application 層不得直接呼叫 podman、不得解析 Pi 協定（SA §19）。模組之間不得互相參考。
@@ -90,7 +92,7 @@ Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真
 
 - 所有 Workspace / Conversation / Message / Execution API 必須在 server 端驗證擁有者；不得信任前端傳入的 user id（SA §12）。新 API 必須加入授權矩陣測試。
 - Host 路徑只能由 workspace id 推導（`WorkspaceDirectories`）；API 不接受任何外部傳入的路徑。讀取 workspace 檔案時必須解析 realpath 並拒絕 `..` 與 symlink 逃逸。
-- Container 不得 `--privileged`、不得掛載 podman socket 或 host 敏感路徑；改動 `PodmanCommandBuilder` 時同步更新 `PodmanCommandBuilderTests`。
+- Container 不得 `--privileged`、不得掛載 container runtime socket 或 host 敏感路徑；改動 `ContainerCommandBuilder` 時同步更新 `ContainerCommandBuilderTests`（Podman 與 Docker 兩種 engine 都要符合）。
 - Container 內不得出現 LiteLLM master key、DB 連線字串或 AD 憑證（ADR-0004）。環境變數以 `podman exec --env NAME` 傳遞，值不得出現在程序參數。
 - 回給瀏覽器的錯誤與 tool 事件只能是摘要：不得含 stack trace、host path、token、完整 command output（SA §10、§12）。原始細節只寫 server log。
 - `LocalRuntimeManager` 沒有隔離，只允許 Development 環境（DI 會在其他環境拒絕啟動）。

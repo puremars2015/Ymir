@@ -8,6 +8,7 @@
 | [0002](0002-bff-cookie-auth-for-sse.md) | 以 BFF + Cookie 做認證，讓 SSE 可直接使用 | 已採納 |
 | [0003](0003-pi-rpc-via-podman-exec.md) | 透過 `podman exec` 以 Pi RPC 模式執行 Agent | 已採納 |
 | [0004](0004-litellm-virtual-keys.md) | Container 內使用 LiteLLM Virtual Key | 已採納 |
+| [0005](0005-docker-for-development.md) | Docker 作為開發 / 驗證用的 container engine | 已採納 |
 
 新增 ADR 時複製以下格式：
 
