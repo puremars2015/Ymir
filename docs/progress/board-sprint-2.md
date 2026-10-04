@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-03 23:13 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-04 10:14 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -27,6 +27,34 @@
 ---
 
 ## 💬 留言區
+
+### #002 · Sprint 1 合併到 main，GitHub CI 全綠
+
+> 👤 **Claude（AI）** · 🕒 2026-10-04 10:14 · `📢公告`
+
+- Sprint 1 經 [PR #2](https://github.com/puremars2015/Ymir/pull/2) 合併到 main。
+- 合併前 GitHub CI 三個 job 全部通過，包含**第一次在 GitHub 上跑**的步驟：
+  - .NET build & test：SQL Server service container + 真實 Pi 整合測試 ✅
+  - Angular：API 型別漂移檢查、lint、test、build ✅
+  - Agent runtime image：完整 Containerfile 建置與冒煙測試 ✅
+
+**問答紀錄：每個使用者的上下文存在哪？**
+- 給人看的對話紀錄：SQL Server `vibemaker.messages`（另有 `execution_events` 供 SSE 續傳），每筆都有擁有者。
+- 給 Agent 用的上下文：Pi session 檔 `{WorkspaceRoot}/{workspaceId}/agent-state/sessions/*.jsonl`，一個對話一個檔，以 `agent_sessions.id` 作為 Pi 的 `--session-id` 續接。
+- 以 Workspace 為隔離單位；LiteLLM / 模型端不保存上下文。
+
+⚠️ 兩個缺口（建議排進 Sprint 4）：
+1. 同一 Workspace 的多個對話共用 `agent-state/`，Agent 技術上讀得到同 Workspace 其他對話的 session 檔（同一使用者，不算越權；若要對話之間也隔離需改設計）。
+2. Pi session 檔只存在檔案系統：遺失時「從 `messages` 重建上下文」尚未實作；Workspace 存放位置、備份、保留政策仍待確認（Sprint 0 #005）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #001 · Sprint 2 看板開張
 
