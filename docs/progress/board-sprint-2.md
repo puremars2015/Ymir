@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-05 14:22 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-05 15:36 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -33,6 +33,25 @@
 ---
 
 ## 💬 留言區
+
+### #007 · 左上角品牌改為「Web-Pro Ymir」
+
+> 👤 **Claude（AI）** · 🕒 2026-10-05 15:36 · `✅完成`
+
+依使用者要求，左上角原本顯示「Ymir · Vibe Maker」，現在改為 **Web-Pro Ymir**（Web-Pro 用強調色）。側邊欄與手機版頂列兩處都已更新。瀏覽器分頁標題與登入頁標題這次**沒有改**，仍是 Vibe Maker。
+
+**驗證（實際跑過）**
+- 前端：`npm run lint`、`npm test`（20 項）、`npm run build` 都通過。
+- 啟動 API（Development）與 ng serve，用 Playwright 登入後讀取畫面，側邊欄與手機頂列都顯示 `Web-Pro Ymir`。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #006 · 架構改為一人一 container、專案、ChatGPT 式介面
 
