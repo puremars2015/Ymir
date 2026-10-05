@@ -1,4 +1,5 @@
-# Cloudflare Tunnel（Named tunnel）設定範本，ADR-0006；步驟見 docs/guides/cloudflare-tunnel.md。
+# Cloudflare Tunnel（Named tunnel，方式 B：本機設定檔）範本，ADR-0006；步驟見 docs/guides/cloudflare-tunnel.md。
+# Token 模式（dashboard 管理 ingress）請改用同目錄的 compose.yml。
 # 複製成 config.yml 後替換 <TUNNEL-UUID> 與 ymir.example.com。
 # 憑證檔（<TUNNEL-UUID>.json、cert.pem）不得放進版控（.gitignore 已排除）。
 
@@ -7,7 +8,7 @@ tunnel: <TUNNEL-UUID>
 credentials-file: /etc/cloudflared/<TUNNEL-UUID>.json
 
 ingress:
-  # health check 只給本機監控使用，不對外。
+  # health check 只給本機監控使用，不對外（API 端也會擋，這裡是第二層）。
   - hostname: ymir.example.com
     path: ^/(health|alive)$
     service: http_status:404

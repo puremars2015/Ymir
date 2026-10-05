@@ -1,0 +1,19 @@
+# Token 模式（Cloudflare dashboard 管理 ingress）的 cloudflared container，ADR-0006；步驟見 docs/guides/cloudflare-tunnel.md。
+#   cd deploy/cloudflared && docker compose up -d
+# TUNNEL_TOKEN 從同目錄的 .env 讀取（.gitignore 已排除）；以環境變數傳入，不出現在程序參數（ps）中。
+services:
+  cloudflared:
+    # 固定版本，不用 latest；升級前先跑指南第 6 節的驗證清單。
+    image: cloudflare/cloudflared:2026.9.3
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?請在 deploy/cloudflared/.env 設定 TUNNEL_TOKEN}
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # Windows / macOS（Docker Desktop）：dashboard 的 Public Hostname service 填 http://host.docker.internal:5080，
+    #   API 綁 127.0.0.1 即可，Docker Desktop 轉送後 API 看到的來源是 loopback（預設 KnownProxies）。
+    # Linux：改用 network_mode: host，service 填 http://127.0.0.1:5080。
+    extra_hosts:
+      - host.docker.internal:host-gateway
