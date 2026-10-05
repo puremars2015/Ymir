@@ -1,13 +1,16 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Ymir.VibeMaker.Application.Agents;
 using Ymir.VibeMaker.Application.Executions;
+using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Infrastructure.Containers;
 using Ymir.VibeMaker.Infrastructure.Dev;
 using Ymir.VibeMaker.Infrastructure.Executions;
+using Ymir.VibeMaker.Infrastructure.LiteLlm;
 using Ymir.VibeMaker.Infrastructure.Persistence;
 using Ymir.VibeMaker.Infrastructure.PiAgent;
 using Ymir.VibeMaker.Infrastructure.Runtime;
@@ -53,6 +56,7 @@ public static class VibeMakerInfrastructureExtensions
     {
         services.Configure<RuntimeOptions>(configuration.GetSection(RuntimeOptions.SectionName));
         services.Configure<PiAgentOptions>(configuration.GetSection(PiAgentOptions.SectionName));
+        AddModelGateway(services, configuration, isDevelopment);
 
         var runtimeProvider = configuration.GetSection(RuntimeOptions.SectionName).GetValue(nameof(RuntimeOptions.Provider), RuntimeProvider.Podman);
         switch (runtimeProvider)
@@ -81,6 +85,47 @@ public static class VibeMakerInfrastructureExtensions
         }
 
         return services;
+    }
+
+    /// <summary>
+    /// 模型金鑰（ADR-0004）：設定了 <c>VibeMaker:LiteLlm:MasterKey</c> 就為每位使用者發 LiteLLM virtual key；
+    /// 沒設定時只有 Development 可以退回固定的開發用 key，其他環境拒絕啟動（避免把 master key 當成共用 key 塞進 container）。
+    /// </summary>
+    private static void AddModelGateway(IServiceCollection services, IConfiguration configuration, bool isDevelopment)
+    {
+        var section = configuration.GetSection(LiteLlmOptions.SectionName);
+        services.Configure<LiteLlmOptions>(section);
+        services.Configure<ModelCredentialOptions>(section);
+        // 沒有設定 AllowedModels 時只允許 Pi 使用的模型，不發出不限模型的 key。
+        var piModel = configuration.GetSection(PiAgentOptions.SectionName).GetValue(nameof(PiAgentOptions.ModelId), new PiAgentOptions().ModelId)!;
+        services.PostConfigure<ModelCredentialOptions>(options =>
+        {
+            if (options.AllowedModels.Count == 0)
+            {
+                options.AllowedModels.Add(piModel);
+            }
+        });
+        services.TryAddSingleton(TimeProvider.System);
+
+        var liteLlm = section.Get<LiteLlmOptions>() ?? new LiteLlmOptions();
+        if (liteLlm.IsConfigured)
+        {
+            if (liteLlm.BaseUrl is null)
+            {
+                throw new InvalidOperationException("VibeMaker:LiteLlm:BaseUrl is required when MasterKey is configured.");
+            }
+
+            services.AddHttpClient<IModelGateway, LiteLlmModelGateway>(LiteLlmModelGateway.HttpClientName);
+            return;
+        }
+
+        var harness = configuration.GetValue("VibeMaker:Harness", HarnessKind.Pi);
+        if (!isDevelopment && harness == HarnessKind.Pi)
+        {
+            throw new InvalidOperationException("VibeMaker:LiteLlm:MasterKey and BaseUrl are required outside Development (per-user virtual keys, ADR-0004).");
+        }
+
+        services.AddSingleton<IModelGateway, DevelopmentModelGateway>();
     }
 }
 

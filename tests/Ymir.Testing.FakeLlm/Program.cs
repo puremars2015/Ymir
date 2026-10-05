@@ -14,8 +14,10 @@ internal static class FakeLlmProgram
             ? args[urlIndex + 1]
             : Environment.GetEnvironmentVariable("ASPNETCORE_URLS")?.Split(';')[0] ?? "http://127.0.0.1:5199";
 
-        await using var server = await FakeLlmServer.StartAsync(url);
-        Console.WriteLine($"Fake LLM listening on {server.BaseUrl} (model: {FakeLlmEndpoints.ModelId})");
+        // 設定 FAKE_LLM_MASTER_KEY 時模擬 LiteLLM 的 virtual key 管理（ADR-0004 的本機驗證）。
+        var masterKey = Environment.GetEnvironmentVariable("FAKE_LLM_MASTER_KEY");
+        await using var server = await FakeLlmServer.StartAsync(url, masterKey);
+        Console.WriteLine($"Fake LLM listening on {server.BaseUrl} (model: {FakeLlmEndpoints.ModelId}, key management: {(masterKey is null ? "off" : "on")})");
 
         var done = new TaskCompletionSource();
         Console.CancelKeyPress += (_, e) =>

@@ -42,7 +42,7 @@ internal sealed class PiAgentHarness(
         await pump.ConfigureAwait(false);
     }
 
-    internal RuntimeProcessSpec BuildProcessSpec(AgentRunRequest request, string apiKey) =>
+    internal RuntimeProcessSpec BuildProcessSpec(AgentRunRequest request) =>
         new(
             _options.Executable,
             [
@@ -58,7 +58,7 @@ internal sealed class PiAgentHarness(
                 ["PI_OFFLINE"] = "1",
                 ["PI_SKIP_VERSION_CHECK"] = "1",
                 ["PI_TELEMETRY"] = "0",
-                [PiRuntimeLayout.ApiKeyEnvironmentVariable] = apiKey,
+                [PiRuntimeLayout.ApiKeyEnvironmentVariable] = request.ModelApiKey,
             },
             // 專案目錄或未分組對話自己的目錄（ADR-0007）；Pi 的檔案工具以此為根。
             request.WorkingDirectory);
@@ -74,9 +74,8 @@ internal sealed class PiAgentHarness(
         {
             await EnsureConfigProvisionedAsync(request.RuntimeId, cancellationToken).ConfigureAwait(false);
 
-            // Sprint 4 起改由 IModelGateway 發放每個 runtime 專屬的 virtual key（ADR-0004）。
-            var apiKey = _options.DevelopmentApiKey ?? "not-configured";
-            process = await runtimeManager.StartProcessAsync(request.RuntimeId, BuildProcessSpec(request, apiKey), cancellationToken)
+            // 使用者的 LiteLLM virtual key（ADR-0004），由 ExecutionRunner 經 IModelGateway 取得；只以環境變數名稱傳入 runtime。
+            process = await runtimeManager.StartProcessAsync(request.RuntimeId, BuildProcessSpec(request), cancellationToken)
                 .ConfigureAwait(false);
             var stdin = process.StandardInput;
 

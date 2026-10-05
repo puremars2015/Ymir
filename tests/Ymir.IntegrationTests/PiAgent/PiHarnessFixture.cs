@@ -13,6 +13,9 @@ namespace Ymir.IntegrationTests.PiAgent;
 /// </summary>
 public sealed class PiHarnessFixture : IAsyncLifetime
 {
+    /// <summary>直接呼叫 harness 時使用的模型金鑰（Fake LLM 不驗證）。</summary>
+    public const string ModelApiKey = "integration-test-key";
+
     public string WorkspaceRoot { get; } = Path.Combine(Path.GetTempPath(), "ymir-pi-it-" + Guid.NewGuid().ToString("N"));
 
     public FakeLlmServer FakeLlm { get; private set; } = null!;
@@ -36,7 +39,7 @@ public sealed class PiHarnessFixture : IAsyncLifetime
             {
                 ModelBaseUrl = FakeLlm.BaseUrl,
                 ModelId = FakeLlmEndpoints.ModelId,
-                DevelopmentApiKey = "integration-test-key",
+                DevelopmentApiKey = ModelApiKey,
                 AutoRetry = autoRetry,
                 AbortGracePeriod = TimeSpan.FromSeconds(5),
             }),

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Ymir.Platform.Auditing;
 using Ymir.VibeMaker.Application.Agents;
+using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
@@ -18,6 +19,7 @@ public sealed class ExecutionRunner(
     IVibeMakerDbContext db,
     IAgentRuntimeManager runtimeManager,
     IAgentHarness harness,
+    RuntimeCredentialService credentials,
     ExecutionEventWriter eventWriter,
     IExecutionCancellationRegistry cancellations,
     UserExecutionLocks userLocks,
@@ -67,12 +69,15 @@ public sealed class ExecutionRunner(
         var executionId = execution.Id;
         RuntimeInfo runtime;
         AgentSession session;
+        RuntimeModelCredential credential;
         try
         {
             await AppendAsync(executionId, new StatusEvent("正在準備 Runtime"), stoppingToken).ConfigureAwait(false);
             runtime = await runtimeManager.EnsureRuntimeAsync(execution.UserId, runToken).ConfigureAwait(false);
             await RecordRuntimeAsync(runtime, stoppingToken).ConfigureAwait(false);
             session = await GetOrCreateSessionAsync(execution, runtime, stoppingToken).ConfigureAwait(false);
+            // 使用者的 LiteLLM virtual key（ADR-0004）：只放進 Agent 程序的環境變數，container 內不會有 master key。
+            credential = await credentials.GetAsync(execution.UserId, runtime.RuntimeId, runToken).ConfigureAwait(false);
 
             execution.Start(session.Id, runtime.RuntimeId, timeProvider.GetUtcNow());
             await db.SaveChangesAsync(stoppingToken).ConfigureAwait(false);
@@ -87,6 +92,12 @@ public sealed class ExecutionRunner(
             await FinishAsync(execution, timeout.IsCancellationRequested
                 ? new AgentFailed(ExecutionErrorCodes.AgentTimeout, "執行超過時間限制。")
                 : new AgentCancelled(string.Empty), stoppingToken).ConfigureAwait(false);
+            return;
+        }
+        catch (ModelCredentialException ex) when (!stoppingToken.IsCancellationRequested)
+        {
+            logger.LogError(ex, "Failed to obtain model credential for execution {ExecutionId}", executionId);
+            await FinishAsync(execution, new AgentFailed(ExecutionErrorCodes.ModelProviderError, "暫時無法連線到模型服務，請稍後再試。"), stoppingToken).ConfigureAwait(false);
             return;
         }
 #pragma warning disable CA1031 // runtime 啟動失敗必須轉成 execution.failed（SA §13 RUNTIME_START_FAILED），不能讓 execution 卡住。
@@ -109,7 +120,8 @@ public sealed class ExecutionRunner(
                 runtime.RuntimeId,
                 session.Id,
                 await GetPromptAsync(execution, stoppingToken).ConfigureAwait(false),
-                await GetWorkingDirectoryAsync(execution, stoppingToken).ConfigureAwait(false));
+                await GetWorkingDirectoryAsync(execution, stoppingToken).ConfigureAwait(false),
+                credential.ApiKey);
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
             {
                 if (agentEvent is AgentCompleted or AgentFailed or AgentCancelled)

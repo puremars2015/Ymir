@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Ymir.Testing.FakeLlm;
 
-/// <summary>OpenAI Chat Completions 相容端點（只實作 Pi 需要的部分）。</summary>
+/// <summary>OpenAI Chat Completions 相容端點（只實作 Pi 需要的部分），以及 LiteLLM key management 的最小子集。</summary>
 public static class FakeLlmEndpoints
 {
     public const string ModelId = "fake-model";
@@ -20,15 +20,70 @@ public static class FakeLlmEndpoints
         }));
 
         endpoints.MapPost("/v1/chat/completions", HandleChatCompletionsAsync);
+        endpoints.MapPost("/key/generate", HandleGenerateKeyAsync);
+        endpoints.MapPost("/key/delete", HandleDeleteKeyAsync);
         return endpoints;
+    }
+
+    private static string? BearerToken(HttpContext context)
+    {
+        var header = context.Request.Headers.Authorization.ToString();
+        return header.StartsWith("Bearer ", StringComparison.Ordinal) ? header["Bearer ".Length..] : null;
+    }
+
+    private static async Task<JsonObject> ReadObjectAsync(HttpContext context) =>
+        await JsonNode.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted) as JsonObject
+        ?? throw new BadHttpRequestException("JSON object expected");
+
+    private static async Task HandleGenerateKeyAsync(HttpContext context)
+    {
+        var state = context.RequestServices.GetRequiredService<FakeLlmState>();
+        if (state.MasterKey is null || BearerToken(context) != state.MasterKey)
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await context.Response.WriteAsJsonAsync(new { error = new { message = "Authentication Error, invalid master key" } });
+            return;
+        }
+
+        var request = await ReadObjectAsync(context);
+        var (key, token) = state.Issue(request);
+        var seconds = long.TryParse(request["duration"]?.GetValue<string>()?.TrimEnd('s'), out var parsed) ? parsed : 86400;
+        await context.Response.WriteAsJsonAsync(new
+        {
+            key,
+            token,
+            key_alias = request["key_alias"]?.GetValue<string>(),
+            expires = DateTimeOffset.UtcNow.AddSeconds(seconds).ToString("O"),
+        });
+    }
+
+    private static async Task HandleDeleteKeyAsync(HttpContext context)
+    {
+        var state = context.RequestServices.GetRequiredService<FakeLlmState>();
+        if (state.MasterKey is null || BearerToken(context) != state.MasterKey)
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+
+        var request = await ReadObjectAsync(context);
+        var deleted = (request["keys"] as JsonArray ?? []).Select(k => k?.GetValue<string>()).Where(k => k is not null && state.Revoke(k)).ToList();
+        await context.Response.WriteAsJsonAsync(new { deleted_keys = deleted });
     }
 
     private static async Task HandleChatCompletionsAsync(HttpContext context)
     {
         var state = context.RequestServices.GetRequiredService<FakeLlmState>();
-        var request = await JsonNode.ParseAsync(context.Request.Body, cancellationToken: context.RequestAborted) as JsonObject
-            ?? throw new BadHttpRequestException("JSON object expected");
-        state.Record(request);
+        var request = await ReadObjectAsync(context);
+        var apiKey = BearerToken(context);
+        state.Record(request, apiKey);
+
+        if (state.MasterKey is not null && !state.IsActive(apiKey))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            await context.Response.WriteAsJsonAsync(new { error = new { message = "Invalid or revoked virtual key", type = "auth_error" } });
+            return;
+        }
 
         var reply = FakeLlmScript.Decide(request);
         if (reply.ErrorStatusCode is { } status)

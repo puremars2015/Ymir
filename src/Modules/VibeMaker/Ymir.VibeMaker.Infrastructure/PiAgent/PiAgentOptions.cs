@@ -17,7 +17,7 @@ public sealed class PiAgentOptions
     public string ModelId { get; set; } = "default";
 
     /// <summary>
-    /// 開發用的固定 API key。正式環境改由 <c>IModelGateway</c> 為每個 runtime 發放 virtual key（ADR-0004）。
+    /// 開發用的固定 API key（只有 Development 且沒有設定 <c>VibeMaker:LiteLlm</c> 時使用）；正式環境由 LiteLLM 為每位使用者發放 virtual key（ADR-0004）。
     /// </summary>
     public string? DevelopmentApiKey { get; set; }
 

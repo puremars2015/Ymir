@@ -1,19 +1,45 @@
-# LiteLLM proxy sample（ADR-0004）：cd deploy/litellm && docker compose up -d
+# LiteLLM proxy + PostgreSQL（virtual key 需要資料庫，ADR-0004）：cd deploy/litellm && docker compose up -d
 # 金鑰從同目錄的 .env 讀取（.gitignore 已排除）；以環境變數傳入，不寫在設定檔或程序參數。
 services:
   litellm:
     # 固定版本；升級前先跑 README 的 smoke test。
-    image: ghcr.io/berriai/litellm:main-v1.103.2
+    image: ghcr.io/berriai/litellm:v1.103.2
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     environment:
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:?請在 deploy/litellm/.env 設定 MINIMAX_API_KEY}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?請在 deploy/litellm/.env 設定 LITELLM_MASTER_KEY}
+      # 加密資料庫內保存的金鑰；設定後不可更改，否則既有的 key 無法解密。
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?請在 deploy/litellm/.env 設定 LITELLM_SALT_KEY}
+      DATABASE_URL: postgresql://litellm:${LITELLM_DB_PASSWORD:?請在 deploy/litellm/.env 設定 LITELLM_DB_PASSWORD}@litellm-db:5432/litellm
+      STORE_MODEL_IN_DB: "False"
       FAKE_LLM_BASE: ${FAKE_LLM_BASE:-http://host.docker.internal:5199/v1}
     volumes:
       - ./config.yaml:/app/config.yaml:ro
     ports:
-      # 只綁本機；Agent container 經由 host.containers.internal / host.docker.internal 連入。
+      # 只綁本機；Ymir API 用 http://127.0.0.1:4000 管理 key，Agent container 經 host.containers.internal / host.docker.internal 連入。
       - "127.0.0.1:4000:4000"
     extra_hosts:
       - host.docker.internal:host-gateway
+    depends_on:
+      litellm-db:
+        condition: service_healthy
     restart: unless-stopped
+
+  # LiteLLM 專用的 PostgreSQL（只保存 virtual key 與用量）；Ymir 自己的資料仍在 SQL Server。不對外開 port。
+  litellm-db:
+    image: docker.io/library/postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${LITELLM_DB_PASSWORD:?請在 deploy/litellm/.env 設定 LITELLM_DB_PASSWORD}
+    volumes:
+      - litellm-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  litellm-db:

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Ymir.VibeMaker.Application.Conversations;
 using Ymir.VibeMaker.Application.Executions;
+using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Projects;
 
 namespace Ymir.VibeMaker;
@@ -17,6 +18,7 @@ public static class VibeMakerApplicationExtensions
         services.AddScoped<ExecutionRunner>();
         services.AddScoped<ExecutionReconciler>();
         services.AddSingleton<UserExecutionLocks>();
+        services.AddSingleton<RuntimeCredentialService>();
         return services;
     }
 }
