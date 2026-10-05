@@ -1,60 +1,62 @@
-<section class="chat">
-  <nav class="breadcrumb">
-    <a routerLink="/">Workspaces</a>
-    @if (conversation(); as c) {
-      / <a [routerLink]="['/workspaces', c.workspaceId]">Workspace</a> / {{ c.title }}
-    }
-  </nav>
+<header class="chat-header">
+  @if (project(); as p) {
+    <a [routerLink]="['/projects', p.id]" class="crumb"
+      ><span aria-hidden="true">📁</span> {{ p.name }}</a
+    >
+    <span class="sep" aria-hidden="true">/</span>
+  }
+  <span class="title">{{ conversation()?.title }}</span>
+</header>
 
+<div class="scroller">
   <ol class="turns">
     @for (message of messages(); track message.id) {
       <li
-        class="bubble"
+        class="turn"
         [class.user]="message.role === 'USER'"
         [class.assistant]="message.role !== 'USER'"
         [class.error-message]="message.messageType === 'ERROR'"
       >
-        <span class="text">{{ message.content }}</span>
+        <div class="bubble">
+          <span class="text">{{ message.content }}</span>
+        </div>
       </li>
     }
     @if (live(); as turn) {
       <!-- 執行中尚未重新載入歷史，先顯示送出的訊息；結束後以後端保存的訊息取代 -->
-      <li class="bubble user">{{ turn.prompt }}</li>
-      <li class="bubble assistant live" [attr.data-status]="turn.view.status">
-        @if (turn.view.statusText) {
-          <p class="status">{{ turn.view.statusText }}</p>
-        }
-        @for (tool of turn.view.tools; track tool.callId) {
-          <p class="tool" [attr.data-state]="tool.state">
-            <span class="tool-name">{{ tool.tool }}</span> <code>{{ tool.summary }}</code>
-          </p>
-        }
-        <p class="text">{{ turn.view.text }}</p>
+      <li class="turn user">
+        <div class="bubble">{{ turn.prompt }}</div>
+      </li>
+      <li class="turn assistant live" [attr.data-status]="turn.view.status">
+        <div class="bubble">
+          @if (turn.view.statusText) {
+            <p class="status">{{ turn.view.statusText }}</p>
+          }
+          @for (tool of turn.view.tools; track tool.callId) {
+            <p class="tool" [attr.data-state]="tool.state">
+              <span class="tool-name">{{ tool.tool }}</span> <code>{{ tool.summary }}</code>
+            </p>
+          }
+          @if (turn.view.text) {
+            <p class="text">{{ turn.view.text }}</p>
+          } @else if (!turn.view.statusText && !turn.view.tools.length) {
+            <p class="status typing" aria-label="Agent 思考中">●●●</p>
+          }
+        </div>
       </li>
     }
-    @if (!messages().length && !live()) {
-      <li class="muted empty">輸入訊息開始對話，例如：幫我建立一個 Todo List 網站</li>
-    }
   </ol>
+</div>
 
+<footer class="composer-area">
   @if (error()) {
     <p class="error">{{ error() }}</p>
   }
-
-  <form class="composer" (ngSubmit)="send()">
-    <input
-      name="prompt"
-      [ngModel]="prompt()"
-      (ngModelChange)="prompt.set($event)"
-      placeholder="輸入訊息"
-      autocomplete="off"
-      aria-label="訊息"
-      [disabled]="!!live()"
-    />
-    @if (live()) {
-      <button type="button" class="secondary" (click)="stop()">停止</button>
-    } @else {
-      <button type="submit" [disabled]="!prompt().trim()">送出</button>
-    }
-  </form>
-</section>
+  <app-composer
+    placeholder="輸入訊息"
+    [busy]="!!live()"
+    (submitted)="send($event)"
+    (stopped)="stop()"
+  />
+  <p class="hint muted">Agent 在你的專屬執行環境中工作；Enter 送出，Shift+Enter 換行。</p>
+</footer>

@@ -52,6 +52,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/runtime': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetRuntime'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/conversations/{conversationId}/messages': {
     parameters: {
       query?: never;
@@ -68,46 +84,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/workspaces': {
+  '/api/projects': {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get: operations['ListWorkspaces'];
+    get: operations['ListProjects'];
     put?: never;
-    post: operations['CreateWorkspace'];
+    post: operations['CreateProject'];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  '/api/workspaces/{workspaceId}': {
+  '/api/projects/{projectId}': {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get: operations['GetWorkspace'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/workspaces/{workspaceId}/runtime': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations['GetWorkspaceRuntime'];
+    get: operations['GetProject'];
     put?: never;
     post?: never;
     delete?: never;
@@ -194,7 +194,7 @@ export interface components {
       /** Format: uuid */
       id: string;
       /** Format: uuid */
-      workspaceId: string;
+      projectId: null | string;
       title: string;
       status: string;
       /** Format: date-time */
@@ -204,10 +204,10 @@ export interface components {
     };
     CreateConversationRequest: {
       /** Format: uuid */
-      workspaceId: string;
+      projectId: null | string;
       title: string;
     };
-    CreateWorkspaceRequest: {
+    CreateProjectRequest: {
       name: string;
     };
     DevLoginRequest: {
@@ -238,9 +238,17 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
     };
-    RuntimeStatusResponse: {
+    ProjectResponse: {
       /** Format: uuid */
-      workspaceId: string;
+      id: string;
+      name: string;
+      status: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    RuntimeStatusResponse: {
       status: string;
       provider: null | string;
       imageVersion: null | string;
@@ -263,16 +271,6 @@ export interface components {
     UserRole: 'User' | 'Admin';
     /** @enum {unknown} */
     UserStatus: 'Active' | 'Disabled';
-    WorkspaceResponse: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      status: string;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
   };
   responses: never;
   parameters: never;
@@ -344,6 +342,26 @@ export interface operations {
       };
     };
   };
+  GetRuntime: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RuntimeStatusResponse'];
+        };
+      };
+    };
+  };
   ListMessages: {
     parameters: {
       query?: never;
@@ -392,7 +410,7 @@ export interface operations {
       };
     };
   };
-  ListWorkspaces: {
+  ListProjects: {
     parameters: {
       query?: never;
       header?: never;
@@ -407,12 +425,12 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['WorkspaceResponse'][];
+          'application/json': components['schemas']['ProjectResponse'][];
         };
       };
     };
   };
-  CreateWorkspace: {
+  CreateProject: {
     parameters: {
       query?: never;
       header?: never;
@@ -421,7 +439,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        'application/json': components['schemas']['CreateWorkspaceRequest'];
+        'application/json': components['schemas']['CreateProjectRequest'];
       };
     };
     responses: {
@@ -431,17 +449,17 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['WorkspaceResponse'];
+          'application/json': components['schemas']['ProjectResponse'];
         };
       };
     };
   };
-  GetWorkspace: {
+  GetProject: {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        workspaceId: string;
+        projectId: string;
       };
       cookie?: never;
     };
@@ -453,29 +471,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['WorkspaceResponse'];
-        };
-      };
-    };
-  };
-  GetWorkspaceRuntime: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        workspaceId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RuntimeStatusResponse'];
+          'application/json': components['schemas']['ProjectResponse'];
         };
       };
     };
@@ -483,7 +479,7 @@ export interface operations {
   ListConversations: {
     parameters: {
       query?: {
-        workspaceId?: string;
+        projectId?: string;
       };
       header?: never;
       path?: never;

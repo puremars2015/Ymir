@@ -8,23 +8,23 @@ export const routes: Routes = [
     title: '登入 · Vibe Maker',
   },
   {
+    // 登入後直接進入主畫面（ChatGPT 式版面：側邊欄 + 對話）
     path: '',
     canActivate: [authGuard],
+    loadComponent: () => import('./layout/shell').then((m) => m.Shell),
     children: [
       {
         path: '',
-        loadComponent: () =>
-          import('./features/workspaces/workspaces-page').then((m) => m.WorkspacesPage),
-        title: 'Workspaces · Vibe Maker',
+        loadComponent: () => import('./features/home/new-chat-page').then((m) => m.NewChatPage),
+        title: 'Vibe Maker',
       },
       {
-        path: 'workspaces/:workspaceId',
-        loadComponent: () =>
-          import('./features/workspaces/workspace-page').then((m) => m.WorkspacePage),
-        title: 'Workspace · Vibe Maker',
+        path: 'projects/:projectId',
+        loadComponent: () => import('./features/projects/project-page').then((m) => m.ProjectPage),
+        title: '專案 · Vibe Maker',
       },
       {
-        path: 'conversations/:conversationId',
+        path: 'c/:conversationId',
         loadComponent: () => import('./features/chat/chat-page').then((m) => m.ChatPage),
         title: '對話 · Vibe Maker',
       },

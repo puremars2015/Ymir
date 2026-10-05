@@ -8,8 +8,9 @@ import {
   Conversation,
   Me,
   SendMessageResponse,
+  Project,
+  RuntimeStatus,
   UserRole,
-  Workspace,
 } from './api-types';
 
 /** 呼叫 Ymir API。認證靠同源 HttpOnly cookie，XSRF header 由 HttpClient 自動加上（ADR-0002）。 */
@@ -29,24 +30,33 @@ export class ApiService {
     return this.http.post<void>('/api/auth/logout', null);
   }
 
-  listWorkspaces(): Observable<Workspace[]> {
-    return this.http.get<Workspace[]>('/api/workspaces');
+  listProjects(): Observable<Project[]> {
+    return this.http.get<Project[]>('/api/projects');
   }
 
-  createWorkspace(name: string): Observable<Workspace> {
-    return this.http.post<Workspace>('/api/workspaces', { name });
+  createProject(name: string): Observable<Project> {
+    return this.http.post<Project>('/api/projects', { name });
   }
 
-  getWorkspace(workspaceId: string): Observable<Workspace> {
-    return this.http.get<Workspace>(`/api/workspaces/${workspaceId}`);
+  getProject(projectId: string): Observable<Project> {
+    return this.http.get<Project>(`/api/projects/${projectId}`);
   }
 
-  listConversations(workspaceId: string): Observable<Conversation[]> {
-    return this.http.get<Conversation[]>('/api/conversations', { params: { workspaceId } });
+  /** 目前使用者的執行環境（一個使用者一個 container，ADR-0007）。 */
+  getRuntime(): Observable<RuntimeStatus> {
+    return this.http.get<RuntimeStatus>('/api/runtime');
   }
 
-  createConversation(workspaceId: string, title: string): Observable<Conversation> {
-    return this.http.post<Conversation>('/api/conversations', { workspaceId, title });
+  /** 不帶 projectId 時回傳全部對話（含未分組），側邊欄依 projectId 分組。 */
+  listConversations(projectId?: string): Observable<Conversation[]> {
+    return this.http.get<Conversation[]>('/api/conversations', {
+      params: projectId ? { projectId } : {},
+    });
+  }
+
+  /** projectId 為 null 時建立未分組的對話。 */
+  createConversation(projectId: string | null, title: string): Observable<Conversation> {
+    return this.http.post<Conversation>('/api/conversations', { projectId, title });
   }
 
   getConversation(conversationId: string): Observable<Conversation> {

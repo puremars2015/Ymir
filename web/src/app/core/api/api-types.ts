@@ -5,7 +5,7 @@ type Schemas = components['schemas'];
 
 export type Me = Schemas['MeResponse'];
 export type UserRole = Schemas['UserRole'];
-export type Workspace = Schemas['WorkspaceResponse'];
+export type Project = Schemas['ProjectResponse'];
 export type RuntimeStatus = Schemas['RuntimeStatusResponse'];
 export type Conversation = Schemas['ConversationResponse'];
 export type ChatMessage = Schemas['MessageResponse'];
