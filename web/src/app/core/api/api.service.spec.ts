@@ -36,11 +36,21 @@ describe('ApiService', () => {
     second.flush({});
   });
 
-  it('filters conversations by workspace', () => {
-    api.listConversations('w1').subscribe();
-    const request = http.expectOne((r) => r.url === '/api/conversations');
-    expect(request.request.params.get('workspaceId')).toBe('w1');
-    request.flush([]);
+  it('filters conversations by project, or lists all without one', () => {
+    api.listConversations('p1').subscribe();
+    api.listConversations().subscribe();
+    const [filtered, all] = http.match((r) => r.url === '/api/conversations');
+    expect(filtered.request.params.get('projectId')).toBe('p1');
+    expect(all.request.params.has('projectId')).toBe(false);
+    filtered.flush([]);
+    all.flush([]);
+  });
+
+  it('creates an ungrouped conversation with a null projectId', () => {
+    api.createConversation(null, 'hi').subscribe();
+    const request = http.expectOne('/api/conversations');
+    expect(request.request.body).toEqual({ projectId: null, title: 'hi' });
+    request.flush({});
   });
 
   it('describes problem details errors using detail', () => {

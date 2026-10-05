@@ -137,6 +137,8 @@ USER
 
 ### 6.1 Runtime 邊界
 
+> **已被 [ADR-0007](../adr/0007-one-runtime-per-user.md) 取代**：改為「一個使用者一個 Agent Container」，Workspace 改為 Project（container 內的檔案群組），對話可以不分組。下方為原始內容，保留供參考。
+
 MVP 建議採「一個 Active Workspace 對應一個 Agent Container」。同一使用者可擁有多個 Workspace，因此 Runtime 不應只以 user_id 作唯一鍵。
 
 ```text

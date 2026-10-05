@@ -10,7 +10,7 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 {
     public const string Schema = "vibemaker";
 
-    public DbSet<Workspace> Workspaces => Set<Workspace>();
+    public DbSet<Project> Projects => Set<Project>();
 
     public DbSet<Conversation> Conversations => Set<Conversation>();
 
@@ -28,15 +28,14 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
     {
         modelBuilder.HasDefaultSchema(Schema);
 
-        modelBuilder.Entity<Workspace>(workspace =>
+        modelBuilder.Entity<Project>(project =>
         {
-            workspace.ToTable("workspaces");
-            workspace.HasKey(w => w.Id);
-            workspace.Property(w => w.Id).ValueGeneratedNever();
-            workspace.Property(w => w.Name).HasMaxLength(Workspace.NameMaxLength).IsRequired();
-            workspace.Property(w => w.StorageKey).HasMaxLength(500).IsRequired();
-            workspace.Property(w => w.Status).HasConversion<UpperSnakeCaseEnumConverter<WorkspaceStatus>>().HasMaxLength(30);
-            workspace.HasIndex(w => w.UserId);
+            project.ToTable("projects");
+            project.HasKey(p => p.Id);
+            project.Property(p => p.Id).ValueGeneratedNever();
+            project.Property(p => p.Name).HasMaxLength(Project.NameMaxLength).IsRequired();
+            project.Property(p => p.Status).HasConversion<UpperSnakeCaseEnumConverter<ProjectStatus>>().HasMaxLength(30);
+            project.HasIndex(p => p.UserId);
         });
 
         modelBuilder.Entity<Conversation>(conversation =>
@@ -46,8 +45,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             conversation.Property(c => c.Id).ValueGeneratedNever();
             conversation.Property(c => c.Title).HasMaxLength(Conversation.TitleMaxLength).IsRequired();
             conversation.Property(c => c.Status).HasConversion<UpperSnakeCaseEnumConverter<ConversationStatus>>().HasMaxLength(30);
-            conversation.HasOne<Workspace>().WithMany().HasForeignKey(c => c.WorkspaceId).OnDelete(DeleteBehavior.Restrict);
-            conversation.HasIndex(c => new { c.UserId, c.WorkspaceId });
+            conversation.HasOne<Project>().WithMany().HasForeignKey(c => c.ProjectId).OnDelete(DeleteBehavior.Restrict);
+            conversation.HasIndex(c => new { c.UserId, c.ProjectId });
         });
 
         modelBuilder.Entity<Message>(message =>
@@ -83,9 +82,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             runtime.Property(r => r.ProviderRuntimeId).HasMaxLength(300).IsRequired();
             runtime.Property(r => r.ImageVersion).HasMaxLength(100).IsRequired();
             runtime.Property(r => r.Status).HasConversion<UpperSnakeCaseEnumConverter<RuntimeStatus>>().HasMaxLength(30);
-            runtime.HasOne<Workspace>().WithMany().HasForeignKey(r => r.WorkspaceId).OnDelete(DeleteBehavior.Restrict);
-            // MVP 每個 workspace 最多一個未刪除的 runtime（SA §8）。
-            runtime.HasIndex(r => r.WorkspaceId).IsUnique().HasFilter("[status] <> 'DELETED'");
+            // 一個使用者最多一個未刪除的 runtime（ADR-0007），由資料庫保證。跨模組只存 user_id，不建 FK（ADR-0001）。
+            runtime.HasIndex(r => r.UserId).IsUnique().HasFilter("[status] <> 'DELETED'");
         });
 
         modelBuilder.Entity<AgentExecution>(execution =>

@@ -1,7 +1,10 @@
+using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
+using Ymir.Api.Endpoints;
 using Ymir.IntegrationTests.Api;
 using Ymir.IntegrationTests.PiAgent;
 using Ymir.Testing.FakeLlm;
+using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
 using Ymir.VibeMaker.Infrastructure.Runtime;
 
@@ -34,12 +37,12 @@ public sealed class PiApiFactory : ApiFactory
 public class PiExecutionTests(PiApiFactory factory) : IClassFixture<PiApiFactory>
 {
     [Fact]
-    public async Task CreateFile_ThroughApi_WritesIntoWorkspaceAndKeepsContext()
+    public async Task CreateFile_ThroughApi_WritesIntoProjectDirectoryAndKeepsContext()
     {
         Assert.SkipUnless(PiHarnessFixture.IsPiOnPath(), "pi is not on PATH (npm i -g @earendil-works/pi-coding-agent@1.0.0)");
         using var client = await factory.LoginAsync("pi-user");
-        var workspace = await client.CreateWorkspaceAsync("pi");
-        var conversation = await client.CreateConversationAsync(workspace.Id, "pi chat");
+        var project = await client.CreateProjectAsync("pi");
+        var conversation = await client.CreateConversationAsync(project.Id, "pi chat");
 
         var (_, first) = await client.SendMessageAsync(conversation.Id, $"{FakeLlmScript.CreateFileMarker} 建立檔案");
         var firstEvents = await client.ReadEventsAsync(first!.EventStreamUrl);
@@ -48,7 +51,9 @@ public class PiExecutionTests(PiApiFactory factory) : IClassFixture<PiApiFactory
 
         Assert.Equal(ExecutionEventNames.ExecutionCompleted, firstEvents[^1].EventType);
         Assert.Contains(firstEvents, e => e.EventType == ExecutionEventNames.ToolStarted);
-        var file = Path.Combine(WorkspaceDirectories.For(factory.WorkspaceRoot, workspace.Id).Workspace, FakeLlmScript.CreatedFileName);
+        // 專案的檔案群組：{使用者目錄}/workspace/projects/{projectId}（ADR-0007）
+        var directories = UserDirectories.For(factory.WorkspaceRoot, await GetUserIdAsync(client));
+        var file = Path.Combine(directories.HostPathOf(RuntimePaths.ProjectDirectory(project.Id)), FakeLlmScript.CreatedFileName);
         Assert.Equal(FakeLlmScript.CreatedFileContent, await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken));
 
         // 同一個 Conversation 的 AgentSession 續接：模型收到第 2 則使用者訊息
@@ -56,4 +61,24 @@ public class PiExecutionTests(PiApiFactory factory) : IClassFixture<PiApiFactory
         Assert.Equal(ExecutionEventNames.ExecutionCompleted, secondEvents[^1].EventType);
         Assert.Equal("收到第 2 則使用者訊息：剛剛做了什麼？", messages[^1].Content);
     }
+
+    [Fact]
+    public async Task UngroupedConversation_WorksInItsOwnDirectory()
+    {
+        Assert.SkipUnless(PiHarnessFixture.IsPiOnPath(), "pi is not on PATH (npm i -g @earendil-works/pi-coding-agent@1.0.0)");
+        using var client = await factory.LoginAsync("pi-loose");
+        var conversation = await client.CreateConversationAsync(null, "loose chat");
+
+        var (_, sent) = await client.SendMessageAsync(conversation.Id, $"{FakeLlmScript.CreateFileMarker} 建立檔案");
+        var events = await client.ReadEventsAsync(sent!.EventStreamUrl);
+
+        Assert.Equal(ExecutionEventNames.ExecutionCompleted, events[^1].EventType);
+        var directories = UserDirectories.For(factory.WorkspaceRoot, await GetUserIdAsync(client));
+        var file = Path.Combine(directories.HostPathOf(RuntimePaths.ConversationDirectory(conversation.Id)), FakeLlmScript.CreatedFileName);
+        Assert.True(File.Exists(file), "未分組對話的檔案應在 chats/{conversationId}");
+        Assert.False(File.Exists(Path.Combine(directories.Workspace, FakeLlmScript.CreatedFileName)), "不應寫到使用者 workspace 根目錄");
+    }
+
+    private static async Task<Guid> GetUserIdAsync(HttpClient client) =>
+        (await client.GetFromJsonAsync<MeResponse>("/api/me", JsonDefaults.Options, TestContext.Current.CancellationToken))!.Id;
 }

@@ -9,7 +9,7 @@
     "test": "ng test",
     "lint": "ng lint",
     "api:generate": "npx -y -p typescript@5.9 -p openapi-typescript@7.13.0 openapi-typescript ../src/Ymir.Api/openapi/v1.json -o src/app/core/api/schema.ts && prettier --write src/app/core/api/schema.ts",
-    "e2e:sprint1": "node e2e/sprint1-walking-skeleton.mjs"
+    "e2e": "node e2e/chat-flow.mjs"
   },
   "private": true,
   "packageManager": "npm@11.19.0",

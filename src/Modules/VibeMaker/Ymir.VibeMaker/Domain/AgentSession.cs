@@ -16,8 +16,6 @@ public sealed class AgentSession
 
     public Guid ConversationId { get; private set; }
 
-    public Guid WorkspaceId { get; private set; }
-
     public Guid? RuntimeId { get; private set; }
 
     public string Provider { get; private set; } = PiProvider;
@@ -38,7 +36,6 @@ public sealed class AgentSession
         {
             Id = id,
             ConversationId = conversation.Id,
-            WorkspaceId = conversation.WorkspaceId,
             ProviderSessionId = id.ToString("D"),
             Status = AgentSessionStatus.Active,
             CreatedAt = now,

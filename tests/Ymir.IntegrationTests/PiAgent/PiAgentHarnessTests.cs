@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Ymir.Testing.FakeLlm;
 using Ymir.VibeMaker.Application.Agents;
+using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
 using Ymir.VibeMaker.Infrastructure.PiAgent;
 using Ymir.VibeMaker.Infrastructure.Runtime;
@@ -25,16 +26,17 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
         Assert.SkipUnless(fixture.PiAvailable, "pi is not on PATH (npm i -g @earendil-works/pi-coding-agent@1.0.0)");
 
     [Fact]
-    public async Task ToolCall_CreatesFileInWorkspace_AndStreamsEvents()
+    public async Task ToolCall_CreatesFileInWorkingDirectory_AndStreamsEvents()
     {
         SkipUnlessPiInstalled();
         var ct = TestContext.Current.CancellationToken;
-        var workspaceId = Guid.NewGuid();
-        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(workspaceId, ct);
+        var userId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, ct);
 
         var events = await RunAsync(
             fixture.CreateHarness(),
-            new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.CreateFileMarker} 請建立檔案"),
+            new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.CreateFileMarker} 請建立檔案", RuntimePaths.ProjectDirectory(projectId)),
             ct);
 
         Assert.IsType<AgentStarted>(events[0]);
@@ -43,7 +45,8 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
         var completed = Assert.IsType<AgentCompleted>(events[^1]);
         Assert.Contains("已完成", completed.FinalText, StringComparison.Ordinal);
 
-        var file = Path.Combine(WorkspaceDirectories.For(fixture.WorkspaceRoot, workspaceId).Workspace, FakeLlmScript.CreatedFileName);
+        var directories = UserDirectories.For(fixture.WorkspaceRoot, userId);
+        var file = Path.Combine(directories.HostPathOf(RuntimePaths.ProjectDirectory(projectId)), FakeLlmScript.CreatedFileName);
         Assert.Equal(FakeLlmScript.CreatedFileContent, await File.ReadAllTextAsync(file, ct));
     }
 
@@ -56,8 +59,8 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
         var sessionId = Guid.NewGuid();
         var harness = fixture.CreateHarness();
 
-        var first = await RunAsync(harness, new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, sessionId, "第一句"), ct);
-        var second = await RunAsync(harness, new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, sessionId, "第二句"), ct);
+        var first = await RunAsync(harness, new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, sessionId, "第一句", RuntimePaths.Workspace), ct);
+        var second = await RunAsync(harness, new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, sessionId, "第二句", RuntimePaths.Workspace), ct);
 
         Assert.Equal("收到第 1 則使用者訊息：第一句", Assert.IsType<AgentCompleted>(first[^1]).FinalText);
         Assert.Equal("收到第 2 則使用者訊息：第二句", Assert.IsType<AgentCompleted>(second[^1]).FinalText);
@@ -72,7 +75,7 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
 
         var events = new List<AgentEvent>();
         await foreach (var agentEvent in fixture.CreateHarness().RunAsync(
-            new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.SlowMarker} 慢慢講"),
+            new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.SlowMarker} 慢慢講", RuntimePaths.Workspace),
             cts.Token))
         {
             events.Add(agentEvent);
@@ -95,7 +98,7 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
 
         var events = await RunAsync(
             fixture.CreateHarness(autoRetry: false),
-            new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.FailMarker} 壞掉"),
+            new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.FailMarker} 壞掉", RuntimePaths.Workspace),
             ct);
 
         var failed = Assert.IsType<AgentFailed>(events[^1]);
@@ -112,7 +115,7 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
             Options.Create(new PiAgentOptions { Executable = "definitely-not-a-real-pi-binary", ModelBaseUrl = fixture.FakeLlm.BaseUrl }),
             new TestOutputLogger<PiAgentHarness>());
 
-        var events = await RunAsync(harness, new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), "hi"), ct);
+        var events = await RunAsync(harness, new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), "hi", RuntimePaths.Workspace), ct);
 
         var failed = Assert.IsType<AgentFailed>(Assert.Single(events));
         Assert.Equal(ExecutionErrorCodes.AgentRuntimeError, failed.Code);

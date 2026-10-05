@@ -9,39 +9,47 @@ namespace Ymir.VibeMaker.Application.Conversations;
 /// <summary>Conversation / Message 用例（SA §5、§9）。只回傳目前使用者自己的資料（SA §12）。</summary>
 public sealed class ConversationService(IVibeMakerDbContext db, ICurrentUser currentUser, TimeProvider timeProvider)
 {
-    /// <returns><paramref name="workspaceId"/> 指定了別人的 workspace 時回傳 null（→ 404）。</returns>
-    public async Task<IReadOnlyList<ConversationResponse>?> ListAsync(Guid? workspaceId, CancellationToken cancellationToken)
+    /// <summary>目前使用者的對話；指定 <paramref name="projectId"/> 時只列該專案的對話（側邊欄由前端依 projectId 分組）。</summary>
+    /// <returns><paramref name="projectId"/> 指定了別人的專案時回傳 null（→ 404）。</returns>
+    public async Task<IReadOnlyList<ConversationResponse>?> ListAsync(Guid? projectId, CancellationToken cancellationToken)
     {
         var userId = currentUser.UserId;
-        if (workspaceId is { } id && !await db.Workspaces.AnyAsync(w => w.Id == id && w.UserId == userId, cancellationToken).ConfigureAwait(false))
+        if (projectId is { } id && !await db.Projects.AnyAsync(p => p.Id == id && p.UserId == userId, cancellationToken).ConfigureAwait(false))
         {
             return null;
         }
 
         var query = db.Conversations.AsNoTracking().Where(c => c.UserId == userId && c.Status == ConversationStatus.Active);
-        if (workspaceId is { } filter)
+        if (projectId is { } filter)
         {
-            query = query.Where(c => c.WorkspaceId == filter);
+            query = query.Where(c => c.ProjectId == filter);
         }
 
         var conversations = await query.OrderByDescending(c => c.UpdatedAt).ToListAsync(cancellationToken).ConfigureAwait(false);
         return conversations.Select(ToResponse).ToList();
     }
 
-    /// <returns>workspace 不存在或不是自己的時回傳 null（→ 404）。</returns>
+    /// <returns>指定的專案不存在或不是自己的時回傳 null（→ 404）；不指定專案則建立未分組的對話。</returns>
     public async Task<ConversationResponse?> CreateAsync(CreateConversationRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         var userId = currentUser.UserId;
-        var workspace = await db.Workspaces.AsNoTracking()
-            .SingleOrDefaultAsync(w => w.Id == request.WorkspaceId && w.UserId == userId && w.Status == WorkspaceStatus.Active, cancellationToken)
-            .ConfigureAwait(false);
-        if (workspace is null)
+        var now = timeProvider.GetUtcNow();
+        Project? project = null;
+        if (request.ProjectId is { } projectId)
         {
-            return null;
+            project = await db.Projects
+                .SingleOrDefaultAsync(p => p.Id == projectId && p.UserId == userId && p.Status == ProjectStatus.Active, cancellationToken)
+                .ConfigureAwait(false);
+            if (project is null)
+            {
+                return null;
+            }
+
+            project.Touch(now); // 側邊欄依最近使用排序
         }
 
-        var conversation = Conversation.Create(workspace, request.Title, timeProvider.GetUtcNow());
+        var conversation = Conversation.Create(userId, project, request.Title, now);
         db.Conversations.Add(conversation);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return ToResponse(conversation);
@@ -74,5 +82,5 @@ public sealed class ConversationService(IVibeMakerDbContext db, ICurrentUser cur
         return db.Conversations.AsNoTracking().SingleOrDefaultAsync(c => c.Id == conversationId && c.UserId == userId, cancellationToken);
     }
 
-    private static ConversationResponse ToResponse(Conversation c) => new(c.Id, c.WorkspaceId, c.Title, SaValues.Of(c.Status), c.CreatedAt, c.UpdatedAt);
+    private static ConversationResponse ToResponse(Conversation c) => new(c.Id, c.ProjectId, c.Title, SaValues.Of(c.Status), c.CreatedAt, c.UpdatedAt);
 }

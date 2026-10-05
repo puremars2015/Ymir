@@ -1,19 +1,11 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
-import { AuthService } from './core/auth/auth.service';
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
 
+/** 根元件只放 router-outlet：登入頁是全頁，登入後由 {@link Shell} 提供 ChatGPT 式版面。 */
 @Component({
-  imports: [RouterOutlet, RouterLink],
+  imports: [RouterOutlet],
   selector: 'app-root',
-  styleUrl: './app.scss',
-  templateUrl: './app.html',
+  template: '<router-outlet />',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class App {
-  protected readonly auth = inject(AuthService);
-  private readonly router = inject(Router);
-
-  protected logout(): void {
-    this.auth.logout().subscribe(() => void this.router.navigate(['/login']));
-  }
-}
+export class App {}

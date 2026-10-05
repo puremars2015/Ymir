@@ -69,6 +69,26 @@
         }
       }
     },
+    "/api/runtime": {
+      "get": {
+        "tags": [
+          "Runtime"
+        ],
+        "operationId": "GetRuntime",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/{conversationId}/messages": {
       "post": {
         "tags": [
@@ -142,12 +162,12 @@
         }
       }
     },
-    "/api/workspaces": {
+    "/api/projects": {
       "get": {
         "tags": [
-          "Workspaces"
+          "Projects"
         ],
-        "operationId": "ListWorkspaces",
+        "operationId": "ListProjects",
         "responses": {
           "200": {
             "description": "OK",
@@ -156,7 +176,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/WorkspaceResponse"
+                    "$ref": "#/components/schemas/ProjectResponse"
                   }
                 }
               }
@@ -166,14 +186,14 @@
       },
       "post": {
         "tags": [
-          "Workspaces"
+          "Projects"
         ],
-        "operationId": "CreateWorkspace",
+        "operationId": "CreateProject",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateWorkspaceRequest"
+                "$ref": "#/components/schemas/CreateProjectRequest"
               }
             }
           },
@@ -185,7 +205,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WorkspaceResponse"
+                  "$ref": "#/components/schemas/ProjectResponse"
                 }
               }
             }
@@ -193,15 +213,15 @@
         }
       }
     },
-    "/api/workspaces/{workspaceId}": {
+    "/api/projects/{projectId}": {
       "get": {
         "tags": [
-          "Workspaces"
+          "Projects"
         ],
-        "operationId": "GetWorkspace",
+        "operationId": "GetProject",
         "parameters": [
           {
-            "name": "workspaceId",
+            "name": "projectId",
             "in": "path",
             "required": true,
             "schema": {
@@ -216,38 +236,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/WorkspaceResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/workspaces/{workspaceId}/runtime": {
-      "get": {
-        "tags": [
-          "Workspaces"
-        ],
-        "operationId": "GetWorkspaceRuntime",
-        "parameters": [
-          {
-            "name": "workspaceId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RuntimeStatusResponse"
+                  "$ref": "#/components/schemas/ProjectResponse"
                 }
               }
             }
@@ -263,7 +252,7 @@
         "operationId": "ListConversations",
         "parameters": [
           {
-            "name": "workspaceId",
+            "name": "projectId",
             "in": "query",
             "schema": {
               "type": "string",
@@ -437,7 +426,7 @@
       "ConversationResponse": {
         "required": [
           "id",
-          "workspaceId",
+          "projectId",
           "title",
           "status",
           "createdAt",
@@ -449,8 +438,11 @@
             "type": "string",
             "format": "uuid"
           },
-          "workspaceId": {
-            "type": "string",
+          "projectId": {
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
           },
           "title": {
@@ -471,13 +463,16 @@
       },
       "CreateConversationRequest": {
         "required": [
-          "workspaceId",
+          "projectId",
           "title"
         ],
         "type": "object",
         "properties": {
-          "workspaceId": {
-            "type": "string",
+          "projectId": {
+            "type": [
+              "null",
+              "string"
+            ],
             "format": "uuid"
           },
           "title": {
@@ -485,7 +480,7 @@
           }
         }
       },
-      "CreateWorkspaceRequest": {
+      "CreateProjectRequest": {
         "required": [
           "name"
         ],
@@ -619,9 +614,38 @@
           }
         }
       },
+      "ProjectResponse": {
+        "required": [
+          "id",
+          "name",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "RuntimeStatusResponse": {
         "required": [
-          "workspaceId",
           "status",
           "provider",
           "imageVersion",
@@ -629,10 +653,6 @@
         ],
         "type": "object",
         "properties": {
-          "workspaceId": {
-            "type": "string",
-            "format": "uuid"
-          },
           "status": {
             "type": "string"
           },
@@ -705,36 +725,6 @@
           "Active",
           "Disabled"
         ]
-      },
-      "WorkspaceResponse": {
-        "required": [
-          "id",
-          "name",
-          "status",
-          "createdAt",
-          "updatedAt"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
       }
     }
   },
@@ -743,10 +733,13 @@
       "name": "Auth"
     },
     {
+      "name": "Runtime"
+    },
+    {
       "name": "Conversations"
     },
     {
-      "name": "Workspaces"
+      "name": "Projects"
     },
     {
       "name": "Executions"

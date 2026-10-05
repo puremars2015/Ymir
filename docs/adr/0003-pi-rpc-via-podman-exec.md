@@ -15,7 +15,7 @@ SA §23 把「Pi 的實際啟動 / Session / streaming protocol」列為待確�
 
 ## 決策
 
-1. **每個 Workspace 一個長駐 container**（SA §6.1），container 主程序只負責保持存活（`sleep infinity`，搭配 `--init` 讓 `podman stop` 能立即結束），不常駐 Pi。
+1. **每個 Workspace 一個長駐 container**（SA §6.1；**已由 [ADR-0007](0007-one-runtime-per-user.md) 改為每個使用者一個 container**，專案是 container 內的目錄），container 主程序只負責保持存活（`sleep infinity`，搭配 `--init` 讓 `podman stop` 能立即結束），不常駐 Pi。
 2. **每次 execution 以 `podman exec -i` 在該 container 內啟動一個 Pi RPC 程序**：
 
    ```

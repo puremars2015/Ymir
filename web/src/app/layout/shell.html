@@ -1,0 +1,138 @@
+<div class="shell" [class.drawer-open]="drawerOpen()">
+  <aside class="sidebar" aria-label="側邊欄">
+    <div class="sidebar-top">
+      <a routerLink="/" class="brand"><strong>Web-Pro</strong> Ymir</a>
+      <button
+        type="button"
+        class="icon close-drawer"
+        (click)="drawerOpen.set(false)"
+        aria-label="關閉側邊欄"
+      >
+        ✕
+      </button>
+    </div>
+
+    <a
+      routerLink="/"
+      class="new-chat"
+      [routerLinkActiveOptions]="{ exact: true }"
+      routerLinkActive="active"
+    >
+      <span aria-hidden="true">✎</span> 新對話
+    </a>
+
+    <nav class="sections">
+      <section class="section">
+        <header class="section-header">
+          <span>專案</span>
+          <button
+            type="button"
+            class="icon"
+            (click)="startCreatingProject()"
+            aria-label="新增專案"
+            title="新增專案"
+          >
+            ＋
+          </button>
+        </header>
+        @if (creatingProject()) {
+          <form class="new-project" (ngSubmit)="createProject()">
+            <input
+              #projectInput
+              name="projectName"
+              [ngModel]="projectName()"
+              (ngModelChange)="projectName.set($event)"
+              (keydown.escape)="creatingProject.set(false)"
+              placeholder="專案名稱，按 Enter 建立"
+              aria-label="專案名稱"
+            />
+          </form>
+        }
+        <ul class="items">
+          @for (group of store.groups().projects; track group.project.id) {
+            <li class="project">
+              <div class="row">
+                <button
+                  type="button"
+                  class="icon chevron"
+                  [class.open]="isExpanded(group.project.id)"
+                  (click)="toggle(group.project.id)"
+                  [attr.aria-expanded]="isExpanded(group.project.id)"
+                  [attr.aria-label]="'展開 ' + group.project.name"
+                >
+                  ›
+                </button>
+                <a
+                  [routerLink]="['/projects', group.project.id]"
+                  routerLinkActive="active"
+                  class="item project-link"
+                >
+                  <span aria-hidden="true">📁</span> {{ group.project.name }}
+                </a>
+              </div>
+              @if (isExpanded(group.project.id)) {
+                <ul class="items nested">
+                  @for (conversation of group.conversations; track conversation.id) {
+                    <li>
+                      <a
+                        [routerLink]="['/c', conversation.id]"
+                        routerLinkActive="active"
+                        class="item"
+                        >{{ conversation.title }}</a
+                      >
+                    </li>
+                  } @empty {
+                    <li class="muted empty">還沒有對話</li>
+                  }
+                </ul>
+              }
+            </li>
+          } @empty {
+            @if (!creatingProject()) {
+              <li class="muted empty">用專案把相關的對話和檔案放在一起</li>
+            }
+          }
+        </ul>
+      </section>
+
+      <section class="section">
+        <header class="section-header"><span>聊天</span></header>
+        <ul class="items">
+          @for (conversation of store.groups().ungrouped; track conversation.id) {
+            <li>
+              <a [routerLink]="['/c', conversation.id]" routerLinkActive="active" class="item">{{
+                conversation.title
+              }}</a>
+            </li>
+          } @empty {
+            <li class="muted empty">還沒有對話</li>
+          }
+        </ul>
+      </section>
+    </nav>
+
+    @if (error()) {
+      <p class="error sidebar-error">{{ error() }}</p>
+    }
+
+    @if (auth.user(); as user) {
+      <footer class="user">
+        <span class="avatar" aria-hidden="true">{{ user.displayName.charAt(0) }}</span>
+        <span class="name">{{ user.displayName }}</span>
+        <button type="button" class="link" (click)="logout()">登出</button>
+      </footer>
+    }
+  </aside>
+
+  <div class="backdrop" (click)="drawerOpen.set(false)" aria-hidden="true"></div>
+
+  <main class="content">
+    <header class="mobile-bar">
+      <button type="button" class="icon" (click)="drawerOpen.set(true)" aria-label="開啟側邊欄">
+        ☰
+      </button>
+      <a routerLink="/" class="brand"><strong>Web-Pro</strong> Ymir</a>
+    </header>
+    <router-outlet />
+  </main>
+</div>

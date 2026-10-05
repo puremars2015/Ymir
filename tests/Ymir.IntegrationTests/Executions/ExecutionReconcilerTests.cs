@@ -19,12 +19,11 @@ public class ExecutionReconcilerTests(ApiFactory factory) : IClassFixture<ApiFac
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<VibeMakerDbContext>();
         var now = DateTimeOffset.UtcNow;
-        var workspace = Workspace.Create(Guid.NewGuid(), "ws", now);
-        var conversation = Conversation.Create(workspace, "chat", now);
+        var conversation = Conversation.Create(Guid.NewGuid(), null, "chat", now);
         var message = Message.CreateUser(conversation.Id, "hi", 1, now);
         var execution = AgentExecution.Queue(conversation, message, Guid.NewGuid(), now);
         execution.Start(Guid.NewGuid(), Guid.NewGuid(), now); // 模擬上次關機時仍在執行
-        db.AddRange(workspace, conversation, message, execution);
+        db.AddRange(conversation, message, execution);
         await db.SaveChangesAsync(ct);
 
         await scope.ServiceProvider.GetRequiredService<ExecutionReconciler>().ReconcileAsync(ct);

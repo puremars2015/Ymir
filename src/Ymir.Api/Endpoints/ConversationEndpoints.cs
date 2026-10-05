@@ -13,17 +13,17 @@ internal static class ConversationEndpoints
     {
         var group = endpoints.MapGroup("/api/conversations").WithTags("Conversations").RequireAntiforgeryHeader();
 
-        group.MapGet("/", async Task<IResult> (Guid? workspaceId, ConversationService service, CancellationToken ct) =>
-                await service.ListAsync(workspaceId, ct) is { } conversations
+        group.MapGet("/", async Task<IResult> (Guid? projectId, ConversationService service, CancellationToken ct) =>
+                await service.ListAsync(projectId, ct) is { } conversations
                     ? TypedResults.Ok(conversations)
-                    : ApiProblem.Create(StatusCodes.Status404NotFound, WorkspaceEndpoints.NotFoundCode, "找不到 Workspace。"))
+                    : ProjectEndpoints.NotFound())
             .WithName("ListConversations")
             .Produces<IReadOnlyList<ConversationResponse>>();
 
         group.MapPost("/", async Task<IResult> (CreateConversationRequest request, ConversationService service, CancellationToken ct) =>
                 await service.CreateAsync(request, ct) is { } conversation
                     ? TypedResults.Created($"/api/conversations/{conversation.Id}", conversation)
-                    : ApiProblem.Create(StatusCodes.Status404NotFound, WorkspaceEndpoints.NotFoundCode, "找不到 Workspace。"))
+                    : ProjectEndpoints.NotFound())
             .WithName("CreateConversation")
             .Produces<ConversationResponse>(StatusCodes.Status201Created);
 

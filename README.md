@@ -3,15 +3,15 @@
 始祖尤米爾，全系統的始祖，一個比 EIP 還要更完整的方案。
 
 第一個子產品 **Vibe Maker**：企業使用者以公司帳號登入後，用對話的方式請 AI Agent 幫忙建立小工具與網站。
-每個 Workspace 都有自己的隔離執行環境（Rootless Podman），Agent 的執行過程即時串流到瀏覽器。
+每個使用者有一個自己的隔離執行環境（Rootless Podman），像 ChatGPT 一樣可以用「專案」把相關的對話與檔案放在一起；Agent 的執行過程即時串流到瀏覽器。
 
 ```
-Angular ──REST/SSE──> .NET 10 API ──> Runtime Manager ──podman exec──> Workspace Container（Pi Agent）──> LiteLLM ──> LLM
+Angular ──REST/SSE──> .NET 10 API ──> Runtime Manager ──podman exec──> 使用者 Container（Pi Agent）──> LiteLLM ──> LLM
 ```
 
 ## 目前進度：Sprint 1（Walking Skeleton）✅
 
-以 Dev 帳號登入 → 建立 Workspace / 對話 → 送出訊息 → Agent（Pi）在 Workspace 中執行並即時串流 → 歷史保存，已端對端打通。
+以 Dev 帳號登入 → 主畫面（ChatGPT 式版面）直接開聊或在專案中對話 → Agent（Pi）在使用者的 container 中執行並即時串流 → 歷史保存，已端對端打通。
 進度與驗證紀錄見 [`docs/progress/`](docs/progress/)。
 
 ### Sprint 0（技術驗證 + 骨架）✅

@@ -10,7 +10,7 @@ namespace Ymir.VibeMaker.Application.Persistence;
 /// </summary>
 public interface IVibeMakerDbContext
 {
-    DbSet<Workspace> Workspaces { get; }
+    DbSet<Project> Projects { get; }
 
     DbSet<Conversation> Conversations { get; }
 

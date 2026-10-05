@@ -51,7 +51,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapAuthEndpoints(app.Environment);
-app.MapWorkspaceEndpoints();
+app.MapProjectEndpoints();
 app.MapConversationEndpoints();
 app.MapExecutionEndpoints();
 app.MapDefaultEndpoints();

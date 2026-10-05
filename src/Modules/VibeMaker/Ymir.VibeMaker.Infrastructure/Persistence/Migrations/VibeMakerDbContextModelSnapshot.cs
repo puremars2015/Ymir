@@ -87,10 +87,6 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("user_message_id");
 
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("workspace_id");
-
                     b.HasKey("Id")
                         .HasName("pk_agent_executions");
 
@@ -154,16 +150,16 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("updated_at");
 
-                    b.Property<Guid>("WorkspaceId")
+                    b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier")
-                        .HasColumnName("workspace_id");
+                        .HasColumnName("user_id");
 
                     b.HasKey("Id")
                         .HasName("pk_agent_runtimes");
 
-                    b.HasIndex("WorkspaceId")
+                    b.HasIndex("UserId")
                         .IsUnique()
-                        .HasDatabaseName("ix_agent_runtimes_workspace_id")
+                        .HasDatabaseName("ix_agent_runtimes_user_id")
                         .HasFilter("[status] <> 'DELETED'");
 
                     b.ToTable("agent_runtimes", "vibemaker");
@@ -208,10 +204,6 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("updated_at");
 
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("workspace_id");
-
                     b.HasKey("Id")
                         .HasName("pk_agent_sessions");
 
@@ -231,6 +223,10 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
+
+                    b.Property<Guid?>("ProjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("project_id");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -252,18 +248,14 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("user_id");
 
-                    b.Property<Guid>("WorkspaceId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("workspace_id");
-
                     b.HasKey("Id")
                         .HasName("pk_conversations");
 
-                    b.HasIndex("WorkspaceId")
-                        .HasDatabaseName("ix_conversations_workspace_id");
+                    b.HasIndex("ProjectId")
+                        .HasDatabaseName("ix_conversations_project_id");
 
-                    b.HasIndex("UserId", "WorkspaceId")
-                        .HasDatabaseName("ix_conversations_user_id_workspace_id");
+                    b.HasIndex("UserId", "ProjectId")
+                        .HasDatabaseName("ix_conversations_user_id_project_id");
 
                     b.ToTable("conversations", "vibemaker");
                 });
@@ -348,7 +340,7 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                     b.ToTable("messages", "vibemaker");
                 });
 
-            modelBuilder.Entity("Ymir.VibeMaker.Domain.Workspace", b =>
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.Project", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier")
@@ -370,12 +362,6 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(30)")
                         .HasColumnName("status");
 
-                    b.Property<string>("StorageKey")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)")
-                        .HasColumnName("storage_key");
-
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("updated_at");
@@ -385,12 +371,12 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnName("user_id");
 
                     b.HasKey("Id")
-                        .HasName("pk_workspaces");
+                        .HasName("pk_projects");
 
                     b.HasIndex("UserId")
-                        .HasDatabaseName("ix_workspaces_user_id");
+                        .HasDatabaseName("ix_projects_user_id");
 
-                    b.ToTable("workspaces", "vibemaker");
+                    b.ToTable("projects", "vibemaker");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.AgentExecution", b =>
@@ -410,16 +396,6 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_agent_executions_messages_user_message_id");
                 });
 
-            modelBuilder.Entity("Ymir.VibeMaker.Domain.AgentRuntimeRecord", b =>
-                {
-                    b.HasOne("Ymir.VibeMaker.Domain.Workspace", null)
-                        .WithMany()
-                        .HasForeignKey("WorkspaceId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_agent_runtimes_workspaces_workspace_id");
-                });
-
             modelBuilder.Entity("Ymir.VibeMaker.Domain.AgentSession", b =>
                 {
                     b.HasOne("Ymir.VibeMaker.Domain.Conversation", null)
@@ -432,12 +408,11 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.Conversation", b =>
                 {
-                    b.HasOne("Ymir.VibeMaker.Domain.Workspace", null)
+                    b.HasOne("Ymir.VibeMaker.Domain.Project", null)
                         .WithMany()
-                        .HasForeignKey("WorkspaceId")
+                        .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_conversations_workspaces_workspace_id");
+                        .HasConstraintName("fk_conversations_projects_project_id");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.ExecutionEventRecord", b =>

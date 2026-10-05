@@ -4,7 +4,9 @@
   --text-muted: #6b7280;
   --surface: #ffffff;
   --surface-muted: #f3f4f6;
-  --background: #f9fafb;
+  --surface-active: #e9eaee;
+  --sidebar: #f7f7f8;
+  --background: #ffffff;
   --border: #e5e7eb;
   --accent: #2563eb;
   --accent-contrast: #ffffff;
@@ -17,7 +19,9 @@
     --text-muted: #9ca3af;
     --surface: #111827;
     --surface-muted: #1f2937;
-    --background: #030712;
+    --surface-active: #2b3442;
+    --sidebar: #0b1220;
+    --background: #111827;
     --border: #374151;
     --accent: #60a5fa;
     --accent-contrast: #030712;
@@ -61,6 +65,10 @@ select {
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
+  font: inherit;
+}
+
+textarea {
   font: inherit;
 }
 

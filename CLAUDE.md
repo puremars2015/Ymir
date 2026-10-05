@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳號登入 → Chat → Agent（Pi）在每個 Workspace 專屬的 Rootless Podman container 執行 → 經 LiteLLM 呼叫模型 → SSE 即時串流回 Angular。
+Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳號登入 → Chat → Agent（Pi）在每個使用者專屬的 Rootless Podman container（一人一個，ADR-0007）執行；專案是 container 內的檔案群組 → 經 LiteLLM 呼叫模型 → SSE 即時串流回 Angular。
 本專案**全由 AI 開發**，請嚴格遵守下列規則；做任何架構相關的改動前，先讀相關 ADR。
 
 ## 必讀文件
@@ -22,7 +22,7 @@ src/
   Ymir.ServiceDefaults/              OpenTelemetry、health check
   Ymir.Edge/                         對外入口（Cloudflare Tunnel，ADR-0006）：可信任 proxy 的 X-Forwarded-*、Host 限制、HSTS、提供 Angular build
   Platform/Ymir.Platform[.Infrastructure]/         共用核心：使用者、身份（ICurrentUser）、稽核；schema platform
-  Modules/VibeMaker/Ymir.VibeMaker/                Domain/（實體、狀態機）+ Application/（Workspaces、Conversations、Executions 用例；IAgentHarness、IAgentRuntimeManager、IModelGateway）
+  Modules/VibeMaker/Ymir.VibeMaker/                Domain/（實體、狀態機）+ Application/（Projects、Conversations、Executions 用例；IAgentHarness、IAgentRuntimeManager、IModelGateway）
   Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/ Persistence/（EF Core，schema vibemaker）、Executions/（背景 worker、事件 bus）、PiAgent/、Containers/（Podman / Docker）、Runtime/（Local，開發用）、Dev/（Scripted harness）
   Modules/VibeMaker/Ymir.VibeMaker.Contracts/      API DTO、SSE 事件契約
 tests/
@@ -63,7 +63,7 @@ YMIR_UPDATE_OPENAPI=1 dotnet test --project tests/Ymir.IntegrationTests -- --fil
 cd web && npm run api:generate
 
 # 端對端驗證（需先啟動 SQL Server、Fake LLM、API（VibeMaker__Harness=Pi）、npm start）
-cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:sprint1 -- <截圖目錄>
+cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e -- <截圖目錄>
 
 # 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
 dotnet run --project src/Ymir.AppHost
@@ -92,8 +92,8 @@ Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用
 
 ## 安全紅線（違反即退回）
 
-- 所有 Workspace / Conversation / Message / Execution API 必須在 server 端驗證擁有者；不得信任前端傳入的 user id（SA §12）。新 API 必須加入授權矩陣測試。
-- Host 路徑只能由 workspace id 推導（`WorkspaceDirectories`）；API 不接受任何外部傳入的路徑。讀取 workspace 檔案時必須解析 realpath 並拒絕 `..` 與 symlink 逃逸。
+- 所有 Project / Conversation / Message / Execution API 必須在 server 端驗證擁有者；不得信任前端傳入的 user id（SA §12）。新 API 必須加入授權矩陣測試。
+- Host 路徑只能由 user id 推導（`UserDirectories`）；Agent 工作目錄只能是 `RuntimePaths` 由 Guid 產生的 `/workspace/projects/{id}`、`/workspace/chats/{id}`（ADR-0007）。API 不接受任何外部傳入的路徑。讀取檔案時必須解析 realpath 並拒絕 `..` 與 symlink 逃逸。
 - Container 不得 `--privileged`、不得掛載 container runtime socket 或 host 敏感路徑；改動 `ContainerCommandBuilder` 時同步更新 `ContainerCommandBuilderTests`（Podman 與 Docker 兩種 engine 都要符合）。
 - Container 內不得出現 LiteLLM master key、DB 連線字串或 AD 憑證（ADR-0004）。環境變數以 `podman exec --env NAME` 傳遞，值不得出現在程序參數。
 - 回給瀏覽器的錯誤與 tool 事件只能是摘要：不得含 stack trace、host path、token、完整 command output（SA §10、§12）。原始細節只寫 server log。
@@ -115,5 +115,6 @@ Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用
 2. **Commit**：一次一個垂直切片，訊息說明做了什麼與為什麼，結尾附 attribution trailer。
 3. **更新進度紀錄**：在 `docs/progress/` 目前 Sprint 的看板留言（做了什麼、實際跑過的驗證、卡關與待決定事項），更新置頂區的工作項目狀態，然後 commit。
 4. **Push**：`git push -u origin <目前分支>`；網路失敗依 2 / 4 / 8 / 16 秒重試。不要推到其他分支。
+5. **合併回 main**（使用者要求：每次做完都直接 merge）：開 PR → `main`，等 CI 全部通過後以 merge commit 合併（指定 head SHA）。CI 失敗就修正、驗證、commit、看板留言、push，直到通過；不得跳過或停用測試。合併後把工作分支重設到最新的 `main`（`git fetch origin main && git checkout -B <分支> origin/main`）再開始下一件工作。
 
 `.claude/hooks/require-commit-push-progress.sh`（Stop hook）會在回合結束時檢查：有未 commit 的變更、最後一次更新 `docs/progress/` 之後還有其他 commit、或有未 push 的 commit，都會擋下要求補完。

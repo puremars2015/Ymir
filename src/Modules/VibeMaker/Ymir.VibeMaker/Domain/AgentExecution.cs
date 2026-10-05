@@ -14,8 +14,6 @@ public sealed class AgentExecution
 
     public Guid ConversationId { get; private set; }
 
-    public Guid WorkspaceId { get; private set; }
-
     public Guid UserId { get; private set; }
 
     public Guid UserMessageId { get; private set; }
@@ -50,7 +48,6 @@ public sealed class AgentExecution
         {
             Id = Guid.CreateVersion7(now),
             ConversationId = conversation.Id,
-            WorkspaceId = conversation.WorkspaceId,
             UserId = conversation.UserId,
             UserMessageId = userMessage.Id,
             ClientRequestId = clientRequestId,

@@ -46,7 +46,8 @@ $env:VibeMaker__Pi__ModelId = "fake-model"
 dotnet run --project src/Ymir.Api
 ```
 
-- 第一次送訊息時會自動建立該 Workspace 的 container（`ymir-ws-<workspaceId>`），之後重複使用。
+- 第一次送訊息時會自動建立該使用者的 container（`ymir-user-<userId>`，一個使用者一個，ADR-0007），之後重複使用。
+- 從舊版升級：舊的 `ymir-ws-*` container 不再使用，可用 `docker ps -a --filter name=ymir-ws- -q | % { docker rm -f $_ }` 移除。
 - `Local` runtime 在 Windows 上不可用（需要 `sh`），API 會直接拒絕啟動並提示改用 `Docker`。
 
 ## 5. 啟動前端並操作
@@ -57,19 +58,19 @@ npm ci
 npm start
 ```
 
-開啟 <http://localhost:4200>，以任意帳號登入 → 建立 Workspace → 建立對話 → 送出 `[create-file] 幫我建立檔案`。
+開啟 <http://localhost:4200>，以任意帳號登入 → 在主畫面的輸入框直接送出 `[create-file] 幫我建立檔案`（或先在側邊欄建立專案，再在專案頁送出）。
 
 ## 6. 驗證清單
 
 | # | 項目 | 怎麼確認 |
 |---|---|---|
-| 1 | Agent 在 Workspace 建立檔案 | `C:\ymir-workspaces\<workspaceId>\workspace\hello.txt` 出現 |
+| 1 | Agent 在工作目錄建立檔案 | 未分組對話：`C:\ymir-workspaces\users\<userId>\workspace\chats\<conversationId>\hello.txt`；專案：`...\workspace\projects\<projectId>\hello.txt` |
 | 2 | 同一對話延續前文 | 再送一則訊息，回覆為「收到第 2 則使用者訊息」 |
-| 3 | Container 重建後仍記得前文 | `docker rm -f ymir-ws-<workspaceId>` 後再送訊息，回覆的則數持續增加 |
+| 3 | Container 重建後仍記得前文 | `docker rm -f ymir-user-<userId>` 後再送訊息，回覆的則數持續增加 |
 | 4 | 取消 | 送出 `[slow] 慢慢講`，執行中按「停止」 |
-| 5 | 安全設定 | `docker inspect ymir-ws-<workspaceId> --format "{{.Config.User}} {{.HostConfig.ReadonlyRootfs}} {{.HostConfig.CapDrop}} {{.HostConfig.SecurityOpt}}"` 應為 `1000:1000 true [ALL] [no-new-privileges]` |
-| 6 | 資源限制 | `docker stats ymir-ws-<workspaceId>` 顯示 MEM LIMIT 2GiB |
-| 7 | Workspace 隔離 | 另建一個 Workspace，`docker exec ymir-ws-<另一個id> ls /workspace` 看不到 `hello.txt` |
+| 5 | 安全設定 | `docker inspect ymir-user-<userId> --format "{{.Config.User}} {{.HostConfig.ReadonlyRootfs}} {{.HostConfig.CapDrop}} {{.HostConfig.SecurityOpt}}"` 應為 `1000:1000 true [ALL] [no-new-privileges]` |
+| 6 | 資源限制 | `docker stats ymir-user-<userId>` 顯示 MEM LIMIT 2GiB |
+| 7 | 使用者隔離 | 用另一個帳號登入並送訊息，會建立第二個 `ymir-user-<另一個userId>`；`docker exec` 進去看不到第一個使用者的檔案 |
 
 只想驗證 runtime（不開前端）時，可以用 PoC：
 
