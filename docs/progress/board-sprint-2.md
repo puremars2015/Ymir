@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-05 00:26 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-05 11:13 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -23,7 +23,7 @@
 | Docker 作為開發 / 驗證用 runtime（Windows Docker Desktop） | ✅ | ADR-0005；見 [#003](#003--新增-docker-runtime可用-windows-docker-desktop-開發與驗證) |
 | 使用者在 Windows 上依指南實機驗證 | ⏳ | [docs/guides/windows-docker.md](../guides/windows-docker.md) 第 6 節驗證清單 |
 | Cloudflare Tunnel 對外入口（`Ymir.Edge` 模組） | ✅ | ADR-0006；見 [#004](#004--新增-cloudflare-tunnel-對外入口模組ymiredge) |
-| 使用者建立 Named tunnel 並依指南驗證 | ⏳ | [docs/guides/cloudflare-tunnel.md](../guides/cloudflare-tunnel.md) 第 6 節；登入相關項目等 OIDC 完成 |
+| 使用者建立 Named tunnel 並依指南驗證 | 🚧 | 已建立 token 模式 tunnel（token 存於本機 `deploy/cloudflared/.env`，未提交）；待在使用者主機 `docker compose up` 並跑 [指南](../guides/cloudflare-tunnel.md) 第 6 節 |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
 **開工前要先有的決定**：企業 IdP 類型（Entra ID / ADFS / 純 LDAP）與測試用的 App 註冊資訊（client id、redirect URI）。
@@ -31,6 +31,49 @@
 ---
 
 ## 💬 留言區
+
+### #005 · Tunnel 改用 token 模式 + Docker；API 端擋 health check
+
+> 👤 **Claude（AI）** · 🕒 2026-10-05 11:13 · `🚧進度`
+
+使用者提供了 dashboard 建立的 tunnel（token 模式），並以 Docker 執行 cloudflared。
+
+- **[`deploy/cloudflared/compose.yml`](../../deploy/cloudflared/compose.yml)**：cloudflared container 的設定。
+  - 版本固定為 `2026.9.3`，不用 `latest`。
+  - 唯讀、drop 全部 capabilities、`no-new-privileges`。
+  - `TUNNEL_TOKEN` 從同目錄的 `.env` 以環境變數傳入，不寫在 `docker run --token`，所以不會出現在 shell 歷史與 `ps` 中。
+- **Token**：依使用者要求寫進本機 `deploy/cloudflared/.env`，檔案權限 600。
+  - `.gitignore` 原本的 `.env` 規則已涵蓋，另外加了明確的 `deploy/cloudflared/.env`。
+  - 範本為 `.env.example`。
+  - 提交前檢查過：所有 commit 都不含 token。
+- **API 端擋 `/health`、`/alive`**：token 模式的 ingress 在 dashboard，不在版控裡，因此改由 API 擋。經由公開網域進來的一律回 404，用 localhost 監控仍可使用（ADR-0006 第 5 點）。
+- 指南新增「2A. Token 模式 + Docker」，並補上兩點：
+  - Docker Desktop 用 `host.docker.internal:5080`，Linux 用 host network。
+  - **警告不可把 Public Hostname 指向 `ng serve` 或 Development 的 API**。tunnel 本身擋不住，API 端的防護只在開啟 `Ymir:PublicEdge` 時生效。
+
+**驗證（實際跑過）**
+- `dotnet format` 通過；Release build 通過。
+- `dotnet test --solution Ymir.slnx`：**121 項全部通過**，新增 5 項 health 隱藏測試。
+- `docker compose config`：有 `.env` 時解析成功；沒有 token 時明確報錯。
+- 確認映像檔標籤 `cloudflare/cloudflared:2026.9.3` 存在。
+- `git check-ignore` 確認 `.env` 被排除。
+
+**沒有驗證的**：
+- 沒有在沙箱啟動這個 tunnel。啟動會把使用者的公開網域接到沙箱，必須在使用者自己的主機上執行。
+- Docker Desktop 經 `host.docker.internal` 轉送後，API 看到的來源是否為 loopback，需要用驗證清單第 4 項（HSTS header）確認。
+
+`⚠️發現`
+1. 沙箱是暫時的環境，**`.env` 只存在這個 session 的 container 裡**，不會同步到使用者電腦。使用者需要在自己的 clone 依 `.env.example` 建立 `.env`。
+2. Token 已出現在對話紀錄中。若擔心外洩，可在 dashboard 對該 tunnel 重新產生 token，再更新 `.env`。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #004 · 新增 Cloudflare Tunnel 對外入口模組（Ymir.Edge）
 
