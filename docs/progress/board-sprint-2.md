@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-04 18:02 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-05 00:26 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -22,6 +22,8 @@
 | 授權矩陣加入角色維度（User 不能呼叫 Admin API） | ⏳ | |
 | Docker 作為開發 / 驗證用 runtime（Windows Docker Desktop） | ✅ | ADR-0005；見 [#003](#003--新增-docker-runtime可用-windows-docker-desktop-開發與驗證) |
 | 使用者在 Windows 上依指南實機驗證 | ⏳ | [docs/guides/windows-docker.md](../guides/windows-docker.md) 第 6 節驗證清單 |
+| Cloudflare Tunnel 對外入口（`Ymir.Edge` 模組） | ✅ | ADR-0006；見 [#004](#004--新增-cloudflare-tunnel-對外入口模組ymiredge) |
+| 使用者建立 Named tunnel 並依指南驗證 | ⏳ | [docs/guides/cloudflare-tunnel.md](../guides/cloudflare-tunnel.md) 第 6 節；登入相關項目等 OIDC 完成 |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
 **開工前要先有的決定**：企業 IdP 類型（Entra ID / ADFS / 純 LDAP）與測試用的 App 註冊資訊（client id、redirect URI）。
@@ -29,6 +31,58 @@
 ---
 
 ## 💬 留言區
+
+### #004 · 新增 Cloudflare Tunnel 對外入口模組（Ymir.Edge）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-05 00:26 · `✅完成`
+
+依使用者的決定：**對外的是 Ymir 平台本身**，使用 **Named tunnel + 自有網域**，**完全公開**（不加 Cloudflare Access，靠平台自己的登入）。決策見 [ADR-0006](../adr/0006-cloudflare-tunnel-public-edge.md)。
+
+- **新模組 `src/Ymir.Edge/`**，以 `Ymir:PublicEdge` 開啟：
+  - 只信任 cloudflared（預設 loopback）送來的 `X-Forwarded-For` / `X-Forwarded-Proto`，只取最後一個值，避免用戶端偽造。
+  - Host header 只接受公開網域與 localhost。
+  - 加上 HSTS。
+  - **Development 環境直接拒絕啟動**，因為 dev 登入與 Local runtime 不能對外。
+- **`Ymir:Web:RootPath`**：API 直接提供 Angular build，同源（ADR-0002），所以 tunnel 只需要一條 ingress 規則；沒有對應端點的 `/api` 網址不會回 HTML。
+- 設定範本 [`deploy/cloudflared/config.example.yml`](../../deploy/cloudflared/config.example.yml)：`/health`、`/alive` 不對外；其他網域一律回 404。
+- 操作指南 [`docs/guides/cloudflare-tunnel.md`](../guides/cloudflare-tunnel.md)：Windows 步驟、設定表、8 項驗證清單、疑難排解。
+- tunnel 憑證已加入 `.gitignore`；CLAUDE.md 安全紅線補上對外規則。
+
+**驗證（實際跑過）**
+- `dotnet format --verify-no-changes` 通過；Release build 通過。
+- `dotnet test --solution Ymir.slnx`：**116 項全部通過**（新增 22 項 Edge 測試）。測試涵蓋：
+  - 可信任 / 不可信任的 proxy
+  - 偽造 `X-Forwarded-For`
+  - 自訂 KnownProxies
+  - Host 限制
+  - Development 拒絕啟動
+  - 無效設定
+  - SPA 路由
+  - `/api` 不回 HTML 且仍需登入
+- 以 **Production** 環境實際啟動 Ymir.Api，帶 Angular build，結果：
+  - 公開網域加 `X-Forwarded-Proto: https`：`/` 回 200 HTML，且有 HSTS。
+  - 前端路由回 index.html。
+  - 未登入呼叫 `/api/me` 回 401。
+  - `/api/dev/login` 不存在，回 401。
+  - Host 不對的請求回 400。
+  - Development 加 PublicEdge 時拒絕啟動。
+- 用 `cloudflared 2026.9.3 tunnel ingress validate` / `ingress rule` 驗證範本：規則合法；`/health` 和其他網域回 404；其他請求轉到 `127.0.0.1:5080`。
+
+**沒有驗證的**：沒有實際連上 Cloudflare 建立 tunnel，因為需要使用者的帳號與網域。SSE 經 Cloudflare 的長連線、約 100 秒閒置逾時後的重連，要等 Sprint 2 有登入後才能驗證。
+
+`⚠️發現`
+1. **在 Sprint 2（OIDC）完成前，對外網站只能顯示首頁與「請先登入」**：正式環境沒有 dev 登入，也還沒有企業帳號登入。
+2. 正式 runtime 仍只支援 Rootless Podman（ADR-0005）；Windows 加 Docker 對外只能短期驗證。
+3. 完全公開會被掃描；目前的防線是授權預設拒絕與授權矩陣測試。需要時可以加 Cloudflare WAF / rate limit，或改用 Cloudflare Access（需要新 ADR）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #003 · 新增 Docker runtime，可用 Windows Docker Desktop 開發與驗證
 

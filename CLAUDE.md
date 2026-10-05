@@ -20,6 +20,7 @@ src/
   Ymir.Api/                          ASP.NET Core Host：Endpoints/、Auth/（Cookie + XSRF）、openapi/v1.json（API 契約快照）
   Ymir.AppHost/                      .NET Aspire 本機開發編排
   Ymir.ServiceDefaults/              OpenTelemetry、health check
+  Ymir.Edge/                         對外入口（Cloudflare Tunnel，ADR-0006）：可信任 proxy 的 X-Forwarded-*、Host 限制、HSTS、提供 Angular build
   Platform/Ymir.Platform[.Infrastructure]/         共用核心：使用者、身份（ICurrentUser）、稽核；schema platform
   Modules/VibeMaker/Ymir.VibeMaker/                Domain/（實體、狀態機）+ Application/（Workspaces、Conversations、Executions 用例；IAgentHarness、IAgentRuntimeManager、IModelGateway）
   Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/ Persistence/（EF Core，schema vibemaker）、Executions/（背景 worker、事件 bus）、PiAgent/、Containers/（Podman / Docker）、Runtime/（Local，開發用）、Dev/（Scripted harness）
@@ -30,6 +31,7 @@ tests/
   Ymir.Testing.FakeLlm/              OpenAI 相容假模型（[create-file] / [slow] / [fail] 腳本）
 web/                                 Angular 22（standalone、signals、zoneless、Vitest、ESLint）；src/app/core/api/schema.ts 由 OpenAPI 產生；e2e/ Playwright 腳本
 runtime/agent/                       Agent runtime Containerfile
+deploy/cloudflared/                  cloudflared ingress 設定範本（指南 docs/guides/cloudflare-tunnel.md）
 spikes/pi-rpc-poc/                   技術驗證主控台程式
 ```
 
@@ -96,6 +98,7 @@ Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用
 - Container 內不得出現 LiteLLM master key、DB 連線字串或 AD 憑證（ADR-0004）。環境變數以 `podman exec --env NAME` 傳遞，值不得出現在程序參數。
 - 回給瀏覽器的錯誤與 tool 事件只能是摘要：不得含 stack trace、host path、token、完整 command output（SA §10、§12）。原始細節只寫 server log。
 - `LocalRuntimeManager` 沒有隔離，只允許 Development 環境（DI 會在其他環境拒絕啟動）。
+- 對外公開（`Ymir:PublicEdge`，ADR-0006）不得在 Development 環境開啟；API 只綁 127.0.0.1、只信任 cloudflared 的 `X-Forwarded-*`。Tunnel 憑證不得進版控或進 container。
 
 ## 程式風格
 

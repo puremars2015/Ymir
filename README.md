@@ -50,5 +50,6 @@ VibeMaker__Harness=Pi dotnet run --project src/Ymir.Api   # 搭配 dotnet run --
 | [`docs/adr/`](docs/adr/) | 架構決策紀錄 |
 | [`docs/progress/`](docs/progress/) | 開發進度留言版（每個 Sprint 一個看板） |
 | [`runtime/agent/README.md`](runtime/agent/README.md) | Agent container image 與部署主機需求 |
+| [`docs/guides/`](docs/guides/) | 操作指南：Windows Docker 開發、Cloudflare Tunnel 對外公開 |
 | [`CLAUDE.md`](CLAUDE.md) | AI 開發規則（專案結構、指令、安全紅線） |
 | `documents/` | 原始 SA 文件與架構圖 |
