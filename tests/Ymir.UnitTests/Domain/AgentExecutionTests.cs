@@ -96,4 +96,49 @@ public class AgentExecutionTests
         var project = Project.Create(Guid.NewGuid(), "someone else", Now);
         Assert.Throws<DomainValidationException>(() => Conversation.Create(Guid.NewGuid(), project, "chat", Now));
     }
+
+    [Fact]
+    public void Project_SystemPrompt_IsTrimmed_BlankClears_AndTooLongIsRejected()
+    {
+        var project = Project.Create(Guid.NewGuid(), "p", Now);
+
+        project.SetSystemPrompt("  請用繁體中文  ", Now);
+        Assert.Equal("請用繁體中文", project.SystemPrompt);
+
+        project.SetSystemPrompt("   ", Now);
+        Assert.Null(project.SystemPrompt);
+
+        Assert.Throws<DomainValidationException>(() => project.SetSystemPrompt(new string('x', Project.SystemPromptMaxLength + 1), Now));
+    }
+
+    [Fact]
+    public void Project_Rename_RequiresName()
+    {
+        var project = Project.Create(Guid.NewGuid(), "old", Now);
+        project.Rename(" new ", Now);
+        Assert.Equal("new", project.Name);
+        Assert.Throws<DomainValidationException>(() => project.Rename(" ", Now));
+    }
+
+    [Fact]
+    public void UserSettings_SystemPrompt_UsesSameLimit()
+    {
+        var settings = UserSettings.Create(Guid.NewGuid(), Now);
+        settings.SetSystemPrompt("回答要簡短", Now);
+        Assert.Equal("回答要簡短", settings.SystemPrompt);
+        Assert.Throws<DomainValidationException>(() => settings.SetSystemPrompt(new string('x', Project.SystemPromptMaxLength + 1), Now));
+    }
+
+    [Fact]
+    public void Queue_RecordsModel_AndConversationRemembersSelection()
+    {
+        var conversation = Conversation.Create(Guid.NewGuid(), null, "chat", Now);
+        conversation.SelectModel("minimax");
+        var message = Message.CreateUser(conversation.Id, "hi", 1, Now);
+
+        var execution = AgentExecution.Queue(conversation, message, Guid.NewGuid(), Now, "minimax");
+
+        Assert.Equal("minimax", conversation.ModelId);
+        Assert.Equal("minimax", execution.ModelId);
+    }
 }

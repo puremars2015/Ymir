@@ -29,6 +29,11 @@ internal static class ProjectEndpoints
             .WithName("GetProject")
             .Produces<ProjectResponse>();
 
+        group.MapPatch("/{projectId:guid}", async Task<IResult> (Guid projectId, UpdateProjectRequest request, ProjectService service, CancellationToken ct) =>
+                await service.UpdateAsync(projectId, request, ct) is { } project ? TypedResults.Ok(project) : NotFound())
+            .WithName("UpdateProject")
+            .Produces<ProjectResponse>();
+
         // 一個使用者一個 runtime：只查自己的，不接受任何 id。
         endpoints.MapGet("/api/runtime", (RuntimeQueryService service, CancellationToken ct) => service.GetCurrentAsync(ct))
             .WithName("GetRuntime")

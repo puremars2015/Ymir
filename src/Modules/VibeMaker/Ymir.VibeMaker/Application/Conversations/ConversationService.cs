@@ -82,5 +82,5 @@ public sealed class ConversationService(IVibeMakerDbContext db, ICurrentUser cur
         return db.Conversations.AsNoTracking().SingleOrDefaultAsync(c => c.Id == conversationId && c.UserId == userId, cancellationToken);
     }
 
-    private static ConversationResponse ToResponse(Conversation c) => new(c.Id, c.ProjectId, c.Title, SaValues.Of(c.Status), c.CreatedAt, c.UpdatedAt);
+    private static ConversationResponse ToResponse(Conversation c) => new(c.Id, c.ProjectId, c.Title, c.ModelId, SaValues.Of(c.Status), c.CreatedAt, c.UpdatedAt);
 }

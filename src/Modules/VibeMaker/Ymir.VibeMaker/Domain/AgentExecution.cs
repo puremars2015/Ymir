@@ -38,9 +38,12 @@ public sealed class AgentExecution
     /// <summary>最後保存的 ASSISTANT 訊息。</summary>
     public Guid? AssistantMessageId { get; private set; }
 
+    /// <summary>這次執行使用的模型（稽核與用量分析）；舊資料為 null，代表當時的預設模型。</summary>
+    public string? ModelId { get; private set; }
+
     public byte[] RowVersion { get; private set; } = [];
 
-    public static AgentExecution Queue(Conversation conversation, Message userMessage, Guid clientRequestId, DateTimeOffset now)
+    public static AgentExecution Queue(Conversation conversation, Message userMessage, Guid clientRequestId, DateTimeOffset now, string? modelId = null)
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(userMessage);
@@ -53,6 +56,7 @@ public sealed class AgentExecution
             ClientRequestId = clientRequestId,
             Status = ExecutionStatus.Queued,
             CreatedAt = now,
+            ModelId = modelId,
         };
         userMessage.AttachExecution(execution.Id);
         return execution;

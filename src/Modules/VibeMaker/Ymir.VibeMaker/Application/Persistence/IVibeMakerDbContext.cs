@@ -24,6 +24,8 @@ public interface IVibeMakerDbContext
 
     DbSet<ExecutionEventRecord> ExecutionEvents { get; }
 
+    DbSet<UserSettings> UserSettings { get; }
+
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity)
         where TEntity : class;
 

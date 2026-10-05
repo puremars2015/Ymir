@@ -11,5 +11,6 @@ public static class ExecutionErrorCodes
     public const string AgentTimeout = "AGENT_TIMEOUT";
     public const string AgentRuntimeError = "AGENT_RUNTIME_ERROR";
     public const string ModelProviderError = "MODEL_PROVIDER_ERROR";
+    public const string ModelNotAvailable = "MODEL_NOT_AVAILABLE";
     public const string ExecutionCancelled = "EXECUTION_CANCELLED";
 }

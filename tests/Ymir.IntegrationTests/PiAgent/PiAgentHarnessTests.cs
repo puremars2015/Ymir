@@ -36,7 +36,7 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
 
         var events = await RunAsync(
             fixture.CreateHarness(),
-            new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.CreateFileMarker} 請建立檔案", RuntimePaths.ProjectDirectory(projectId), PiHarnessFixture.ModelApiKey),
+            PiHarnessFixture.Request(runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.CreateFileMarker} 請建立檔案", RuntimePaths.ProjectDirectory(projectId)),
             ct);
 
         Assert.IsType<AgentStarted>(events[0]);
@@ -59,8 +59,8 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
         var sessionId = Guid.NewGuid();
         var harness = fixture.CreateHarness();
 
-        var first = await RunAsync(harness, new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, sessionId, "第一句", RuntimePaths.Workspace, PiHarnessFixture.ModelApiKey), ct);
-        var second = await RunAsync(harness, new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, sessionId, "第二句", RuntimePaths.Workspace, PiHarnessFixture.ModelApiKey), ct);
+        var first = await RunAsync(harness, PiHarnessFixture.Request(runtime.RuntimeId, sessionId, "第一句", RuntimePaths.Workspace), ct);
+        var second = await RunAsync(harness, PiHarnessFixture.Request(runtime.RuntimeId, sessionId, "第二句", RuntimePaths.Workspace), ct);
 
         Assert.Equal("收到第 1 則使用者訊息：第一句", Assert.IsType<AgentCompleted>(first[^1]).FinalText);
         Assert.Equal("收到第 2 則使用者訊息：第二句", Assert.IsType<AgentCompleted>(second[^1]).FinalText);
@@ -75,7 +75,7 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
 
         var events = new List<AgentEvent>();
         await foreach (var agentEvent in fixture.CreateHarness().RunAsync(
-            new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.SlowMarker} 慢慢講", RuntimePaths.Workspace, PiHarnessFixture.ModelApiKey),
+            PiHarnessFixture.Request(runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.SlowMarker} 慢慢講", RuntimePaths.Workspace),
             cts.Token))
         {
             events.Add(agentEvent);
@@ -98,7 +98,7 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
 
         var events = await RunAsync(
             fixture.CreateHarness(autoRetry: false),
-            new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.FailMarker} 壞掉", RuntimePaths.Workspace, PiHarnessFixture.ModelApiKey),
+            PiHarnessFixture.Request(runtime.RuntimeId, Guid.NewGuid(), $"{FakeLlmScript.FailMarker} 壞掉", RuntimePaths.Workspace),
             ct);
 
         var failed = Assert.IsType<AgentFailed>(events[^1]);
@@ -113,9 +113,10 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
         var harness = new PiAgentHarness(
             fixture.RuntimeManager,
             Options.Create(new PiAgentOptions { Executable = "definitely-not-a-real-pi-binary", ModelBaseUrl = fixture.FakeLlm.BaseUrl }),
+            PiHarnessFixture.Catalog,
             new TestOutputLogger<PiAgentHarness>());
 
-        var events = await RunAsync(harness, new AgentRunRequest(Guid.NewGuid(), runtime.RuntimeId, Guid.NewGuid(), "hi", RuntimePaths.Workspace, PiHarnessFixture.ModelApiKey), ct);
+        var events = await RunAsync(harness, PiHarnessFixture.Request(runtime.RuntimeId, Guid.NewGuid(), "hi", RuntimePaths.Workspace), ct);
 
         var failed = Assert.IsType<AgentFailed>(Assert.Single(events));
         Assert.Equal(ExecutionErrorCodes.AgentRuntimeError, failed.Code);

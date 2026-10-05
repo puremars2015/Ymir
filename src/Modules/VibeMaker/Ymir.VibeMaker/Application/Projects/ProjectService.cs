@@ -35,6 +35,34 @@ public sealed class ProjectService(IVibeMakerDbContext db, ICurrentUser currentU
         return ToResponse(project);
     }
 
+    /// <returns>專案不存在或不是自己的時回傳 null（→ 404）。</returns>
+    public async Task<ProjectResponse?> UpdateAsync(Guid projectId, UpdateProjectRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var userId = currentUser.UserId;
+        var project = await db.Projects.SingleOrDefaultAsync(p => p.Id == projectId && p.UserId == userId, cancellationToken).ConfigureAwait(false);
+        if (project is null)
+        {
+            return null;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        if (request.Name is not null)
+        {
+            project.Rename(request.Name, now);
+        }
+
+        if (request.SystemPrompt is not null)
+        {
+            project.SetSystemPrompt(request.SystemPrompt, now);
+        }
+
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await auditLog.WriteAsync(new AuditEntry(currentUser.ActorName, "project.update", "project", project.Id.ToString("D"), AuditResult.Success, now, null), cancellationToken)
+            .ConfigureAwait(false);
+        return ToResponse(project);
+    }
+
     public async Task<ProjectResponse?> GetAsync(Guid projectId, CancellationToken cancellationToken)
     {
         var userId = currentUser.UserId;
@@ -44,5 +72,5 @@ public sealed class ProjectService(IVibeMakerDbContext db, ICurrentUser currentU
         return project is null ? null : ToResponse(project);
     }
 
-    private static ProjectResponse ToResponse(Project p) => new(p.Id, p.Name, SaValues.Of(p.Status), p.CreatedAt, p.UpdatedAt);
+    private static ProjectResponse ToResponse(Project p) => new(p.Id, p.Name, p.SystemPrompt, SaValues.Of(p.Status), p.CreatedAt, p.UpdatedAt);
 }

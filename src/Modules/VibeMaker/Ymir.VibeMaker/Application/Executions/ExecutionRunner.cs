@@ -20,6 +20,7 @@ public sealed class ExecutionRunner(
     IAgentRuntimeManager runtimeManager,
     IAgentHarness harness,
     RuntimeCredentialService credentials,
+    ModelCatalog models,
     ExecutionEventWriter eventWriter,
     IExecutionCancellationRegistry cancellations,
     UserExecutionLocks userLocks,
@@ -121,7 +122,9 @@ public sealed class ExecutionRunner(
                 session.Id,
                 await GetPromptAsync(execution, stoppingToken).ConfigureAwait(false),
                 await GetWorkingDirectoryAsync(execution, stoppingToken).ConfigureAwait(false),
-                credential.ApiKey);
+                credential.ApiKey,
+                models.Resolve(execution.ModelId),
+                await GetSystemPromptsAsync(execution, stoppingToken).ConfigureAwait(false));
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
             {
                 if (agentEvent is AgentCompleted or AgentFailed or AgentCancelled)
@@ -216,6 +219,27 @@ public sealed class ExecutionRunner(
     {
         var projectId = await db.Conversations.Where(c => c.Id == execution.ConversationId).Select(c => c.ProjectId).SingleAsync(cancellationToken).ConfigureAwait(false);
         return RuntimePaths.WorkingDirectoryFor(execution.ConversationId, projectId);
+    }
+
+    /// <summary>個人 global system prompt 在前、專案 system prompt 在後；未設定的省略。</summary>
+    private async Task<IReadOnlyList<string>> GetSystemPromptsAsync(AgentExecution execution, CancellationToken cancellationToken)
+    {
+        var prompts = new List<string>(2);
+        var userPrompt = await db.UserSettings.Where(s => s.UserId == execution.UserId).Select(s => s.SystemPrompt).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(userPrompt))
+        {
+            prompts.Add(userPrompt);
+        }
+
+        var projectPrompt = await db.Conversations.Where(c => c.Id == execution.ConversationId && c.ProjectId != null)
+            .Join(db.Projects, c => c.ProjectId, p => p.Id, (_, p) => p.SystemPrompt)
+            .SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(projectPrompt))
+        {
+            prompts.Add(projectPrompt);
+        }
+
+        return prompts;
     }
 
     private async Task RecordRuntimeAsync(RuntimeInfo runtime, CancellationToken cancellationToken)

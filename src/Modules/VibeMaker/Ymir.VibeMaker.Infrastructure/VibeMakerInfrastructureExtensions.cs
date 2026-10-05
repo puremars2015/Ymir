@@ -91,18 +91,43 @@ public static class VibeMakerInfrastructureExtensions
     /// 模型金鑰（ADR-0004）：設定了 <c>VibeMaker:LiteLlm:MasterKey</c> 就為每位使用者發 LiteLLM virtual key；
     /// 沒設定時只有 Development 可以退回固定的開發用 key，其他環境拒絕啟動（避免把 master key 當成共用 key 塞進 container）。
     /// </summary>
+    /// <summary>
+    /// 可選用的模型：<c>VibeMaker:Models</c>（每項 Id、DisplayName）；預設模型為 <c>VibeMaker:Pi:ModelId</c>，
+    /// 不在清單內時自動加入，清單未設定時只有預設模型。
+    /// </summary>
+    internal static ModelCatalog BuildModelCatalog(IConfiguration configuration)
+    {
+        var defaultModel = configuration.GetSection(PiAgentOptions.SectionName).GetValue(nameof(PiAgentOptions.ModelId), new PiAgentOptions().ModelId)!;
+        var models = configuration.GetSection("VibeMaker:Models").GetChildren()
+            .Select(section => (Id: section["Id"]?.Trim(), DisplayName: section["DisplayName"]?.Trim()))
+            .Where(m => !string.IsNullOrEmpty(m.Id))
+            .Select(m => new ModelDescriptor(m.Id!, string.IsNullOrEmpty(m.DisplayName) ? m.Id! : m.DisplayName!))
+            .DistinctBy(m => m.Id)
+            .ToList();
+        if (!models.Any(m => m.Id == defaultModel))
+        {
+            models.Insert(0, new ModelDescriptor(defaultModel, defaultModel));
+        }
+
+        return new ModelCatalog(models, defaultModel);
+    }
+
     private static void AddModelGateway(IServiceCollection services, IConfiguration configuration, bool isDevelopment)
     {
         var section = configuration.GetSection(LiteLlmOptions.SectionName);
         services.Configure<LiteLlmOptions>(section);
         services.Configure<ModelCredentialOptions>(section);
-        // 沒有設定 AllowedModels 時只允許 Pi 使用的模型，不發出不限模型的 key。
-        var piModel = configuration.GetSection(PiAgentOptions.SectionName).GetValue(nameof(PiAgentOptions.ModelId), new PiAgentOptions().ModelId)!;
+        var catalog = BuildModelCatalog(configuration);
+        services.AddSingleton(catalog);
+        // 沒有設定 AllowedModels 時只允許模型清單內的模型，不發出不限模型的 key。
         services.PostConfigure<ModelCredentialOptions>(options =>
         {
             if (options.AllowedModels.Count == 0)
             {
-                options.AllowedModels.Add(piModel);
+                foreach (var model in catalog.Models)
+                {
+                    options.AllowedModels.Add(model.Id);
+                }
             }
         });
         services.TryAddSingleton(TimeProvider.System);

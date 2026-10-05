@@ -24,6 +24,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<ExecutionEventRecord> ExecutionEvents => Set<ExecutionEventRecord>();
 
+    public DbSet<UserSettings> UserSettings => Set<UserSettings>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -34,6 +36,7 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             project.HasKey(p => p.Id);
             project.Property(p => p.Id).ValueGeneratedNever();
             project.Property(p => p.Name).HasMaxLength(Project.NameMaxLength).IsRequired();
+            project.Property(p => p.SystemPrompt).HasMaxLength(Project.SystemPromptMaxLength);
             project.Property(p => p.Status).HasConversion<UpperSnakeCaseEnumConverter<ProjectStatus>>().HasMaxLength(30);
             project.HasIndex(p => p.UserId);
         });
@@ -44,6 +47,7 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             conversation.HasKey(c => c.Id);
             conversation.Property(c => c.Id).ValueGeneratedNever();
             conversation.Property(c => c.Title).HasMaxLength(Conversation.TitleMaxLength).IsRequired();
+            conversation.Property(c => c.ModelId).HasMaxLength(Conversation.ModelIdMaxLength);
             conversation.Property(c => c.Status).HasConversion<UpperSnakeCaseEnumConverter<ConversationStatus>>().HasMaxLength(30);
             conversation.HasOne<Project>().WithMany().HasForeignKey(c => c.ProjectId).OnDelete(DeleteBehavior.Restrict);
             conversation.HasIndex(c => new { c.UserId, c.ProjectId });
@@ -93,6 +97,7 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             execution.Property(e => e.Id).ValueGeneratedNever();
             execution.Property(e => e.Status).HasConversion<UpperSnakeCaseEnumConverter<ExecutionStatus>>().HasMaxLength(30);
             execution.Property(e => e.ErrorCode).HasMaxLength(100);
+            execution.Property(e => e.ModelId).HasMaxLength(Conversation.ModelIdMaxLength);
             execution.Property(e => e.RowVersion).IsRowVersion();
             execution.HasOne<Conversation>().WithMany().HasForeignKey(e => e.ConversationId).OnDelete(DeleteBehavior.Restrict);
             execution.HasOne<Message>().WithMany().HasForeignKey(e => e.UserMessageId).OnDelete(DeleteBehavior.Restrict);
@@ -111,6 +116,14 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             evt.Property(e => e.EventType).HasMaxLength(50).IsRequired();
             evt.Property(e => e.Data).IsRequired();
             evt.HasOne<AgentExecution>().WithMany().HasForeignKey(e => e.ExecutionId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<UserSettings>(settings =>
+        {
+            settings.ToTable("user_settings");
+            settings.HasKey(s => s.UserId);
+            settings.Property(s => s.UserId).ValueGeneratedNever();
+            settings.Property(s => s.SystemPrompt).HasMaxLength(Project.SystemPromptMaxLength);
         });
 
         modelBuilder.ApplySnakeCaseNames();

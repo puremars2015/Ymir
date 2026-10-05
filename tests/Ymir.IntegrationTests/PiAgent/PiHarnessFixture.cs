@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using Ymir.Testing.FakeLlm;
 using Ymir.VibeMaker.Application.Agents;
+using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Infrastructure.PiAgent;
 using Ymir.VibeMaker.Infrastructure.Runtime;
@@ -15,6 +16,17 @@ public sealed class PiHarnessFixture : IAsyncLifetime
 {
     /// <summary>直接呼叫 harness 時使用的模型金鑰（Fake LLM 不驗證）。</summary>
     public const string ModelApiKey = "integration-test-key";
+
+    /// <summary>第二個可選用的模型（Fake LLM 不檢查模型名稱，用來驗證 --model 確實帶入）。</summary>
+    public const string SecondModelId = "fake-model-2";
+
+    public static ModelCatalog Catalog { get; } = new(
+        [new ModelDescriptor(FakeLlmEndpoints.ModelId, "Fake"), new ModelDescriptor(SecondModelId, "Fake 2")],
+        FakeLlmEndpoints.ModelId);
+
+    /// <summary>直接呼叫 harness 的 request（預設模型、沒有附加 system prompt）。</summary>
+    public static AgentRunRequest Request(Guid runtimeId, Guid sessionId, string prompt, string? workingDirectory = null, string? modelId = null, IReadOnlyList<string>? systemPrompts = null) =>
+        new(Guid.NewGuid(), runtimeId, sessionId, prompt, workingDirectory ?? RuntimePaths.Workspace, ModelApiKey, modelId ?? FakeLlmEndpoints.ModelId, systemPrompts ?? []);
 
     public string WorkspaceRoot { get; } = Path.Combine(Path.GetTempPath(), "ymir-pi-it-" + Guid.NewGuid().ToString("N"));
 
@@ -43,6 +55,7 @@ public sealed class PiHarnessFixture : IAsyncLifetime
                 AutoRetry = autoRetry,
                 AbortGracePeriod = TimeSpan.FromSeconds(5),
             }),
+            Catalog,
             new TestOutputLogger<PiAgentHarness>());
 
     public async ValueTask DisposeAsync()
