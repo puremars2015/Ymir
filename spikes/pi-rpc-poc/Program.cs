@@ -56,13 +56,13 @@ internal static class Program
         var prompts = options.Prompts.Count > 0 ? options.Prompts : ReadPromptsInteractively();
         foreach (var prompt in prompts)
         {
-            await RunOnceAsync(harness, runtime.RuntimeId, options.SessionId, prompt);
+            await RunOnceAsync(harness, runtime.RuntimeId, options.SessionId, prompt, options.ApiKey);
         }
 
         return 0;
     }
 
-    private static async Task RunOnceAsync(IAgentHarness harness, Guid runtimeId, Guid sessionId, string prompt)
+    private static async Task RunOnceAsync(IAgentHarness harness, Guid runtimeId, Guid sessionId, string prompt, string apiKey)
     {
         using var cts = new CancellationTokenSource();
         ConsoleCancelEventHandler onCancel = (_, e) =>
@@ -77,7 +77,7 @@ internal static class Program
             var executionId = Guid.NewGuid();
             Console.WriteLine($"\n> {prompt}");
             var sequence = 0;
-            await foreach (var agentEvent in harness.RunAsync(new AgentRunRequest(executionId, runtimeId, sessionId, prompt, RuntimePaths.Workspace), cts.Token))
+            await foreach (var agentEvent in harness.RunAsync(new AgentRunRequest(executionId, runtimeId, sessionId, prompt, RuntimePaths.Workspace, apiKey), cts.Token))
             {
                 var executionEvent = agentEvent.ToExecutionEvent(executionId);
                 Console.WriteLine($"id: {++sequence}\nevent: {executionEvent.EventName}\ndata: {executionEvent.ToJson()}\n");
