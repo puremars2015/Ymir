@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-05 15:51 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-05 16:04 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -26,6 +26,7 @@
 | 使用者建立 Named tunnel 並依指南驗證 | 🚧 | 已建立 token 模式 tunnel（token 存於本機 `deploy/cloudflared/.env`，未提交）；待在使用者主機 `docker compose up` 並跑 [指南](../guides/cloudflare-tunnel.md) 第 6 節 |
 | 一個使用者一個 container + 專案（檔案群組）（ADR-0007） | ✅ | 見 [#006](#006--架構改為一人一-container專案chatgpt-式介面) |
 | ChatGPT 式介面：登入即主畫面、側邊欄專案 / 聊天、直接開聊 | ✅ | 見 [#006](#006--架構改為一人一-container專案chatgpt-式介面) |
+| LiteLLM sample（MiniMax 國際站） | 🚧 | 設定與 proxy 已用 Fake LLM 驗證；**沙箱網路擋 `api.minimax.io`，MiniMax 實連未驗證**，見 [#009](#009--litellm-sampleminimax-國際站沙箱網路尚未放行) |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
 **開工前要先有的決定**：企業 IdP 類型（Entra ID / ADFS / 純 LDAP）與測試用的 App 註冊資訊（client id、redirect URI）。
@@ -33,6 +34,43 @@
 ---
 
 ## 💬 留言區
+
+### #009 · LiteLLM sample（MiniMax 國際站），沙箱網路尚未放行
+
+> 👤 **Claude（AI）** · 🕒 2026-10-05 16:04 · `🚧進度` `⛔卡關`
+
+依使用者要求，新增 [`deploy/litellm/`](../../deploy/litellm/README.md)：
+- `config.yaml` 有兩個模型：
+  - `minimax`：走 MiniMax 國際站的 OpenAI 相容端點 `https://api.minimax.io/v1`，預設模型 `MiniMax-M2`，可依訂閱方案修改；
+  - `fake-model`：轉給 Fake LLM，用於離線驗證。
+- `compose.yml`：LiteLLM `main-v1.103.2`，只綁 `127.0.0.1:4000`；另有 `smoke-test.sh` 可送一則測試訊息。
+- 金鑰只放在本機的 `deploy/litellm/.env`（權限 600）。
+  - `.gitignore` 加了明確規則；commit 前檢查過，staged diff 不含 token。
+  - CLAUDE.md 安全紅線補上模型金鑰的規則。
+
+**驗證（實際跑過）**
+- 在本機以 `pip install litellm[proxy]`（1.103.2）啟動 proxy，搭配 Fake LLM：
+  - `fake-model` 正常回覆；
+  - 沒帶 master key、或帶錯 master key 都被拒絕。
+- 直接 `curl https://api.minimax.io/v1/...`：**沙箱的網路 policy 擋下（CONNECT 403）**。經 LiteLLM 走 `minimax` 也是 Connection error。**MiniMax 實際能否連通尚未驗證**。
+
+`⛔卡關`
+- 需要使用者在雲端環境設定把 `api.minimax.io` 加入允許的網域（Network access → Custom → Allowed domains）。加入後，我在新 session 跑 `deploy/litellm/smoke-test.sh minimax` 即可驗證。
+- 或者使用者在自己電腦上照 README `docker compose up -d` 後跑 smoke test。
+
+`⚠️發現`
+- 本機 pip 版 LiteLLM 處理「沒帶金鑰」時，因缺少一個選用模組，回 500 而不是 401；請求仍然被拒絕。官方 image 含完整套件，未驗證是否有同樣情況。
+- `.env` 只存在這個 session 的沙箱裡，不會同步到使用者電腦；使用者要自己依 `.env.example` 建立。
+- token 已出現在對話紀錄中；擔心外洩可以到 MiniMax 後台重新產生。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #008 · 流程變更：每次做完都直接合併回 main
 
