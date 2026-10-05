@@ -4,6 +4,7 @@ import { deriveTitle, groupConversations } from './navigation';
 const project = (id: string, updatedAt: string): Project => ({
   id,
   name: id,
+  systemPrompt: null,
   status: 'ACTIVE',
   createdAt: updatedAt,
   updatedAt,
@@ -13,6 +14,7 @@ const conversation = (id: string, projectId: string | null, updatedAt: string): 
   id,
   projectId,
   title: id,
+  modelId: null,
   status: 'ACTIVE',
   createdAt: updatedAt,
   updatedAt,

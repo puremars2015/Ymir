@@ -1,131 +1,69 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  OnInit,
+  signal,
+  untracked,
+} from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { catchError, of, switchMap } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { Project } from '../../core/api/api-types';
+import {
+  isSystemPromptTooLong,
+  resolveModel,
+  SYSTEM_PROMPT_MAX_LENGTH,
+} from '../../core/models/model-selection';
+import { ModelStore } from '../../core/models/model.store';
 import { ChatStarter } from '../../core/navigation/chat-starter.service';
 import { NavigationStore } from '../../core/navigation/navigation.store';
 import { Composer } from '../../shared/composer';
+import { ModelPicker } from '../../shared/model-picker';
 
 /**
  * 專案頁（ADR-0007）：專案是使用者執行環境內的一個檔案群組，同一專案的對話共用檔案。
- * 在這裡輸入即在此專案開新對話，下方列出專案內的對話。
+ * 在這裡輸入即在此專案開新對話；「專案設定」可改名稱與專案專用的 system prompt。
  */
 @Component({
   selector: 'app-project-page',
-  imports: [Composer, RouterLink, DatePipe],
-  template: `
-    <section class="project">
-      @if (project(); as p) {
-        <h1><span aria-hidden="true">📁</span> {{ p.name }}</h1>
-        <p class="muted">這個專案的對話共用同一組檔案。</p>
-        <app-composer
-          class="composer"
-          [placeholder]="'在「' + p.name + '」開始新對話'"
-          [disabled]="busy()"
-          (submitted)="start(p, $event)"
-        />
-        @if (error()) {
-          <p class="error">{{ error() }}</p>
-        }
-        <h2>對話</h2>
-        <ul class="conversations">
-          @for (conversation of conversations(); track conversation.id) {
-            <li>
-              <a [routerLink]="['/c', conversation.id]">
-                <span class="title">{{ conversation.title }}</span>
-                <span class="muted when">{{ conversation.updatedAt | date: 'M/d HH:mm' }}</span>
-              </a>
-            </li>
-          } @empty {
-            <li class="muted empty">還沒有對話，從上面的輸入框開始。</li>
-          }
-        </ul>
-      } @else if (error()) {
-        <p class="error">{{ error() }}</p>
-      }
-    </section>
-  `,
-  styles: `
-    :host {
-      flex: 1;
-      overflow-y: auto;
-      padding: 2rem 1rem;
-    }
-    .project {
-      max-width: 46rem;
-      margin: 0 auto;
-    }
-    h1 {
-      font-size: 1.5rem;
-      margin-bottom: 0.25rem;
-    }
-    h2 {
-      font-size: 0.875rem;
-      color: var(--text-muted);
-      margin: 2rem 0 0.5rem;
-    }
-    .composer {
-      display: block;
-      margin-top: 1.25rem;
-    }
-    .conversations {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      border-top: 1px solid var(--border);
-      a {
-        display: flex;
-        justify-content: space-between;
-        gap: 1rem;
-        padding: 0.875rem 0.5rem;
-        border-bottom: 1px solid var(--border);
-        color: var(--text);
-        text-decoration: none;
-        &:hover {
-          background: var(--surface-muted);
-        }
-      }
-      .title {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .when {
-        flex-shrink: 0;
-        font-size: 0.8125rem;
-      }
-    }
-    .empty {
-      padding: 1rem 0.5rem;
-    }
-  `,
+  imports: [Composer, ModelPicker, RouterLink, DatePipe, FormsModule],
+  templateUrl: './project-page.html',
+  styleUrl: './project-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ProjectPage {
+export class ProjectPage implements OnInit {
   private readonly api = inject(ApiService);
   private readonly store = inject(NavigationStore);
   private readonly starter = inject(ChatStarter);
+  protected readonly modelStore = inject(ModelStore);
+  protected readonly maxLength = SYSTEM_PROMPT_MAX_LENGTH;
 
   readonly projectId = input.required<string>();
+  protected readonly project = signal<Project | null>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
 
-  /** 專案資料以 API 為準（直接開網址時側邊欄可能還沒載入）。 */
-  protected readonly project = toSignal(
-    toObservable(this.projectId).pipe(
-      switchMap((id) =>
-        this.api.getProject(id).pipe(
-          catchError((e: unknown) => {
-            this.error.set(describeApiError(e));
-            return of(null);
-          }),
-        ),
-      ),
-    ),
-    { initialValue: null },
+  protected readonly nameDraft = signal('');
+  protected readonly promptDraft = signal('');
+  protected readonly saving = signal(false);
+  protected readonly saved = signal(false);
+  protected readonly settingsError = signal<string | null>(null);
+  protected readonly promptTooLong = computed(() => isSystemPromptTooLong(this.promptDraft()));
+  protected readonly dirty = computed(() => {
+    const p = this.project();
+    return (
+      !!p &&
+      (this.nameDraft().trim() !== p.name || this.promptDraft().trim() !== (p.systemPrompt ?? ''))
+    );
+  });
+
+  protected readonly selectedModel = computed(() =>
+    resolveModel(this.modelStore.models(), null, this.modelStore.preferred()),
   );
 
   protected readonly conversations = computed(
@@ -134,14 +72,66 @@ export class ProjectPage {
       [],
   );
 
+  constructor() {
+    // 從側邊欄切換專案時 router 會重用此元件，因此以 projectId 的變化重新載入。
+    effect(() => {
+      const id = this.projectId();
+      untracked(() => this.load(id));
+    });
+  }
+
+  ngOnInit(): void {
+    this.modelStore.load();
+  }
+
   protected start(project: Project, prompt: string): void {
     this.busy.set(true);
     this.error.set(null);
-    this.starter.start(project.id, prompt).subscribe({
+    this.starter.start(project.id, prompt, this.selectedModel()).subscribe({
       error: (e: unknown) => {
         this.error.set(describeApiError(e));
         this.busy.set(false);
       },
     });
+  }
+
+  protected saveSettings(project: Project): void {
+    this.saving.set(true);
+    this.saved.set(false);
+    this.settingsError.set(null);
+    this.api
+      .updateProject(project.id, {
+        name: this.nameDraft().trim() !== project.name ? this.nameDraft() : undefined,
+        systemPrompt: this.promptDraft(),
+      })
+      .subscribe({
+        next: (updated) => {
+          this.applyProject(updated);
+          this.store.replaceProject(updated);
+          this.saving.set(false);
+          this.saved.set(true);
+        },
+        error: (e: unknown) => {
+          this.settingsError.set(describeApiError(e));
+          this.saving.set(false);
+        },
+      });
+  }
+
+  private load(projectId: string): void {
+    this.project.set(null);
+    this.error.set(null);
+    this.saved.set(false);
+    this.settingsError.set(null);
+    this.api.getProject(projectId).subscribe({
+      next: (project) => this.applyProject(project),
+      error: (e: unknown) => this.error.set(describeApiError(e)),
+    });
+  }
+
+  private applyProject(project: Project): void {
+    this.project.set(project);
+    this.nameDraft.set(project.name);
+    this.promptDraft.set(project.systemPrompt ?? '');
   }
 }

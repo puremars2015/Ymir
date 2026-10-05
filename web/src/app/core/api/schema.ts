@@ -68,6 +68,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/models': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListModels'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/conversations/{conversationId}/messages': {
     parameters: {
       query?: never;
@@ -109,6 +125,22 @@ export interface paths {
     };
     get: operations['GetProject'];
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch: operations['UpdateProject'];
+    trace?: never;
+  };
+  '/api/me/settings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetMySettings'];
+    put: operations['UpdateMySettings'];
     post?: never;
     delete?: never;
     options?: never;
@@ -196,6 +228,7 @@ export interface components {
       /** Format: uuid */
       projectId: null | string;
       title: string;
+      modelId: null | string;
       status: string;
       /** Format: date-time */
       createdAt: string;
@@ -238,10 +271,16 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
     };
+    ModelResponse: {
+      id: string;
+      displayName: string;
+      isDefault: boolean;
+    };
     ProjectResponse: {
       /** Format: uuid */
       id: string;
       name: string;
+      systemPrompt: null | string;
       status: string;
       /** Format: date-time */
       createdAt: string;
@@ -259,6 +298,7 @@ export interface components {
       content: string;
       /** Format: uuid */
       clientRequestId: string;
+      modelId?: null | string;
     };
     SendMessageResponse: {
       /** Format: uuid */
@@ -267,8 +307,18 @@ export interface components {
       executionId: string;
       eventStreamUrl: string;
     };
+    UpdateProjectRequest: {
+      name: null | string;
+      systemPrompt: null | string;
+    };
+    UpdateUserSettingsRequest: {
+      systemPrompt: null | string;
+    };
     /** @enum {unknown} */
     UserRole: 'User' | 'Admin';
+    UserSettingsResponse: {
+      systemPrompt: null | string;
+    };
     /** @enum {unknown} */
     UserStatus: 'Active' | 'Disabled';
   };
@@ -358,6 +408,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['RuntimeStatusResponse'];
+        };
+      };
+    };
+  };
+  ListModels: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ModelResponse'][];
         };
       };
     };
@@ -472,6 +542,76 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+    };
+  };
+  UpdateProject: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateProjectRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+    };
+  };
+  GetMySettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UserSettingsResponse'];
+        };
+      };
+    };
+  };
+  UpdateMySettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateUserSettingsRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UserSettingsResponse'];
         };
       };
     };

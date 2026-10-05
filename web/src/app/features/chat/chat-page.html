@@ -52,6 +52,12 @@
   @if (error()) {
     <p class="error">{{ error() }}</p>
   }
+  <app-model-picker
+    class="picker"
+    [models]="modelStore.models()"
+    [selected]="selectedModel()"
+    (changed)="selectModel($event)"
+  />
   <app-composer
     placeholder="輸入訊息"
     [busy]="!!live()"

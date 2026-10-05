@@ -1,0 +1,80 @@
+<section class="project">
+  @if (project(); as p) {
+    <h1><span aria-hidden="true">📁</span> {{ p.name }}</h1>
+    <p class="muted">這個專案的對話共用同一組檔案。</p>
+    <app-model-picker
+      class="picker"
+      [models]="modelStore.models()"
+      [selected]="selectedModel()"
+      (changed)="modelStore.remember($event)"
+    />
+    <app-composer
+      class="composer"
+      [placeholder]="'在「' + p.name + '」開始新對話'"
+      [disabled]="busy()"
+      (submitted)="start(p, $event)"
+    />
+    @if (error()) {
+      <p class="error">{{ error() }}</p>
+    }
+
+    <details class="settings" [open]="!!p.systemPrompt">
+      <summary>專案設定</summary>
+      <form class="stack" (ngSubmit)="saveSettings(p)">
+        <label>
+          專案名稱
+          <input
+            name="projectName"
+            [ngModel]="nameDraft()"
+            (ngModelChange)="nameDraft.set($event); saved.set(false)"
+            required
+          />
+        </label>
+        <label>
+          專案 system prompt
+          <span class="muted hint">附加在個人 system prompt 之後，只套用到這個專案的對話。</span>
+          <textarea
+            name="projectPrompt"
+            rows="6"
+            [ngModel]="promptDraft()"
+            (ngModelChange)="promptDraft.set($event); saved.set(false)"
+            placeholder="例如：這個專案是公司行銷網站，使用 Vue 3 與 Tailwind，文案用繁體中文。"
+          ></textarea>
+          <span class="counter" [class.error]="promptTooLong()">
+            {{ promptDraft().trim().length }} / {{ maxLength }}
+          </span>
+        </label>
+        <div class="actions">
+          <button
+            type="submit"
+            [disabled]="saving() || !dirty() || promptTooLong() || !nameDraft().trim()"
+          >
+            儲存
+          </button>
+          @if (saved()) {
+            <span class="muted" role="status">已儲存</span>
+          }
+          @if (settingsError()) {
+            <span class="error">{{ settingsError() }}</span>
+          }
+        </div>
+      </form>
+    </details>
+
+    <h2>對話</h2>
+    <ul class="conversations">
+      @for (conversation of conversations(); track conversation.id) {
+        <li>
+          <a [routerLink]="['/c', conversation.id]">
+            <span class="title">{{ conversation.title }}</span>
+            <span class="muted when">{{ conversation.updatedAt | date: 'M/d HH:mm' }}</span>
+          </a>
+        </li>
+      } @empty {
+        <li class="muted empty">還沒有對話，從上面的輸入框開始。</li>
+      }
+    </ul>
+  } @else if (error()) {
+    <p class="error">{{ error() }}</p>
+  }
+</section>

@@ -11,6 +11,8 @@ export type Conversation = Schemas['ConversationResponse'];
 export type ChatMessage = Schemas['MessageResponse'];
 export type SendMessageResponse = Schemas['SendMessageResponse'];
 export type CancelExecutionResponse = Schemas['CancelExecutionResponse'];
+export type ModelOption = Schemas['ModelResponse'];
+export type UserSettings = Schemas['UserSettingsResponse'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

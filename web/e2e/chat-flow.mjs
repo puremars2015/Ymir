@@ -26,7 +26,38 @@ await page.click('button[type=submit]');
 await page.waitForSelector('app-new-chat-page h1');
 await page.waitForSelector('.sidebar .section-header:has-text("專案")');
 step('login → main layout (sidebar + composer)');
+
+// 1b. 個人設定：個人 global system prompt
+await page.click('.user a:has-text("設定")');
+await page.waitForURL(/\/settings/);
+await page.fill('textarea[name=systemPrompt]', '請一律用繁體中文回答。');
+await page.click('app-settings-page button[type=submit]');
+await page.waitForSelector('app-settings-page [role=status]:has-text("已儲存")');
+await page.screenshot({ path: `${outDir}/07-settings.png` });
+await page.reload();
+await page.waitForFunction(
+  () => {
+    const area = document.querySelector('textarea[name=systemPrompt]');
+    return area && !area.disabled && area.value.length > 0;
+  },
+  null,
+  { timeout: 15000 },
+);
+const savedPrompt = await page.inputValue('textarea[name=systemPrompt]');
+if (savedPrompt !== '請一律用繁體中文回答。')
+  throw new Error(`personal prompt not saved: ${savedPrompt}`);
+step('personal system prompt saved');
+await page.click('a.new-chat');
+await page.waitForSelector('app-new-chat-page h1');
+
+// 1c. 首頁選模型（需要 API 設定兩個以上的 VibeMaker:Models）
+const modelOptions = await page.locator('app-new-chat-page select[name=model] option').count();
+if (modelOptions >= 2) {
+  await page.selectOption('app-new-chat-page select[name=model]', { index: 1 });
+}
 await page.screenshot({ path: `${outDir}/01-home.png` });
+const chosenModel = await page.inputValue('app-new-chat-page select[name=model]');
+step(`model picker (${modelOptions} models, chose ${chosenModel})`);
 
 // 2. 像 ChatGPT 一樣直接在首頁輸入 → 建立未分組對話並送出
 await sendPrompt('[create-file] 幫我建立一個檔案');
@@ -40,7 +71,10 @@ await page.screenshot({ path: `${outDir}/02-chat.png` });
 // 3. 重新整理後歷史仍在
 await page.reload();
 await page.waitForSelector('.turn.assistant:has-text("已完成")');
-step('history persisted after reload');
+const rememberedModel = await page.inputValue('app-chat-page select[name=model]');
+if (rememberedModel !== chosenModel)
+  throw new Error(`conversation did not remember model: ${rememberedModel}`);
+step(`history persisted after reload (model ${rememberedModel} remembered)`);
 
 // 4. 建立專案 → 在專案頁直接開聊
 await page.click('button[aria-label="新增專案"]');
@@ -49,6 +83,14 @@ await page.press('input[name=projectName]', 'Enter');
 await page.waitForURL(/\/projects\//);
 await page.waitForSelector('app-project-page h1:has-text("行銷網站")');
 step('created project from the sidebar');
+
+// 4b. 專案設定：專案 system prompt
+await page.click('app-project-page details.settings summary');
+await page.fill('textarea[name=projectPrompt]', '這是公司行銷網站，使用 Vue 3。');
+await page.click('app-project-page details.settings button[type=submit]');
+await page.waitForSelector('app-project-page [role=status]:has-text("已儲存")');
+await page.screenshot({ path: `${outDir}/08-project-settings.png` });
+step('project system prompt saved');
 await sendPrompt('[create-file] 在專案裡建立檔案');
 await page.waitForURL(/\/c\//);
 await page.waitForSelector('.turn.assistant:has-text("已完成")', { timeout: 60000 });

@@ -13,10 +13,14 @@ export class ChatStarter {
   private readonly pending = inject(PendingPromptService);
   private readonly router = inject(Router);
 
-  start(projectId: string | null, firstMessage: string): Observable<Conversation> {
+  start(
+    projectId: string | null,
+    firstMessage: string,
+    modelId: string | null,
+  ): Observable<Conversation> {
     return this.store.createConversation(projectId, deriveTitle(firstMessage)).pipe(
       tap((conversation) => {
-        this.pending.set(conversation.id, firstMessage);
+        this.pending.set(conversation.id, { prompt: firstMessage, modelId });
         void this.router.navigate(['/c', conversation.id]);
       }),
     );
