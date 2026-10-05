@@ -58,6 +58,11 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(100)")
                         .HasColumnName("error_code");
 
+                    b.Property<string>("ModelId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("model_id");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
@@ -224,6 +229,11 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("ModelId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("model_id");
+
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("project_id");
@@ -362,6 +372,11 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(30)")
                         .HasColumnName("status");
 
+                    b.Property<string>("SystemPrompt")
+                        .HasMaxLength(10000)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("system_prompt");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("updated_at");
@@ -377,6 +392,27 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_projects_user_id");
 
                     b.ToTable("projects", "vibemaker");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.UserSettings", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("SystemPrompt")
+                        .HasMaxLength(10000)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("system_prompt");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_user_settings");
+
+                    b.ToTable("user_settings", "vibemaker");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.AgentExecution", b =>

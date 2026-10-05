@@ -10,5 +10,8 @@ internal static class PiRuntimeLayout
 
     public const string SessionDirectory = RuntimePaths.AgentState + "/sessions";
 
+    /// <summary>每次執行附加的 system prompt 檔案；執行結束後刪除。</summary>
+    public const string PromptDirectory = RuntimePaths.AgentState + "/prompts";
+
     public const string ApiKeyEnvironmentVariable = "LITELLM_API_KEY";
 }

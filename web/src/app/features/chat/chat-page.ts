@@ -19,9 +19,12 @@ import {
   initialExecutionView,
 } from '../../core/executions/execution-state';
 import { ExecutionStreamService } from '../../core/executions/execution-stream.service';
+import { resolveModel } from '../../core/models/model-selection';
+import { ModelStore } from '../../core/models/model.store';
 import { NavigationStore } from '../../core/navigation/navigation.store';
 import { PendingPromptService } from '../../core/navigation/pending-prompt.service';
 import { Composer } from '../../shared/composer';
+import { ModelPicker } from '../../shared/model-picker';
 
 interface LiveTurn {
   prompt: string;
@@ -36,7 +39,7 @@ interface LiveTurn {
  */
 @Component({
   selector: 'app-chat-page',
-  imports: [RouterLink, Composer],
+  imports: [RouterLink, Composer, ModelPicker],
   templateUrl: './chat-page.html',
   styleUrl: './chat-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -46,6 +49,7 @@ export class ChatPage {
   private readonly streams = inject(ExecutionStreamService);
   private readonly store = inject(NavigationStore);
   private readonly pending = inject(PendingPromptService);
+  protected readonly modelStore = inject(ModelStore);
 
   readonly conversationId = input.required<string>();
   protected readonly conversation = signal<Conversation | null>(null);
@@ -54,9 +58,22 @@ export class ChatPage {
   protected readonly error = signal<string | null>(null);
   protected readonly project = computed(() => this.store.project(this.conversation()?.projectId));
 
+  /** 這個對話本次選的模型；未選時沿用對話上次的模型 → 個人偏好 → 預設。 */
+  private readonly chosenModel = signal<string | null>(null);
+  protected readonly selectedModel = computed(
+    () =>
+      this.chosenModel() ??
+      resolveModel(
+        this.modelStore.models(),
+        this.conversation()?.modelId,
+        this.modelStore.preferred(),
+      ),
+  );
+
   private stream: Subscription | null = null;
 
   constructor() {
+    this.modelStore.load();
     effect(() => {
       const id = this.conversationId();
       untracked(() => this.load(id));
@@ -64,14 +81,19 @@ export class ChatPage {
     inject(DestroyRef).onDestroy(() => this.stream?.unsubscribe());
   }
 
-  protected send(prompt: string): void {
+  protected selectModel(modelId: string): void {
+    this.chosenModel.set(modelId);
+    this.modelStore.remember(modelId);
+  }
+
+  protected send(prompt: string, modelId: string | null = this.selectedModel()): void {
     if (this.live()) {
       return;
     }
 
     const conversationId = this.conversationId();
     this.error.set(null);
-    this.api.sendMessage(conversationId, prompt).subscribe({
+    this.api.sendMessage(conversationId, prompt, modelId).subscribe({
       next: (accepted) => {
         if (conversationId !== this.conversationId()) {
           return; // 送出後使用者已切到別的對話；執行在背景繼續，回來時看歷史即可
@@ -106,6 +128,7 @@ export class ChatPage {
     this.stream = null;
     this.live.set(null);
     this.error.set(null);
+    this.chosenModel.set(null);
     this.conversation.set(null);
     this.messages.set([]);
 
@@ -115,9 +138,12 @@ export class ChatPage {
     });
     this.reloadMessages(conversationId, () => {
       // 從首頁 / 專案頁「直接開聊」：送出暫存的第一則訊息
-      const firstMessage = this.pending.take(conversationId);
-      if (firstMessage) {
-        this.send(firstMessage);
+      const pending = this.pending.take(conversationId);
+      if (pending) {
+        if (pending.modelId) {
+          this.chosenModel.set(pending.modelId);
+        }
+        this.send(pending.prompt, pending.modelId);
       }
     });
   }

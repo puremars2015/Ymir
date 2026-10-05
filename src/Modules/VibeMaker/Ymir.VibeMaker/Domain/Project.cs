@@ -8,6 +8,9 @@ public sealed class Project
 {
     public const int NameMaxLength = 200;
 
+    /// <summary>system prompt 上限（個人與專案相同），避免過長的 prompt 吃掉模型的 context。</summary>
+    public const int SystemPromptMaxLength = 10_000;
+
     private Project()
     {
     }
@@ -17,6 +20,9 @@ public sealed class Project
     public Guid UserId { get; private set; }
 
     public string Name { get; private set; } = string.Empty;
+
+    /// <summary>專案專用的 system prompt，附加在個人 system prompt 之後（Pi 的預設 prompt 保留）。</summary>
+    public string? SystemPrompt { get; private set; }
 
     public ProjectStatus Status { get; private set; }
 
@@ -36,6 +42,18 @@ public sealed class Project
         };
 
     public void Touch(DateTimeOffset now) => UpdatedAt = now;
+
+    public void Rename(string name, DateTimeOffset now)
+    {
+        Name = DomainGuard.RequiredText(name, NameMaxLength, nameof(name));
+        UpdatedAt = now;
+    }
+
+    public void SetSystemPrompt(string? systemPrompt, DateTimeOffset now)
+    {
+        SystemPrompt = DomainGuard.OptionalText(systemPrompt, SystemPromptMaxLength, "systemPrompt");
+        UpdatedAt = now;
+    }
 }
 
 public enum ProjectStatus

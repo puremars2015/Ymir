@@ -184,6 +184,17 @@
   }
 }
 
+.settings-link {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  text-decoration: none;
+
+  &:hover,
+  &.active {
+    color: var(--text);
+  }
+}
+
 .content {
   flex: 1;
   min-width: 0;

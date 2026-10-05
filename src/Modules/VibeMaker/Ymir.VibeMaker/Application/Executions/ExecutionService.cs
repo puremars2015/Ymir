@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Users;
+using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Contracts.Conversations;
 using Ymir.VibeMaker.Contracts.Executions;
@@ -18,6 +19,7 @@ public sealed class ExecutionService(
     IExecutionCancellationRegistry cancellations,
     ExecutionEventWriter eventWriter,
     IAuditLog auditLog,
+    ModelCatalog models,
     TimeProvider timeProvider)
 {
     public static string EventStreamUrl(Guid executionId) => $"/api/executions/{executionId}/events";
@@ -46,6 +48,11 @@ public sealed class ExecutionService(
             return existing;
         }
 
+        if (request.ModelId is not null && !models.IsAvailable(request.ModelId))
+        {
+            return SubmitMessageResult.ModelNotAvailable;
+        }
+
         var conversation = await db.Conversations.SingleOrDefaultAsync(c => c.Id == conversationId && c.UserId == userId, cancellationToken)
             .ConfigureAwait(false);
         if (conversation is null)
@@ -57,7 +64,13 @@ public sealed class ExecutionService(
         var nextSequence = await db.Messages.Where(m => m.ConversationId == conversationId)
             .MaxAsync(m => (long?)m.SequenceNo, cancellationToken).ConfigureAwait(false) ?? 0;
         var message = Message.CreateUser(conversationId, request.Content, nextSequence + 1, now);
-        var execution = AgentExecution.Queue(conversation, message, request.ClientRequestId, now);
+        if (request.ModelId is not null)
+        {
+            conversation.SelectModel(request.ModelId);
+        }
+
+        // 執行時的模型：這次選的 → 對話上次選的 → 預設；已不在清單的模型退回預設。
+        var execution = AgentExecution.Queue(conversation, message, request.ClientRequestId, now, models.Resolve(request.ModelId ?? conversation.ModelId));
         conversation.Touch(now);
         db.Messages.Add(message);
         db.AgentExecutions.Add(execution);
@@ -165,6 +178,7 @@ public sealed record SubmitMessageResult(SubmitMessageOutcome Outcome, SendMessa
     public static readonly SubmitMessageResult NotFound = new(SubmitMessageOutcome.NotFound, null);
     public static readonly SubmitMessageResult Conflict = new(SubmitMessageOutcome.Conflict, null);
     public static readonly SubmitMessageResult Forbidden = new(SubmitMessageOutcome.Forbidden, null);
+    public static readonly SubmitMessageResult ModelNotAvailable = new(SubmitMessageOutcome.ModelNotAvailable, null);
 
     public static SubmitMessageResult Accept(SendMessageResponse response) => new(SubmitMessageOutcome.Accepted, response);
 }
@@ -175,4 +189,5 @@ public enum SubmitMessageOutcome
     NotFound = 1,
     Conflict = 2,
     Forbidden = 3,
+    ModelNotAvailable = 4,
 }

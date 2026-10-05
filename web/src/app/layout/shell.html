@@ -119,6 +119,9 @@
       <footer class="user">
         <span class="avatar" aria-hidden="true">{{ user.displayName.charAt(0) }}</span>
         <span class="name">{{ user.displayName }}</span>
+        <a routerLink="/settings" routerLinkActive="active" class="settings-link" title="個人設定"
+          >設定</a
+        >
         <button type="button" class="link" (click)="logout()">登出</button>
       </footer>
     }

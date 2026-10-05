@@ -7,10 +7,12 @@ import {
   ChatMessage,
   Conversation,
   Me,
+  ModelOption,
   SendMessageResponse,
   Project,
   RuntimeStatus,
   UserRole,
+  UserSettings,
 } from './api-types';
 
 /** 呼叫 Ymir API。認證靠同源 HttpOnly cookie，XSRF header 由 HttpClient 自動加上（ADR-0002）。 */
@@ -42,6 +44,29 @@ export class ApiService {
     return this.http.get<Project>(`/api/projects/${projectId}`);
   }
 
+  /** 只送有變更的欄位；systemPrompt 傳空字串表示清除。 */
+  updateProject(
+    projectId: string,
+    changes: { name?: string; systemPrompt?: string },
+  ): Observable<Project> {
+    return this.http.patch<Project>(`/api/projects/${projectId}`, {
+      name: changes.name ?? null,
+      systemPrompt: changes.systemPrompt ?? null,
+    });
+  }
+
+  listModels(): Observable<ModelOption[]> {
+    return this.http.get<ModelOption[]>('/api/models');
+  }
+
+  getSettings(): Observable<UserSettings> {
+    return this.http.get<UserSettings>('/api/me/settings');
+  }
+
+  updateSettings(systemPrompt: string): Observable<UserSettings> {
+    return this.http.put<UserSettings>('/api/me/settings', { systemPrompt });
+  }
+
   /** 目前使用者的執行環境（一個使用者一個 container，ADR-0007）。 */
   getRuntime(): Observable<RuntimeStatus> {
     return this.http.get<RuntimeStatus>('/api/runtime');
@@ -71,11 +96,13 @@ export class ApiService {
   sendMessage(
     conversationId: string,
     content: string,
+    modelId: string | null = null,
     clientRequestId: string = crypto.randomUUID(),
   ): Observable<SendMessageResponse> {
     return this.http.post<SendMessageResponse>(`/api/conversations/${conversationId}/messages`, {
       content,
       clientRequestId,
+      modelId,
     });
   }
 

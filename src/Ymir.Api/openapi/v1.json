@@ -89,6 +89,29 @@
         }
       }
     },
+    "/api/models": {
+      "get": {
+        "tags": [
+          "Models"
+        ],
+        "operationId": "ListModels",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModelResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/{conversationId}/messages": {
       "post": {
         "tags": [
@@ -237,6 +260,93 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Projects"
+        ],
+        "operationId": "UpdateProject",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/settings": {
+      "get": {
+        "tags": [
+          "Settings"
+        ],
+        "operationId": "GetMySettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Settings"
+        ],
+        "operationId": "UpdateMySettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserSettingsResponse"
                 }
               }
             }
@@ -428,6 +538,7 @@
           "id",
           "projectId",
           "title",
+          "modelId",
           "status",
           "createdAt",
           "updatedAt"
@@ -447,6 +558,12 @@
           },
           "title": {
             "type": "string"
+          },
+          "modelId": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "status": {
             "type": "string"
@@ -614,10 +731,30 @@
           }
         }
       },
+      "ModelResponse": {
+        "required": [
+          "id",
+          "displayName",
+          "isDefault"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "isDefault": {
+            "type": "boolean"
+          }
+        }
+      },
       "ProjectResponse": {
         "required": [
           "id",
           "name",
+          "systemPrompt",
           "status",
           "createdAt",
           "updatedAt"
@@ -630,6 +767,12 @@
           },
           "name": {
             "type": "string"
+          },
+          "systemPrompt": {
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "status": {
             "type": "string"
@@ -690,6 +833,12 @@
           "clientRequestId": {
             "type": "string",
             "format": "uuid"
+          },
+          "modelId": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -714,11 +863,60 @@
           }
         }
       },
+      "UpdateProjectRequest": {
+        "required": [
+          "name",
+          "systemPrompt"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "systemPrompt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "UpdateUserSettingsRequest": {
+        "required": [
+          "systemPrompt"
+        ],
+        "type": "object",
+        "properties": {
+          "systemPrompt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "UserRole": {
         "enum": [
           "User",
           "Admin"
         ]
+      },
+      "UserSettingsResponse": {
+        "required": [
+          "systemPrompt"
+        ],
+        "type": "object",
+        "properties": {
+          "systemPrompt": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
       },
       "UserStatus": {
         "enum": [
@@ -736,10 +934,16 @@
       "name": "Runtime"
     },
     {
+      "name": "Models"
+    },
+    {
       "name": "Conversations"
     },
     {
       "name": "Projects"
+    },
+    {
+      "name": "Settings"
     },
     {
       "name": "Executions"

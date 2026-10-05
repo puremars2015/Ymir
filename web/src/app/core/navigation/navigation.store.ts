@@ -42,6 +42,11 @@ export class NavigationStore {
     );
   }
 
+  /** 專案改名或更新設定後同步側邊欄。 */
+  replaceProject(project: Project): void {
+    this.projects.update((list) => list.map((p) => (p.id === project.id ? project : p)));
+  }
+
   project(projectId: string | null | undefined): Project | undefined {
     return projectId ? this.projects().find((p) => p.id === projectId) : undefined;
   }

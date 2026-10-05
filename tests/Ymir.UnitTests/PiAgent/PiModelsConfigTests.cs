@@ -16,7 +16,7 @@ public class PiModelsConfigTests
             DevelopmentApiKey = "super-secret",
         };
 
-        var json = PiModelsConfig.Build(options);
+        var json = PiModelsConfig.Build(options, ["gpt-x", "gpt-y"]);
 
         Assert.DoesNotContain("super-secret", json, StringComparison.Ordinal);
         using var document = JsonDocument.Parse(json);
@@ -24,6 +24,6 @@ public class PiModelsConfigTests
         Assert.Equal("http://litellm:4000/v1", provider.GetProperty("baseUrl").GetString());
         Assert.Equal("openai-completions", provider.GetProperty("api").GetString());
         Assert.Equal("${LITELLM_API_KEY}", provider.GetProperty("apiKey").GetString());
-        Assert.Equal("gpt-x", provider.GetProperty("models")[0].GetProperty("id").GetString());
+        Assert.Equal(["gpt-x", "gpt-y"], provider.GetProperty("models").EnumerateArray().Select(m => m.GetProperty("id").GetString()));
     }
 }

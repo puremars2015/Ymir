@@ -24,6 +24,12 @@ export const routes: Routes = [
         title: '專案 · Vibe Maker',
       },
       {
+        path: 'settings',
+        loadComponent: () =>
+          import('./features/settings/settings-page').then((m) => m.SettingsPage),
+        title: '個人設定 · Vibe Maker',
+      },
+      {
         path: 'c/:conversationId',
         loadComponent: () => import('./features/chat/chat-page').then((m) => m.ChatPage),
         title: '對話 · Vibe Maker',

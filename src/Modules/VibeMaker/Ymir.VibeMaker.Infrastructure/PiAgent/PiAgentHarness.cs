@@ -7,6 +7,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Ymir.VibeMaker.Application.Agents;
+using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
 
@@ -19,6 +20,7 @@ namespace Ymir.VibeMaker.Infrastructure.PiAgent;
 internal sealed class PiAgentHarness(
     IAgentRuntimeManager runtimeManager,
     IOptions<PiAgentOptions> options,
+    ModelCatalog models,
     ILogger<PiAgentHarness> logger) : IAgentHarness
 {
     private static readonly JsonSerializerOptions s_jsonOptions = new(JsonSerializerDefaults.Web);
@@ -42,15 +44,19 @@ internal sealed class PiAgentHarness(
         await pump.ConfigureAwait(false);
     }
 
+    /// <summary>附加 system prompt 的檔案（runtime 內路徑）；以檔案傳給 Pi，內容不會出現在 host 的程序參數。</summary>
+    internal static string SystemPromptPath(Guid executionId, int index) => $"{PiRuntimeLayout.PromptDirectory}/{executionId:N}-{index}.md";
+
     internal RuntimeProcessSpec BuildProcessSpec(AgentRunRequest request) =>
         new(
             _options.Executable,
             [
                 "--mode", "rpc",
                 "--provider", _options.ProviderName,
-                "--model", _options.ModelId,
+                "--model", request.ModelId,
                 "--session-dir", PiRuntimeLayout.SessionDirectory,
                 "--session-id", request.SessionId.ToString("D"),
+                .. request.SystemPrompts.SelectMany((_, i) => new[] { "--append-system-prompt", SystemPromptPath(request.ExecutionId, i) }),
             ],
             new Dictionary<string, string>
             {
@@ -73,6 +79,7 @@ internal sealed class PiAgentHarness(
         try
         {
             await EnsureConfigProvisionedAsync(request.RuntimeId, cancellationToken).ConfigureAwait(false);
+            await WriteSystemPromptsAsync(request, cancellationToken).ConfigureAwait(false);
 
             // 使用者的 LiteLLM virtual key（ADR-0004），由 ExecutionRunner 經 IModelGateway 取得；只以環境變數名稱傳入 runtime。
             process = await runtimeManager.StartProcessAsync(request.RuntimeId, BuildProcessSpec(request), cancellationToken)
@@ -160,7 +167,56 @@ internal sealed class PiAgentHarness(
                 await process.DisposeAsync().ConfigureAwait(false);
             }
 
+            await DeleteSystemPromptsAsync(request).ConfigureAwait(false);
             writer.TryComplete();
+        }
+    }
+
+    /// <summary>把這次的 system prompt 寫成 runtime 內的檔案（與 models.json 相同，經 stdin 寫入，不經程序參數）。</summary>
+    private async Task WriteSystemPromptsAsync(AgentRunRequest request, CancellationToken cancellationToken)
+    {
+        for (var i = 0; i < request.SystemPrompts.Count; i++)
+        {
+            var spec = new RuntimeProcessSpec(
+                "sh",
+                ["-c", "mkdir -p \"$1\" && cat > \"$2\"", "ymir-prompt", PiRuntimeLayout.PromptDirectory, SystemPromptPath(request.ExecutionId, i)]);
+            var writerProcess = await runtimeManager.StartProcessAsync(request.RuntimeId, spec, cancellationToken).ConfigureAwait(false);
+            await using (writerProcess.ConfigureAwait(false))
+            {
+                await writerProcess.StandardInput.WriteAsync(Encoding.UTF8.GetBytes(request.SystemPrompts[i]), cancellationToken).ConfigureAwait(false);
+                writerProcess.CloseStandardInput();
+                var exitCode = await writerProcess.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                if (exitCode != 0)
+                {
+                    throw new InvalidOperationException($"Writing system prompt failed with exit code {exitCode}: {writerProcess.GetStandardErrorTail()}");
+                }
+            }
+        }
+    }
+
+    private async Task DeleteSystemPromptsAsync(AgentRunRequest request)
+    {
+        if (request.SystemPrompts.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var paths = Enumerable.Range(0, request.SystemPrompts.Count).Select(i => SystemPromptPath(request.ExecutionId, i));
+            var cleanup = await runtimeManager.StartProcessAsync(request.RuntimeId, new RuntimeProcessSpec("rm", ["-f", .. paths]), CancellationToken.None)
+                .ConfigureAwait(false);
+            await using (cleanup.ConfigureAwait(false))
+            {
+                cleanup.CloseStandardInput();
+                await cleanup.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+#pragma warning disable CA1031 // 清理失敗不影響結果（檔案在使用者自己的 runtime 內），只記錄警告。
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            logger.LogWarning(ex, "Failed to delete system prompt files for execution {ExecutionId}", request.ExecutionId);
         }
     }
 
@@ -191,7 +247,7 @@ internal sealed class PiAgentHarness(
 
     private async Task EnsureConfigProvisionedAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
-        var modelsJson = PiModelsConfig.Build(_options);
+        var modelsJson = PiModelsConfig.Build(_options, models.Models.Select(m => m.Id));
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(modelsJson)));
         if (_provisionedConfigHashes.TryGetValue(runtimeId, out var existing) && existing == hash)
         {

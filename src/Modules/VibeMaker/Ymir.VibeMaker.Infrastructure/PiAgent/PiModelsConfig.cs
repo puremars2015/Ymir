@@ -3,12 +3,12 @@ using System.Text.Json.Nodes;
 
 namespace Ymir.VibeMaker.Infrastructure.PiAgent;
 
-/// <summary>產生 Pi 的 models.json：單一 OpenAI 相容 provider 指向 LiteLLM，API key 以環境變數注入（不寫入檔案）。</summary>
+/// <summary>產生 Pi 的 models.json：單一 OpenAI 相容 provider 指向 LiteLLM，列出所有可選用的模型；API key 以環境變數注入（不寫入檔案）。</summary>
 internal static class PiModelsConfig
 {
     private static readonly JsonSerializerOptions s_indented = new() { WriteIndented = true };
 
-    public static string Build(PiAgentOptions options)
+    public static string Build(PiAgentOptions options, IEnumerable<string> modelIds)
     {
         var config = new JsonObject
         {
@@ -19,7 +19,7 @@ internal static class PiModelsConfig
                     ["baseUrl"] = options.ModelBaseUrl.ToString().TrimEnd('/'),
                     ["api"] = "openai-completions",
                     ["apiKey"] = "${" + PiRuntimeLayout.ApiKeyEnvironmentVariable + "}",
-                    ["models"] = new JsonArray(new JsonObject { ["id"] = options.ModelId }),
+                    ["models"] = new JsonArray(modelIds.Select(id => (JsonNode)new JsonObject { ["id"] = id }).ToArray()),
                 },
             },
         };

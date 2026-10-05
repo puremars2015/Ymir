@@ -6,6 +6,8 @@ using Ymir.IntegrationTests.PiAgent;
 using Ymir.Testing.FakeLlm;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
+using Ymir.VibeMaker.Contracts.Projects;
+using Ymir.VibeMaker.Contracts.Settings;
 using Ymir.VibeMaker.Infrastructure.Runtime;
 
 namespace Ymir.IntegrationTests.Executions;
@@ -22,7 +24,11 @@ public sealed class PiApiFactory : ApiFactory
         builder.UseSetting("VibeMaker:Pi:ModelId", FakeLlmEndpoints.ModelId);
         builder.UseSetting("VibeMaker:Pi:DevelopmentApiKey", "integration-test-key");
         builder.UseSetting("VibeMaker:Pi:AutoRetry", "false");
+        builder.UseSetting("VibeMaker:Models:0:Id", FakeLlmEndpoints.ModelId);
+        builder.UseSetting("VibeMaker:Models:1:Id", PiHarnessFixture.SecondModelId);
     }
+
+    public FakeLlmState FakeLlm => _fakeLlm.Value.State;
 
     public override async ValueTask DisposeAsync()
     {
@@ -77,6 +83,38 @@ public class PiExecutionTests(PiApiFactory factory) : IClassFixture<PiApiFactory
         var file = Path.Combine(directories.HostPathOf(RuntimePaths.ConversationDirectory(conversation.Id)), FakeLlmScript.CreatedFileName);
         Assert.True(File.Exists(file), "未分組對話的檔案應在 chats/{conversationId}");
         Assert.False(File.Exists(Path.Combine(directories.Workspace, FakeLlmScript.CreatedFileName)), "不應寫到使用者 workspace 根目錄");
+    }
+
+    [Fact]
+    public async Task SelectedModel_AndPersonalPlusProjectSystemPrompts_ReachTheModel()
+    {
+        Assert.SkipUnless(PiHarnessFixture.IsPiOnPath(), "pi is not on PATH (npm i -g @earendil-works/pi-coding-agent@1.0.0)");
+        var ct = TestContext.Current.CancellationToken;
+        using var client = await factory.LoginAsync("pi-prompts");
+        using var settings = await client.PutAsJsonAsync("/api/me/settings", new UpdateUserSettingsRequest("PERSONAL-PROMPT-MARKER 請用繁體中文"), ct);
+        var project = await client.CreateProjectAsync("prompted");
+        using var patch = await client.PatchAsJsonAsync($"/api/projects/{project.Id}", new UpdateProjectRequest(null, "PROJECT-PROMPT-MARKER 這是行銷網站"), ct);
+        var conversation = await client.CreateConversationAsync(project.Id, "chat");
+
+        var (_, sent) = await client.SendMessageAsync(conversation.Id, "hi", modelId: PiHarnessFixture.SecondModelId);
+        var events = await client.ReadEventsAsync(sent!.EventStreamUrl);
+
+        Assert.Equal(ExecutionEventNames.ExecutionCompleted, events[^1].EventType);
+        var request = factory.FakeLlm.LastRequest!;
+        Assert.Equal(PiHarnessFixture.SecondModelId, request["model"]!.GetValue<string>());
+        var system = request["messages"]!.AsArray()
+            .Where(m => m!["role"]!.GetValue<string>() is "system" or "developer")
+            .Select(m => m!["content"]!.ToJsonString())
+            .Single();
+        var personal = system.IndexOf("PERSONAL-PROMPT-MARKER", StringComparison.Ordinal);
+        var projectIndex = system.IndexOf("PROJECT-PROMPT-MARKER", StringComparison.Ordinal);
+        Assert.True(personal >= 0 && projectIndex > personal, "個人 prompt 應在專案 prompt 之前，且兩者都送到模型");
+        Assert.DoesNotContain("/agent-state/prompts", system, StringComparison.Ordinal); // 傳的是內容，不是路徑
+
+        // 執行結束後 prompt 檔案已刪除
+        var directories = UserDirectories.For(factory.WorkspaceRoot, await GetUserIdAsync(client));
+        var promptDirectory = Path.Combine(directories.AgentState, "prompts");
+        Assert.True(!Directory.Exists(promptDirectory) || Directory.GetFiles(promptDirectory).Length == 0);
     }
 
     private static async Task<Guid> GetUserIdAsync(HttpClient client) =>

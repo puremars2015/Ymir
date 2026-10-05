@@ -3,6 +3,7 @@ using Ymir.VibeMaker.Application.Conversations;
 using Ymir.VibeMaker.Application.Executions;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Projects;
+using Ymir.VibeMaker.Application.Settings;
 
 namespace Ymir.VibeMaker;
 
@@ -12,6 +13,7 @@ public static class VibeMakerApplicationExtensions
     {
         services.AddScoped<ProjectService>();
         services.AddScoped<RuntimeQueryService>();
+        services.AddScoped<UserSettingsService>();
         services.AddScoped<ConversationService>();
         services.AddScoped<ExecutionService>();
         services.AddScoped<ExecutionEventWriter>();

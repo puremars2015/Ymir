@@ -8,6 +8,8 @@ public sealed class Conversation
 {
     public const int TitleMaxLength = 300;
 
+    public const int ModelIdMaxLength = 200;
+
     private Conversation()
     {
     }
@@ -20,6 +22,9 @@ public sealed class Conversation
     public Guid UserId { get; private set; }
 
     public string Title { get; private set; } = string.Empty;
+
+    /// <summary>最後選用的模型（LiteLLM model_name）；null 表示使用預設模型。</summary>
+    public string? ModelId { get; private set; }
 
     public ConversationStatus Status { get; private set; }
 
@@ -47,6 +52,9 @@ public sealed class Conversation
     }
 
     public void Touch(DateTimeOffset now) => UpdatedAt = now;
+
+    /// <summary>記住使用者選的模型，下次開啟對話時沿用（像 ChatGPT）。模型是否可用由 Application 層檢查。</summary>
+    public void SelectModel(string modelId) => ModelId = DomainGuard.RequiredText(modelId, ModelIdMaxLength, nameof(modelId));
 }
 
 public enum ConversationStatus

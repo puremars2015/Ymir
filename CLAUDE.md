@@ -77,6 +77,8 @@ cd web && npm start                                  # http://localhost:4200，/
 
 Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真正的 Pi：設定 `VibeMaker__Harness=Pi` 並啟動 Fake LLM。
 
+可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
+
 模型金鑰（ADR-0004）：設定 `VibeMaker__LiteLlm__BaseUrl` 與 `VibeMaker__LiteLlm__MasterKey` 後，API 為每位使用者向 LiteLLM 發 virtual key；非 Development 未設定會拒絕啟動。本機可用 `FAKE_LLM_MASTER_KEY=<任意值>` 讓 Fake LLM 模擬 LiteLLM 的 key 管理（說明見 `deploy/litellm/README.md`）。
 
 Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用於開發 / 驗證，例如 Windows，ADR-0005；指南 `docs/guides/windows-docker.md`）| `Local`（Linux / macOS 開發用，無隔離）。
