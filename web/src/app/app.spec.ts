@@ -59,7 +59,7 @@ describe('App', () => {
     await fixture.whenStable();
 
     const page = fixture.nativeElement as HTMLElement;
-    expect(page.querySelector('.sidebar .brand')?.textContent).toContain('Vibe Maker');
+    expect(page.querySelector('.sidebar .brand')?.textContent).toContain('Web-Pro Ymir');
     expect(page.querySelector('.project-link')?.textContent).toContain('行銷網站');
     expect(page.textContent).toContain('隨便聊聊');
     expect(page.querySelector('.user .name')?.textContent).toContain('Alice');
