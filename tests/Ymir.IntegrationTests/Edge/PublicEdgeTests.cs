@@ -36,6 +36,8 @@ public sealed class PublicEdgeTests
         });
         app.UsePublicEdge();
         app.MapGet("/echo", (HttpContext context) => $"{context.Request.Scheme} {context.Connection.RemoteIpAddress}");
+        app.MapGet("/health", () => "Healthy");
+        app.MapGet("/alive", () => "Healthy");
         await app.StartAsync(TestContext.Current.CancellationToken);
         return app;
     }
@@ -123,6 +125,22 @@ public sealed class PublicEdgeTests
         using var client = app.GetTestClient();
 
         using var response = await client.SendAsync(Echo(host), TestContext.Current.CancellationToken);
+
+        Assert.Equal(expected, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData(PublicHost, "/health", HttpStatusCode.NotFound)]
+    [InlineData(PublicHost, "/ALIVE", HttpStatusCode.NotFound)]
+    [InlineData(PublicHost, "/health/ready", HttpStatusCode.NotFound)]
+    [InlineData("localhost", "/health", HttpStatusCode.OK)]
+    [InlineData("localhost", "/alive", HttpStatusCode.OK)]
+    public async Task HealthChecks_AreHiddenFromPublicHostname(string host, string path, HttpStatusCode expected)
+    {
+        await using var app = await StartPublicAsync();
+        using var client = app.GetTestClient();
+
+        using var response = await client.GetAsync(new Uri($"http://{host}{path}"), TestContext.Current.CancellationToken);
 
         Assert.Equal(expected, response.StatusCode);
     }

@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.HostFiltering;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -41,6 +42,8 @@ public static class PublicEdgeExtensions
             throw new InvalidOperationException("Ymir:PublicEdge:PublicHostname must be a DNS host name without scheme or port, e.g. ymir.example.com.");
         }
 
+        options.PublicHostname = hostname;
+
         var proxies = (options.KnownProxies.Count > 0 ? options.KnownProxies : LoopbackProxies)
             .Select(ParseProxy)
             .ToList();
@@ -71,15 +74,34 @@ public static class PublicEdgeExtensions
     public static WebApplication UsePublicEdge(this WebApplication app)
     {
         ArgumentNullException.ThrowIfNull(app);
-        if (!app.Services.GetRequiredService<PublicEdgeOptions>().Enabled)
+        var options = app.Services.GetRequiredService<PublicEdgeOptions>();
+        if (!options.Enabled)
         {
             return app;
         }
 
         app.UseForwardedHeaders();
         app.UseHsts();
+
+        // health check 只給本機監控使用。Token 模式的 tunnel 由 Cloudflare dashboard 管理 ingress，無法保證有擋 /health，
+        // 因此在 API 端擋：經由公開網域進來的 /health、/alive 一律 404（ADR-0006）。
+        app.Use((context, next) =>
+        {
+            if (IsHealthPath(context.Request.Path)
+                && string.Equals(context.Request.Host.Host, options.PublicHostname, StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return Task.CompletedTask;
+            }
+
+            return next(context);
+        });
         return app;
     }
+
+    private static bool IsHealthPath(PathString path) =>
+        path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWithSegments("/alive", StringComparison.OrdinalIgnoreCase);
 
     private static IPAddress ParseProxy(string value) =>
         IPAddress.TryParse(value.Trim(), out var address)

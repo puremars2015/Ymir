@@ -23,6 +23,9 @@ SA §16 的部署拓樸在 API 前面有一層 Reverse Proxy / HTTPS；ADR-0002 
    - 回應加上 HSTS。
    - **Development 環境拒絕開啟**：Development 有免密碼的 `/api/dev/login`（任何人都能以 Admin 登入）與沒有隔離的 Local runtime，對外等於把主機交出去。
 4. Tunnel 憑證（credentials JSON / token）不進版控（`.gitignore`），也不放進 API 設定；只有 cloudflared 讀得到。
+5. **兩種 tunnel 管理方式都支援**：本機 `config.yml`（ingress 可版控、可 `ingress validate`），或 dashboard 管理的 **token 模式**
+   加 container（[`deploy/cloudflared/compose.yml`](../../deploy/cloudflared/compose.yml)：token 從 `.env` 以環境變數傳入、固定版本、唯讀、drop 全部 capabilities）。
+   因為 token 模式的 ingress 不在版控裡，`/health`、`/alive` 改由 API 擋：經由公開網域進來的一律 404，只有本機 Host 可用。
 
 ## 影響
 
