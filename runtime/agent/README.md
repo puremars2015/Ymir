@@ -1,6 +1,7 @@
 # Agent Runtime Image
 
-每個 Workspace 一個長駐 container，API 以 `podman exec -i` 啟動 `pi --mode rpc`（[ADR-0003](../../docs/adr/0003-pi-rpc-via-podman-exec.md)）。
+每個使用者一個長駐 container（[ADR-0007](../../docs/adr/0007-one-runtime-per-user.md)），API 以 `podman exec -i` 啟動 `pi --mode rpc`（[ADR-0003](../../docs/adr/0003-pi-rpc-via-podman-exec.md)）。
+專案是 container 內的目錄 `/workspace/projects/{id}`，未分組的對話在 `/workspace/chats/{id}`。
 參數的唯一來源是 `src/Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/Containers/ContainerCommandBuilder.cs`，並有單元測試保護。
 正式環境使用 Rootless Podman；沒有 Linux 主機時可以用 Docker 開發與驗證（[ADR-0005](../../docs/adr/0005-docker-for-development.md)、[Windows 指南](../../docs/guides/windows-docker.md)）。
 
@@ -20,7 +21,7 @@ Pi 版本以 `--build-arg PI_VERSION=x.y.z` 指定（預設 1.0.0）。升級 Pi
 | `/agent-state` | host `{WorkspaceRoot}/{workspaceId}/agent-state` | Pi 設定（`pi-agent/`，含 `models.json`）與 session 檔（`sessions/`），container 重建後 Agent 不失憶 |
 | `/tmp`、`/home/agent` | tmpfs | 暫存；root filesystem 為唯讀 |
 
-Host 路徑只由 workspace id 推導（`WorkspaceDirectories`），API 不接受任何外部傳入的路徑（SA §12）。
+Host 路徑只由 user id 推導（`UserDirectories`：`{WorkspaceRoot}/users/{userId}/workspace`、`agent-state`），API 不接受任何外部傳入的路徑（SA §12）。
 
 ## 安全設定（SA §7、§12）
 

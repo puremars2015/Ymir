@@ -2,7 +2,7 @@
 #
 #   podman build -t localhost/ymir/agent-runtime:dev -f runtime/agent/Containerfile runtime/agent
 #
-# 一個 workspace 一個長駐 container（CMD sleep infinity），API 以 `podman exec -i` 啟動 `pi --mode rpc`。
+# 一個使用者一個長駐 container（CMD sleep infinity，ADR-0007），API 以 `podman exec -i` 啟動 `pi --mode rpc`。
 FROM docker.io/library/node:24-bookworm-slim
 
 # Pi 版本鎖定；升級時需同步更新 tests/Ymir.UnitTests/Fixtures/pi-rpc 並重跑整合測試。
