@@ -9,29 +9,29 @@ using Ymir.VibeMaker.Infrastructure.Runtime;
 namespace Ymir.VibeMaker.Infrastructure.Containers;
 
 /// <summary>
-/// Container runtime（Rootless Podman；開發 / 驗證時可用 Docker，ADR-0005）：一個 workspace 一個長駐 container（主程序 <c>sleep infinity</c>），
+/// Container runtime（Rootless Podman；開發 / 驗證時可用 Docker，ADR-0005）：一個使用者一個長駐 container（ADR-0007）（主程序 <c>sleep infinity</c>），
 /// Agent 以 <c>exec -i</c> 執行（ADR-0003）。
 /// Sprint 0 狀態只存在記憶體；Sprint 1/4 改存 AGENT_RUNTIME 並加入 idle stop 與 reconciliation。
 /// </summary>
 internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, ILogger<ContainerRuntimeManager> logger) : IAgentRuntimeManager
 {
     private readonly RuntimeOptions _options = options.Value;
-    private readonly ConcurrentDictionary<Guid, RuntimeInfo> _runtimesByWorkspace = new();
-    private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _workspaceLocks = new();
+    private readonly ConcurrentDictionary<Guid, RuntimeInfo> _runtimesByUser = new();
+    private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _userLocks = new();
 
-    public async Task<RuntimeInfo> EnsureRuntimeAsync(Guid workspaceId, CancellationToken cancellationToken)
+    public async Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, CancellationToken cancellationToken)
     {
-        // 同一 workspace 序列化，避免兩個 request 同時建立兩個 container（SA §14）。
-        var workspaceLock = _workspaceLocks.GetOrAdd(workspaceId, _ => new SemaphoreSlim(1, 1));
-        await workspaceLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        // 同一使用者序列化，避免兩個 request 同時建立兩個 container（SA §14）。
+        var userLock = _userLocks.GetOrAdd(userId, _ => new SemaphoreSlim(1, 1));
+        await userLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var runtimeId = _runtimesByWorkspace.TryGetValue(workspaceId, out var known) ? known.RuntimeId : Guid.NewGuid();
-            var state = await InspectAsync(workspaceId, cancellationToken).ConfigureAwait(false);
+            var runtimeId = _runtimesByUser.TryGetValue(userId, out var known) ? known.RuntimeId : Guid.NewGuid();
+            var state = await InspectAsync(userId, cancellationToken).ConfigureAwait(false);
             switch (state)
             {
                 case null:
-                    var directories = WorkspaceDirectories.For(_options.WorkspaceRoot, workspaceId);
+                    var directories = UserDirectories.For(_options.WorkspaceRoot, userId);
                     directories.EnsureCreated();
                     if (_options.Provider == RuntimeProvider.Docker)
                     {
@@ -39,54 +39,54 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
                             .ConfigureAwait(false);
                     }
 
-                    await RunContainerCliAsync(ContainerCommandBuilder.BuildRunArguments(_options, workspaceId, runtimeId, directories), cancellationToken)
+                    await RunContainerCliAsync(ContainerCommandBuilder.BuildRunArguments(_options, userId, runtimeId, directories), cancellationToken)
                         .ConfigureAwait(false);
-                    logger.LogInformation("Created runtime container for workspace {WorkspaceId}", workspaceId);
+                    logger.LogInformation("Created runtime container for user {UserId}", userId);
                     break;
                 case "running":
                     break;
                 default:
-                    await RunContainerCliAsync(ContainerCommandBuilder.BuildStartArguments(workspaceId), cancellationToken).ConfigureAwait(false);
-                    logger.LogInformation("Started runtime container for workspace {WorkspaceId} (was {State})", workspaceId, state);
+                    await RunContainerCliAsync(ContainerCommandBuilder.BuildStartArguments(userId), cancellationToken).ConfigureAwait(false);
+                    logger.LogInformation("Started runtime container for user {UserId} (was {State})", userId, state);
                     break;
             }
 
-            var runtime = new RuntimeInfo(runtimeId, workspaceId, ProviderName(), ContainerCommandBuilder.ContainerName(workspaceId), _options.Image, RuntimeStatus.Running);
-            _runtimesByWorkspace[workspaceId] = runtime;
+            var runtime = new RuntimeInfo(runtimeId, userId, ProviderName(), ContainerCommandBuilder.ContainerName(userId), _options.Image, RuntimeStatus.Running);
+            _runtimesByUser[userId] = runtime;
             return runtime;
         }
         finally
         {
-            workspaceLock.Release();
+            userLock.Release();
         }
     }
 
     public async Task StartAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
         var runtime = Find(runtimeId);
-        await RunContainerCliAsync(ContainerCommandBuilder.BuildStartArguments(runtime.WorkspaceId), cancellationToken).ConfigureAwait(false);
-        _runtimesByWorkspace[runtime.WorkspaceId] = runtime with { Status = RuntimeStatus.Running };
+        await RunContainerCliAsync(ContainerCommandBuilder.BuildStartArguments(runtime.UserId), cancellationToken).ConfigureAwait(false);
+        _runtimesByUser[runtime.UserId] = runtime with { Status = RuntimeStatus.Running };
     }
 
     public async Task StopAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
         var runtime = Find(runtimeId);
-        await RunContainerCliAsync(ContainerCommandBuilder.BuildStopArguments(runtime.WorkspaceId), cancellationToken).ConfigureAwait(false);
-        _runtimesByWorkspace[runtime.WorkspaceId] = runtime with { Status = RuntimeStatus.Stopped };
+        await RunContainerCliAsync(ContainerCommandBuilder.BuildStopArguments(runtime.UserId), cancellationToken).ConfigureAwait(false);
+        _runtimesByUser[runtime.UserId] = runtime with { Status = RuntimeStatus.Stopped };
     }
 
     public async Task DeleteAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
         var runtime = Find(runtimeId);
-        // 只移除 container；workspace 與 agent-state 目錄保留（SA §15）。
-        await RunContainerCliAsync(ContainerCommandBuilder.BuildRemoveArguments(runtime.WorkspaceId), cancellationToken).ConfigureAwait(false);
-        _runtimesByWorkspace.TryRemove(runtime.WorkspaceId, out _);
+        // 只移除 container；使用者的 workspace 與 agent-state 目錄保留（SA §15）。
+        await RunContainerCliAsync(ContainerCommandBuilder.BuildRemoveArguments(runtime.UserId), cancellationToken).ConfigureAwait(false);
+        _runtimesByUser.TryRemove(runtime.UserId, out _);
     }
 
     public async Task<RuntimeInfo> GetStatusAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
         var runtime = Find(runtimeId);
-        var state = await InspectAsync(runtime.WorkspaceId, cancellationToken).ConfigureAwait(false);
+        var state = await InspectAsync(runtime.UserId, cancellationToken).ConfigureAwait(false);
         var status = state switch
         {
             null => RuntimeStatus.NotCreated,
@@ -98,21 +98,24 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
         return runtime with { Status = status };
     }
 
-    public Task<IRuntimeProcess> StartProcessAsync(Guid runtimeId, RuntimeProcessSpec spec, CancellationToken cancellationToken)
+    public async Task<IRuntimeProcess> StartProcessAsync(Guid runtimeId, RuntimeProcessSpec spec, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(spec);
         cancellationToken.ThrowIfCancellationRequested();
         var runtime = Find(runtimeId);
-        IRuntimeProcess process = HostProcess.Start(
-            _options.ResolvedExecutable,
-            ContainerCommandBuilder.BuildExecArguments(runtime.WorkspaceId, spec),
-            workingDirectory: null,
-            environment: spec.Environment);
-        return Task.FromResult(process);
+        var execArguments = ContainerCommandBuilder.BuildExecArguments(runtime.UserId, spec); // 先驗證工作目錄
+        if (spec.WorkingDirectory != RuntimePaths.Workspace)
+        {
+            await RunContainerCliAsync(ContainerCommandBuilder.BuildEnsureDirectoryArguments(runtime.UserId, spec.WorkingDirectory), cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return HostProcess.Start(_options.ResolvedExecutable, execArguments, workingDirectory: null, environment: spec.Environment);
     }
 
-    private async Task<string?> InspectAsync(Guid workspaceId, CancellationToken cancellationToken)
+    private async Task<string?> InspectAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var (exitCode, output, _) = await ExecuteContainerCliAsync(ContainerCommandBuilder.BuildInspectStatusArguments(workspaceId), cancellationToken)
+        var (exitCode, output, _) = await ExecuteContainerCliAsync(ContainerCommandBuilder.BuildInspectStatusArguments(userId), cancellationToken)
             .ConfigureAwait(false);
         return exitCode == 0 ? output.Trim() : null;
     }
@@ -143,6 +146,6 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
     private string ProviderName() => _options.Provider == RuntimeProvider.Docker ? "DOCKER" : "PODMAN";
 
     private RuntimeInfo Find(Guid runtimeId) =>
-        _runtimesByWorkspace.Values.FirstOrDefault(r => r.RuntimeId == runtimeId)
+        _runtimesByUser.Values.FirstOrDefault(r => r.RuntimeId == runtimeId)
         ?? throw new InvalidOperationException($"Runtime {runtimeId} not found.");
 }

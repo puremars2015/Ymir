@@ -1,8 +1,10 @@
 namespace Ymir.VibeMaker.Contracts.Conversations;
 
-public sealed record CreateConversationRequest(Guid WorkspaceId, string Title);
+/// <param name="ProjectId">所屬專案；省略表示未分組的對話（ADR-0007）。</param>
+public sealed record CreateConversationRequest(Guid? ProjectId, string Title);
 
-public sealed record ConversationResponse(Guid Id, Guid WorkspaceId, string Title, string Status, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+/// <param name="ProjectId">所屬專案；null 表示未分組（ADR-0007）。</param>
+public sealed record ConversationResponse(Guid Id, Guid? ProjectId, string Title, string Status, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
 
 /// <param name="Role">USER / ASSISTANT / SYSTEM / TOOL（SA §8）。</param>
 /// <param name="MessageType">TEXT / STATUS / TOOL_EVENT / ERROR（SA §8）。</param>

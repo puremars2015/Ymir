@@ -59,7 +59,9 @@ internal sealed class PiAgentHarness(
                 ["PI_SKIP_VERSION_CHECK"] = "1",
                 ["PI_TELEMETRY"] = "0",
                 [PiRuntimeLayout.ApiKeyEnvironmentVariable] = apiKey,
-            });
+            },
+            // 專案目錄或未分組對話自己的目錄（ADR-0007）；Pi 的檔案工具以此為根。
+            request.WorkingDirectory);
 
     private async Task PumpAsync(AgentRunRequest request, ChannelWriter<AgentEvent> writer, CancellationToken cancellationToken)
     {

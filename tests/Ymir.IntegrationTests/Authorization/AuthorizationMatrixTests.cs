@@ -18,15 +18,14 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     /// <summary>以「另一個使用者的資源」呼叫，必須得到 404（或 403）。</summary>
     private static readonly Dictionary<string, Func<OwnedResources, HttpRequestMessage>> ResourceRequests = new()
     {
-        ["GET /api/workspaces/{workspaceId:guid}"] = r => Get($"/api/workspaces/{r.WorkspaceId}"),
-        ["GET /api/workspaces/{workspaceId:guid}/runtime"] = r => Get($"/api/workspaces/{r.WorkspaceId}/runtime"),
+        ["GET /api/projects/{projectId:guid}"] = r => Get($"/api/projects/{r.ProjectId}"),
         ["GET /api/conversations/{conversationId:guid}"] = r => Get($"/api/conversations/{r.ConversationId}"),
         ["GET /api/conversations/{conversationId:guid}/messages"] = r => Get($"/api/conversations/{r.ConversationId}/messages"),
         // 列表 / 建立端點以 query / body 指定別人的資源
-        ["GET /api/conversations/"] = r => Get($"/api/conversations?workspaceId={r.WorkspaceId}"),
+        ["GET /api/conversations/"] = r => Get($"/api/conversations?projectId={r.ProjectId}"),
         ["POST /api/conversations/"] = r => new HttpRequestMessage(HttpMethod.Post, "/api/conversations")
         {
-            Content = JsonContent.Create(new CreateConversationRequest(r.WorkspaceId, "intrusion")),
+            Content = JsonContent.Create(new CreateConversationRequest(r.ProjectId, "intrusion")),
         },
         ["POST /api/conversations/{conversationId:guid}/messages"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/messages")
         {
@@ -42,11 +41,12 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "GET /api/me",
         "POST /api/auth/logout",
         "POST /api/dev/login",
-        "GET /api/workspaces/",
-        "POST /api/workspaces/",
+        "GET /api/projects/",
+        "POST /api/projects/",
+        "GET /api/runtime",
     ];
 
-    private sealed record OwnedResources(Guid WorkspaceId, Guid ConversationId, Guid ExecutionId);
+    private sealed record OwnedResources(Guid ProjectId, Guid ConversationId, Guid ExecutionId);
 
     private static HttpRequestMessage Get(string url) => new(HttpMethod.Get, url);
 
@@ -70,11 +70,11 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         var ct = TestContext.Current.CancellationToken;
         using var owner = await factory.LoginAsync("matrix-owner");
         using var intruder = await factory.LoginAsync("matrix-intruder");
-        var workspace = await owner.CreateWorkspaceAsync("secret");
-        var conversation = await owner.CreateConversationAsync(workspace.Id, "secret chat");
+        var project = await owner.CreateProjectAsync("secret");
+        var conversation = await owner.CreateConversationAsync(project.Id, "secret chat");
         var (_, sent) = await owner.SendMessageAsync(conversation.Id, "secret prompt");
         await owner.ReadEventsAsync(sent!.EventStreamUrl); // 等執行結束，擁有者之後才能再送訊息
-        var resources = new OwnedResources(workspace.Id, conversation.Id, sent.ExecutionId);
+        var resources = new OwnedResources(project.Id, conversation.Id, sent.ExecutionId);
 
         var failures = new List<string>();
         foreach (var (endpoint, createRequest) in ResourceRequests)

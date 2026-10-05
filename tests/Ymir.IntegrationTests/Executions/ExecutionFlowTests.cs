@@ -16,8 +16,8 @@ public class ExecutionFlowTests(ApiFactory factory) : IClassFixture<ApiFactory>
     private async Task<(HttpClient Client, Guid ConversationId)> ArrangeAsync(string account)
     {
         var client = await factory.LoginAsync(account);
-        var workspace = await client.CreateWorkspaceAsync("ws");
-        var conversation = await client.CreateConversationAsync(workspace.Id, "chat");
+        var project = await client.CreateProjectAsync("project");
+        var conversation = await client.CreateConversationAsync(project.Id, "chat");
         return (client, conversation.Id);
     }
 

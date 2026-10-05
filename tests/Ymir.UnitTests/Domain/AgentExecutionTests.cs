@@ -8,8 +8,8 @@ public class AgentExecutionTests
 
     private static (AgentExecution Execution, Message UserMessage) Queue()
     {
-        var workspace = Workspace.Create(Guid.NewGuid(), "ws", Now);
-        var conversation = Conversation.Create(workspace, "chat", Now);
+        var project = Project.Create(Guid.NewGuid(), "project", Now);
+        var conversation = Conversation.Create(project.UserId, project, "chat", Now);
         var message = Message.CreateUser(conversation.Id, "hello", 1, Now);
         return (AgentExecution.Queue(conversation, message, Guid.NewGuid(), Now), message);
     }
@@ -69,16 +69,31 @@ public class AgentExecutionTests
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public void Workspace_RequiresName(string name)
+    public void Project_RequiresName(string name)
     {
-        Assert.Throws<DomainValidationException>(() => Workspace.Create(Guid.NewGuid(), name, Now));
+        Assert.Throws<DomainValidationException>(() => Project.Create(Guid.NewGuid(), name, Now));
     }
 
     [Fact]
-    public void Workspace_TrimsNameAndUsesIdAsStorageKey()
+    public void Project_TrimsName()
     {
-        var workspace = Workspace.Create(Guid.NewGuid(), "  My Project  ", Now);
-        Assert.Equal("My Project", workspace.Name);
-        Assert.Equal(workspace.Id.ToString("N"), workspace.StorageKey);
+        var project = Project.Create(Guid.NewGuid(), "  My Project  ", Now);
+        Assert.Equal("My Project", project.Name);
+    }
+
+    [Fact]
+    public void Conversation_WithoutProject_IsUngrouped()
+    {
+        var userId = Guid.NewGuid();
+        var conversation = Conversation.Create(userId, null, "chat", Now);
+        Assert.Null(conversation.ProjectId);
+        Assert.Equal(userId, conversation.UserId);
+    }
+
+    [Fact]
+    public void Conversation_CannotUseAnotherUsersProject()
+    {
+        var project = Project.Create(Guid.NewGuid(), "someone else", Now);
+        Assert.Throws<DomainValidationException>(() => Conversation.Create(Guid.NewGuid(), project, "chat", Now));
     }
 }

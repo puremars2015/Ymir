@@ -13,7 +13,6 @@ public interface IModelGateway
 
 public sealed record RuntimeCredentialRequest(
     Guid UserId,
-    Guid WorkspaceId,
     Guid RuntimeId,
     IReadOnlyList<string> AllowedModels,
     TimeSpan Lifetime,

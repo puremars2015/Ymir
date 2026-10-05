@@ -20,7 +20,7 @@ public sealed class ExecutionRunner(
     IAgentHarness harness,
     ExecutionEventWriter eventWriter,
     IExecutionCancellationRegistry cancellations,
-    WorkspaceExecutionLocks workspaceLocks,
+    UserExecutionLocks userLocks,
     IOptions<ExecutionOptions> options,
     IAuditLog auditLog,
     TimeProvider timeProvider,
@@ -39,7 +39,8 @@ public sealed class ExecutionRunner(
         _sequence = await db.ExecutionEvents.Where(e => e.ExecutionId == executionId)
             .MaxAsync(e => (long?)e.Sequence, stoppingToken).ConfigureAwait(false) ?? 0;
 
-        using var workspaceLock = await workspaceLocks.AcquireAsync(execution.WorkspaceId, stoppingToken).ConfigureAwait(false);
+        // 一個使用者一個 container（ADR-0007）：同一使用者的 execution 依序執行。
+        using var userLock = await userLocks.AcquireAsync(execution.UserId, stoppingToken).ConfigureAwait(false);
 
         // 等待 lock 期間可能已被取消。
         await db.Entry(execution).ReloadAsync(stoppingToken).ConfigureAwait(false);
@@ -69,7 +70,7 @@ public sealed class ExecutionRunner(
         try
         {
             await AppendAsync(executionId, new StatusEvent("正在準備 Runtime"), stoppingToken).ConfigureAwait(false);
-            runtime = await runtimeManager.EnsureRuntimeAsync(execution.WorkspaceId, runToken).ConfigureAwait(false);
+            runtime = await runtimeManager.EnsureRuntimeAsync(execution.UserId, runToken).ConfigureAwait(false);
             await RecordRuntimeAsync(runtime, stoppingToken).ConfigureAwait(false);
             session = await GetOrCreateSessionAsync(execution, runtime, stoppingToken).ConfigureAwait(false);
 
@@ -103,7 +104,12 @@ public sealed class ExecutionRunner(
         AgentEvent? terminal = null;
         try
         {
-            var request = new AgentRunRequest(executionId, runtime.RuntimeId, session.Id, await GetPromptAsync(execution, stoppingToken).ConfigureAwait(false));
+            var request = new AgentRunRequest(
+                executionId,
+                runtime.RuntimeId,
+                session.Id,
+                await GetPromptAsync(execution, stoppingToken).ConfigureAwait(false),
+                await GetWorkingDirectoryAsync(execution, stoppingToken).ConfigureAwait(false));
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
             {
                 if (agentEvent is AgentCompleted or AgentFailed or AgentCancelled)
@@ -193,15 +199,22 @@ public sealed class ExecutionRunner(
     private async Task<string> GetPromptAsync(AgentExecution execution, CancellationToken cancellationToken) =>
         await db.Messages.Where(m => m.Id == execution.UserMessageId).Select(m => m.Content).SingleAsync(cancellationToken).ConfigureAwait(false);
 
+    /// <summary>有專案的對話在專案目錄工作（共用檔案），未分組的對話在自己的目錄工作（ADR-0007）。</summary>
+    private async Task<string> GetWorkingDirectoryAsync(AgentExecution execution, CancellationToken cancellationToken)
+    {
+        var projectId = await db.Conversations.Where(c => c.Id == execution.ConversationId).Select(c => c.ProjectId).SingleAsync(cancellationToken).ConfigureAwait(false);
+        return RuntimePaths.WorkingDirectoryFor(execution.ConversationId, projectId);
+    }
+
     private async Task RecordRuntimeAsync(RuntimeInfo runtime, CancellationToken cancellationToken)
     {
         var now = timeProvider.GetUtcNow();
         var record = await db.AgentRuntimes
-            .SingleOrDefaultAsync(r => r.WorkspaceId == runtime.WorkspaceId && r.Status != RuntimeStatus.Deleted, cancellationToken)
+            .SingleOrDefaultAsync(r => r.UserId == runtime.UserId && r.Status != RuntimeStatus.Deleted, cancellationToken)
             .ConfigureAwait(false);
         if (record is null)
         {
-            db.AgentRuntimes.Add(AgentRuntimeRecord.Create(runtime.RuntimeId, runtime.WorkspaceId, runtime.Provider, runtime.ProviderRuntimeId, runtime.ImageVersion, runtime.Status, now));
+            db.AgentRuntimes.Add(AgentRuntimeRecord.Create(runtime.RuntimeId, runtime.UserId, runtime.Provider, runtime.ProviderRuntimeId, runtime.ImageVersion, runtime.Status, now));
         }
         else
         {

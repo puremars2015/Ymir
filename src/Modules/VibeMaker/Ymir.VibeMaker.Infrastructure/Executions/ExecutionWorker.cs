@@ -8,7 +8,7 @@ namespace Ymir.VibeMaker.Infrastructure.Executions;
 
 /// <summary>
 /// 背景執行 execution（與 HTTP request 解耦，開發規劃 §5）。啟動時先做 reconciliation（SA §14），
-/// 之後每個 execution 在自己的 DI scope 執行；同一 workspace 由 <see cref="WorkspaceExecutionLocks"/> 序列化。
+/// 之後每個 execution 在自己的 DI scope 執行；同一使用者由 <see cref="UserExecutionLocks"/> 序列化（ADR-0007）。
 /// </summary>
 internal sealed class ExecutionWorker(IServiceScopeFactory scopeFactory, IExecutionDispatcher dispatcher, ILogger<ExecutionWorker> logger) : BackgroundService
 {

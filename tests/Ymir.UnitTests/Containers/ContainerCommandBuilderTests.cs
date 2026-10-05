@@ -4,17 +4,19 @@ using Ymir.VibeMaker.Infrastructure.Runtime;
 
 namespace Ymir.UnitTests.Containers;
 
-/// <summary>驗證 SA §7 / §12 的 container 安全規則；Podman（正式）與 Docker（開發 / 驗證，ADR-0005）都必須符合。</summary>
+/// <summary>驗證 SA §7 / §12 的 container 安全規則；Podman（正式）與 Docker（開發 / 驗證，ADR-0005）都必須符合。一個使用者一個 container（ADR-0007）。</summary>
 public class ContainerCommandBuilderTests
 {
-    private static readonly Guid WorkspaceId = Guid.Parse("6f9619ff-8b86-d011-b42d-00c04fc964ff");
+    private static readonly Guid UserId = Guid.Parse("6f9619ff-8b86-d011-b42d-00c04fc964ff");
+
+    private const string UserRoot = "/srv/ymir/workspaces/users/6f9619ff8b86d011b42d00c04fc964ff";
 
     public static TheoryData<RuntimeProvider> Engines => new() { RuntimeProvider.Podman, RuntimeProvider.Docker };
 
     private static IReadOnlyList<string> RunArguments(RuntimeOptions options)
     {
-        var directories = WorkspaceDirectories.For(options.WorkspaceRoot, WorkspaceId);
-        return ContainerCommandBuilder.BuildRunArguments(options, WorkspaceId, Guid.NewGuid(), directories);
+        var directories = UserDirectories.For(options.WorkspaceRoot, UserId);
+        return ContainerCommandBuilder.BuildRunArguments(options, UserId, Guid.NewGuid(), directories);
     }
 
     private static IReadOnlyList<string> RunArguments(RuntimeProvider provider) =>
@@ -47,15 +49,15 @@ public class ContainerCommandBuilderTests
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public void Run_MountsOnlyThisWorkspaceDirectories_AndNeverTheContainerSocket(RuntimeProvider provider)
+    public void Run_MountsOnlyThisUsersDirectories_AndNeverTheContainerSocket(RuntimeProvider provider)
     {
         var args = RunArguments(provider);
         var mounts = ValuesAfter(args, "--mount");
 
         Assert.Equal(
             [
-                $"type=bind,source=/srv/ymir/workspaces/{WorkspaceId:N}/workspace,target={RuntimePaths.Workspace}",
-                $"type=bind,source=/srv/ymir/workspaces/{WorkspaceId:N}/agent-state,target={RuntimePaths.AgentState}",
+                $"type=bind,source={UserRoot}/workspace,target={RuntimePaths.Workspace}",
+                $"type=bind,source={UserRoot}/agent-state,target={RuntimePaths.AgentState}",
             ],
             mounts);
         Assert.DoesNotContain("--volume", args);
@@ -94,10 +96,10 @@ public class ContainerCommandBuilderTests
     }
 
     [Fact]
-    public void DockerPrepareMounts_ChownsOnlyTheTwoWorkspaceDirectories_WithoutNetwork()
+    public void DockerPrepareMounts_ChownsOnlyTheUsersTwoDirectories_WithoutNetwork()
     {
         var options = new RuntimeOptions { Provider = RuntimeProvider.Docker, WorkspaceRoot = "/srv/ymir/workspaces" };
-        var args = ContainerCommandBuilder.BuildDockerPrepareMountsArguments(options, WorkspaceDirectories.For(options.WorkspaceRoot, WorkspaceId));
+        var args = ContainerCommandBuilder.BuildDockerPrepareMountsArguments(options, UserDirectories.For(options.WorkspaceRoot, UserId));
 
         Assert.Equal("none", ValueAfter(args, "--network"));
         Assert.Contains("--rm", args);
@@ -119,23 +121,56 @@ public class ContainerCommandBuilderTests
     {
         var spec = new RuntimeProcessSpec("pi", ["--mode", "rpc"], new Dictionary<string, string> { ["LITELLM_API_KEY"] = "secret-value" });
 
-        var args = ContainerCommandBuilder.BuildExecArguments(WorkspaceId, spec);
+        var args = ContainerCommandBuilder.BuildExecArguments(UserId, spec);
 
-        Assert.Equal(["exec", "--interactive", "--workdir", "/workspace", "--env", "LITELLM_API_KEY", $"ymir-ws-{WorkspaceId:N}", "pi", "--mode", "rpc"], args);
+        Assert.Equal(["exec", "--interactive", "--workdir", "/workspace", "--env", "LITELLM_API_KEY", $"ymir-user-{UserId:N}", "pi", "--mode", "rpc"], args);
         Assert.DoesNotContain(args, a => a.Contains("secret-value", StringComparison.Ordinal));
     }
 
     [Fact]
     public void Stop_UsesShortTimeoutFlagSupportedByBothEngines()
     {
-        Assert.Equal(["stop", "-t", "10", $"ymir-ws-{WorkspaceId:N}"], ContainerCommandBuilder.BuildStopArguments(WorkspaceId));
+        Assert.Equal(["stop", "-t", "10", $"ymir-user-{UserId:N}"], ContainerCommandBuilder.BuildStopArguments(UserId));
     }
 
     [Fact]
-    public void WorkspaceDirectories_AreDerivedOnlyFromWorkspaceId()
+    public void ContainerName_AndLabel_IdentifyTheUser()
     {
-        var directories = WorkspaceDirectories.For("/srv/ymir/../ymir/workspaces", WorkspaceId);
-        Assert.Equal($"/srv/ymir/workspaces/{WorkspaceId:N}/workspace", directories.Workspace);
+        var args = RunArguments(RuntimeProvider.Podman);
+        Assert.Equal($"ymir-user-{UserId:N}", ValueAfter(args, "--name"));
+        Assert.Contains($"ymir.user-id={UserId:D}", ValuesAfter(args, "--label"));
+    }
+
+    [Fact]
+    public void Exec_UsesProjectWorkingDirectory()
+    {
+        var projectId = Guid.NewGuid();
+        var spec = new RuntimeProcessSpec("pi", [], null, RuntimePaths.ProjectDirectory(projectId));
+
+        var args = ContainerCommandBuilder.BuildExecArguments(UserId, spec);
+
+        Assert.Equal($"/workspace/projects/{projectId:N}", ValueAfter(args, "--workdir"));
+    }
+
+    [Theory]
+    [InlineData("/etc")]
+    [InlineData("/workspace/../etc")]
+    [InlineData("/agent-state")]
+    [InlineData("/workspace/projects/not-a-guid")]
+    public void Exec_RejectsWorkingDirectoriesOutsideAllowedPaths(string workingDirectory)
+    {
+        var spec = new RuntimeProcessSpec("pi", [], null, workingDirectory);
+        Assert.Throws<ArgumentException>(() => ContainerCommandBuilder.BuildExecArguments(UserId, spec));
+        Assert.Throws<ArgumentException>(() => ContainerCommandBuilder.BuildEnsureDirectoryArguments(UserId, workingDirectory));
+    }
+
+    [Fact]
+    public void EnsureDirectory_RunsMkdirInsideTheUsersContainer()
+    {
+        var conversationId = Guid.NewGuid();
+        Assert.Equal(
+            ["exec", $"ymir-user-{UserId:N}", "mkdir", "-p", $"/workspace/chats/{conversationId:N}"],
+            ContainerCommandBuilder.BuildEnsureDirectoryArguments(UserId, RuntimePaths.ConversationDirectory(conversationId)));
     }
 
     [Theory]

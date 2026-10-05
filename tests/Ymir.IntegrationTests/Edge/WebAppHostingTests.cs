@@ -53,7 +53,7 @@ public sealed class WebAppHostingTests : IDisposable
 
     [Theory]
     [InlineData("/")]
-    [InlineData("/workspaces/6f9619ff-8b86-d011-b42d-00c04fc964ff")]
+    [InlineData("/c/6f9619ff-8b86-d011-b42d-00c04fc964ff")]
     public async Task FrontendRoutes_ServeIndexHtml_Anonymously(string path)
     {
         await using var app = await StartAsync(_root);

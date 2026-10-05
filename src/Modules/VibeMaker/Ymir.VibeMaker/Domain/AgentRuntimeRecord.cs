@@ -2,7 +2,7 @@ namespace Ymir.VibeMaker.Domain;
 
 /// <summary>
 /// Runtime metadata（SA §8 AGENT_RUNTIME）。Container 是運算資源，不是唯一資料來源（SA §15）；
-/// 每個 workspace 最多一筆未刪除的紀錄（filtered unique index）。
+/// 每個使用者最多一筆未刪除的紀錄（filtered unique index，ADR-0007）。
 /// </summary>
 public sealed class AgentRuntimeRecord
 {
@@ -12,7 +12,7 @@ public sealed class AgentRuntimeRecord
 
     public Guid Id { get; private set; }
 
-    public Guid WorkspaceId { get; private set; }
+    public Guid UserId { get; private set; }
 
     public string Provider { get; private set; } = string.Empty;
 
@@ -28,11 +28,11 @@ public sealed class AgentRuntimeRecord
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    public static AgentRuntimeRecord Create(Guid id, Guid workspaceId, string provider, string providerRuntimeId, string imageVersion, RuntimeStatus status, DateTimeOffset now) =>
+    public static AgentRuntimeRecord Create(Guid id, Guid userId, string provider, string providerRuntimeId, string imageVersion, RuntimeStatus status, DateTimeOffset now) =>
         new()
         {
             Id = id,
-            WorkspaceId = workspaceId,
+            UserId = userId,
             Provider = provider,
             ProviderRuntimeId = providerRuntimeId,
             ImageVersion = imageVersion,

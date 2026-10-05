@@ -17,8 +17,8 @@ public class ExecutionTimeoutTests(ShortTimeoutApiFactory factory) : IClassFixtu
     public async Task ExecutionExceedingTimeout_FailsWithAgentTimeout()
     {
         using var client = await factory.LoginAsync("timeout-user");
-        var workspace = await client.CreateWorkspaceAsync("ws");
-        var conversation = await client.CreateConversationAsync(workspace.Id, "chat");
+        var project = await client.CreateProjectAsync("project");
+        var conversation = await client.CreateConversationAsync(project.Id, "chat");
 
         var (_, accepted) = await client.SendMessageAsync(conversation.Id, "slow task");
         var events = await client.ReadEventsAsync(accepted!.EventStreamUrl);

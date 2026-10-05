@@ -18,9 +18,9 @@ public class PersistenceConstraintTests(ApiFactory factory) : IClassFixture<ApiF
         _ = factory.Server; // 啟動 host（含 migrate）
         var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<VibeMakerDbContext>();
-        var workspace = Workspace.Create(Guid.NewGuid(), "ws", Now);
-        var conversation = Conversation.Create(workspace, "chat", Now);
-        db.AddRange(workspace, conversation);
+        var project = Project.Create(Guid.NewGuid(), "project", Now);
+        var conversation = Conversation.Create(project.UserId, project, "chat", Now);
+        db.AddRange(project, conversation);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         return (db, scope, conversation);
     }

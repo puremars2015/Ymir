@@ -30,7 +30,7 @@ dotnet run --project spikes/pi-rpc-poc -- --runtime Podman --network host --prom
 | `--runtime` | `Local` | `Local`（host 直接執行，無隔離）或 `Podman` |
 | `--llm-url` | 內建 Fake LLM | OpenAI 相容 base URL |
 | `--model` / `--api-key` | `fake-model` / `$LITELLM_API_KEY` | |
-| `--workspace` / `--session` | 固定 GUID | 相同 session 會續接對話 |
+| `--user` / `--session` | 固定 GUID | 一個使用者一個 runtime（ADR-0007）；相同 session 會續接對話 |
 | `--workspace-root` | `$TMPDIR/ymir-poc-workspaces` | Host 上的 workspace 根目錄 |
 | `--network` / `--image` | `slirp4netns` / `localhost/ymir/agent-runtime:dev` | Podman 專用 |
 

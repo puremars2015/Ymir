@@ -12,7 +12,7 @@ public sealed class RuntimeOptions
     public RuntimeProvider Provider { get; set; } = RuntimeProvider.Podman;
 
     /// <summary>
-    /// Host 上所有 workspace 的根目錄；每個 workspace 位於 <c>{WorkspaceRoot}/{workspaceId}</c>。
+    /// Host 上所有使用者資料的根目錄；每個使用者位於 <c>{WorkspaceRoot}/users/{userId}</c>（一個使用者一個 runtime，ADR-0007）。
     /// 只有 Runtime Manager 會解析此路徑，API 不接受任何外部傳入的 host path（SA §12）。
     /// </summary>
     public string WorkspaceRoot { get; set; } = Path.Combine(Path.GetTempPath(), "ymir-workspaces");

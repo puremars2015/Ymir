@@ -14,7 +14,7 @@ namespace Ymir.Spikes.PiRpcPoc;
 /// </summary>
 internal static class Program
 {
-    private static readonly Guid DefaultWorkspaceId = Guid.Parse("00000000-0000-0000-0000-0000000000a1");
+    private static readonly Guid DefaultUserId = Guid.Parse("00000000-0000-0000-0000-0000000000a1");
     private static readonly Guid DefaultSessionId = Guid.Parse("00000000-0000-0000-0000-0000000000b1");
 
     public static async Task<int> Main(string[] args)
@@ -24,7 +24,7 @@ internal static class Program
         await using var fakeLlm = options.LlmUrl is null ? await FakeLlmServer.StartAsync() : null;
         var modelBaseUrl = options.LlmUrl ?? fakeLlm!.BaseUrl.ToString();
         Console.WriteLine($"# runtime={options.Runtime} model={options.Model} endpoint={modelBaseUrl}");
-        Console.WriteLine($"# workspace={options.WorkspaceId} session={options.SessionId}");
+        Console.WriteLine($"# user={options.UserId} session={options.SessionId}");
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -50,7 +50,7 @@ internal static class Program
         var runtimeManager = services.GetRequiredService<IAgentRuntimeManager>();
         var harness = services.GetRequiredService<IAgentHarness>();
 
-        var runtime = await runtimeManager.EnsureRuntimeAsync(options.WorkspaceId, CancellationToken.None);
+        var runtime = await runtimeManager.EnsureRuntimeAsync(options.UserId, CancellationToken.None);
         Console.WriteLine($"# runtime ready: {runtime.Provider} {runtime.ProviderRuntimeId}");
 
         var prompts = options.Prompts.Count > 0 ? options.Prompts : ReadPromptsInteractively();
@@ -77,7 +77,7 @@ internal static class Program
             var executionId = Guid.NewGuid();
             Console.WriteLine($"\n> {prompt}");
             var sequence = 0;
-            await foreach (var agentEvent in harness.RunAsync(new AgentRunRequest(executionId, runtimeId, sessionId, prompt), cts.Token))
+            await foreach (var agentEvent in harness.RunAsync(new AgentRunRequest(executionId, runtimeId, sessionId, prompt, RuntimePaths.Workspace), cts.Token))
             {
                 var executionEvent = agentEvent.ToExecutionEvent(executionId);
                 Console.WriteLine($"id: {++sequence}\nevent: {executionEvent.EventName}\ndata: {executionEvent.ToJson()}\n");
@@ -113,7 +113,7 @@ internal static class Program
         string WorkspaceRoot,
         string Image,
         string? Network,
-        Guid WorkspaceId,
+        Guid UserId,
         Guid SessionId,
         List<string> Prompts)
     {
@@ -143,7 +143,7 @@ internal static class Program
                 WorkspaceRoot: Value("--workspace-root") ?? Path.Combine(Path.GetTempPath(), "ymir-poc-workspaces"),
                 Image: Value("--image") ?? "localhost/ymir/agent-runtime:dev",
                 Network: Value("--network"),
-                WorkspaceId: Guid.TryParse(Value("--workspace"), out var workspaceId) ? workspaceId : DefaultWorkspaceId,
+                UserId: Guid.TryParse(Value("--user"), out var userId) ? userId : DefaultUserId,
                 SessionId: Guid.TryParse(Value("--session"), out var sessionId) ? sessionId : DefaultSessionId,
                 Prompts: prompts);
         }
