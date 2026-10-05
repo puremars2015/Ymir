@@ -115,5 +115,6 @@ Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用
 2. **Commit**：一次一個垂直切片，訊息說明做了什麼與為什麼，結尾附 attribution trailer。
 3. **更新進度紀錄**：在 `docs/progress/` 目前 Sprint 的看板留言（做了什麼、實際跑過的驗證、卡關與待決定事項），更新置頂區的工作項目狀態，然後 commit。
 4. **Push**：`git push -u origin <目前分支>`；網路失敗依 2 / 4 / 8 / 16 秒重試。不要推到其他分支。
+5. **合併回 main**（使用者要求：每次做完都直接 merge）：開 PR → `main`，等 CI 全部通過後以 merge commit 合併（指定 head SHA）。CI 失敗就修正、驗證、commit、看板留言、push，直到通過；不得跳過或停用測試。合併後把工作分支重設到最新的 `main`（`git fetch origin main && git checkout -B <分支> origin/main`）再開始下一件工作。
 
 `.claude/hooks/require-commit-push-progress.sh`（Stop hook）會在回合結束時檢查：有未 commit 的變更、最後一次更新 `docs/progress/` 之後還有其他 commit、或有未 push 的 commit，都會擋下要求補完。
