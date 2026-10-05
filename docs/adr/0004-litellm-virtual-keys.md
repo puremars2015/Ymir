@@ -1,6 +1,6 @@
 # ADR-0004：Container 內使用 LiteLLM Virtual Key
 
-- 狀態：已採納（Sprint 4 實作）
+- 狀態：已採納（2026-10-05 實作，見下方「實作細節」）
 - 日期：2026-10-02
 
 ## 背景
@@ -17,6 +17,29 @@ SA §12 要求「LiteLLM key 不應落地到使用者可讀 Workspace，以 runt
 3. Virtual key 以環境變數注入 container，Pi 的 `models.json` 以 `"apiKey": "${LITELLM_API_KEY}"` 引用。
 4. Runtime 停止 / 刪除、使用者被停用時，撤銷該 key。
 5. Sprint 0 ~ 3 在開發環境先用固定的開發用 key 或 Fake LLM。
+
+## 實作細節（2026-10-05）
+
+- `LiteLlmModelGateway`：以 master key 呼叫 `POST /key/generate`，參數如下：
+  - `models`：沒設定 `AllowedModels` 時只允許 Pi 使用的模型，不會發出不限模型的 key；
+  - `duration`：預設 24h；
+  - `max_budget`：可選；
+  - `key_alias`：`ymir-user-{userId}-{時間}`；
+  - `metadata`：`ymir_user_id`、`ymir_runtime_id`。
+  
+  撤銷用 `POST /key/delete`（以 LiteLLM 回傳的 hashed token）。
+- 因為一個使用者一個 runtime（ADR-0007），key 以**使用者**為單位，metadata 不再有 `workspace_id`。
+- `RuntimeCredentialService`：
+  - 每位使用者一把 key，**只快取在 API 記憶體**，不寫資料庫、不寫 log（record 覆寫 `ToString`）；
+  - 到期前 1 小時換發，換發後撤銷舊 key；
+  - API 重啟後重新發一把，舊 key 最晚在有效期後失效。
+- `ExecutionRunner` 在 `EnsureRuntime` 之後取得 key：
+  - 經 `AgentRunRequest` 交給 `PiAgentHarness`，以 `exec --env LITELLM_API_KEY`（只傳名稱）注入；
+  - 拿不到 key 時，execution 以 `MODEL_PROVIDER_ERROR` 結束。
+- 沒有設定 `VibeMaker:LiteLlm:MasterKey` 時：只有 Development 可以退回固定的 `DevelopmentApiKey`，其他環境拒絕啟動。
+- **尚未完成**：
+  - 使用者被停用時撤銷 key：已有 `RuntimeCredentialService.RevokeAsync`，等帳號停用流程（Sprint 2 Admin）呼叫；
+  - runtime idle stop 時撤銷：等 idle stop 實作。
 
 ## 影響
 
