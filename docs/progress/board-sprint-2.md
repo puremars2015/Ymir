@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-05 11:13 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-05 14:22 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -24,6 +24,8 @@
 | 使用者在 Windows 上依指南實機驗證 | ⏳ | [docs/guides/windows-docker.md](../guides/windows-docker.md) 第 6 節驗證清單 |
 | Cloudflare Tunnel 對外入口（`Ymir.Edge` 模組） | ✅ | ADR-0006；見 [#004](#004--新增-cloudflare-tunnel-對外入口模組ymiredge) |
 | 使用者建立 Named tunnel 並依指南驗證 | 🚧 | 已建立 token 模式 tunnel（token 存於本機 `deploy/cloudflared/.env`，未提交）；待在使用者主機 `docker compose up` 並跑 [指南](../guides/cloudflare-tunnel.md) 第 6 節 |
+| 一個使用者一個 container + 專案（檔案群組）（ADR-0007） | ✅ | 見 [#006](#006--架構改為一人一-container專案chatgpt-式介面) |
+| ChatGPT 式介面：登入即主畫面、側邊欄專案 / 聊天、直接開聊 | ✅ | 見 [#006](#006--架構改為一人一-container專案chatgpt-式介面) |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
 **開工前要先有的決定**：企業 IdP 類型（Entra ID / ADFS / 純 LDAP）與測試用的 App 註冊資訊（client id、redirect URI）。
@@ -31,6 +33,70 @@
 ---
 
 ## 💬 留言區
+
+### #006 · 架構改為一人一 container、專案、ChatGPT 式介面
+
+> 👤 **Claude（AI）** · 🕒 2026-10-05 14:22 · `📢公告` `✅完成`
+
+依使用者要求修改架構與 UI/UX flow，決策見 [ADR-0007](../adr/0007-one-runtime-per-user.md)。
+
+**架構（取代 SA §6.1「一個 Workspace 一個 container」）**
+- **一個使用者一個 container**：
+  - container 名稱為 `ymir-user-{userId}`；
+  - host 目錄為 `{WorkspaceRoot}/users/{userId}/workspace` 與 `agent-state`；
+  - `agent_runtimes` 以 `user_id` 加唯一索引，每人一筆。
+- **Workspace 改名為 Project（專案）**：專案就是 container 內的檔案群組 `/workspace/projects/{id}`，同一專案的對話共用檔案。
+- **對話可以不分組**：未分組的對話在 `/workspace/chats/{conversationId}` 工作。
+- **工作目錄**：
+  - 每次執行以 `exec --workdir` 進入工作目錄；
+  - 只接受由 Guid 產生的路徑，其他一律拒絕；
+  - 目錄在 container 內用 `mkdir -p` 建立，所以擁有者是 agent 使用者。
+- **依序執行**：同一使用者的 execution 依序執行，因為共用同一個 container 的資源限制。
+- **API**：
+  - `/api/workspaces` 改為 `/api/projects`；
+  - 新增 `GET /api/runtime`；
+  - `/api/conversations` 的 `projectId` 可省略。
+- **Migration `OneRuntimePerUser`**：
+  - 舊的 workspace 變成專案，原本的對話保留在該專案；
+  - 舊的 runtime 紀錄清空；
+  - 舊的 `ymir-ws-*` container 要手動移除，方法見 Windows 指南。
+
+**UI/UX（ChatGPT 式）**
+- 登入後直接進主畫面。左側欄依序是：新對話、**專案**（可新增、可展開看底下的對話）、**聊天**（未分組的對話）、使用者 / 登出。窄螢幕時側欄變成抽屜。
+- **直接在輸入框開聊**：首頁或專案頁送出第一則訊息時，自動建立對話，標題取自第一則訊息。
+- 輸入框：Enter 送出、Shift+Enter 換行；中文輸入法選字中按 Enter 不會送出。
+
+截圖：[首頁](screenshots/chat-layout/01-home.png) · [未分組對話](screenshots/chat-layout/02-chat.png) · [專案內對話](screenshots/chat-layout/03-project-chat.png) · [專案頁](screenshots/chat-layout/04-project.png) · [手機](screenshots/chat-layout/05-mobile.png) · [手機抽屜](screenshots/chat-layout/06-mobile-drawer.png)
+
+**驗證（實際跑過）**
+- 後端：
+  - `dotnet format` 通過；
+  - `dotnet test --solution Ymir.slnx` **151 項全部通過**，包含真實 Pi、授權矩陣、OpenAPI 快照；
+  - 新增的測試涵蓋：專案 / 未分組對話 API、工作目錄白名單、container 指令（Podman / Docker）、Pi 檔案落點。
+- Migration：
+  - 先用舊版 migration 建庫並寫入 workspace / 對話 / runtime；
+  - 升級後，專案名稱與對話的 `project_id` 正確，runtime 紀錄清空，`project_id` 可為 null。
+- 前端：`npm run lint`、`npm test`（20 項）、`npm run build` 都通過。
+- 端對端：
+  - 環境是 SQL Server + Fake LLM + API（Pi harness、**Docker runtime**）+ ng serve；
+  - `npm run e2e` 跑完 9 個步驟全部通過：登入 → 直接開聊 → 重新整理後歷史仍在 → 建立專案 → 專案內對話 → 停止 → session 續接 → 專案頁 / 切換對話 → 手機抽屜。
+- 執行後檢查 container 與檔案：
+  - 每個帳號只有一個 `ymir-user-*` container，兩個帳號共兩個；
+  - `chats/{id}/hello.txt` 與 `projects/{id}/hello.txt` 都在正確位置，擁有者是 uid 1000。
+
+`⚠️發現`
+1. 沙箱網路擋 `deb.debian.org`（http 403），**正式的 `runtime/agent/Containerfile` 在這裡無法 build**。端對端驗證改用只在沙箱用的 image：從 host 複製 Pi 1.0.0，使用者與目錄設定相同，**沒有提交**。CI 的「Agent runtime image」job 仍會 build 正式 Containerfile。
+2. 這個沙箱的 Podman 是 rootful（root），`keep-id` 對應不到可寫的 host 目錄，而且 `keep-id` 加 host network 無法啟動，所以端對端改用 Docker provider 驗證。**正式的 Rootless Podman 仍需在 Linux / WSL2 主機上驗證**，這一項已列在置頂表。
+3. 同一使用者的多個對話**無法同時執行**，第二個會排隊等第一個結束。要並行的話，需要先評估 container 資源與檔案鎖定。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #005 · Tunnel 改用 token 模式 + Docker；API 端擋 health check
 
