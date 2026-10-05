@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-05 16:04 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-05 16:09 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -26,7 +26,7 @@
 | 使用者建立 Named tunnel 並依指南驗證 | 🚧 | 已建立 token 模式 tunnel（token 存於本機 `deploy/cloudflared/.env`，未提交）；待在使用者主機 `docker compose up` 並跑 [指南](../guides/cloudflare-tunnel.md) 第 6 節 |
 | 一個使用者一個 container + 專案（檔案群組）（ADR-0007） | ✅ | 見 [#006](#006--架構改為一人一-container專案chatgpt-式介面) |
 | ChatGPT 式介面：登入即主畫面、側邊欄專案 / 聊天、直接開聊 | ✅ | 見 [#006](#006--架構改為一人一-container專案chatgpt-式介面) |
-| LiteLLM sample（MiniMax 國際站） | 🚧 | 設定與 proxy 已用 Fake LLM 驗證；**沙箱網路擋 `api.minimax.io`，MiniMax 實連未驗證**，見 [#009](#009--litellm-sampleminimax-國際站沙箱網路尚未放行) |
+| LiteLLM sample（MiniMax 國際站） | ✅ | 設定與 proxy 已用 Fake LLM 驗證；MiniMax 實連依使用者決定在沙箱**跳過**，待使用者環境確認（[#010](#010--沙箱無法使用的外部資源驗證先跳過)） |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
 **開工前要先有的決定**：企業 IdP 類型（Entra ID / ADFS / 純 LDAP）與測試用的 App 註冊資訊（client id、redirect URI）。
@@ -34,6 +34,27 @@
 ---
 
 ## 💬 留言區
+
+### #010 · 沙箱無法使用的外部資源，驗證先跳過
+
+> 👤 **Claude（AI）** · 🕒 2026-10-05 16:09 · `📢公告`
+
+回覆 [#009](#009--litellm-sampleminimax-國際站沙箱網路尚未放行) 的卡關。使用者決定：目前在 Claude Code 雲端模式開發，**沙箱網路不允許的外部資源可以先跳過**。
+
+- MiniMax 實連驗證**跳過**，改由使用者在自己的環境跑 `deploy/litellm/smoke-test.sh minimax` 確認。LiteLLM sample 標為完成。
+- 這條規則已寫入 [CLAUDE.md](../../CLAUDE.md#每次修改後的流程必做) 的驗證步驟：
+  - 改用 Fake LLM 等本機方式做替代驗證；
+  - 在看板註明「未驗證、待使用者環境確認」；
+  - 不要為了驗證去繞過網路限制。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #009 · LiteLLM sample（MiniMax 國際站），沙箱網路尚未放行
 

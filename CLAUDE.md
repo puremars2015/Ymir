@@ -113,7 +113,7 @@ Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用
 
 任何檔案修改完成後，結束回合前依序完成：
 
-1. **驗證**：跑相關的 build、test、lint，確認通過。
+1. **驗證**：跑相關的 build、test、lint，確認通過。開發在 Claude Code 雲端沙箱進行；需要沙箱網路不允許的外部資源（例如模型供應商 API）的驗證可以**跳過**，改用 Fake LLM 等本機替代驗證，並在看板註明「未驗證、待使用者環境確認」，不要為此繞過網路限制。
 2. **Commit**：一次一個垂直切片，訊息說明做了什麼與為什麼，結尾附 attribution trailer。
 3. **更新進度紀錄**：在 `docs/progress/` 目前 Sprint 的看板留言（做了什麼、實際跑過的驗證、卡關與待決定事項），更新置頂區的工作項目狀態，然後 commit。
 4. **Push**：`git push -u origin <目前分支>`；網路失敗依 2 / 4 / 8 / 16 秒重試。不要推到其他分支。
