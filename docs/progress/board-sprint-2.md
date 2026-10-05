@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-05 16:09 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-05 16:50 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -27,6 +27,7 @@
 | 一個使用者一個 container + 專案（檔案群組）（ADR-0007） | ✅ | 見 [#006](#006--架構改為一人一-container專案chatgpt-式介面) |
 | ChatGPT 式介面：登入即主畫面、側邊欄專案 / 聊天、直接開聊 | ✅ | 見 [#006](#006--架構改為一人一-container專案chatgpt-式介面) |
 | LiteLLM sample（MiniMax 國際站） | ✅ | 設定與 proxy 已用 Fake LLM 驗證；MiniMax 實連依使用者決定在沙箱**跳過**，待使用者環境確認（[#010](#010--沙箱無法使用的外部資源驗證先跳過)） |
+| Ymir 接上 LiteLLM：每位使用者的 virtual key（ADR-0004） | ✅ | 以 Fake LLM 模擬的 LiteLLM 驗證；真正的 LiteLLM + PostgreSQL 在沙箱**跳過**（image 拉不下來），見 [#011](#011--ymir-接上-litellm每位使用者的-virtual-key) |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
 **開工前要先有的決定**：企業 IdP 類型（Entra ID / ADFS / 純 LDAP）與測試用的 App 註冊資訊（client id、redirect URI）。
@@ -34,6 +35,60 @@
 ---
 
 ## 💬 留言區
+
+### #011 · Ymir 接上 LiteLLM：每位使用者的 virtual key
+
+> 👤 **Claude（AI）** · 🕒 2026-10-05 16:50 · `✅完成`
+
+依使用者選擇（LiteLLM virtual key + PostgreSQL，[ADR-0004](../adr/0004-litellm-virtual-keys.md) 主方案），Agent 改為透過 LiteLLM 呼叫模型，而且**只拿得到自己的短效 virtual key**。
+
+- **API 發 key**：API 以 master key 向 LiteLLM 為每位使用者發一把 key。
+  - 只能用指定模型；
+  - 24 小時有效，到期前 1 小時換發，並撤銷舊 key；
+  - 可設預算上限；
+  - metadata 記錄 user id，方便追蹤用量。
+- **key 不落地**：key 只快取在 API 記憶體，不寫資料庫、不寫 log。
+- **注入方式**：以 `exec --env LITELLM_API_KEY`（只傳名稱）注入 Pi。master key 與 MiniMax key 都不會進 container。
+- **失敗處理**：拿不到 key 時，execution 以 `MODEL_PROVIDER_ERROR` 結束，錯誤訊息不含內部位址。
+- **啟動檢查**：非 Development 環境沒設定 `VibeMaker:LiteLlm:MasterKey` 時拒絕啟動；Development 才能退回固定的開發用 key。
+- **`deploy/litellm` 調整**：
+  - 加入 LiteLLM 專用的 PostgreSQL；
+  - image 修正為 `ghcr.io/berriai/litellm:v1.103.2`（原本的 `main-v1.103.2` 不存在，已從 registry 查到正確 tag）；
+  - `.env` 新增 `LITELLM_SALT_KEY` 與 DB 密碼，仍被 gitignore 排除；
+  - README 列出 `VibeMaker__LiteLlm__*` 設定。
+- **Fake LLM 擴充**：設定 `FAKE_LLM_MASTER_KEY` 後，可模擬 LiteLLM 的 `/key/generate`、`/key/delete`，並拒絕 master key 與未發放的 key，可用來抓出金鑰外洩。
+
+**驗證（實際跑過）**
+- `dotnet format` 通過；`dotnet test --solution Ymir.slnx` **175 項全部通過**，新增 24 項。
+  - **單元測試**涵蓋：
+    - gateway 的 request 格式、master key header、錯誤與無法連線的處理；
+    - 每人一把 key 的快取、換發、撤銷，以及並行時只發一把；
+    - DI 檢查（非 Development 環境拒絕啟動、預設限定模型）；
+    - Pi 程序只透過環境變數拿到 virtual key；
+    - `ToString` 不洩漏金鑰。
+  - **整合測試**（真實 Pi 搭配模擬的 LiteLLM）：
+    - Agent 全程使用 virtual key，從未用 master key；
+    - 同一使用者兩次執行共用一把 key，不同使用者的 key 不同；
+    - LiteLLM 連不上時 execution 以 `MODEL_PROVIDER_ERROR` 結束。
+
+**未驗證（依 [#010](#010--沙箱無法使用的外部資源驗證先跳過) 規則跳過）**
+- 真正的 LiteLLM + PostgreSQL：沙箱拉不到 image（ghcr 的 blob 主機被網路 policy 擋、Docker Hub 回 429）。
+- MiniMax 實連。
+
+以上兩項請在你的環境用 `deploy/litellm` 的 `docker compose up -d` 搭配 Ymir API 設定確認。
+
+`⚠️發現`
+- 使用者被停用時撤銷 key：已有 `RevokeAsync`，等 Admin 停用流程完成後接上；runtime idle stop 時撤銷也還沒做。
+- `/key/generate` 也會套用 ServiceDefaults 的 HTTP 重試；萬一重試造成多發 key，多出的 key 會在有效期後自動失效。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #010 · 沙箱無法使用的外部資源，驗證先跳過
 
