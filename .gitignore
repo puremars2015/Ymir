@@ -66,6 +66,9 @@ coverage/
 # Cloudflare Tunnel 憑證（ADR-0006）
 deploy/cloudflared/config.yml
 deploy/cloudflared/.env
+
+# LiteLLM 金鑰（MiniMax API key、master key）
+deploy/litellm/.env
 deploy/cloudflared/*.json
 cert.pem
 

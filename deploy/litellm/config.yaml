@@ -1,0 +1,25 @@
+# LiteLLM sample：MiniMax 國際站（minimax.io）訂閱帳號，ADR-0004 / SA §19。
+# 啟動方式見同目錄 README.md；金鑰只放在 .env（已由 .gitignore 排除）。
+model_list:
+  # MiniMax 國際站的 OpenAI 相容端點。模型名稱依訂閱方案而定，在 MiniMax 後台確認後修改 openai/ 後面的名稱。
+  - model_name: minimax
+    litellm_params:
+      model: openai/MiniMax-M2
+      api_base: https://api.minimax.io/v1
+      api_key: os.environ/MINIMAX_API_KEY
+
+  # 開發 / 離線驗證用：轉給 Ymir 的 Fake LLM（dotnet run --project tests/Ymir.Testing.FakeLlm），不需要任何金鑰。
+  - model_name: fake-model
+    litellm_params:
+      model: openai/fake-model
+      api_base: os.environ/FAKE_LLM_BASE
+      api_key: dev-key
+
+general_settings:
+  # 呼叫 proxy 需要的金鑰（Ymir API 使用）；不得放進 Agent container（ADR-0004）。
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+litellm_settings:
+  # 不把 prompt / 回應內容送到任何外部服務。
+  telemetry: false
+  drop_params: true

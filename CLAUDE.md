@@ -32,6 +32,7 @@ tests/
 web/                                 Angular 22（standalone、signals、zoneless、Vitest、ESLint）；src/app/core/api/schema.ts 由 OpenAPI 產生；e2e/ Playwright 腳本
 runtime/agent/                       Agent runtime Containerfile
 deploy/cloudflared/                  cloudflared ingress 設定範本（指南 docs/guides/cloudflare-tunnel.md）
+deploy/litellm/                      LiteLLM proxy sample（MiniMax 國際站 + Fake LLM）；金鑰只放在 .env（已被 gitignore）
 spikes/pi-rpc-poc/                   技術驗證主控台程式
 ```
 
@@ -98,6 +99,7 @@ Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用
 - Container 內不得出現 LiteLLM master key、DB 連線字串或 AD 憑證（ADR-0004）。環境變數以 `podman exec --env NAME` 傳遞，值不得出現在程序參數。
 - 回給瀏覽器的錯誤與 tool 事件只能是摘要：不得含 stack trace、host path、token、完整 command output（SA §10、§12）。原始細節只寫 server log。
 - `LocalRuntimeManager` 沒有隔離，只允許 Development 環境（DI 會在其他環境拒絕啟動）。
+- 模型供應商金鑰（例如 `MINIMAX_API_KEY`）與 LiteLLM master key 只放在 `deploy/*/.env` 或部署環境的 secret，不得進版控、不得進 Agent container。
 - 對外公開（`Ymir:PublicEdge`，ADR-0006）不得在 Development 環境開啟；API 只綁 127.0.0.1、只信任 cloudflared 的 `X-Forwarded-*`。Tunnel 憑證不得進版控或進 container。
 
 ## 程式風格

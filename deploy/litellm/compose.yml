@@ -1,0 +1,19 @@
+# LiteLLM proxy sample（ADR-0004）：cd deploy/litellm && docker compose up -d
+# 金鑰從同目錄的 .env 讀取（.gitignore 已排除）；以環境變數傳入，不寫在設定檔或程序參數。
+services:
+  litellm:
+    # 固定版本；升級前先跑 README 的 smoke test。
+    image: ghcr.io/berriai/litellm:main-v1.103.2
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY:?請在 deploy/litellm/.env 設定 MINIMAX_API_KEY}
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?請在 deploy/litellm/.env 設定 LITELLM_MASTER_KEY}
+      FAKE_LLM_BASE: ${FAKE_LLM_BASE:-http://host.docker.internal:5199/v1}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    ports:
+      # 只綁本機；Agent container 經由 host.containers.internal / host.docker.internal 連入。
+      - "127.0.0.1:4000:4000"
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: unless-stopped
