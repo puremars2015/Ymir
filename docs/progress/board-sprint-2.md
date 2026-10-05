@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-05 16:50 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-05 18:12 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -28,6 +28,7 @@
 | ChatGPT 式介面：登入即主畫面、側邊欄專案 / 聊天、直接開聊 | ✅ | 見 [#006](#006--架構改為一人一-container專案chatgpt-式介面) |
 | LiteLLM sample（MiniMax 國際站） | ✅ | 設定與 proxy 已用 Fake LLM 驗證；MiniMax 實連依使用者決定在沙箱**跳過**，待使用者環境確認（[#010](#010--沙箱無法使用的外部資源驗證先跳過)） |
 | Ymir 接上 LiteLLM：每位使用者的 virtual key（ADR-0004） | ✅ | 以 Fake LLM 模擬的 LiteLLM 驗證；真正的 LiteLLM + PostgreSQL 在沙箱**跳過**（image 拉不下來），見 [#011](#011--ymir-接上-litellm每位使用者的-virtual-key) |
+| 對話選模型、個人 global / 專案 system prompt | ✅ | 見 [#012](#012--對話選模型個人-global-與專案-system-prompt) |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
 **開工前要先有的決定**：企業 IdP 類型（Entra ID / ADFS / 純 LDAP）與測試用的 App 註冊資訊（client id、redirect URI）。
@@ -35,6 +36,49 @@
 ---
 
 ## 💬 留言區
+
+### #012 · 對話選模型、個人 global 與專案 system prompt
+
+> 👤 **Claude（AI）** · 🕒 2026-10-05 18:12 · `✅完成`
+
+依使用者要求完成三項功能：
+
+1. **對話可選模型**：
+   - 輸入框上方有模型下拉選單（首頁、專案頁、對話頁）。
+   - 模型清單由 `VibeMaker:Models` 設定，`GET /api/models` 提供給前端。
+   - 選擇以對話為單位記住；預設依序取：對話上次用的模型 → 個人上次選的 → 系統預設。
+   - Pi 以 `--model` 帶入；選了清單外的模型回 `400 MODEL_NOT_AVAILABLE`。
+   - LiteLLM virtual key 預設只允許清單內的模型。
+2. **個人 global system prompt**：側邊欄底部「設定」進入 `/settings` 編輯，API 為 `GET/PUT /api/me/settings`，資料存 `vibemaker.user_settings`。
+3. **專案 system prompt**：專案頁的「專案設定」可以改名稱與 prompt（`PATCH /api/projects/{id}`，會驗證擁有者）。
+- **prompt 怎麼送進 Agent**：
+  - 依序附加「個人 → 專案」，**保留 Pi 預設的 coding prompt**，以免影響工具使用。
+  - 內容經 stdin 寫成 runtime 內的檔案，再用 `--append-system-prompt <檔案>` 帶入，所以不會出現在 host 的程序參數；執行結束後刪除檔案。
+  - 開工前已實測：Pi 1.0.0 會讀取檔案內容，模型收到的是內容而不是路徑。
+- 每段 prompt 上限 10,000 字；migration `ModelsAndSystemPrompts`。
+
+截圖：[個人設定](screenshots/models-prompts/07-settings.png) · [專案設定](screenshots/models-prompts/08-project-settings.png) · [專案內對話與模型選單](screenshots/models-prompts/03-project-chat.png) · [首頁](screenshots/models-prompts/01-home.png)
+
+**驗證（實際跑過）**
+- 後端：
+  - `dotnet format` 通過；`dotnet test --solution Ymir.slnx` **191 項全部通過**（新增 16 項）。
+  - 整合測試（真實 Pi + Fake LLM）確認：選的模型確實送到模型端；個人與專案 prompt 依序出現在 system message；prompt 檔案執行後已刪除。
+  - 授權矩陣：別人改不了你的專案。
+- 前端：`npm run lint`、`npm test`（24 項）、`npm run build` 都通過。
+- 端對端：`npm run e2e` 12 個步驟全部通過，包含：
+  - 設定個人 prompt，重新整理後仍在；
+  - 選模型，重新整理後對話仍記得；
+  - 設定專案 prompt。
+- MiniMax 實連依規則跳過，請在你的環境確認。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #011 · Ymir 接上 LiteLLM：每位使用者的 virtual key
 

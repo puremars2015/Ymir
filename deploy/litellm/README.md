@@ -49,8 +49,12 @@ Agent container 只拿得到這把 virtual key，**master key 與 MiniMax key �
 | `VibeMaker__LiteLlm__AllowedModels__0` | key 可用的模型；未設定時只允許 `VibeMaker__Pi__ModelId` |
 | `VibeMaker__LiteLlm__KeyLifetime` / `RenewBefore` / `MaxBudget` | 有效期（預設 `1.00:00:00`）、提前換發時間（預設 `01:00:00`）、每把 key 的預算上限（美元，可不設） |
 | `VibeMaker__Pi__ModelBaseUrl` | **Agent container 內**連 LiteLLM 的位址：`http://host.containers.internal:4000/v1`（Podman）或 `http://host.docker.internal:4000/v1`（Docker） |
-| `VibeMaker__Pi__ModelId` | `minimax`（對應 `config.yaml` 的 `model_name`） |
+| `VibeMaker__Pi__ModelId` | 預設模型，例如 `minimax`（對應 `config.yaml` 的 `model_name`） |
+| `VibeMaker__Models__0__Id` / `VibeMaker__Models__0__DisplayName` | 對話中可選的模型清單（`__1__`、`__2__` 依序增加）；Id 必須與 `config.yaml` 的 `model_name` 相同。未設定時只有預設模型 |
 
+- **新增模型**：先在 `config.yaml` 加一筆 `model_name`，再在 Ymir 的 `VibeMaker__Models__*` 加同名的 Id。
+  - virtual key 預設只允許清單內的模型；
+  - 選了清單外的模型，API 回 `400 MODEL_NOT_AVAILABLE`。
 - 非 Development 環境沒有設定 `VibeMaker__LiteLlm__MasterKey` 時，API 會拒絕啟動。
 - Development 沒設定時，會退回固定的 `VibeMaker__Pi__DevelopmentApiKey`（給 Fake LLM 用）。
 - 想在本機不跑 LiteLLM 也驗證整個發 key 流程：用 `FAKE_LLM_MASTER_KEY=sk-dev dotnet run --project tests/Ymir.Testing.FakeLlm` 啟動 Fake LLM，它會模擬 `/key/generate`，並拒絕 master key 與未發放的 key。
