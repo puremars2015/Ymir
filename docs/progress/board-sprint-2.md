@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-06 15:10 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-06 15:45 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -38,6 +38,7 @@
 | 本機帳號密碼登入（使用者追加需求） | ✅ | Admin 建立、第一次登入強制改密碼、鎖定、rate limit |
 | 對話 `/make` 指令：主題按鈕（小工具架設、網站系統架設）、`/make 描述` 由 Agent 判斷主題 | ✅ | 見 [#019](#019--對話-make-指令與-make-主題管理)；真實模型是否照指示先問需求**待使用者環境確認** |
 | Admin「Make 主題」管理頁（新增、編輯、排序、停用、刪除） | ✅ | 見 [#019](#019--對話-make-指令與-make-主題管理) |
+| Agent 回覆以 Markdown 排版（程式碼區塊可複製） | ✅ | 見 [#020](#020--agent-回覆以-markdown-排版) |
 | 後台系統設定：Entra ID 設定欄位、Cloudflare Tunnel token 與網域 | ⏳ | 使用者要求先記錄，之後做後台時加入；需先寫新 ADR，見 [開發規劃](../planning/development-plan.md#後台系統設定待辦功能) |
 | 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
@@ -47,6 +48,40 @@
 ---
 
 ## 💬 留言區
+
+### #020 · Agent 回覆以 Markdown 排版
+
+> 👤 **Claude（AI）** · 🕒 2026-10-06 15:45 · `✅完成`
+
+- **問題**（使用者回報）：Agent 回覆直接顯示 `##`、```` ```cmd ```` 等 Markdown 語法。
+- **做法**：
+  - 新增 `marked`，用新的 `app-markdown` 元件（`web/src/app/shared/markdown.ts`）顯示 Agent 回覆，歷史訊息與串流中的即時回覆都適用。
+  - 支援標題、清單、粗體、行內 code、程式碼區塊、表格、引用、連結。程式碼區塊上方標示語言，右上角有「複製」按鈕。
+  - 使用者訊息與錯誤訊息維持純文字。
+  - 先經 `AssistantText` 過濾思考內容，再渲染。
+- **安全**：模型輸出視為不可信。
+  - 原始 HTML 一律 escape 成文字；
+  - 連結只允許 http(s) / mailto，並在新分頁開啟（`noopener`）；
+  - 圖片不載入、只顯示成連結，避免以圖片網址把資料帶出去；
+  - 結果仍經過 Angular 的 `[innerHTML]` sanitizer，不使用 `bypassSecurityTrust`。
+- **Fake LLM**：新增 `[markdown]` 腳本，分段點刻意切在程式碼區塊中間，用來測串流中未閉合的 code fence。
+- **驗證（實際跑過）**：
+  - 前端：`npm run lint`、`npm test`（**61 項**，新增 7 項 Markdown 測試，含 escape 與危險連結）、`npm run build` 都通過。marked 只進對話頁的 lazy chunk（60.8 kB）。
+  - 後端：`dotnet test --project tests/Ymir.UnitTests` **201 項通過**；`dotnet format` 通過。
+  - 端對端：`npm run e2e` 新增一步，**13 個步驟全部通過**。這一步確認：
+    - 串流中就已排版；
+    - 完成後有 h2、`cmd` 程式碼區塊、表格，畫面上沒有 `##` 與 ```` ``` ````；
+    - 按「複製」後剪貼簿內容正確。
+  - 淺色與深色主題都已截圖確認。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #019 · 對話 `/make` 指令與 Make 主題管理
 
