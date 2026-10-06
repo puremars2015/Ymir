@@ -50,6 +50,7 @@ interface LiveTurn {
  */
 @Component({
   selector: 'app-chat-page',
+  host: { class: 'chat-surface' },
   imports: [RouterLink, Composer, ModelPicker, AssistantText, Markdown, FilesPanel],
   templateUrl: './chat-page.html',
   styleUrl: './chat-page.scss',

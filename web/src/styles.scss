@@ -57,6 +57,25 @@ code {
   font-size: 0.875em;
 }
 
+/* 對話以白底呈現，避免系統深色模式降低藍色漸層的可讀性。 */
+.chat-surface {
+  color-scheme: light;
+  --text: #20364b;
+  --text-muted: #5f7385;
+  --surface: #ffffff;
+  --surface-muted: #f0f6fb;
+  --surface-active: #e2eff9;
+  --border: #d7e3ee;
+  --accent: #004ea0;
+  --accent-hover: #003d7d;
+  --accent-contrast: #ffffff;
+  --accent-soft: #e2eff9;
+  --focus-ring: #0085c8;
+  --danger: #dc2626;
+  color: var(--text);
+  background: linear-gradient(180deg, #edf6ff 0%, #ffffff 30%, #ffffff 100%);
+}
+
 /* 共用元件樣式（讓各 component 的 style 保持精簡） */
 h1 {
   font-size: 1.375rem;
