@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳號登入 → Chat → Agent（Pi）在每個使用者專屬的 Rootless Podman container（一人一個，ADR-0007）執行（正式部署時 API 在容器內，container 由主機上的 runtime host 管理，ADR-0008）；專案是 container 內的檔案群組 → 經 LiteLLM 呼叫模型 → SSE 即時串流回 Angular。
+Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳號（Entra ID OIDC）或本機帳號密碼登入（ADR-0009）→ Chat → Agent（Pi）在每個使用者專屬的 Rootless Podman container（一人一個，ADR-0007）執行（正式部署時 API 在容器內，container 由主機上的 runtime host 管理，ADR-0008）；專案是 container 內的檔案群組 → 經 LiteLLM 呼叫模型 → SSE 即時串流回 Angular。
 本專案**全由 AI 開發**，請嚴格遵守下列規則；做任何架構相關的改動前，先讀相關 ADR。
 
 ## 必讀文件
@@ -17,13 +17,13 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 
 ```
 src/
-  Ymir.Api/                          ASP.NET Core Host：Endpoints/、Auth/（Cookie + XSRF）、openapi/v1.json（API 契約快照）
+  Ymir.Api/                          ASP.NET Core Host：Endpoints/（含 Admin）、Auth/（Cookie + XSRF、Entra OIDC、本機帳號、每請求狀態檢查）、openapi/v1.json（API 契約快照）
   Ymir.AppHost/                      .NET Aspire 本機開發編排
   Ymir.ServiceDefaults/              OpenTelemetry、health check
   Ymir.Edge/                         對外入口（Cloudflare Tunnel，ADR-0006）：可信任 proxy 的 X-Forwarded-*、Host 限制、HSTS、提供 Angular build
   Ymir.Api/Containerfile             API image（含 Angular build；Provider=Remote，ADR-0008）
   Ymir.RuntimeHost/                  主機服務（ADR-0008）：Unix socket + token，以 user id 管理 Agent container、WebSocket 轉送 stdio
-  Platform/Ymir.Platform[.Infrastructure]/         共用核心：使用者、身份（ICurrentUser）、稽核；schema platform
+  Platform/Ymir.Platform[.Infrastructure]/         共用核心：使用者、本機帳號密碼（LocalCredential）、身份（ICurrentUser）、稽核；schema platform
   Modules/VibeMaker/Ymir.VibeMaker/                Domain/（實體、狀態機）+ Application/（Projects、Conversations、Executions 用例；IAgentHarness、IAgentRuntimeManager、IModelGateway）
   Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/ Persistence/（EF Core，schema vibemaker）、Executions/（背景 worker、事件 bus）、PiAgent/、Containers/（Podman / Docker）、Runtime/（Local，開發用；Remote/：呼叫 runtime host）、Dev/（Scripted harness）
   Modules/VibeMaker/Ymir.VibeMaker.Contracts/      API DTO、SSE 事件契約
@@ -31,6 +31,7 @@ tests/
   Ymir.UnitTests/                    含 Fixtures/pi-rpc/：Pi 1.0.0 的真實 RPC 錄製
   Ymir.IntegrationTests/             WebApplicationFactory + SQL Server（每個 fixture 獨立資料庫）+ 真實 Pi；含授權矩陣、OpenAPI 快照
   Ymir.Testing.FakeLlm/              OpenAI 相容假模型（[create-file] / [slow] / [fail] 腳本）
+  Ymir.Testing.FakeOidc/             模擬 Entra ID 的 OIDC 伺服器（tid / oid / pairwise sub / roles、PKCE），測試與本機開發用
 web/                                 Angular 22（standalone、signals、zoneless、Vitest、ESLint）；src/app/core/api/schema.ts 由 OpenAPI 產生；e2e/ Playwright 腳本
 runtime/agent/                       Agent runtime Containerfile
 deploy/cloudflared/                  cloudflared ingress 設定範本（指南 docs/guides/cloudflare-tunnel.md）
@@ -69,6 +70,9 @@ cd web && npm run api:generate
 
 # 端對端驗證（需先啟動 SQL Server、Fake LLM、API（VibeMaker__Harness=Pi）、npm start）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e -- <截圖目錄>
+# 登入流程（另需 Fake OIDC，API 設定 Ymir__Auth__Oidc__* 指向它，見 docs/guides/entra-id.md）
+dotnet run --project tests/Ymir.Testing.FakeOidc      # http://127.0.0.1:5299，client ymir-dev / ymir-dev-secret
+cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:auth -- <截圖目錄>
 
 # 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
 dotnet run --project src/Ymir.AppHost
@@ -78,6 +82,8 @@ dotnet run --project tests/Ymir.Testing.FakeLlm      # http://127.0.0.1:5199/v1
 dotnet run --project src/Ymir.Api                    # http://localhost:5080（Development：自動 migrate、Scripted harness、Local runtime）
 cd web && npm start                                  # http://localhost:4200，/api 轉給 5080
 ```
+
+登入（ADR-0009）：企業帳號 `Ymir__Auth__Oidc__Authority` / `ClientId` / `ClientSecret`（Entra ID，設定值見 `docs/guides/entra-id.md`）；本機帳號 `Ymir__Auth__LocalAccounts__Enabled`（預設開啟，由 Admin 建立，第一個 Admin 可用 `dotnet Ymir.Api.dll create-local-admin <帳號>`）；Development 另有 `/api/dev/login`。
 
 Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真正的 Pi：設定 `VibeMaker__Harness=Pi` 並啟動 Fake LLM。
 
@@ -97,7 +103,7 @@ API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:de
 - **SSE 契約**以 `Ymir.VibeMaker.Contracts.Executions` 與 `web/src/app/core/executions/execution-events.ts` 為準，兩邊必須同步修改。其他 API 型別一律由 OpenAPI 產生，不要手寫 DTO。
 - **Execution**：與 HTTP request 解耦，由 `ExecutionWorker` 背景執行；事件**先寫 `execution_events` 再發佈**；任何結束路徑（完成、失敗、取消、逾時、例外）都必須寫終止事件並推進狀態（`ExecutionRunner`）。
 - **授權預設拒絕**：fallback policy 要求登入；匿名端點必須明確 `AllowAnonymous`。狀態變更端點加 `RequireAntiforgeryHeader()`。新 `/api` 端點必須加入 `AuthorizationMatrixTests`，否則測試失敗。
-- **認證**採 BFF + HttpOnly Cookie（ADR-0002）：前端不得保存 token，SSE 使用原生 `EventSource`。
+- **認證**採 BFF + HttpOnly Cookie（ADR-0002）：前端不得保存 token，SSE 使用原生 `EventSource`。企業帳號以 `iss` + `oid` 識別、角色以 Entra app role 為準；本機帳號角色由 Ymir 管理；每個請求檢查帳號狀態，停用立即生效（ADR-0009）。Admin 端點用 `AuthSetup.AdminPolicy`，並加入授權矩陣的 `AdminOnlyRequests`。
 - **資料存取**：Application 層透過 `IVibeMakerDbContext`（EF Core DbSet）存取；跨模組只存 id、不建 FK（ADR-0001）。並行規則（同 Conversation 單一執行中、冪等鍵）由 filtered unique index 保證，不要改成先查再寫。
 - **Pi 版本鎖定**在 `runtime/agent/Containerfile` 與 CI；升級時必須重新錄製 `tests/Ymir.UnitTests/Fixtures/pi-rpc/` 並重跑整合測試。
 
@@ -110,6 +116,7 @@ API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:de
 - 回給瀏覽器的錯誤與 tool 事件只能是摘要：不得含 stack trace、host path、token、完整 command output（SA §10、§12）。原始細節只寫 server log。
 - `LocalRuntimeManager` 沒有隔離，只允許 Development 環境（DI 會在其他環境拒絕啟動）。
 - API container 不得掛載 container runtime socket（podman.sock / docker.sock）或使用者 workspace，只能經由 runtime host（ADR-0008）。Runtime host 的端點只接受 user id 與 runtime 內的程序規格，不得新增接受 host 路徑、image、掛載或資源設定的端點；改動協定時同步更新 `RuntimeHostProtocolTests` 與 `RuntimeHostTests`。Runtime host token 只放在部署 secret，不得進版控；不得用 rootless Podman 帳號 `ymir` 跑 API container。
+- 不得保存 IdP token（`SaveTokens=false`）；登入後導回位址只接受站內相對路徑（`SafeRedirect`）。Entra client secret 只放在 `deploy/api/.env` 或部署 secret。本機帳號密碼只存 `PasswordHasher` 雜湊，不得記錄、回傳或寫入 log；登入端點的錯誤訊息不得區分「帳號不存在」與「密碼錯誤」。
 - 模型供應商金鑰（例如 `MINIMAX_API_KEY`）與 LiteLLM master key 只放在 `deploy/*/.env` 或部署環境的 secret，不得進版控、不得進 Agent container。
 - 對外公開（`Ymir:PublicEdge`，ADR-0006）不得在 Development 環境開啟；API 只綁 127.0.0.1、只信任 cloudflared 的 `X-Forwarded-*`。Tunnel 憑證不得進版控或進 container。
 
