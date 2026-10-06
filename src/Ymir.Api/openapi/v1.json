@@ -1077,6 +1077,106 @@
         }
       }
     },
+    "/api/admin/settings/runtime": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetRuntimePolicy",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimePolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveRuntimePolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRuntimePolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimePolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminResetRuntimePolicy",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimePolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/usage": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetUsage",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUsageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/settings/oidc": {
       "get": {
         "tags": [
@@ -1433,6 +1533,38 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RuntimeSummaryResponse"
+            }
+          }
+        }
+      },
+      "AdminUsageResponse": {
+        "required": [
+          "days",
+          "dailyExecutionLimit",
+          "users"
+        ],
+        "type": "object",
+        "properties": {
+          "days": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dailyExecutionLimit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserUsageResponse"
             }
           }
         }
@@ -2233,6 +2365,83 @@
           }
         }
       },
+      "RuntimePolicyResponse": {
+        "required": [
+          "effective",
+          "deployment",
+          "source",
+          "updatedAt",
+          "updatedByName"
+        ],
+        "type": "object",
+        "properties": {
+          "effective": {
+            "$ref": "#/components/schemas/RuntimePolicyValues"
+          },
+          "deployment": {
+            "$ref": "#/components/schemas/RuntimePolicyValues"
+          },
+          "source": {
+            "$ref": "#/components/schemas/OidcSettingsSource"
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedByName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RuntimePolicyValues": {
+        "required": [
+          "idleTimeoutMinutes",
+          "executionTimeoutMinutes",
+          "maxPendingExecutionsPerUser",
+          "dailyExecutionLimit"
+        ],
+        "type": "object",
+        "properties": {
+          "idleTimeoutMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "executionTimeoutMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "maxPendingExecutionsPerUser": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dailyExecutionLimit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "RuntimeStatus": {
         "enum": [
           "NotCreated",
@@ -2391,6 +2600,49 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "SaveRuntimePolicyRequest": {
+        "required": [
+          "idleTimeoutMinutes",
+          "executionTimeoutMinutes",
+          "maxPendingExecutionsPerUser",
+          "dailyExecutionLimit"
+        ],
+        "type": "object",
+        "properties": {
+          "idleTimeoutMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "executionTimeoutMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxPendingExecutionsPerUser": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "dailyExecutionLimit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -2661,6 +2913,95 @@
           "Active",
           "Disabled"
         ]
+      },
+      "UserUsageResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "executions",
+          "completed",
+          "failed",
+          "cancelled",
+          "runMinutes",
+          "last24Hours",
+          "lastExecutionAt",
+          "runtimeStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "executions": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "completed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "failed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cancelled": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "runMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "last24Hours": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lastExecutionAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "runtimeStatus": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RuntimeStatus"
+              }
+            ]
+          }
+        }
       },
       "WorkspaceFileResponse": {
         "required": [

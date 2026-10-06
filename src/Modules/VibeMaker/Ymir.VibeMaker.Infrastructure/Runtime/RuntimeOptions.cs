@@ -33,10 +33,23 @@ public sealed class RuntimeOptions
     /// <summary>SELinux 主機需要重新標記掛載目錄（<c>relabel=private</c>，等同 <c>:Z</c>；只適用 Podman）。</summary>
     public bool SelinuxRelabel { get; set; }
 
-    public int IdleTimeoutMinutes { get; set; } = 30;
+    /// <summary>
+    /// 沒有 execution 多久後自動停止使用者的 runtime（分鐘，0 表示不停止；檔案保留，下一次送訊息時自動啟動）。
+    /// 以下四項是部署預設值，管理介面儲存的執行政策優先（ADR-0011）。
+    /// </summary>
+    public double IdleTimeoutMinutes { get; set; } = 30;
 
     /// <summary>單次 Agent execution 逾時（分鐘，可為小數）。</summary>
     public double ExecutionTimeoutMinutes { get; set; } = 30;
+
+    /// <summary>每位使用者同時排隊 + 執行中的 execution 上限。</summary>
+    public int MaxPendingExecutionsPerUser { get; set; } = 5;
+
+    /// <summary>每位使用者過去 24 小時可建立的 execution 數；0 表示不限制。</summary>
+    public int DailyExecutionLimit { get; set; }
+
+    /// <summary>閒置檢查間隔（秒）。</summary>
+    public double IdleCheckIntervalSeconds { get; set; } = 60;
 
     /// <summary>Container CLI；未設定時依 <see cref="Provider"/> 使用 <c>podman</c> 或 <c>docker</c>。</summary>
     public string? ContainerExecutable { get; set; }

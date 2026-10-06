@@ -71,6 +71,7 @@ app.MapWorkspaceFileEndpoints();
 app.MapExecutionEndpoints();
 app.MapAdminEndpoints();
 app.MapAdminOverviewEndpoints();
+app.MapAdminRuntimeEndpoints();
 app.MapAdminSettingsEndpoints();
 app.MapMakeTopicEndpoints();
 app.MapDefaultEndpoints();

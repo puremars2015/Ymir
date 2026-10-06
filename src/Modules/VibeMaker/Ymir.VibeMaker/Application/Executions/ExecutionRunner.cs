@@ -1,6 +1,5 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Ymir.Platform.Auditing;
 using Ymir.VibeMaker.Application.Agents;
 using Ymir.VibeMaker.Application.Models;
@@ -24,7 +23,7 @@ public sealed class ExecutionRunner(
     ExecutionEventWriter eventWriter,
     IExecutionCancellationRegistry cancellations,
     UserExecutionLocks userLocks,
-    IOptions<ExecutionOptions> options,
+    RuntimePolicyService policies,
     IAuditLog auditLog,
     TimeProvider timeProvider,
     ILogger<ExecutionRunner> logger)
@@ -53,7 +52,9 @@ public sealed class ExecutionRunner(
         }
 
         using var userCancellation = cancellations.Register(executionId);
-        using var timeout = new CancellationTokenSource(options.Value.Timeout, timeProvider);
+        // 逾時以目前的執行政策為準（管理介面可調整，ADR-0011）。
+        var policy = await policies.GetAsync(stoppingToken).ConfigureAwait(false);
+        using var timeout = new CancellationTokenSource(policy.ExecutionTimeout, timeProvider);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(userCancellation.Token, timeout.Token, stoppingToken);
         try
         {
@@ -191,6 +192,12 @@ public sealed class ExecutionRunner(
                 terminalEvent = new ExecutionCancelledEvent(execution.Id);
                 break;
         }
+
+        // 執行結束也算使用者活動：閒置停止從最後一次 execution 結束開始計時。
+        var runtimeRecord = await db.AgentRuntimes
+            .FirstOrDefaultAsync(r => r.UserId == execution.UserId && r.Status != RuntimeStatus.Deleted, cancellationToken)
+            .ConfigureAwait(false);
+        runtimeRecord?.MarkActive(now);
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await AppendAsync(execution.Id, terminalEvent, cancellationToken).ConfigureAwait(false);

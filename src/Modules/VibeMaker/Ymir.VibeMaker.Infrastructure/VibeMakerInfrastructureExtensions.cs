@@ -35,12 +35,34 @@ public static class VibeMakerInfrastructureExtensions
         services.AddSingleton<IExecutionCancellationRegistry, ExecutionCancellationRegistry>();
         services.AddSingleton<Application.Files.IWorkspaceFileReader, Files.RuntimeWorkspaceFileReader>();
         services.AddHostedService<ExecutionWorker>();
+        services.AddHostedService<RuntimeLifecycleWorker>();
         services.Configure<ExecutionOptions>(options =>
         {
-            var minutes = configuration.GetSection(RuntimeOptions.SectionName).GetValue<double?>(nameof(RuntimeOptions.ExecutionTimeoutMinutes));
-            if (minutes is > 0)
+            // 部署設定的預設值；管理介面儲存的執行政策優先（ADR-0011）。
+            var runtime = configuration.GetSection(RuntimeOptions.SectionName);
+            if (runtime.GetValue<double?>(nameof(RuntimeOptions.ExecutionTimeoutMinutes)) is > 0 and var minutes)
             {
-                options.Timeout = TimeSpan.FromMinutes(minutes.Value);
+                options.Timeout = TimeSpan.FromMinutes(minutes);
+            }
+
+            if (runtime.GetValue<double?>(nameof(RuntimeOptions.IdleTimeoutMinutes)) is >= 0 and var idle)
+            {
+                options.IdleTimeout = TimeSpan.FromMinutes(idle);
+            }
+
+            if (runtime.GetValue<int?>(nameof(RuntimeOptions.MaxPendingExecutionsPerUser)) is > 0 and var pending)
+            {
+                options.MaxPendingExecutionsPerUser = pending;
+            }
+
+            if (runtime.GetValue<int?>(nameof(RuntimeOptions.DailyExecutionLimit)) is >= 0 and var daily)
+            {
+                options.DailyExecutionLimit = daily;
+            }
+
+            if (runtime.GetValue<double?>(nameof(RuntimeOptions.IdleCheckIntervalSeconds)) is > 0 and var interval)
+            {
+                options.IdleCheckInterval = TimeSpan.FromSeconds(interval);
             }
         });
         return services.AddVibeMakerAgentRuntime(configuration, isDevelopment);

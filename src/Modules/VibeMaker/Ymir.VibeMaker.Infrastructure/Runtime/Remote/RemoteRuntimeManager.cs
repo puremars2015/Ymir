@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Ymir.VibeMaker.Application.Runtime;
+using Ymir.VibeMaker.Domain;
 
 namespace Ymir.VibeMaker.Infrastructure.Runtime.Remote;
 
@@ -15,7 +16,7 @@ internal sealed class RemoteRuntimeManager : IAgentRuntimeManager, IDisposable
 {
     private readonly RuntimeHostConnection _connection;
     private readonly ILogger<RemoteRuntimeManager> _logger;
-    private readonly ConcurrentDictionary<Guid, Guid> _usersByRuntime = new();
+    private readonly ConcurrentDictionary<Guid, RuntimeInfo> _runtimes = new();
 
     public RemoteRuntimeManager(IOptions<RuntimeOptions> options, ILogger<RemoteRuntimeManager> logger)
     {
@@ -44,12 +45,7 @@ internal sealed class RemoteRuntimeManager : IAgentRuntimeManager, IDisposable
         await ReadRuntimeAsync(response, "start", cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task StopAsync(Guid runtimeId, CancellationToken cancellationToken)
-    {
-        using var response = await _connection.Http.PostAsync(new Uri(RuntimeHostProtocol.StopPath(UserOf(runtimeId)), UriKind.Relative), null, cancellationToken)
-            .ConfigureAwait(false);
-        await ReadRuntimeAsync(response, "stop", cancellationToken).ConfigureAwait(false);
-    }
+    public Task StopAsync(Guid runtimeId, CancellationToken cancellationToken) => StopForUserAsync(UserOf(runtimeId), cancellationToken);
 
     public async Task DeleteAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
@@ -57,14 +53,38 @@ internal sealed class RemoteRuntimeManager : IAgentRuntimeManager, IDisposable
         using var response = await _connection.Http.DeleteAsync(new Uri(RuntimeHostProtocol.RuntimePath(userId), UriKind.Relative), cancellationToken)
             .ConfigureAwait(false);
         EnsureSuccess(response, "delete");
-        _usersByRuntime.TryRemove(runtimeId, out _);
+        _runtimes.TryRemove(runtimeId, out _);
     }
 
     public async Task<RuntimeInfo> GetStatusAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
-        using var response = await _connection.Http.GetAsync(new Uri(RuntimeHostProtocol.RuntimePath(UserOf(runtimeId)), UriKind.Relative), cancellationToken)
+        var known = _runtimes.TryGetValue(runtimeId, out var runtime)
+            ? runtime
+            : throw new InvalidOperationException($"Runtime {runtimeId} not found.");
+        return known with { Status = await GetStatusForUserAsync(known.UserId, cancellationToken).ConfigureAwait(false) };
+    }
+
+    public async Task<RuntimeStatus> GetStatusForUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        using var response = await _connection.Http.GetAsync(new Uri(RuntimeHostProtocol.RuntimePath(userId), UriKind.Relative), cancellationToken)
             .ConfigureAwait(false);
-        return await ReadRuntimeAsync(response, "status", cancellationToken).ConfigureAwait(false);
+        EnsureSuccess(response, "status");
+        var message = await response.Content.ReadFromJsonAsync<RuntimeStateMessage>(RuntimeHostProtocol.JsonOptions, cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("Runtime host status returned an empty response.");
+        return message.Status;
+    }
+
+    public async Task<bool> StopForUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        using var response = await _connection.Http.PostAsync(new Uri(RuntimeHostProtocol.StopPath(userId), UriKind.Relative), null, cancellationToken)
+            .ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        EnsureSuccess(response, "stop");
+        return true;
     }
 
     public async Task<IRuntimeProcess> StartProcessAsync(Guid runtimeId, RuntimeProcessSpec spec, CancellationToken cancellationToken)
@@ -97,7 +117,7 @@ internal sealed class RemoteRuntimeManager : IAgentRuntimeManager, IDisposable
         var message = await response.Content.ReadFromJsonAsync<RuntimeInfoMessage>(RuntimeHostProtocol.JsonOptions, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Runtime host {operation} returned an empty response.");
         var runtime = message.ToRuntimeInfo();
-        _usersByRuntime[runtime.RuntimeId] = runtime.UserId;
+        _runtimes[runtime.RuntimeId] = runtime;
         return runtime;
     }
 
@@ -119,7 +139,7 @@ internal sealed class RemoteRuntimeManager : IAgentRuntimeManager, IDisposable
     /// API 重新啟動後，下一次 execution 的 EnsureRuntime 會重新建立對應。
     /// </summary>
     private Guid UserOf(Guid runtimeId) =>
-        _usersByRuntime.TryGetValue(runtimeId, out var userId)
-            ? userId
+        _runtimes.TryGetValue(runtimeId, out var runtime)
+            ? runtime.UserId
             : throw new InvalidOperationException($"Runtime {runtimeId} not found.");
 }

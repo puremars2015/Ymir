@@ -1,3 +1,5 @@
+using Ymir.VibeMaker.Domain;
+
 namespace Ymir.VibeMaker.Application.Runtime;
 
 /// <summary>
@@ -23,6 +25,16 @@ public interface IAgentRuntimeManager
     Task DeleteAsync(Guid runtimeId, CancellationToken cancellationToken);
 
     Task<RuntimeInfo> GetStatusAsync(Guid runtimeId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// 以 user id 查詢 runtime 的實際狀態；沒有 runtime 時回傳 <see cref="RuntimeStatus.NotCreated"/>。
+    /// runtime id 只存在於 manager 的記憶體，服務重新啟動後就會不同（資料庫紀錄的 id 不變），
+    /// 所以生命週期管理（閒置停止、啟動時對帳、Admin 停止）一律以 user id 操作（一人一個 runtime，ADR-0007）。
+    /// </summary>
+    Task<RuntimeStatus> GetStatusForUserAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>以 user id 停止 runtime（檔案保留，SA §15）；沒有 runtime 時回傳 false。</summary>
+    Task<bool> StopForUserAsync(Guid userId, CancellationToken cancellationToken);
 
     /// <summary>
     /// 在 runtime 內啟動程序（Podman 為 <c>podman exec -i</c>），工作目錄為 <see cref="RuntimeProcessSpec.WorkingDirectory"/>

@@ -437,6 +437,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/settings/runtime': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetRuntimePolicy'];
+    put: operations['AdminSaveRuntimePolicy'];
+    post?: never;
+    delete: operations['AdminResetRuntimePolicy'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/usage': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetUsage'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/settings/oidc': {
     parameters: {
       query?: never;
@@ -569,6 +601,13 @@ export interface components {
       users: components['schemas']['UserCountsResponse'];
       executions: components['schemas']['ExecutionCountsResponse'];
       runtimes: components['schemas']['RuntimeSummaryResponse'][];
+    };
+    AdminUsageResponse: {
+      /** Format: int32 */
+      days: number | string;
+      /** Format: int32 */
+      dailyExecutionLimit: number | string;
+      users: components['schemas']['UserUsageResponse'][];
     };
     AdminUserResponse: {
       /** Format: uuid */
@@ -760,6 +799,24 @@ export interface components {
     ResetPasswordRequest: {
       newPassword: null | string;
     };
+    RuntimePolicyResponse: {
+      effective: components['schemas']['RuntimePolicyValues'];
+      deployment: components['schemas']['RuntimePolicyValues'];
+      source: components['schemas']['OidcSettingsSource'];
+      /** Format: date-time */
+      updatedAt: null | string;
+      updatedByName: null | string;
+    };
+    RuntimePolicyValues: {
+      /** Format: double */
+      idleTimeoutMinutes: number | string;
+      /** Format: double */
+      executionTimeoutMinutes: number | string;
+      /** Format: int32 */
+      maxPendingExecutionsPerUser: number | string;
+      /** Format: int32 */
+      dailyExecutionLimit: number | string;
+    };
     /** @enum {unknown} */
     RuntimeStatus: 'NotCreated' | 'Created' | 'Running' | 'Busy' | 'Stopped' | 'Error' | 'Deleted';
     RuntimeStatusResponse: {
@@ -794,6 +851,16 @@ export interface components {
       secretExpiresOn: null | string;
       adminRole: null | string;
       displayName: null | string;
+    };
+    SaveRuntimePolicyRequest: {
+      /** Format: int32 */
+      idleTimeoutMinutes: number | string;
+      /** Format: int32 */
+      executionTimeoutMinutes: number | string;
+      /** Format: int32 */
+      maxPendingExecutionsPerUser: number | string;
+      /** Format: int32 */
+      dailyExecutionLimit: number | string;
     };
     SendMessageRequest: {
       content: string;
@@ -859,6 +926,26 @@ export interface components {
     };
     /** @enum {unknown} */
     UserStatus: 'Active' | 'Disabled';
+    UserUsageResponse: {
+      /** Format: uuid */
+      userId: string;
+      displayName: string;
+      /** Format: int32 */
+      executions: number | string;
+      /** Format: int32 */
+      completed: number | string;
+      /** Format: int32 */
+      failed: number | string;
+      /** Format: int32 */
+      cancelled: number | string;
+      /** Format: double */
+      runMinutes: number | string;
+      /** Format: int32 */
+      last24Hours: number | string;
+      /** Format: date-time */
+      lastExecutionAt: null | string;
+      runtimeStatus: null | components['schemas']['RuntimeStatus'];
+    };
     WorkspaceFileResponse: {
       path: string;
       /** Format: int64 */
@@ -1673,6 +1760,92 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AuditLogPageResponse'];
+        };
+      };
+    };
+  };
+  AdminGetRuntimePolicy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RuntimePolicyResponse'];
+        };
+      };
+    };
+  };
+  AdminSaveRuntimePolicy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveRuntimePolicyRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RuntimePolicyResponse'];
+        };
+      };
+    };
+  };
+  AdminResetRuntimePolicy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RuntimePolicyResponse'];
+        };
+      };
+    };
+  };
+  AdminGetUsage: {
+    parameters: {
+      query?: {
+        days?: number | string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminUsageResponse'];
         };
       };
     };

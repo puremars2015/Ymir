@@ -17,6 +17,13 @@ public sealed class UserExecutionLocks
         return new Releaser(semaphore);
     }
 
+    /// <summary>不等待：使用者正在執行時回傳 null（閒置停止用來避開執行中的 runtime）。</summary>
+    public IDisposable? TryAcquire(Guid userId)
+    {
+        var semaphore = _locks.GetOrAdd(userId, _ => new SemaphoreSlim(1, 1));
+        return semaphore.Wait(0) ? new Releaser(semaphore) : null;
+    }
+
     private sealed class Releaser(SemaphoreSlim semaphore) : IDisposable
     {
         private int _released;

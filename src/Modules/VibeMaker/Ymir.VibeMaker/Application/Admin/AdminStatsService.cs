@@ -66,21 +66,55 @@ public sealed class AdminStatsService(
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+    /// <summary>
+    /// 各使用者近 <paramref name="days"/> 天的用量：執行數、結果、Agent 實際執行時間，以及過去 24 小時的次數（與每日上限比較）。
+    /// 依執行數由多到少排序。
+    /// </summary>
+    public async Task<IReadOnlyList<UserUsage>> GetUsageAsync(int days, CancellationToken cancellationToken)
+    {
+        var now = timeProvider.GetUtcNow();
+        var since = now.AddDays(-days);
+        var last24Hours = now.AddDays(-1);
+        var rows = await db.AgentExecutions.AsNoTracking()
+            .Where(e => e.CreatedAt >= since)
+            .Select(e => new { e.UserId, e.Status, e.CreatedAt, e.StartedAt, e.EndedAt })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var runtimeStatuses = await db.AgentRuntimes.AsNoTracking()
+            .Where(r => r.Status != RuntimeStatus.Deleted)
+            .Select(r => new { r.UserId, r.Status })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var statusByUser = runtimeStatuses.GroupBy(r => r.UserId).ToDictionary(g => g.Key, g => g.First().Status);
+
+        return [.. rows.GroupBy(e => e.UserId)
+            .Select(g => new UserUsage(
+                g.Key,
+                g.Count(),
+                g.Count(e => e.Status == ExecutionStatus.Completed),
+                g.Count(e => e.Status == ExecutionStatus.Failed),
+                g.Count(e => e.Status == ExecutionStatus.Cancelled),
+                TimeSpan.FromTicks(g.Where(e => e.StartedAt is not null && e.EndedAt is not null).Sum(e => (e.EndedAt!.Value - e.StartedAt!.Value).Ticks)),
+                g.Count(e => e.CreatedAt > last24Hours),
+                g.Max(e => e.CreatedAt),
+                statusByUser.TryGetValue(g.Key, out var status) ? status : null))
+            .OrderByDescending(u => u.Executions)
+            .ThenByDescending(u => u.LastExecutionAt)];
+    }
+
     /// <summary>停止指定使用者的 runtime（不刪除檔案）；沒有 runtime 時回傳 false。</summary>
     public async Task<bool> StopRuntimeAsync(Guid userId, string actor, CancellationToken cancellationToken)
     {
-        var runtimeId = await db.AgentRuntimes.AsNoTracking()
-            .Where(r => r.UserId == userId && r.Status != RuntimeStatus.Deleted)
-            .Select(r => (Guid?)r.Id)
-            .FirstOrDefaultAsync(cancellationToken)
+        var record = await db.AgentRuntimes
+            .FirstOrDefaultAsync(r => r.UserId == userId && r.Status != RuntimeStatus.Deleted, cancellationToken)
             .ConfigureAwait(false);
-        if (runtimeId is not { } id)
+        if (record is null)
         {
             return false;
         }
 
-        await runtimes.StopAsync(id, cancellationToken).ConfigureAwait(false);
-        var record = await db.AgentRuntimes.SingleAsync(r => r.Id == id, cancellationToken).ConfigureAwait(false);
+        // 以 user id 停止：runtime id 在服務重新啟動後會改變（見 IAgentRuntimeManager.StopForUserAsync）。
+        await runtimes.StopForUserAsync(userId, cancellationToken).ConfigureAwait(false);
         record.MarkStatus(RuntimeStatus.Stopped, timeProvider.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await auditLog.WriteAsync(
@@ -89,6 +123,17 @@ public sealed class AdminStatsService(
         return true;
     }
 }
+
+public sealed record UserUsage(
+    Guid UserId,
+    int Executions,
+    int Completed,
+    int Failed,
+    int Cancelled,
+    TimeSpan RunTime,
+    int Last24Hours,
+    DateTimeOffset? LastExecutionAt,
+    RuntimeStatus? RuntimeStatus);
 
 public sealed record DailyExecutionCount(DateOnly Date, int Total, int Failed);
 

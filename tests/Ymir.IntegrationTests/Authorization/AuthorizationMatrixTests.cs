@@ -102,6 +102,13 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
             Content = JsonContent.Create(new SaveOidcSettingsRequest(true, Guid.NewGuid().ToString(), "intruder", "intruder-secret", null, "Ymir.Admin", "intruder")),
         },
         ["DELETE /api/admin/settings/oidc"] = () => new HttpRequestMessage(HttpMethod.Delete, "/api/admin/settings/oidc"),
+        ["GET /api/admin/settings/runtime"] = () => Get("/api/admin/settings/runtime"),
+        ["PUT /api/admin/settings/runtime"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/runtime")
+        {
+            Content = JsonContent.Create(new SaveRuntimePolicyRequest(0, 240, 50, 0)),
+        },
+        ["DELETE /api/admin/settings/runtime"] = () => new HttpRequestMessage(HttpMethod.Delete, "/api/admin/settings/runtime"),
+        ["GET /api/admin/usage"] = () => Get("/api/admin/usage?days=7"),
         ["POST /api/admin/settings/oidc/test"] = () => new HttpRequestMessage(HttpMethod.Post, "/api/admin/settings/oidc/test")
         {
             Content = JsonContent.Create(new TestOidcSettingsRequest(Guid.NewGuid().ToString())),
