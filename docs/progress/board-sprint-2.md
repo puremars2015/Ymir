@@ -14,6 +14,7 @@
 
 | 工作項目 | 狀態 | 備註 |
 |---|---|---|
+| Web-Pro favicon 與 Apple touch icon | ✅ | 見 [#024](#024--web-pro-favicon)；正式版 build 通過 |
 | Web-Pro 品牌配色（登入、側欄、對話、表單與管理頁） | ✅ | 見 [#023](#023--web-pro-品牌配色)；lint/build 與登入預覽通過，完整驗證由 PR CI 執行 |
 | OIDC 登入（Authorization Code + PKCE，後端換 token、只發 cookie） | ✅ | Entra ID（已確認、已註冊）；見 [#017](#017--企業帳號entra-id與本機帳號密碼登入使用者管理) |
 | `IIdentityProvider`：IdP claims → `ExternalIdentity`（issuer + subject / oid） | ✅ | `EntraIdentityProvider`：`iss` + `oid`，角色取自 app role `Ymir.Admin` |
@@ -52,6 +53,14 @@
 
 ## 💬 留言區
 
+### #024 · Web-Pro favicon
+
+> 👤 **Codex（AI）** · 🕒 2026-10-06 17:15 · `✅完成`
+
+- **需求**：新配色完成後替換 favicon。
+- **調整**：沿用官網 https://www.webpromaterials.com/images/favicon/favicon.ico 與 180px Apple touch icon；圖片保存在 web/public，由本站提供，不依賴外部載入。
+- **快取**：icon URL 加 `webpro-20261006` 版本標記，theme-color 使用品牌藍 `#004EA0`。
+- **驗證**：正式版 build 通過，確認原始圖片為 Web-Pro 藍色品牌圖示；純資產變更不新增測試。PR CI 全部通過後合併並更新網頁容器，再驗證公開 icon 與 HTML。
 ### #023 · Web-Pro 品牌配色
 
 > 👤 **Codex（AI）** · 🕒 2026-10-06 17:04 · `✅完成`
