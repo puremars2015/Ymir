@@ -98,6 +98,21 @@ button {
   }
 }
 
+/* 外觀像按鈕的連結（例如企業帳號登入：必須整頁導向，不能用 XHR） */
+a.button {
+  display: inline-block;
+  padding: 0.625rem 1.125rem;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  text-decoration: none;
+  font: inherit;
+}
+
+.danger-text {
+  color: var(--danger);
+}
+
 .muted {
   color: var(--text-muted);
 }

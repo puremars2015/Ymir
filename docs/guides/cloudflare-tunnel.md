@@ -10,7 +10,7 @@
 ```
 
 > ⚠️ **目前的限制**
-> - 正式環境還沒有登入方式（企業帳號登入在 Sprint 2）。照本指南做完，對外的網站會顯示首頁，但 `/api/*` 一律回「請先登入」。
+> - 登入方式：企業帳號（Entra ID）與本機帳號密碼（[ADR-0009](../adr/0009-entra-id-and-local-accounts.md)），設定見 [entra-id.md](entra-id.md)。Entra 的重新導向 URI 必須包含 `https://<你的網域>/signin-oidc`。
 > - API **不能用 Development 環境對外**（有免密碼的 dev 登入），開啟 `Ymir:PublicEdge` 時會直接拒絕啟動。
 > - 正式的 Agent runtime 只支援 Rootless Podman（ADR-0005）；Windows + Docker 只能拿來驗證。
 
@@ -138,7 +138,7 @@ cloudflared tunnel run ymir
 | 7 | 從另一台機器 `curl http://<主機 IP>:5080/` | 連不上（API 只綁 127.0.0.1） |
 | 8 | 在主機上 `curl -H "Host: evil.example.net" http://127.0.0.1:5080/` | `400`（Host header 限制） |
 
-Sprint 2 完成登入後再補：登入後的 cookie 有 `Secure`、SSE 串流經 tunnel 正常、閒置超過 100 秒後 `EventSource` 自動重連且不遺失事件。
+登入相關的驗證見 [entra-id.md 第 5 節](entra-id.md#5-驗證清單)；另外確認：登入後的 cookie 有 `Secure`、SSE 串流經 tunnel 正常、閒置超過 100 秒後 `EventSource` 自動重連且不遺失事件。
 
 ## 疑難排解
 

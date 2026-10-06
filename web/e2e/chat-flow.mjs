@@ -17,12 +17,16 @@ const sendPrompt = async (text) => {
 };
 const waitIdle = () => page.waitForSelector('.turn.live', { state: 'detached', timeout: 60000 });
 
-// 1. 未登入 → 登入頁 → Dev 登入後直接進主畫面
+// 1. 未登入 → 登入頁 → Dev 登入後直接進主畫面（Development 的開發登入收在 <details> 內）
 await page.goto(baseUrl);
 await page.waitForURL(/\/login/);
 const account = `e2e-${Date.now()}`;
-await page.fill('input[name=account]', account);
-await page.click('button[type=submit]');
+await page.waitForSelector('details.dev');
+if (!(await page.locator('details.dev').evaluate((d) => d.open))) {
+  await page.click('details.dev summary');
+}
+await page.fill('input[name=devAccount]', account);
+await page.click('details.dev button[type=submit]');
 await page.waitForSelector('app-new-chat-page h1');
 await page.waitForSelector('.sidebar .section-header:has-text("專案")');
 step('login → main layout (sidebar + composer)');

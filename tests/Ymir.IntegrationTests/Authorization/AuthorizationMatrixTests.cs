@@ -2,8 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Ymir.Api.Endpoints;
 using Ymir.IntegrationTests.Api;
 using Ymir.IntegrationTests.Executions;
+using Ymir.Platform.Users;
 using Ymir.VibeMaker.Contracts.Conversations;
 using Ymir.VibeMaker.Contracts.Projects;
 
@@ -40,11 +42,31 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["POST /api/executions/{executionId:guid}/cancel"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/executions/{r.ExecutionId}/cancel"),
     };
 
+    /// <summary>只有 Admin 能呼叫（SA §4、ADR-0009）：一般使用者必須得到 403。</summary>
+    private static readonly Dictionary<string, Func<HttpRequestMessage>> AdminOnlyRequests = new()
+    {
+        ["GET /api/admin/users/"] = () => Get("/api/admin/users"),
+        ["POST /api/admin/users/"] = () => new HttpRequestMessage(HttpMethod.Post, "/api/admin/users")
+        {
+            Content = JsonContent.Create(new CreateLocalUserRequest("intruder-made", "Intruder", null, UserRole.Admin, "intruder-password-123")),
+        },
+        ["POST /api/admin/users/{userId:guid}/disable"] = () => new HttpRequestMessage(HttpMethod.Post, $"/api/admin/users/{Guid.NewGuid()}/disable"),
+        ["POST /api/admin/users/{userId:guid}/enable"] = () => new HttpRequestMessage(HttpMethod.Post, $"/api/admin/users/{Guid.NewGuid()}/enable"),
+        ["POST /api/admin/users/{userId:guid}/reset-password"] = () => new HttpRequestMessage(HttpMethod.Post, $"/api/admin/users/{Guid.NewGuid()}/reset-password")
+        {
+            Content = JsonContent.Create(new ResetPasswordRequest("intruder-password-123")),
+        },
+    };
+
     /// <summary>不以資源 id 存取的端點（只會操作目前使用者自己的資料，或是匿名端點）。</summary>
     private static readonly HashSet<string> NotResourceScoped =
     [
         "GET /api/me",
+        "POST /api/me/password",
         "POST /api/auth/logout",
+        "GET /api/auth/providers",
+        "GET /api/auth/login",
+        "POST /api/auth/password-login",
         "POST /api/dev/login",
         "GET /api/projects/",
         "POST /api/projects/",
@@ -68,7 +90,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
             .SelectMany(e => (e.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? ["ANY"]).Select(m => $"{m} {e.RoutePattern.RawText}"))
             .ToList();
 
-        var unclassified = endpoints.Where(e => !ResourceRequests.ContainsKey(e) && !NotResourceScoped.Contains(e)).ToList();
+        var unclassified = endpoints.Where(e => !ResourceRequests.ContainsKey(e) && !AdminOnlyRequests.ContainsKey(e) && !NotResourceScoped.Contains(e)).ToList();
         Assert.True(unclassified.Count == 0, "未分類的端點（請加入授權矩陣）：" + string.Join(", ", unclassified));
     }
 
@@ -119,5 +141,39 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
             using var response = await anonymous.SendAsync(request, ct);
             Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, $"{endpoint} → {(int)response.StatusCode}");
         }
+    }
+
+    [Fact]
+    public async Task AdminEndpoints_AreForbiddenForUsers_AndRequireLogin()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var user = await factory.LoginAsync("matrix-plain-user");
+        using var admin = await factory.LoginAsync("matrix-admin", UserRole.Admin);
+        using var anonymous = factory.CreateBrowserClient();
+
+        var failures = new List<string>();
+        foreach (var (endpoint, createRequest) in AdminOnlyRequests)
+        {
+            using var asUser = await user.SendAsync(createRequest(), ct);
+            if (asUser.StatusCode != HttpStatusCode.Forbidden)
+            {
+                failures.Add($"{endpoint} (user) → {(int)asUser.StatusCode}");
+            }
+
+            using var asAnonymous = await anonymous.SendAsync(createRequest(), ct);
+            if (asAnonymous.StatusCode != HttpStatusCode.Unauthorized)
+            {
+                failures.Add($"{endpoint} (anonymous) → {(int)asAnonymous.StatusCode}");
+            }
+
+            // Admin 不會被授權擋下（可能因為資源不存在回 404 / 400，但不是 401 / 403）。
+            using var asAdmin = await admin.SendAsync(createRequest(), ct);
+            if (asAdmin.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            {
+                failures.Add($"{endpoint} (admin) → {(int)asAdmin.StatusCode}");
+            }
+        }
+
+        Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 }

@@ -17,6 +17,7 @@ public static class PlatformInfrastructureExtensions
         services.AddDbContext<PlatformDbContext>(options => options.UseSqlServer(connectionString, SqlServerOptions.Configure));
         services.AddSingleton<IAuditLog, DbAuditLog>();
         services.AddScoped<IUserDirectory, UserDirectory>();
+        services.AddScoped<ILocalAccountService, LocalAccountService>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
         services.AddSingleton(TimeProvider.System);

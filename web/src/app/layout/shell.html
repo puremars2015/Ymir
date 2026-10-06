@@ -119,6 +119,15 @@
       <footer class="user">
         <span class="avatar" aria-hidden="true">{{ user.displayName.charAt(0) }}</span>
         <span class="name">{{ user.displayName }}</span>
+        @if (auth.isAdmin()) {
+          <a
+            routerLink="/admin/users"
+            routerLinkActive="active"
+            class="settings-link"
+            title="使用者管理"
+            >管理</a
+          >
+        }
         <a routerLink="/settings" routerLinkActive="active" class="settings-link" title="個人設定"
           >設定</a
         >

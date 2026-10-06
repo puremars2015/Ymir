@@ -36,6 +36,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/auth/providers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetLoginProviders'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/password-login': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['PasswordLogin'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/me/password': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['ChangePassword'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/dev/login': {
     parameters: {
       query?: never;
@@ -213,14 +261,98 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/users': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminListUsers'];
+    put?: never;
+    post: operations['AdminCreateLocalUser'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/users/{userId}/disable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['AdminDisableUser'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/users/{userId}/enable': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['AdminEnableUser'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/users/{userId}/reset-password': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['AdminResetPassword'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AdminUserResponse: {
+      /** Format: uuid */
+      id: string;
+      displayName: string;
+      accountName: null | string;
+      email: null | string;
+      role: components['schemas']['UserRole'];
+      status: components['schemas']['UserStatus'];
+      authMethod: components['schemas']['AuthMethod'];
+      /** Format: date-time */
+      lastLoginAt: null | string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {unknown} */
+    AuthMethod: 'Oidc' | 'Local' | 'Dev';
     CancelExecutionResponse: {
       /** Format: uuid */
       executionId: string;
       status: string;
+    };
+    ChangePasswordRequest: {
+      currentPassword: null | string;
+      newPassword: null | string;
     };
     ConversationResponse: {
       /** Format: uuid */
@@ -240,6 +372,13 @@ export interface components {
       projectId: null | string;
       title: string;
     };
+    CreateLocalUserRequest: {
+      account: null | string;
+      displayName: null | string;
+      email: null | string;
+      role: null | components['schemas']['UserRole'];
+      initialPassword: null | string;
+    };
     CreateProjectRequest: {
       name: string;
     };
@@ -247,6 +386,12 @@ export interface components {
       account: null | string;
       displayName: null | string;
       role: null | components['schemas']['UserRole'];
+    };
+    LoginProvidersResponse: {
+      oidc: boolean;
+      oidcDisplayName: null | string;
+      password: boolean;
+      devLogin: boolean;
     };
     MeResponse: {
       /** Format: uuid */
@@ -257,6 +402,8 @@ export interface components {
       department: null | string;
       role: components['schemas']['UserRole'];
       status: components['schemas']['UserStatus'];
+      authMethod: components['schemas']['AuthMethod'];
+      mustChangePassword: boolean;
     };
     MessageResponse: {
       /** Format: uuid */
@@ -276,6 +423,10 @@ export interface components {
       displayName: string;
       isDefault: boolean;
     };
+    PasswordLoginRequest: {
+      account: null | string;
+      password: null | string;
+    };
     ProjectResponse: {
       /** Format: uuid */
       id: string;
@@ -286,6 +437,9 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+    };
+    ResetPasswordRequest: {
+      newPassword: null | string;
     };
     RuntimeStatusResponse: {
       status: string;
@@ -358,6 +512,72 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  GetLoginProviders: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['LoginProvidersResponse'];
+        };
+      };
+    };
+  };
+  PasswordLogin: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PasswordLoginRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MeResponse'];
+        };
+      };
+    };
+  };
+  ChangePassword: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangePasswordRequest'];
+      };
+    };
     responses: {
       /** @description No Content */
       204: {
@@ -725,6 +945,120 @@ export interface operations {
         content: {
           'application/json': components['schemas']['CancelExecutionResponse'];
         };
+      };
+    };
+  };
+  AdminListUsers: {
+    parameters: {
+      query?: {
+        search?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminUserResponse'][];
+        };
+      };
+    };
+  };
+  AdminCreateLocalUser: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateLocalUserRequest'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminUserResponse'];
+        };
+      };
+    };
+  };
+  AdminDisableUser: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminUserResponse'];
+        };
+      };
+    };
+  };
+  AdminEnableUser: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminUserResponse'];
+        };
+      };
+    };
+  };
+  AdminResetPassword: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ResetPasswordRequest'];
+      };
+    };
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

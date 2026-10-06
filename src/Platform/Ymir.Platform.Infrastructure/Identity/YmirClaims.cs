@@ -8,16 +8,26 @@ public static class YmirClaims
 {
     public const string UserId = ClaimTypes.NameIdentifier;
 
-    public static ClaimsPrincipal CreatePrincipal(User user, string authenticationScheme)
+    /// <summary>本機帳號必須先改密碼（Admin 設定的初始 / 重設密碼，ADR-0009）；有此 claim 時只能呼叫改密碼等少數端點。</summary>
+    public const string MustChangePassword = "ymir:must_change_password";
+
+    public static ClaimsPrincipal CreatePrincipal(User user, string authenticationScheme, bool mustChangePassword = false)
     {
         ArgumentNullException.ThrowIfNull(user);
-        var identity = new ClaimsIdentity(
-            [
-                new Claim(UserId, user.Id.ToString("D")),
-                new Claim(ClaimTypes.Name, user.DisplayName),
-                new Claim(ClaimTypes.Role, user.Role.ToString()),
-            ],
-            authenticationScheme);
-        return new ClaimsPrincipal(identity);
+        List<Claim> claims =
+        [
+            new Claim(UserId, user.Id.ToString("D")),
+            new Claim(ClaimTypes.Name, user.DisplayName),
+            new Claim(ClaimTypes.Role, user.Role.ToString()),
+        ];
+        if (mustChangePassword)
+        {
+            claims.Add(new Claim(MustChangePassword, "true"));
+        }
+
+        return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationScheme));
     }
+
+    public static bool RequiresPasswordChange(ClaimsPrincipal principal) =>
+        principal?.HasClaim(MustChangePassword, "true") == true;
 }

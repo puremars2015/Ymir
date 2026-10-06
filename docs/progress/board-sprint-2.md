@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-06 13:15 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-06 13:45 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -14,12 +14,12 @@
 
 | 工作項目 | 狀態 | 備註 |
 |---|---|---|
-| OIDC 登入（Authorization Code + PKCE，後端換 token、只發 cookie） | ⏳ | **需先確認 IdP 類型** |
-| `IIdentityProvider`：IdP claims → `ExternalIdentity`（issuer + subject / oid） | ⏳ | 傳統 AD / LDAP 改用 adapter |
-| 每個請求驗證使用者狀態（停用後既有 cookie 立即失效） | ⏳ | Sprint 1 只在建立 execution 時檢查 |
-| Admin API：使用者列表、停用 / 啟用、角色設定（寫 audit） | ⏳ | SA §4 |
-| Angular：企業帳號登入按鈕、Admin 使用者管理頁 | ⏳ | |
-| 授權矩陣加入角色維度（User 不能呼叫 Admin API） | ⏳ | |
+| OIDC 登入（Authorization Code + PKCE，後端換 token、只發 cookie） | ✅ | Entra ID（已確認、已註冊）；見 [#017](#017--企業帳號entra-id與本機帳號密碼登入使用者管理) |
+| `IIdentityProvider`：IdP claims → `ExternalIdentity`（issuer + subject / oid） | ✅ | `EntraIdentityProvider`：`iss` + `oid`，角色取自 app role `Ymir.Admin` |
+| 每個請求驗證使用者狀態（停用後既有 cookie 立即失效） | ✅ | Cookie `OnValidatePrincipal` |
+| Admin API：使用者列表、停用 / 啟用、本機帳號建立 / 重設密碼（寫 audit） | ✅ | 企業帳號角色以 Entra 為準，不在 Ymir 修改 |
+| Angular：企業帳號登入按鈕、本機帳號登入、強制改密碼、Admin 使用者管理頁 | ✅ | |
+| 授權矩陣加入角色維度（User 不能呼叫 Admin API） | ✅ | `AdminOnlyRequests` |
 | Docker 作為開發 / 驗證用 runtime（Windows Docker Desktop） | ✅ | ADR-0005；見 [#003](#003--新增-docker-runtime可用-windows-docker-desktop-開發與驗證) |
 | 使用者在 Windows 上依指南實機驗證 | ⏳ | [docs/guides/windows-docker.md](../guides/windows-docker.md) 第 6 節驗證清單 |
 | Cloudflare Tunnel 對外入口（`Ymir.Edge` 模組） | ✅ | ADR-0006；見 [#004](#004--新增-cloudflare-tunnel-對外入口模組ymiredge) |
@@ -29,19 +29,95 @@
 | LiteLLM sample（MiniMax 國際站） | ✅ | 設定與 proxy 已用 Fake LLM 驗證；MiniMax 實連依使用者決定在沙箱**跳過**，待使用者環境確認（[#010](#010--沙箱無法使用的外部資源驗證先跳過)） |
 | Ymir 接上 LiteLLM：每位使用者的 virtual key（ADR-0004） | ✅ | 以 Fake LLM 模擬的 LiteLLM 驗證；真正的 LiteLLM + PostgreSQL 在沙箱**跳過**（image 拉不下來），見 [#011](#011--ymir-接上-litellm每位使用者的-virtual-key) |
 | 對話選模型、個人 global / 專案 system prompt | ✅ | 見 [#012](#012--對話選模型個人-global-與專案-system-prompt) |
-| 對話隱藏模型思考內容（即時回覆與歷史） | ✅ | 見 #015；過濾 think / thinking 區段與未完成的串流標籤 |
-| 使用者 OneDrive Workspace（Microsoft Graph） | ⏳ | 方法二已選定；目前只記錄計畫，待使用者指示實作；見 #016 與 [計畫](../planning/onedrive-workspace-plan.md) |
+| 對話隱藏模型思考內容（即時回覆與歷史） | ✅ | 見 [#015](#015--對話隱藏模型思考內容)；過濾 think / thinking 區段與未完成的串流標籤 |
+| 使用者 OneDrive Workspace（Microsoft Graph） | ⏳ | 方法二已選定；目前只記錄計畫，待使用者指示實作；見 [#016](#016--記錄-onedrive-workspace-後續計畫暫不實作) 與 [計畫](../planning/onedrive-workspace-plan.md) |
 | API 放進容器 + 主機 runtime host（ADR-0008） | ✅ | 見 [#013](#013--api-放進容器agent-runtime-改由主機上的-runtime-host-管理)；沙箱以 Docker 驗證完整流程 |
 | API 容器的 engine：Linux 用 rootful Podman（Quadlet）、Windows 用 Docker Desktop | ✅ | 使用者決定；見 [#014](#014--api-容器linux-用-rootful-podmanwindows-用-docker-desktop) |
 | 在 Linux 主機安裝 runtime host（rootless Podman、systemd、`ymir-runtime` group）並以 Quadlet 啟動 API 容器 | ⏳ | 依 [deploy/runtime-host](../../deploy/runtime-host/README.md)、[deploy/api](../../deploy/api/README.md)；**待使用者環境確認** |
 | Windows：runtime host + Docker Desktop 跑 API 容器 | ⏳ | 依 [deploy/api 的 Windows 一節](../../deploy/api/README.md#windowsdocker-desktop開發--驗證)；**待使用者環境確認** |
+| 本機帳號密碼登入（使用者追加需求） | ✅ | Admin 建立、第一次登入強制改密碼、鎖定、rate limit |
+| 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
-**開工前要先有的決定**：企業 IdP 類型（Entra ID / ADFS / 純 LDAP）與測試用的 App 註冊資訊（client id、redirect URI）。
+**IdP 決定**：Entra ID（tenant `e333846a-0ee2-4e2d-a13b-efc97851b892`、client `5e85a804-c308-4402-b621-0be6d023a2ac`、網域 `ymir.thetainformation.com`），見 [ADR-0009](../adr/0009-entra-id-and-local-accounts.md)。
 
 ---
 
 ## 💬 留言區
+
+### #018 · 合併 main 的看板衝突；redirect URI 已加入
+
+> 👤 **Claude（AI）** · 🕒 2026-10-06 13:45 · `🚧進度`
+
+- **redirect URI**：使用者確認已在 Entra 加入 `https://ymir.thetainformation.com/signin-oidc` 與 `http://localhost:5080/signin-oidc`。[entra-id.md](../guides/entra-id.md) 第 1 節已標註完成。
+- **PR #15 的衝突**：開 PR 後，main 合併了 Codex 的 #13（對話隱藏思考）與 #14（OneDrive 計畫），這兩個 PR 和 Sprint 2 都在看板新增了 #015 留言。
+  - 程式碼沒有衝突，只有這份看板衝突。
+  - 處理方式：保留 Codex 的 #015、#016 原文；Sprint 2 的留言改為 [#017](#017--企業帳號entra-id與本機帳號密碼登入使用者管理)；置頂表兩邊的項目都保留。
+  - 以 merge commit 合併 main，沒有改寫歷史。
+- **合併後的驗證（實際跑過）**：
+  - 後端：`dotnet format` 通過，`dotnet test --solution Ymir.slnx` **301 項全部通過**。
+  - 前端：`npm run lint`、`npm test`（**35 項**，含 Codex 新增的思考過濾測試）、`npm run build` 都通過；`schema.ts` 與 OpenAPI 一致。
+- **剩下由使用者做**（步驟見 [entra-id.md](../guides/entra-id.md)）：
+  1. 把用戶端密碼的「值」填進部署主機的 `deploy/api/.env`。
+  2. 企業應用程式「需要指派使用者」設為「是」，指派使用者並把自己設為 `Admin`。
+  3. 依第 5 節的驗證清單實際登入。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #017 · 企業帳號（Entra ID）與本機帳號密碼登入、使用者管理
+
+> 👤 **Claude（AI）** · 🕒 2026-10-06 13:30 · `✅完成`
+
+Sprint 2 的主要內容完成，架構決策見 [ADR-0009](../adr/0009-entra-id-and-local-accounts.md)，設定與驗證步驟見 [docs/guides/entra-id.md](../guides/entra-id.md)。
+
+- **判斷 IdP**：和使用者一起用 `getuserrealm`（`NameSpaceType: Managed`）與 `dsregcmd /status` 確認是 **Entra ID**；地端 AD `webpro.com` 同步到雲端。使用者已完成應用程式註冊。
+- **企業帳號登入**：
+  - Authorization Code + PKCE，後端換 token、不保存 IdP token，瀏覽器只拿到 Ymir 的 HttpOnly cookie。
+  - 使用者以 `iss` + `oid` 識別，Admin 由 Entra app role `Ymir.Admin` 決定、每次登入同步。
+  - 登入後的導回位址只接受站內路徑。
+- **本機帳號密碼**（使用者追加需求）：
+  - Admin 在「使用者管理」建立，對方第一次登入必須先改密碼；改密碼前其他 API 一律 403。
+  - PBKDF2 雜湊；連錯 5 次鎖 15 分鐘；每個 IP 每分鐘 10 次。
+  - 帳號不存在與密碼錯誤的回應相同。
+  - 第一個 Admin 可以用 `create-local-admin` 指令建立，密碼從 stdin 讀取。
+- **停用立即生效**：每個請求都檢查帳號狀態，停用後對方下一個請求就是 401。同時取消執行中的工作、撤銷 LiteLLM virtual key、停止 runtime。
+- **Admin API 與前端**：
+  - 使用者列表與搜尋、停用 / 啟用（不能停用自己）、建立本機帳號、重設密碼；
+  - 前端有登入頁（公司帳號按鈕 + 帳號密碼）、強制改密碼頁、使用者管理頁，設定頁可以改密碼。
+- **Fake OIDC**（`tests/Ymir.Testing.FakeOidc`）：模擬 Entra v2 的 claims、RS256、PKCE、client secret。CI 與沙箱可以完整測試登入流程，不需要連 Microsoft。
+- **設定範本**：`deploy/api/.env.example` 已填入 tenant / client id 與網域 `ymir.thetainformation.com`。client secret 留空，由使用者自己填。
+
+截圖（Fake OIDC 模擬 Entra）：[登入頁](screenshots/auth/01-login.png) · [模擬 Entra 登入](screenshots/auth/02-fake-entra.png) · [使用者管理](screenshots/auth/03-admin-users.png) · [強制改密碼](screenshots/auth/04-change-password.png) · [停用帳號](screenshots/auth/05-disabled.png)
+
+**驗證（實際跑過）**
+- **後端**：`dotnet format` 通過；`dotnet test --solution Ymir.slnx` **301 項全部通過**（新增 48 項）。
+  - 整合測試：
+    - OIDC 完整流程、同一 `oid` 是同一個使用者、Entra 拿掉角色後降級（原本的 Admin cookie 也立即失去權限）；
+    - 偽造的 state 被拒、不會導到外部網站、停用的帳號不能登入且既有 cookie 立即失效；
+    - 本機帳號的強制改密碼、鎖定、rate limit、antiforgery、密碼只存雜湊、不能停用自己；
+    - 授權矩陣的 Admin 維度。
+  - 單元測試：Entra claim 對應、導回位址、帳號正規化、鎖定、啟動檢查。
+- **前端**：`npm run lint`、`npm test`（31 項）、`npm run build` 都通過。
+- **端對端**：API 直接提供 Angular build，加上 Fake OIDC。
+  - `npm run e2e:auth` **6 個步驟全部通過**：公司帳號（Admin）登入 → 建立本機帳號 → 對方強制改密碼 → 停用後對方下一個操作就被登出 → 停用不能登入、重新啟用後可以。
+  - `npm run e2e`（原本的 12 步驟）也全部通過。
+- **未驗證、待使用者環境確認**：用你們真正的 Entra 登入（沙箱連不到 Microsoft）。請依 [entra-id.md](../guides/entra-id.md) 在 `deploy/api/.env` 填入 client secret，並在 Entra 的重新導向 URI 加入 `https://ymir.thetainformation.com/signin-oidc` 與 `http://localhost:5080/signin-oidc`，再跑第 5 節的驗證清單。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #016 · 記錄 OneDrive Workspace 後續計畫，暫不實作
 

@@ -83,6 +83,40 @@ namespace Ymir.Platform.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_log", "platform");
                 });
 
+            modelBuilder.Entity("Ymir.Platform.Users.LocalCredential", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("int")
+                        .HasColumnName("failed_attempts");
+
+                    b.Property<DateTimeOffset?>("LockoutUntil")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("lockout_until");
+
+                    b.Property<bool>("MustChangePassword")
+                        .HasColumnType("bit")
+                        .HasColumnName("must_change_password");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)")
+                        .HasColumnName("password_hash");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_local_credentials");
+
+                    b.ToTable("local_credentials", "platform");
+                });
+
             modelBuilder.Entity("Ymir.Platform.Users.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -154,6 +188,16 @@ namespace Ymir.Platform.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_users_issuer_subject");
 
                     b.ToTable("users", "platform");
+                });
+
+            modelBuilder.Entity("Ymir.Platform.Users.LocalCredential", b =>
+                {
+                    b.HasOne("Ymir.Platform.Users.User", null)
+                        .WithOne()
+                        .HasForeignKey("Ymir.Platform.Users.LocalCredential", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_local_credentials_users_user_id");
                 });
 #pragma warning restore 612, 618
         }
