@@ -45,6 +45,7 @@ export class AdminTabs {
   protected readonly tabs = [
     { path: '/admin', label: '總覽', exact: true },
     { path: '/admin/users', label: '使用者', exact: false },
+    { path: '/admin/usage', label: '用量', exact: false },
     { path: '/admin/make-topics', label: 'Make 主題', exact: false },
     { path: '/admin/settings', label: '系統設定', exact: false },
     { path: '/admin/audit', label: '稽核紀錄', exact: false },

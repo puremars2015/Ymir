@@ -102,7 +102,7 @@ internal static class AdminRuntimeEndpoints
                 u.Completed,
                 u.Failed,
                 u.Cancelled,
-                Math.Round(u.RunTime.TotalMinutes, 1),
+                Math.Round(u.RunTime.TotalMinutes, 2),
                 u.Last24Hours,
                 u.LastExecutionAt,
                 u.RuntimeStatus))]));

@@ -9,6 +9,9 @@ import {
   OidcTestResult,
   SaveOidcSettingsRequest,
   TunnelSettings,
+  RuntimePolicy,
+  SaveRuntimePolicyRequest,
+  AdminUsage,
   WorkspaceFiles,
   AdminUser,
   ApiProblem,
@@ -117,6 +120,22 @@ export class ApiService {
 
   adminSetPublicHostname(hostname: string): Observable<TunnelSettings> {
     return this.http.put<TunnelSettings>('/api/admin/settings/tunnel/hostname', { hostname });
+  }
+
+  adminGetRuntimePolicy(): Observable<RuntimePolicy> {
+    return this.http.get<RuntimePolicy>('/api/admin/settings/runtime');
+  }
+
+  adminSaveRuntimePolicy(request: SaveRuntimePolicyRequest): Observable<RuntimePolicy> {
+    return this.http.put<RuntimePolicy>('/api/admin/settings/runtime', request);
+  }
+
+  adminResetRuntimePolicy(): Observable<RuntimePolicy> {
+    return this.http.delete<RuntimePolicy>('/api/admin/settings/runtime');
+  }
+
+  adminUsage(days: number): Observable<AdminUsage> {
+    return this.http.get<AdminUsage>('/api/admin/usage', { params: { days } });
   }
 
   listConversationFiles(conversationId: string): Observable<WorkspaceFiles> {

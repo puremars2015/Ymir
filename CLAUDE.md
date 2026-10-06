@@ -9,7 +9,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 |---|---|
 | `docs/sa/vibe-maker-core-mvp-sa.md` | SA（需求、資料模型、API、SSE 契約、驗收條件），以章節編號引用，例如「SA §10」 |
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
-| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0010） |
+| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0011） |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
 | `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
@@ -92,11 +92,13 @@ cd web && npm start                                  # http://localhost:4200，/
 
 Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真正的 Pi：設定 `VibeMaker__Harness=Pi` 並啟動 Fake LLM。
 
-管理介面（ADR-0010）：`/admin` 總覽、使用者、Make 主題、系統設定（Entra ID、Cloudflare Tunnel token 與對外網域）、稽核紀錄；端點在 `src/Ymir.Api/Endpoints/Admin*.cs`，跨模組資料（使用者名稱 + Vibe Maker 統計）在 Api 層組合。稽核只讀查詢用 `IAuditLogQuery`，寫入仍只經由 `IAuditLog`。
+管理介面（ADR-0010）：`/admin` 總覽、使用者、用量、Make 主題、系統設定（Entra ID、Cloudflare Tunnel token 與對外網域、執行政策）、稽核紀錄；端點在 `src/Ymir.Api/Endpoints/Admin*.cs`，跨模組資料（使用者名稱 + Vibe Maker 統計）在 Api 層組合。稽核只讀查詢用 `IAuditLogQuery`，寫入仍只經由 `IAuditLog`。
 
 對話檔案（Agent 產生的成果）：`GET /api/conversations/{id}/files`、`/files/download?path=`、`/files/archive`（zip）。經 `IWorkspaceFileReader` 在使用者 runtime 內執行 `find` / `bash` 讀取，所以 Remote（runtime host）也適用；路徑經 stdin 傳入、runtime 內以 realpath 確認不逃出工作目錄；下載一律附件（octet-stream、nosniff、CSP sandbox），不得在 Ymir 網域上直接開啟 Agent 產生的 HTML。
 
 對話與專案的「刪除」一律是封存（`Status = Archived`，資料與 runtime 內的檔案保留；封存後所有端點回 404，執行中的對話不能封存）。`ConversationResponse.ActiveExecutionId` 讓前端重新整理後接回執行中的 SSE（`resumeTurnFrom`）；檔案面板的預覽只用文字綁定或 blob URL 的 `<img>`，不得以 innerHTML 或 iframe 顯示 Agent 產生的內容。
+
+Runtime 生命週期（ADR-0011）：`RuntimeLifecycleWorker` 啟動時對帳、定期停止閒置的 runtime（跳過執行中的使用者）；執行政策（閒置時間、單次執行上限、每人排隊上限、每日次數）由 `RuntimePolicyService` 提供，管理介面的值（`vibemaker.runtime_policy`）優先於 `VibeMaker__Runtime__*`；超過配額回 429 `QUOTA_EXCEEDED`。生命週期操作（停止、查詢、對帳）一律以 user id 呼叫 `StopForUserAsync` / `GetStatusForUserAsync`，不要用 runtime id（服務重啟後會變）。
 
 `/make`：對話輸入 `/make` 顯示管理員設定的主題按鈕（`vibemaker.make_topics`，Admin 在「管理 → Make 主題」維護）；給 Agent 的完整指示由後端 `MakePromptBuilder` 組合並存在 `AgentExecution.AgentPrompt`，對話紀錄只保留使用者輸入的文字。
 

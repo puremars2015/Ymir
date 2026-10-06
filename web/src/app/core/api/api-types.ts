@@ -35,6 +35,11 @@ export type OidcTestResult = Schemas['OidcTestResponse'];
 export type WorkspaceFile = Schemas['WorkspaceFileResponse'];
 export type TunnelSettings = Schemas['TunnelSettingsResponse'];
 export type WorkspaceFiles = Schemas['WorkspaceFilesResponse'];
+export type RuntimePolicy = Schemas['RuntimePolicyResponse'];
+export type RuntimePolicyValues = Schemas['RuntimePolicyValues'];
+export type SaveRuntimePolicyRequest = Schemas['SaveRuntimePolicyRequest'];
+export type AdminUsage = Schemas['AdminUsageResponse'];
+export type UserUsage = Schemas['UserUsageResponse'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {
