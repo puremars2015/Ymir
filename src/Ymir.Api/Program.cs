@@ -22,6 +22,9 @@ builder.Services.AddOpenApi();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddYmirDataProtection(builder.Configuration);
 builder.Services.AddYmirAuth(builder.Environment, builder.Configuration);
+// 管理介面設定的對外網域優先於部署設定（ADR-0010）；必須在 AddPublicEdge 之前註冊。
+builder.Services.AddSingleton<Ymir.Api.Edge.PublicHostnameSettings>();
+builder.Services.AddSingleton<Ymir.Edge.IPublicHostnameSource>(sp => sp.GetRequiredService<Ymir.Api.Edge.PublicHostnameSettings>());
 builder.Services.AddPublicEdge(builder.Configuration, builder.Environment);
 builder.Services.AddPlatformInfrastructure(connectionString);
 builder.Services.AddVibeMakerApplication();

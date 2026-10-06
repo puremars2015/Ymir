@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Ymir.Edge;
 
@@ -17,11 +18,19 @@ public sealed class PublicEdgeTests
     /// <summary>測試用 header：模擬 TCP 連線的來源 IP（TestServer 預設沒有來源 IP）。</summary>
     private const string TestRemoteIpHeader = "X-Test-Remote-Ip";
 
-    private static async Task<WebApplication> StartAsync(string environment, params (string Key, string Value)[] settings)
+    private static Task<WebApplication> StartAsync(string environment, params (string Key, string Value)[] settings) =>
+        StartAsync(environment, hostnameSource: null, settings);
+
+    private static async Task<WebApplication> StartAsync(string environment, IPublicHostnameSource? hostnameSource, params (string Key, string Value)[] settings)
     {
         var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = environment });
         builder.WebHost.UseTestServer();
         builder.Configuration.AddInMemoryCollection(settings.Select(s => KeyValuePair.Create(s.Key, (string?)s.Value)));
+        if (hostnameSource is not null)
+        {
+            builder.Services.AddSingleton(hostnameSource);
+        }
+
         builder.Services.AddPublicEdge(builder.Configuration, builder.Environment);
 
         var app = builder.Build();
@@ -143,6 +152,53 @@ public sealed class PublicEdgeTests
         using var response = await client.GetAsync(new Uri($"http://{host}{path}"), TestContext.Current.CancellationToken);
 
         Assert.Equal(expected, response.StatusCode);
+    }
+
+    /// <summary>ADR-0010：管理介面改了對外網域，下一個請求就用新網域，不必重啟。</summary>
+    [Fact]
+    public async Task HostnameOverride_TakesEffectWithoutRestart()
+    {
+        var source = new MutableHostnameSource();
+        await using var app = await StartAsync(
+            Environments.Production,
+            source,
+            ("Ymir:PublicEdge:Enabled", "true"),
+            ("Ymir:PublicEdge:PublicHostname", PublicHost));
+        using var client = app.GetTestClient();
+        var ct = TestContext.Current.CancellationToken;
+
+        using var beforeOld = await client.SendAsync(Echo(PublicHost), ct);
+        using var beforeNew = await client.SendAsync(Echo("ymir.new-domain.example"), ct);
+        source.Hostname = "ymir.new-domain.example";
+        using var afterOld = await client.SendAsync(Echo(PublicHost), ct);
+        using var afterNew = await client.SendAsync(Echo("ymir.new-domain.example"), ct);
+        using var health = await client.GetAsync(new Uri("http://ymir.new-domain.example/health"), ct);
+
+        Assert.Equal(HttpStatusCode.OK, beforeOld.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, beforeNew.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, afterOld.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, afterNew.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, health.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("ymir.example.com", true)]
+    [InlineData("a.b.c.example.co.uk", true)]
+    [InlineData("localhost", false)]
+    [InlineData("https://ymir.example.com", false)]
+    [InlineData("ymir.example.com:443", false)]
+    [InlineData("ymir.example.com/path", false)]
+    [InlineData(" ymir.example.com", false)]
+    [InlineData("10.0.0.1", false)]
+    [InlineData("", false)]
+    public void Hostnames_AreValidated(string hostname, bool valid) =>
+        Assert.Equal(valid, PublicEdgeHostnames.IsValid(hostname));
+
+    private sealed class MutableHostnameSource : IPublicHostnameSource
+    {
+        public string? Hostname { get; set; }
+
+        public ValueTask<string?> GetOverrideAsync(CancellationToken cancellationToken) => ValueTask.FromResult(Hostname);
     }
 
     [Fact]

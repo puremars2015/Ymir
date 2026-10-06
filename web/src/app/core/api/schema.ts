@@ -469,6 +469,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/settings/tunnel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetTunnelSettings'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/settings/tunnel/token': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['AdminSetTunnelToken'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/settings/tunnel/hostname': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['AdminSetPublicHostname'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/make-topics': {
     parameters: {
       query?: never;
@@ -760,8 +808,25 @@ export interface components {
       executionId: string;
       eventStreamUrl: string;
     };
+    SetPublicHostnameRequest: {
+      hostname: null | string;
+    };
+    SetTunnelTokenRequest: {
+      token: null | string;
+    };
     TestOidcSettingsRequest: {
       tenantId: null | string;
+    };
+    TunnelSettingsResponse: {
+      publicEdgeEnabled: boolean;
+      hostname: null | string;
+      hostnameSource: components['schemas']['OidcSettingsSource'];
+      managementAvailable: boolean;
+      configured: boolean;
+      active: boolean;
+      /** Format: date-time */
+      tokenUpdatedAt: null | string;
+      redirectUri: null | string;
     };
     UpdateProjectRequest: {
       name: null | string;
@@ -1625,6 +1690,74 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['OidcTestResponse'];
+        };
+      };
+    };
+  };
+  AdminGetTunnelSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TunnelSettingsResponse'];
+        };
+      };
+    };
+  };
+  AdminSetTunnelToken: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetTunnelTokenRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TunnelSettingsResponse'];
+        };
+      };
+    };
+  };
+  AdminSetPublicHostname: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetPublicHostnameRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['TunnelSettingsResponse'];
         };
       };
     };

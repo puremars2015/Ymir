@@ -1090,6 +1090,86 @@
         }
       }
     },
+    "/api/admin/settings/tunnel": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetTunnelSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TunnelSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/settings/tunnel/token": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSetTunnelToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTunnelTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TunnelSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/settings/tunnel/hostname": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSetPublicHostname",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPublicHostnameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TunnelSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/make-topics": {
       "get": {
         "tags": [
@@ -2274,6 +2354,34 @@
           }
         }
       },
+      "SetPublicHostnameRequest": {
+        "required": [
+          "hostname"
+        ],
+        "type": "object",
+        "properties": {
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SetTunnelTokenRequest": {
+        "required": [
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "TestOidcSettingsRequest": {
         "required": [
           "tenantId"
@@ -2281,6 +2389,55 @@
         "type": "object",
         "properties": {
           "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "TunnelSettingsResponse": {
+        "required": [
+          "publicEdgeEnabled",
+          "hostname",
+          "hostnameSource",
+          "managementAvailable",
+          "configured",
+          "active",
+          "tokenUpdatedAt",
+          "redirectUri"
+        ],
+        "type": "object",
+        "properties": {
+          "publicEdgeEnabled": {
+            "type": "boolean"
+          },
+          "hostname": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hostnameSource": {
+            "$ref": "#/components/schemas/OidcSettingsSource"
+          },
+          "managementAvailable": {
+            "type": "boolean"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "tokenUpdatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "redirectUri": {
             "type": [
               "null",
               "string"

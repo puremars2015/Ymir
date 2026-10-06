@@ -1,10 +1,10 @@
 using System.Net;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.HostFiltering;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Ymir.Edge;
@@ -37,7 +37,7 @@ public static class PublicEdgeExtensions
         }
 
         var hostname = options.PublicHostname?.Trim();
-        if (string.IsNullOrEmpty(hostname) || Uri.CheckHostName(hostname) != UriHostNameType.Dns)
+        if (!PublicEdgeHostnames.IsValid(hostname))
         {
             throw new InvalidOperationException("Ymir:PublicEdge:PublicHostname must be a DNS host name without scheme or port, e.g. ymir.example.com.");
         }
@@ -61,9 +61,9 @@ public static class PublicEdgeExtensions
             }
         });
 
-        // 預設的 HostFiltering middleware 讀取 AllowedHosts（appsettings 為 *）；對外時只接受公開主機名稱與本機（health check）。
-        services.PostConfigure<HostFilteringOptions>(filtering =>
-            filtering.AllowedHosts = [hostname, "localhost", "127.0.0.1", "[::1]"]);
+        // 對外網域可由管理介面修改（ADR-0010）：Host 限制改在 UsePublicEdge 的 middleware 每次讀目前值，
+        // 不再使用啟動時固定的 HostFilteringOptions。沒有覆寫時使用部署設定。
+        services.TryAddSingleton<IPublicHostnameSource, DeploymentPublicHostname>();
 
         services.AddHsts(hsts => hsts.MaxAge = TimeSpan.FromDays(180));
 
@@ -83,21 +83,34 @@ public static class PublicEdgeExtensions
         app.UseForwardedHeaders();
         app.UseHsts();
 
-        // health check 只給本機監控使用。Token 模式的 tunnel 由 Cloudflare dashboard 管理 ingress，無法保證有擋 /health，
-        // 因此在 API 端擋：經由公開網域進來的 /health、/alive 一律 404（ADR-0006）。
-        app.Use((context, next) =>
+        var source = app.Services.GetRequiredService<IPublicHostnameSource>();
+        app.Use(async (context, next) =>
         {
-            if (IsHealthPath(context.Request.Path)
-                && string.Equals(context.Request.Host.Host, options.PublicHostname, StringComparison.OrdinalIgnoreCase))
+            var publicHostname = await source.GetOverrideAsync(context.RequestAborted) ?? options.PublicHostname!;
+            var host = context.Request.Host.Host;
+
+            // 只接受公開網域與本機（health check、本機管理）；擋掉直接以其他網域（例如 *.trycloudflare.com）連進來的請求。
+            if (!string.Equals(host, publicHostname, StringComparison.OrdinalIgnoreCase) && !IsLocalHost(host))
             {
-                context.Response.StatusCode = StatusCodes.Status404NotFound;
-                return Task.CompletedTask;
+                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                return;
             }
 
-            return next(context);
+            // health check 只給本機監控使用。Token 模式的 tunnel 由 Cloudflare dashboard 管理 ingress，無法保證有擋 /health，
+            // 因此在 API 端擋：經由公開網域進來的 /health、/alive 一律 404（ADR-0006）。
+            if (IsHealthPath(context.Request.Path) && string.Equals(host, publicHostname, StringComparison.OrdinalIgnoreCase))
+            {
+                context.Response.StatusCode = StatusCodes.Status404NotFound;
+                return;
+            }
+
+            await next(context);
         });
         return app;
     }
+
+    private static bool IsLocalHost(string host) =>
+        host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || host is "127.0.0.1" or "[::1]" or "::1";
 
     private static bool IsHealthPath(PathString path) =>
         path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase)
