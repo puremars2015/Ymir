@@ -15,7 +15,8 @@ import {
   trendBars,
 } from '../../core/admin/admin-rules';
 import { ApiService, describeApiError } from '../../core/api/api.service';
-import { AdminOverview, RuntimeSummary } from '../../core/api/api-types';
+import { localToday, oidcWarnings } from '../../core/admin/oidc-settings-rules';
+import { AdminOverview, OidcSettings, RuntimeSummary } from '../../core/api/api-types';
 import { AdminTabs } from './admin-tabs';
 
 /** Admin 總覽（ADR-0010）：使用者、Agent 執行狀況、各使用者的執行環境。 */
@@ -32,6 +33,12 @@ import { AdminTabs } from './admin-tabs';
         </button>
       </header>
 
+      @for (warning of warnings(); track warning.message) {
+        <a class="warning" [attr.data-level]="warning.level" [routerLink]="warning.link">
+          <span aria-hidden="true">{{ warning.level === 'danger' ? '⛔' : '⚠️' }}</span>
+          {{ warning.message }}
+        </a>
+      }
       @if (message()) {
         <p class="muted" role="status">{{ message() }}</p>
       }
@@ -304,6 +311,20 @@ import { AdminTabs } from './admin-tabs';
       color: var(--danger);
       border-color: var(--danger);
     }
+    .warning {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.625rem 0.875rem;
+      border-radius: 0.625rem;
+      border: 1px solid #f59e0b;
+      background: rgb(245 158 11 / 10%);
+      color: var(--text);
+      text-decoration: none;
+    }
+    .warning[data-level='danger'] {
+      border-color: var(--danger);
+      background: rgb(220 38 38 / 10%);
+    }
     .actions {
       display: inline-flex;
       gap: 0.75rem;
@@ -316,6 +337,11 @@ export class OverviewPage implements OnInit {
   private readonly api = inject(ApiService);
 
   protected readonly overview = signal<AdminOverview | null>(null);
+  private readonly oidc = signal<OidcSettings | null>(null);
+  protected readonly warnings = computed(() => {
+    const oidc = this.oidc();
+    return oidc ? oidcWarnings(oidc, localToday()) : [];
+  });
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -334,6 +360,11 @@ export class OverviewPage implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    // 警告只是提示：讀不到設定時不影響總覽
+    this.api.adminGetOidcSettings().subscribe({
+      next: (settings) => this.oidc.set(settings),
+      error: () => this.oidc.set(null),
+    });
   }
 
   protected load(): void {
