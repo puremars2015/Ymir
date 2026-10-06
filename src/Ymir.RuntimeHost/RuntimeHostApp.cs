@@ -29,6 +29,9 @@ public static class RuntimeHostApp
         {
             if (endpoint.SocketPath is { } socketPath)
             {
+                // 正式環境由 systemd 的 RuntimeDirectory 建立目錄（權限 750）；開發時自動建立。
+                Directory.CreateDirectory(Path.GetDirectoryName(socketPath)!);
+
                 // 上一次程序結束時留下的 socket 檔會讓 bind 失敗。
                 if (File.Exists(socketPath))
                 {

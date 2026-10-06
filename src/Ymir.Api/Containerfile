@@ -1,0 +1,40 @@
+# Ymir API（含 Angular build）container image，ADR-0008。
+#   在 repo 根目錄建置：podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:dev .
+# API 在容器內不執行 Podman，也不掛載任何 container runtime socket：Agent runtime 由主機上的 runtime host 管理
+# （VibeMaker:Runtime:Provider=Remote），部署方式見 deploy/api/README.md。
+
+# ---- Angular ----
+FROM docker.io/library/node:24-bookworm-slim AS web
+WORKDIR /src/web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY web/ ./
+RUN npm run build
+
+# ---- .NET publish ----
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS api
+WORKDIR /src
+# .editorconfig 含分析器設定（警告視為錯誤），必須一起複製。
+COPY .editorconfig global.json nuget.config Directory.Build.props Directory.Packages.props ./
+COPY src/ src/
+RUN dotnet publish src/Ymir.Api/Ymir.Api.csproj -c Release -o /out /p:UseAppHost=false
+
+# ---- runtime ----
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+COPY --from=api /out ./
+COPY --from=web /src/web/dist/ymir-web/browser ./wwwroot
+
+# 預設值；連線字串、LiteLLM master key、runtime host token 等 secret 由部署環境傳入（deploy/api/.env），不放進 image。
+# 以 host network 執行：只綁主機的 127.0.0.1，外部只能經由 cloudflared 進來（ADR-0006）。
+ENV ASPNETCORE_ENVIRONMENT=Production \
+    ASPNETCORE_URLS=http://127.0.0.1:5080 \
+    ASPNETCORE_HTTP_PORTS= \
+    Ymir__Web__RootPath=/app/wwwroot \
+    Ymir__DataProtection__KeysPath=/var/lib/ymir/keys \
+    VibeMaker__Runtime__Provider=Remote \
+    VibeMaker__Runtime__Remote__Endpoint=unix:/run/ymir-runtime/runtime.sock
+
+# .NET image 內建的非 root 使用者（uid 1654）。
+USER $APP_UID
+ENTRYPOINT ["dotnet", "Ymir.Api.dll"]

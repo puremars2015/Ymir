@@ -1,0 +1,36 @@
+# Ymir runtime host（ADR-0008）：以 rootless Podman 的專用帳號 ymir 管理每位使用者的 Agent container。
+# 安裝步驟見同目錄 README.md。複製到 /etc/systemd/system/ymir-runtime-host.service。
+[Unit]
+Description=Ymir runtime host (per-user agent containers via rootless Podman)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ymir
+# socket 的 group：API 容器以這個 group 連線（socket 權限 660，目錄 750）。
+Group=ymir-runtime
+# 建立 /run/ymir-runtime（擁有者 ymir:ymir-runtime），socket 放在這裡；服務停止時自動清除。
+RuntimeDirectory=ymir-runtime
+RuntimeDirectoryMode=0750
+WorkingDirectory=/opt/ymir/runtime-host
+# Token、WorkspaceRoot、XDG_RUNTIME_DIR 等設定；權限 600，擁有者 root（systemd 以 root 讀取後再切換使用者）。
+EnvironmentFile=/etc/ymir/runtime-host.env
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+ExecStart=/usr/bin/dotnet /opt/ymir/runtime-host/Ymir.RuntimeHost.dll
+Restart=on-failure
+RestartSec=5
+# 停止時先讓 runtime host 結束執行中的 exec，再由 systemd 收尾；Agent container 本身不受影響（下次 EnsureRuntime 會沿用）。
+KillMode=mixed
+TimeoutStopSec=30
+
+# 沙箱：rootless Podman 需要 setuid 的 newuidmap 與 user namespace，所以不能開 NoNewPrivileges / PrivateUsers。
+# ReadWritePaths：使用者資料（WorkspaceRoot）與 ymir 自己的 Podman 儲存區（~/.local/share/containers）。
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/srv/ymir/workspaces /home/ymir
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

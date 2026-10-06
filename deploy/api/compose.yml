@@ -1,0 +1,27 @@
+# Ymir API container（ADR-0008）；步驟見同目錄 README.md。
+#   cd deploy/api && cp .env.example .env && docker compose up -d --build
+# Secret（連線字串、LiteLLM master key、runtime host token）只放在同目錄的 .env（.gitignore 已排除）。
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: src/Ymir.Api/Containerfile
+    image: localhost/ymir/api:dev
+    env_file: .env
+    # 只綁主機的 127.0.0.1:5080（ADR-0006）；cloudflared 從 loopback 連進來，X-Forwarded-* 的信任設定不變。
+    # 也讓 API 用 127.0.0.1 連到 SQL Server 與 LiteLLM。
+    network_mode: host
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,size=64m
+    # 讓容器內的使用者（uid 1654）屬於 socket 的 group（getent group ymir-runtime 查 gid）。
+    group_add:
+      - ${YMIR_RUNTIME_GID:?請在 deploy/api/.env 設定 YMIR_RUNTIME_GID}
+    volumes:
+      # 主機上唯一需要的兩個資料夾：runtime host 的 socket 目錄，以及 Data Protection 金鑰（登入 cookie 在重建後仍有效）。
+      # 不掛載任何 container runtime socket（podman.sock / docker.sock）或使用者 workspace。
+      - /run/ymir-runtime:/run/ymir-runtime
+      - ${YMIR_API_DATA:-/srv/ymir/api}/keys:/var/lib/ymir/keys
