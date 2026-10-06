@@ -16,7 +16,9 @@ const initialPassword = 'initial-password-123';
 const newPassword = 'my-own-password-456';
 
 // 1. 登入頁：企業帳號按鈕 + 帳號密碼
-const admin = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const admin = await (
+  await browser.newContext({ viewport: { width: 1280, height: 800 } })
+).newPage();
 await admin.goto(`${baseUrl}/login`);
 await admin.waitForSelector('a.sso');
 await admin.screenshot({ path: `${outDir}/01-login.png` });
@@ -36,6 +38,7 @@ step('signed in with the company account (OIDC) and returned to the app');
 
 // 3. 使用者管理：建立本機帳號
 await admin.click('.user a:has-text("管理")');
+await admin.click('app-admin-tabs a:has-text("使用者")');
 await admin.waitForSelector('app-users-page table');
 await admin.click('app-users-page header button');
 await admin.fill('input[name=account]', localAccount);
@@ -47,7 +50,9 @@ await admin.screenshot({ path: `${outDir}/03-admin-users.png` });
 step('admin created a local account');
 
 // 4. 本機帳號第一次登入 → 必須改密碼 → 進主畫面
-const local = await (await browser.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
+const local = await (
+  await browser.newContext({ viewport: { width: 1280, height: 800 } })
+).newPage();
 await local.goto(`${baseUrl}/login`);
 await local.fill('input[name=account]', localAccount);
 await local.fill('input[name=password]', initialPassword);

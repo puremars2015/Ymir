@@ -16,6 +16,15 @@ public interface IUserDirectory
     /// <summary>管理用列表（Admin，SA §4）：依名稱 / 帳號 / email 搜尋，依最後登入時間排序。</summary>
     Task<IReadOnlyList<User>> ListAsync(string? search, int take, CancellationToken cancellationToken);
 
+    /// <summary>依 id 批次取得使用者（稽核頁、總覽顯示名稱用）；找不到的 id 不會出現在結果中。</summary>
+    Task<IReadOnlyList<User>> FindManyAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
+
+    /// <summary>總覽統計（Admin 總覽，ADR-0010）。</summary>
+    Task<UserStatistics> GetStatisticsAsync(DateTimeOffset activeSince, CancellationToken cancellationToken);
+
     /// <summary>停用 / 啟用；找不到使用者時回傳 null。</summary>
     Task<User?> SetStatusAsync(Guid userId, UserStatus status, CancellationToken cancellationToken);
 }
+
+/// <param name="ActiveSince">在 activeSince 之後登入過的使用者數。</param>
+public sealed record UserStatistics(int Total, int Active, int Disabled, int Admins, int ActiveSince);
