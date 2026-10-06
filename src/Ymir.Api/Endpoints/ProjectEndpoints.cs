@@ -34,6 +34,12 @@ internal static class ProjectEndpoints
             .WithName("UpdateProject")
             .Produces<ProjectResponse>();
 
+        // 「刪除」= 封存專案與其對話；檔案保留在 runtime（ADR-0007）。
+        group.MapDelete("/{projectId:guid}", async Task<IResult> (Guid projectId, ProjectService service, CancellationToken ct) =>
+                ConversationEndpoints.ArchiveResult(await service.ArchiveAsync(projectId, ct), NotFound))
+            .WithName("ArchiveProject")
+            .Produces(StatusCodes.Status204NoContent);
+
         // 一個使用者一個 runtime：只查自己的，不接受任何 id。
         endpoints.MapGet("/api/runtime", (RuntimeQueryService service, CancellationToken ct) => service.GetCurrentAsync(ct))
             .WithName("GetRuntime")

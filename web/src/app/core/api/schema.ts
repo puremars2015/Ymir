@@ -190,7 +190,7 @@ export interface paths {
     get: operations['GetProject'];
     put?: never;
     post?: never;
-    delete?: never;
+    delete: operations['ArchiveProject'];
     options?: never;
     head?: never;
     patch: operations['UpdateProject'];
@@ -238,10 +238,10 @@ export interface paths {
     get: operations['GetConversation'];
     put?: never;
     post?: never;
-    delete?: never;
+    delete: operations['ArchiveConversation'];
     options?: never;
     head?: never;
-    patch?: never;
+    patch: operations['UpdateConversation'];
     trace?: never;
   };
   '/api/conversations/{conversationId}/files': {
@@ -629,6 +629,8 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+      /** Format: uuid */
+      activeExecutionId?: null | string;
     };
     CreateConversationRequest: {
       /** Format: uuid */
@@ -827,6 +829,9 @@ export interface components {
       /** Format: date-time */
       tokenUpdatedAt: null | string;
       redirectUri: null | string;
+    };
+    UpdateConversationRequest: {
+      title: null | string;
     };
     UpdateProjectRequest: {
       name: null | string;
@@ -1176,6 +1181,26 @@ export interface operations {
       };
     };
   };
+  ArchiveProject: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   UpdateProject: {
     parameters: {
       query?: never;
@@ -1302,6 +1327,52 @@ export interface operations {
       cookie?: never;
     };
     requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConversationResponse'];
+        };
+      };
+    };
+  };
+  ArchiveConversation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  UpdateConversation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateConversationRequest'];
+      };
+    };
     responses: {
       /** @description OK */
       200: {

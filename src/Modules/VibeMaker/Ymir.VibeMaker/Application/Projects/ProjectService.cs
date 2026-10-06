@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
+using Ymir.VibeMaker.Application.Conversations;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Contracts.Projects;
 using Ymir.VibeMaker.Domain;
@@ -40,7 +41,7 @@ public sealed class ProjectService(IVibeMakerDbContext db, ICurrentUser currentU
     {
         ArgumentNullException.ThrowIfNull(request);
         var userId = currentUser.UserId;
-        var project = await db.Projects.SingleOrDefaultAsync(p => p.Id == projectId && p.UserId == userId, cancellationToken).ConfigureAwait(false);
+        var project = await db.Projects.SingleOrDefaultAsync(p => p.Id == projectId && p.UserId == userId && p.Status == ProjectStatus.Active, cancellationToken).ConfigureAwait(false);
         if (project is null)
         {
             return null;
@@ -67,9 +68,39 @@ public sealed class ProjectService(IVibeMakerDbContext db, ICurrentUser currentU
     {
         var userId = currentUser.UserId;
         var project = await db.Projects.AsNoTracking()
-            .SingleOrDefaultAsync(p => p.Id == projectId && p.UserId == userId, cancellationToken)
+            .SingleOrDefaultAsync(p => p.Id == projectId && p.UserId == userId && p.Status == ProjectStatus.Active, cancellationToken)
             .ConfigureAwait(false);
         return project is null ? null : ToResponse(project);
+    }
+
+    /// <summary>封存（「刪除」）專案與其所有對話；任何一個對話還在執行時拒絕。檔案保留在 runtime 內（ADR-0007）。</summary>
+    public async Task<ArchiveOutcome> ArchiveAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        var userId = currentUser.UserId;
+        var project = await db.Projects.SingleOrDefaultAsync(p => p.Id == projectId && p.UserId == userId && p.Status == ProjectStatus.Active, cancellationToken).ConfigureAwait(false);
+        if (project is null)
+        {
+            return ArchiveOutcome.NotFound;
+        }
+
+        var conversations = await db.Conversations.Where(c => c.ProjectId == projectId && c.Status == ConversationStatus.Active).ToListAsync(cancellationToken).ConfigureAwait(false);
+        var ids = conversations.Select(c => c.Id).ToList();
+        if (await db.AgentExecutions.AnyAsync(e => ids.Contains(e.ConversationId) && (e.Status == ExecutionStatus.Queued || e.Status == ExecutionStatus.Running), cancellationToken).ConfigureAwait(false))
+        {
+            return ArchiveOutcome.ExecutionInProgress;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        project.Archive(now);
+        foreach (var conversation in conversations)
+        {
+            conversation.Archive(now);
+        }
+
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await auditLog.WriteAsync(new AuditEntry(currentUser.ActorName, "project.archive", "project", projectId.ToString("D"), AuditResult.Success, now, null), cancellationToken)
+            .ConfigureAwait(false);
+        return ArchiveOutcome.Archived;
     }
 
     private static ProjectResponse ToResponse(Project p) => new(p.Id, p.Name, p.SystemPrompt, SaValues.Of(p.Status), p.CreatedAt, p.UpdatedAt);
