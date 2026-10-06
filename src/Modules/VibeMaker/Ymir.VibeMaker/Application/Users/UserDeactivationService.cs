@@ -17,6 +17,7 @@ public sealed class UserDeactivationService(
     ExecutionService executions,
     RuntimeCredentialService credentials,
     IAgentRuntimeManager runtimes,
+    TimeProvider timeProvider,
     ILogger<UserDeactivationService> logger)
 {
     public async Task DeactivateAsync(Guid userId, string actor, CancellationToken cancellationToken)
@@ -43,20 +44,21 @@ public sealed class UserDeactivationService(
 
         try
         {
-            var runtime = await db.AgentRuntimes.AsNoTracking()
-                .Where(r => r.UserId == userId && r.Status != RuntimeStatus.Deleted)
-                .Select(r => (Guid?)r.Id)
-                .FirstOrDefaultAsync(cancellationToken)
+            var record = await db.AgentRuntimes
+                .FirstOrDefaultAsync(r => r.UserId == userId && r.Status != RuntimeStatus.Deleted, cancellationToken)
                 .ConfigureAwait(false);
-            if (runtime is { } runtimeId)
+            if (record is not null)
             {
-                await runtimes.StopAsync(runtimeId, cancellationToken).ConfigureAwait(false);
+                // 以 user id 停止，服務重新啟動後也有效（runtime id 只存在於 manager 記憶體）。
+                await runtimes.StopForUserAsync(userId, cancellationToken).ConfigureAwait(false);
+                record.MarkStatus(RuntimeStatus.Stopped, timeProvider.GetUtcNow());
+                await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            // runtime manager 重新啟動後不認得舊的 runtime id 時也會到這裡；container 之後由 idle stop 處理（Sprint 4）。
+            // runtime host 暫時無法連線等；container 之後仍會由閒置停止處理。
             logger.LogWarning(ex, "Failed to stop runtime for disabled user {UserId}", userId);
         }
     }

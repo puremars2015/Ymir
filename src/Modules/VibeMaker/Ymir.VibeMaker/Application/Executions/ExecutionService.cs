@@ -22,6 +22,7 @@ public sealed class ExecutionService(
     IAuditLog auditLog,
     ModelCatalog models,
     MakeTopicService makeTopics,
+    Runtime.RuntimePolicyService policies,
     TimeProvider timeProvider)
 {
     public static string EventStreamUrl(Guid executionId) => $"/api/executions/{executionId}/events";
@@ -87,6 +88,11 @@ public sealed class ExecutionService(
         }
 
         var now = timeProvider.GetUtcNow();
+        if (await CheckQuotaAsync(userId, now, cancellationToken).ConfigureAwait(false) is { } quota)
+        {
+            return quota;
+        }
+
         var nextSequence = await db.Messages.Where(m => m.ConversationId == conversationId)
             .MaxAsync(m => (long?)m.SequenceNo, cancellationToken).ConfigureAwait(false) ?? 0;
         var message = Message.CreateUser(conversationId, request.Content, nextSequence + 1, now);
@@ -213,6 +219,34 @@ public sealed class ExecutionService(
             : SubmitMessageResult.Accept(new SendMessageResponse(existing.UserMessageId, existing.Id, EventStreamUrl(existing.Id)));
     }
 
+    /// <summary>
+    /// 每人配額（ADR-0011）：排隊 + 執行中的數量與過去 24 小時的執行次數。先查再寫，同時送出時可能略為超過；
+    /// 這是防止濫用的軟性上限，不像「同對話單一執行中」需要資料庫保證（那仍由 filtered unique index 處理）。
+    /// </summary>
+    private async Task<SubmitMessageResult?> CheckQuotaAsync(Guid userId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var policy = await policies.GetAsync(cancellationToken).ConfigureAwait(false);
+        var pending = await db.AgentExecutions.CountAsync(
+            e => e.UserId == userId && (e.Status == ExecutionStatus.Queued || e.Status == ExecutionStatus.Running),
+            cancellationToken).ConfigureAwait(false);
+        if (pending >= policy.MaxPendingExecutionsPerUser)
+        {
+            return SubmitMessageResult.QuotaExceeded($"排隊中的工作已達上限（{policy.MaxPendingExecutionsPerUser} 個），請等待完成後再送出。");
+        }
+
+        if (policy.DailyExecutionLimit > 0)
+        {
+            var since = now.AddDays(-1);
+            var recent = await db.AgentExecutions.CountAsync(e => e.UserId == userId && e.CreatedAt > since, cancellationToken).ConfigureAwait(false);
+            if (recent >= policy.DailyExecutionLimit)
+            {
+                return SubmitMessageResult.QuotaExceeded($"已達每日執行次數上限（24 小時內 {policy.DailyExecutionLimit} 次），請稍後再試或聯絡管理員。");
+            }
+        }
+
+        return null;
+    }
+
     private void DetachAll()
     {
         if (db is DbContext context)
@@ -222,7 +256,8 @@ public sealed class ExecutionService(
     }
 }
 
-public sealed record SubmitMessageResult(SubmitMessageOutcome Outcome, SendMessageResponse? Response)
+/// <param name="Message">給使用者看的原因（目前只有配額使用）。</param>
+public sealed record SubmitMessageResult(SubmitMessageOutcome Outcome, SendMessageResponse? Response, string? Message = null)
 {
     public static readonly SubmitMessageResult NotFound = new(SubmitMessageOutcome.NotFound, null);
     public static readonly SubmitMessageResult Conflict = new(SubmitMessageOutcome.Conflict, null);
@@ -230,6 +265,8 @@ public sealed record SubmitMessageResult(SubmitMessageOutcome Outcome, SendMessa
     public static readonly SubmitMessageResult ModelNotAvailable = new(SubmitMessageOutcome.ModelNotAvailable, null);
     public static readonly SubmitMessageResult MakeTopicNotAvailable = new(SubmitMessageOutcome.MakeTopicNotAvailable, null);
     public static readonly SubmitMessageResult MakeDescriptionRequired = new(SubmitMessageOutcome.MakeDescriptionRequired, null);
+
+    public static SubmitMessageResult QuotaExceeded(string message) => new(SubmitMessageOutcome.QuotaExceeded, null, message);
 
     public static SubmitMessageResult Accept(SendMessageResponse response) => new(SubmitMessageOutcome.Accepted, response);
 }
@@ -243,4 +280,5 @@ public enum SubmitMessageOutcome
     ModelNotAvailable = 4,
     MakeTopicNotAvailable = 5,
     MakeDescriptionRequired = 6,
+    QuotaExceeded = 7,
 }

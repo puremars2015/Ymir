@@ -20,10 +20,9 @@ internal static class RuntimeEndpoints
         runtime.MapPost("/", async (Guid userId, RuntimeRegistry registry, CancellationToken cancellationToken) =>
             Results.Ok(RuntimeInfoMessage.From(await registry.EnsureAsync(userId, cancellationToken))));
 
+        // 查詢與停止以 user id 直接操作 container，不依賴 registry：runtime host 重新啟動後仍可停止既有的 container。
         runtime.MapGet("/", async (Guid userId, RuntimeRegistry registry, CancellationToken cancellationToken) =>
-            registry.Find(userId) is { } runtimeId
-                ? Results.Ok(RuntimeInfoMessage.From(await registry.Manager.GetStatusAsync(runtimeId, cancellationToken)))
-                : Results.NotFound());
+            Results.Ok(new RuntimeStateMessage(await registry.Manager.GetStatusForUserAsync(userId, cancellationToken))));
 
         runtime.MapPost("/start", async (Guid userId, RuntimeRegistry registry, CancellationToken cancellationToken) =>
         {
@@ -37,15 +36,7 @@ internal static class RuntimeEndpoints
         });
 
         runtime.MapPost("/stop", async (Guid userId, RuntimeRegistry registry, CancellationToken cancellationToken) =>
-        {
-            if (registry.Find(userId) is not { } runtimeId)
-            {
-                return Results.NotFound();
-            }
-
-            await registry.Manager.StopAsync(runtimeId, cancellationToken);
-            return Results.Ok(RuntimeInfoMessage.From(await registry.Manager.GetStatusAsync(runtimeId, cancellationToken)));
-        });
+            await registry.Manager.StopForUserAsync(userId, cancellationToken) ? Results.NoContent() : Results.NotFound());
 
         runtime.MapDelete("/", async (Guid userId, RuntimeRegistry registry, CancellationToken cancellationToken) =>
         {

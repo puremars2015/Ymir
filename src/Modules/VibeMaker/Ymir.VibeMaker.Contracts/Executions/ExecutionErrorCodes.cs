@@ -19,4 +19,7 @@ public static class ExecutionErrorCodes
     /// <summary>只送了 <c>/make</c>：前端應顯示主題按鈕，不會送出。</summary>
     public const string MakeDescriptionRequired = "MAKE_DESCRIPTION_REQUIRED";
     public const string ExecutionCancelled = "EXECUTION_CANCELLED";
+
+    /// <summary>超過每人配額（排隊上限或每日次數，ADR-0011）；HTTP 429。</summary>
+    public const string QuotaExceeded = "QUOTA_EXCEEDED";
 }

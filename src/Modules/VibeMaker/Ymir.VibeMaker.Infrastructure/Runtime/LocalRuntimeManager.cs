@@ -48,6 +48,13 @@ internal sealed class LocalRuntimeManager : IAgentRuntimeManager
 
     public Task<RuntimeInfo> GetStatusAsync(Guid runtimeId, CancellationToken cancellationToken) => Task.FromResult(Find(runtimeId));
 
+    public Task<RuntimeStatus> GetStatusForUserAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult(_runtimesByUser.ContainsKey(userId) ? RuntimeStatus.Running : RuntimeStatus.NotCreated);
+
+    /// <summary>本機沒有 container 可停止；移除記錄，下一次 EnsureRuntime 重新建立（等同重新啟動）。</summary>
+    public Task<bool> StopForUserAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult(_runtimesByUser.TryRemove(userId, out _));
+
     public Task<IRuntimeProcess> StartProcessAsync(Guid runtimeId, RuntimeProcessSpec spec, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

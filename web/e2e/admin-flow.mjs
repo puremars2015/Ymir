@@ -1,4 +1,4 @@
-// 管理介面的端對端驗證（ADR-0010）：總覽、停止執行環境、稽核紀錄、系統設定（Entra ID）。
+// 管理介面的端對端驗證（ADR-0010、ADR-0011）：總覽、停止執行環境、稽核紀錄、系統設定（Entra ID、Tunnel、執行政策）、用量。
 // 前置：SQL Server、Fake LLM、Fake OIDC（dotnet run --project tests/Ymir.Testing.FakeOidc）都已啟動；
 //       API 以 VibeMaker__Harness=Pi、Ymir__Auth__Oidc__AuthorityHost=http://127.0.0.1:5299 啟動（不設定 Ymir__Auth__Oidc__Authority，
 //       Entra 由管理介面設定）；ng serve。
@@ -177,5 +177,35 @@ await tunnelCard.locator('input[name=hostname]').fill('');
 await tunnelCard.locator('button:has-text("儲存網域")').click();
 await tunnelCard.locator('[role=status]:has-text("已還原")').waitFor();
 step('tunnel card: unavailable without runtime host; public hostname set and reset');
+
+// 11. 執行政策：每日上限設為 1 → 已執行過一次的使用者再送出會被拒絕（429），不必重啟
+const runtimeCard = admin.locator('app-runtime-settings-card');
+await runtimeCard.locator('.summary:has-text("閒置")').waitFor();
+await runtimeCard.locator('input[name=executionTimeoutMinutes]').fill('0');
+await runtimeCard.locator('text=單次執行上限必須是').waitFor();
+await runtimeCard.locator('input[name=executionTimeoutMinutes]').fill('20');
+await runtimeCard.locator('input[name=idleTimeoutMinutes]').fill('45');
+await runtimeCard.locator('input[name=dailyExecutionLimit]').fill('1');
+await runtimeCard.locator('button:has-text("儲存")').click();
+await runtimeCard.locator('[role=status]:has-text("立即生效")').waitFor();
+await runtimeCard.locator('.summary:has-text("每日 1 次")').waitFor();
+await runtimeCard.screenshot({ path: `${outDir}/06-settings-runtime.png` });
+await worker.fill('app-composer textarea', '再做一次');
+await worker.press('app-composer textarea', 'Enter');
+await worker.waitForSelector('.composer-area .error:has-text("每日執行次數上限")');
+await worker.screenshot({ path: `${outDir}/07-quota-exceeded.png` });
+step('runtime policy saved; daily limit rejects the next message without a restart');
+
+// 12. 用量：使用者的執行次數，24 小時次數標示已達上限；之後還原執行政策
+await admin.click('app-admin-tabs a:has-text("用量")');
+const workerRow = admin.locator(`app-usage-page tr:has-text("${workerAccount}")`);
+await workerRow.locator('.quota[data-level="reached"]').waitFor();
+await admin.selectOption('app-usage-page select[name=days]', { label: '近 30 天' });
+await workerRow.waitFor();
+await admin.screenshot({ path: `${outDir}/08-usage.png`, fullPage: true });
+await admin.click('app-admin-tabs a:has-text("系統設定")');
+await admin.locator('app-runtime-settings-card button:has-text("還原為部署設定")').click();
+await admin.locator('app-runtime-settings-card [role=status]:has-text("已還原")').waitFor();
+step('usage page shows the worker at the daily limit; policy reset to deployment');
 
 await browser.close();

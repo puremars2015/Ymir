@@ -47,8 +47,23 @@ public interface IExecutionCancellationRegistry
     bool TryCancel(Guid executionId);
 }
 
-/// <summary>設定：單次 Agent execution 的逾時（SA §17 <c>Runtime:ExecutionTimeoutMinutes</c>）。</summary>
+/// <summary>
+/// 部署設定的執行政策預設值（<c>VibeMaker:Runtime:*</c>，SA §17）。管理介面儲存的值優先（<see cref="Runtime.RuntimePolicyService"/>，ADR-0011）。
+/// </summary>
 public sealed class ExecutionOptions
 {
+    /// <summary>單次 Agent execution 的逾時（<c>ExecutionTimeoutMinutes</c>）。</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(30);
+
+    /// <summary>沒有 execution 多久後停止 runtime（<c>IdleTimeoutMinutes</c>）；<see cref="TimeSpan.Zero"/> 表示不自動停止。</summary>
+    public TimeSpan IdleTimeout { get; set; } = TimeSpan.FromMinutes(30);
+
+    /// <summary>每位使用者同時排隊 + 執行中的 execution 上限（<c>MaxPendingExecutionsPerUser</c>）。</summary>
+    public int MaxPendingExecutionsPerUser { get; set; } = 5;
+
+    /// <summary>每位使用者過去 24 小時可建立的 execution 數（<c>DailyExecutionLimit</c>）；0 表示不限制。</summary>
+    public int DailyExecutionLimit { get; set; }
+
+    /// <summary>閒置檢查的間隔（<c>IdleCheckIntervalSeconds</c>，測試可調短）。</summary>
+    public TimeSpan IdleCheckInterval { get; set; } = TimeSpan.FromMinutes(1);
 }

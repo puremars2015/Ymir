@@ -50,6 +50,24 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
     }
 
     [Fact]
+    public async Task StatusAndStop_WorkByUserId_EvenFromAFreshApiInstance()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        await fixture.RuntimeManager.EnsureRuntimeAsync(userId, ct);
+
+        // API 重新啟動後的 manager 不認得任何 runtime id（ADR-0011）：查詢與停止只用 user id
+        using var restarted = fixture.CreateManager(RuntimeHostFixture.Token);
+        Assert.Equal(VibeMaker.Domain.RuntimeStatus.Running, await restarted.GetStatusForUserAsync(userId, ct));
+        Assert.True(await restarted.StopForUserAsync(userId, ct));
+        Assert.Equal(VibeMaker.Domain.RuntimeStatus.NotCreated, await restarted.GetStatusForUserAsync(userId, ct));
+
+        var unknown = Guid.NewGuid();
+        Assert.Equal(VibeMaker.Domain.RuntimeStatus.NotCreated, await restarted.GetStatusForUserAsync(unknown, ct));
+        Assert.False(await restarted.StopForUserAsync(unknown, ct));
+    }
+
+    [Fact]
     public async Task Process_StreamsStdinToStdout_AndReturnsExitCode()
     {
         var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);

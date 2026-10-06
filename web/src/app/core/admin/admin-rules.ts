@@ -21,6 +21,9 @@ export const canStopRuntime = (status: RuntimeState): boolean =>
   status === 'Running' || status === 'Busy' || status === 'Created';
 
 const ACTION_LABELS: Record<string, string> = {
+  'runtime.idle_stop': '閒置自動停止執行環境',
+  'admin.settings.runtime.update': '修改執行政策',
+  'admin.settings.runtime.reset': '還原執行政策',
   'auth.login': '開發登入',
   'auth.login.oidc': '企業帳號登入',
   'auth.login.password': '帳號密碼登入',

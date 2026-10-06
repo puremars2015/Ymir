@@ -179,6 +179,12 @@ internal sealed record RuntimeInfoMessage(
     public RuntimeInfo ToRuntimeInfo() => new(RuntimeId, UserId, Provider, ProviderRuntimeId, ImageVersion, Status);
 }
 
+/// <summary>
+/// <c>GET /v1/users/{userId}/runtime</c> 的回應：以 user id 查到的實際狀態（沒有 runtime 時為 NotCreated）。
+/// 不依賴 runtime host 記憶體中的 runtime id，兩邊服務重新啟動後仍能查詢與停止。
+/// </summary>
+internal sealed record RuntimeStateMessage(RuntimeStatus Status);
+
 /// <summary>WebSocket 的第一個訊息（text frame）：要啟動的程序。</summary>
 internal sealed record ProcessStartMessage(
     string Executable,

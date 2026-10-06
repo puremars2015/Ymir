@@ -14,6 +14,7 @@
 | [0008](0008-containerized-api-runtime-host.md) | API 放進容器，Agent runtime 由主機上的 runtime host 管理 | 已採納 |
 | [0009](0009-entra-id-and-local-accounts.md) | 企業帳號（Entra ID OIDC）與本機帳號密碼登入 | 已採納 |
 | [0010](0010-admin-editable-system-settings.md) | 管理介面與可由網頁修改的系統設定（Entra ID、Cloudflare Tunnel） | 已採納 |
+| [0011](0011-runtime-lifecycle-policy.md) | Runtime 生命週期與執行政策（閒置停止、對帳、配額、用量） | 已採納 |
 
 新增 ADR 時複製以下格式：
 

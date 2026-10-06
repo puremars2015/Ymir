@@ -87,15 +87,52 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
     {
         var runtime = Find(runtimeId);
         var state = await InspectAsync(runtime.UserId, cancellationToken).ConfigureAwait(false);
-        var status = state switch
+        return runtime with { Status = StatusOf(state) };
+    }
+
+    private static RuntimeStatus StatusOf(string? state) => state switch
+    {
+        null => RuntimeStatus.NotCreated,
+        "running" => RuntimeStatus.Running,
+        "created" => RuntimeStatus.Created,
+        "exited" or "stopped" => RuntimeStatus.Stopped,
+        _ => RuntimeStatus.Error,
+    };
+
+    public async Task<RuntimeStatus> GetStatusForUserAsync(Guid userId, CancellationToken cancellationToken) =>
+        StatusOf(await InspectAsync(userId, cancellationToken).ConfigureAwait(false));
+
+    public async Task<bool> StopForUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        // 與 EnsureRuntime 共用同一個 lock，避免停止到剛啟動、正要執行程序的 container。
+        var userLock = _userLocks.GetOrAdd(userId, _ => new SemaphoreSlim(1, 1));
+        await userLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            null => RuntimeStatus.NotCreated,
-            "running" => RuntimeStatus.Running,
-            "created" => RuntimeStatus.Created,
-            "exited" or "stopped" => RuntimeStatus.Stopped,
-            _ => RuntimeStatus.Error,
-        };
-        return runtime with { Status = status };
+            var state = await InspectAsync(userId, cancellationToken).ConfigureAwait(false);
+            if (state is null)
+            {
+                _runtimesByUser.TryRemove(userId, out _);
+                return false;
+            }
+
+            if (state == "running")
+            {
+                await RunContainerCliAsync(ContainerCommandBuilder.BuildStopArguments(userId), cancellationToken).ConfigureAwait(false);
+                logger.LogInformation("Stopped runtime container for user {UserId}", userId);
+            }
+
+            if (_runtimesByUser.TryGetValue(userId, out var known))
+            {
+                _runtimesByUser[userId] = known with { Status = RuntimeStatus.Stopped };
+            }
+
+            return true;
+        }
+        finally
+        {
+            userLock.Release();
+        }
     }
 
     public async Task<IRuntimeProcess> StartProcessAsync(Guid runtimeId, RuntimeProcessSpec spec, CancellationToken cancellationToken)

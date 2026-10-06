@@ -51,6 +51,13 @@ public sealed class AgentRuntimeRecord
         UpdatedAt = now;
     }
 
+    /// <summary>使用者活動（execution 結束）：閒置停止以此計時。</summary>
+    public void MarkActive(DateTimeOffset now)
+    {
+        LastActiveAt = now;
+        UpdatedAt = now;
+    }
+
     /// <summary>只更新狀態（例如 Admin 手動停止），不視為使用者活動。</summary>
     public void MarkStatus(RuntimeStatus status, DateTimeOffset now)
     {
