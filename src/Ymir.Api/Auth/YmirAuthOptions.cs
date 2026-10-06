@@ -29,6 +29,12 @@ public sealed class OidcLoginOptions
     /// </summary>
     public string SubjectClaim { get; set; } = "oid";
 
+    /// <summary>
+    /// 管理介面設定 Entra 時，authority 由此 host 與 Tenant ID 組成（ADR-0010）；只能在部署設定修改。
+    /// Development 可設成 Fake OIDC 的 loopback http。
+    /// </summary>
+    public string AuthorityHost { get; set; } = "https://login.microsoftonline.com";
+
     /// <summary>登入按鈕上的名稱。</summary>
     public string DisplayName { get; set; } = "公司帳號";
 

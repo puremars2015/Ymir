@@ -32,11 +32,9 @@ await page.fill(composer, '/');
 await page.waitForSelector('app-composer .make-hint');
 await page.screenshot({ path: `${outDir}/01-make-hint.png` });
 await page.click('app-composer .make-hint');
-await page.waitForFunction(
-  (sel) => document.querySelector(sel)?.value === '/make ',
-  composer,
-  { timeout: 5000 },
-);
+await page.waitForFunction((sel) => document.querySelector(sel)?.value === '/make ', composer, {
+  timeout: 5000,
+});
 step('typing "/" shows the /make hint');
 
 // 3. 只送出 /make → 顯示主題按鈕（預設兩個），不送給 Agent
@@ -77,7 +75,7 @@ step('"/make 一個計算機" sent and answered');
 // 6. Admin 新增主題 → 對話輸入框出現第三個按鈕
 const topicName = `資料報表-${Date.now() % 100000}`;
 await page.click('.user a:has-text("管理")');
-await page.waitForURL(/\/admin\/users/);
+await page.waitForURL(/\/admin$/);
 await page.click('app-admin-tabs a:has-text("Make 主題")');
 await page.waitForURL(/\/admin\/make-topics/);
 await page.waitForSelector('app-make-topics-page li.topic:has-text("小工具架設")');

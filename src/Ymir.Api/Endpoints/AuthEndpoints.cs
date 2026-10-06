@@ -23,10 +23,10 @@ internal static class AuthEndpoints
         endpoints.MapPost("/api/auth/logout", LogoutAsync).WithName("Logout").WithTags("Auth").RequireAntiforgeryHeader().Produces(StatusCodes.Status204NoContent);
 
         // 登入頁依此顯示可用的登入方式（ADR-0009）。
-        endpoints.MapGet("/api/auth/providers", GetProviders).WithName("GetLoginProviders").WithTags("Auth").AllowAnonymous().Produces<LoginProvidersResponse>();
+        endpoints.MapGet("/api/auth/providers", GetProvidersAsync).WithName("GetLoginProviders").WithTags("Auth").AllowAnonymous().Produces<LoginProvidersResponse>();
 
         // 企業帳號：整頁導向（不是 XHR），由後端完成 OIDC（ADR-0002、ADR-0009）。
-        endpoints.MapGet("/api/auth/login", ChallengeOidc).WithName("LoginWithOidc").WithTags("Auth").AllowAnonymous()
+        endpoints.MapGet("/api/auth/login", ChallengeOidcAsync).WithName("LoginWithOidc").WithTags("Auth").AllowAnonymous()
             .Produces(StatusCodes.Status302Found).Produces(StatusCodes.Status404NotFound).ExcludeFromDescription();
 
         endpoints.MapPost("/api/auth/password-login", PasswordLoginAsync).WithName("PasswordLogin").WithTags("Auth").AllowAnonymous()
@@ -56,19 +56,19 @@ internal static class AuthEndpoints
         return TypedResults.Ok(MeResponse.From(user, local?.MustChangePassword ?? false));
     }
 
-    private static LoginProvidersResponse GetProviders(IOptions<YmirAuthOptions> options, IHostEnvironment environment)
+    private static async Task<LoginProvidersResponse> GetProvidersAsync(IOptions<YmirAuthOptions> options, OidcSettingsProvider oidc, IHostEnvironment environment, CancellationToken cancellationToken)
     {
-        var auth = options.Value;
+        var settings = await oidc.GetAsync(cancellationToken);
         return new LoginProvidersResponse(
-            auth.Oidc.IsConfigured,
-            auth.Oidc.IsConfigured ? auth.Oidc.DisplayName : null,
-            auth.LocalAccounts.Enabled,
+            settings.IsConfigured,
+            settings.IsConfigured ? settings.DisplayName : null,
+            options.Value.LocalAccounts.Enabled,
             environment.IsDevelopment());
     }
 
-    private static IResult ChallengeOidc(string? returnUrl, IOptions<YmirAuthOptions> options)
+    private static async Task<IResult> ChallengeOidcAsync(string? returnUrl, OidcSettingsProvider oidc, CancellationToken cancellationToken)
     {
-        if (!options.Value.Oidc.IsConfigured)
+        if (!(await oidc.GetAsync(cancellationToken)).IsConfigured)
         {
             return ApiProblem.Create(StatusCodes.Status404NotFound, "OIDC_NOT_CONFIGURED", "未設定企業帳號登入。");
         }

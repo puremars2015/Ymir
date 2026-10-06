@@ -7,12 +7,15 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   imports: [RouterLink, RouterLinkActive],
   template: `
     <nav class="tabs" aria-label="管理">
-      <a routerLink="/admin/users" routerLinkActive="active" ariaCurrentWhenActive="page"
-        >使用者管理</a
-      >
-      <a routerLink="/admin/make-topics" routerLinkActive="active" ariaCurrentWhenActive="page"
-        >Make 主題</a
-      >
+      @for (tab of tabs; track tab.path) {
+        <a
+          [routerLink]="tab.path"
+          routerLinkActive="active"
+          [routerLinkActiveOptions]="{ exact: tab.exact }"
+          ariaCurrentWhenActive="page"
+          >{{ tab.label }}</a
+        >
+      }
     </nav>
   `,
   styles: `
@@ -20,6 +23,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       display: flex;
       gap: 0.25rem;
       border-bottom: 1px solid var(--border);
+      overflow-x: auto;
     }
     a {
       padding: 0.5rem 0.875rem;
@@ -27,6 +31,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       text-decoration: none;
       border-bottom: 2px solid transparent;
       margin-bottom: -1px;
+      white-space: nowrap;
     }
     a.active {
       color: var(--text);
@@ -36,4 +41,12 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AdminTabs {}
+export class AdminTabs {
+  protected readonly tabs = [
+    { path: '/admin', label: '總覽', exact: true },
+    { path: '/admin/users', label: '使用者', exact: false },
+    { path: '/admin/make-topics', label: 'Make 主題', exact: false },
+    { path: '/admin/settings', label: '系統設定', exact: false },
+    { path: '/admin/audit', label: '稽核紀錄', exact: false },
+  ];
+}

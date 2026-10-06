@@ -51,8 +51,8 @@ export class Shell implements OnInit {
     { initialValue: this.router.url },
   );
 
-  /** 管理區有多個分頁（使用者、Make 主題），任何一頁都標示「管理」。 */
-  protected readonly adminActive = computed(() => this.url().startsWith('/admin/'));
+  /** 管理區有多個分頁，任何一頁都標示「管理」。 */
+  protected readonly adminActive = computed(() => /^\/admin(\/|\?|$)/.test(this.url()));
 
   /** 目前所在的專案：專案頁本身，或所開啟對話的專案（自動展開）。 */
   private readonly activeProjectId = computed(() => {

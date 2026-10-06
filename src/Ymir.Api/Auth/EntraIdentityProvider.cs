@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Microsoft.Extensions.Options;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Users;
 
@@ -9,9 +8,10 @@ namespace Ymir.Api.Auth;
 /// Entra ID（OIDC id_token）→ <see cref="ExternalIdentity"/>（ADR-0009）。claims 保留原始名稱（<c>MapInboundClaims=false</c>）：
 /// <c>iss</c> 含 tenant，<c>oid</c> 是使用者在 tenant 內不變的識別；帳號名稱（UPN）可能更名，只用於顯示。
 /// </summary>
-public sealed class EntraIdentityProvider(IOptions<YmirAuthOptions> options) : IIdentityProvider
+public sealed class EntraIdentityProvider(IOidcSettingsSource settings) : IIdentityProvider
 {
-    private readonly OidcLoginOptions _options = options.Value.Oidc;
+    // 每次讀目前生效的設定：Admin 在管理介面改了角色名稱，下一次登入就生效（ADR-0010）。
+    private EffectiveOidcSettings _options => settings.Current;
 
     public ExternalIdentity? Resolve(ClaimsPrincipal principal)
     {

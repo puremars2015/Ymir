@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Ymir.Platform.Settings;
 using Ymir.Platform.Users;
 
 namespace Ymir.Platform.Infrastructure.Persistence;
@@ -13,6 +14,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<LocalCredential> LocalCredentials => Set<LocalCredential>();
 
     internal DbSet<AuditLogRecord> AuditLog => Set<AuditLogRecord>();
+
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -56,6 +59,18 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             audit.Property(a => a.CorrelationId).HasMaxLength(100);
             audit.HasIndex(a => a.Timestamp);
             audit.HasIndex(a => new { a.TargetType, a.TargetId });
+            // 稽核頁依動作前綴與操作者篩選（ADR-0010）
+            audit.HasIndex(a => a.Action);
+            audit.HasIndex(a => a.Actor);
+        });
+
+        modelBuilder.Entity<SystemSetting>(setting =>
+        {
+            setting.ToTable("system_settings");
+            setting.HasKey(s => s.Key);
+            setting.Property(s => s.Key).HasMaxLength(SystemSetting.KeyMaxLength);
+            setting.Property(s => s.Value).HasMaxLength(SystemSetting.ValueMaxLength).IsRequired();
+            setting.Property(s => s.UpdatedBy).HasMaxLength(200).IsRequired();
         });
 
         modelBuilder.ApplySnakeCaseNames();

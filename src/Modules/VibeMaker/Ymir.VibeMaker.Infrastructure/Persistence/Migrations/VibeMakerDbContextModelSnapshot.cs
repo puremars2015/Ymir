@@ -104,6 +104,9 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ux_agent_executions_active_per_conversation")
                         .HasFilter("[status] IN ('QUEUED', 'RUNNING')");
 
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_agent_executions_created_at");
+
                     b.HasIndex("Status")
                         .HasDatabaseName("ix_agent_executions_status");
 

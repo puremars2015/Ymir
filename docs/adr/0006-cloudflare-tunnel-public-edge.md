@@ -1,6 +1,6 @@
 # ADR-0006：以 Cloudflare Tunnel 作為 Ymir 平台的對外入口
 
-- 狀態：已採納
+- 狀態：已採納（第 4 點的 tunnel 憑證存放位置由 [ADR-0010](0010-admin-editable-system-settings.md) 修訂）
 - 日期：2026-10-04
 
 ## 背景

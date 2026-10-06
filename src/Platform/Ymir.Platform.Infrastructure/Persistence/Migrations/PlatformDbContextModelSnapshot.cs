@@ -74,6 +74,12 @@ namespace Ymir.Platform.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_audit_log");
 
+                    b.HasIndex("Action")
+                        .HasDatabaseName("ix_audit_log_action");
+
+                    b.HasIndex("Actor")
+                        .HasDatabaseName("ix_audit_log_actor");
+
                     b.HasIndex("Timestamp")
                         .HasDatabaseName("ix_audit_log_timestamp");
 
@@ -81,6 +87,39 @@ namespace Ymir.Platform.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_audit_log_target_type_target_id");
 
                     b.ToTable("audit_log", "platform");
+                });
+
+            modelBuilder.Entity("Ymir.Platform.Settings.SystemSetting", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("key");
+
+                    b.Property<bool>("IsSecret")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_secret");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("updated_by");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(8000)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("value");
+
+                    b.HasKey("Key")
+                        .HasName("pk_system_settings");
+
+                    b.ToTable("system_settings", "platform");
                 });
 
             modelBuilder.Entity("Ymir.Platform.Users.LocalCredential", b =>

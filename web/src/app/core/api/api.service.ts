@@ -3,6 +3,11 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AdminMakeTopic,
+  AdminOverview,
+  AuditLogPage,
+  OidcSettings,
+  OidcTestResult,
+  SaveOidcSettingsRequest,
   AdminUser,
   ApiProblem,
   CancelExecutionResponse,
@@ -68,6 +73,36 @@ export class ApiService {
 
   adminDeleteMakeTopic(topicId: string): Observable<void> {
     return this.http.delete<void>(`/api/admin/make-topics/${topicId}`);
+  }
+
+  adminOverview(utcOffsetMinutes: number): Observable<AdminOverview> {
+    return this.http.get<AdminOverview>('/api/admin/overview', {
+      params: { utcOffsetMinutes },
+    });
+  }
+
+  adminStopRuntime(userId: string): Observable<void> {
+    return this.http.post<void>(`/api/admin/runtimes/${userId}/stop`, null);
+  }
+
+  adminSearchAudit(params: Record<string, string>): Observable<AuditLogPage> {
+    return this.http.get<AuditLogPage>('/api/admin/audit', { params });
+  }
+
+  adminGetOidcSettings(): Observable<OidcSettings> {
+    return this.http.get<OidcSettings>('/api/admin/settings/oidc');
+  }
+
+  adminSaveOidcSettings(request: SaveOidcSettingsRequest): Observable<OidcSettings> {
+    return this.http.put<OidcSettings>('/api/admin/settings/oidc', request);
+  }
+
+  adminResetOidcSettings(): Observable<OidcSettings> {
+    return this.http.delete<OidcSettings>('/api/admin/settings/oidc');
+  }
+
+  adminTestOidcSettings(tenantId: string): Observable<OidcTestResult> {
+    return this.http.post<OidcTestResult>('/api/admin/settings/oidc/test', { tenantId });
   }
 
   adminListUsers(search: string): Observable<AdminUser[]> {

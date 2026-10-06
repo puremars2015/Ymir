@@ -110,6 +110,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             // 前端重送不產生重複 execution（SA §9.1）。
             execution.HasIndex(e => new { e.UserId, e.ClientRequestId }).IsUnique();
             execution.HasIndex(e => e.Status);
+            // Admin 總覽依建立時間統計近幾天的執行數（ADR-0010）
+            execution.HasIndex(e => e.CreatedAt);
         });
 
         modelBuilder.Entity<ExecutionEventRecord>(evt =>

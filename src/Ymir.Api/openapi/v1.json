@@ -766,6 +766,244 @@
         }
       }
     },
+    "/api/admin/overview": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetOverview",
+        "parameters": [
+          {
+            "name": "utcOffsetMinutes",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOverviewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/runtimes/{userId}/stop": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminStopRuntime",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/admin/audit": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSearchAudit",
+        "parameters": [
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "result",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/AuditResult"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int64"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogPageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/settings/oidc": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetOidcSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveOidcSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveOidcSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminResetOidcSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/settings/oidc/test": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminTestOidcSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestOidcSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcTestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/make-topics": {
       "get": {
         "tags": [
@@ -928,6 +1166,28 @@
           }
         }
       },
+      "AdminOverviewResponse": {
+        "required": [
+          "users",
+          "executions",
+          "runtimes"
+        ],
+        "type": "object",
+        "properties": {
+          "users": {
+            "$ref": "#/components/schemas/UserCountsResponse"
+          },
+          "executions": {
+            "$ref": "#/components/schemas/ExecutionCountsResponse"
+          },
+          "runtimes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuntimeSummaryResponse"
+            }
+          }
+        }
+      },
       "AdminUserResponse": {
         "required": [
           "id",
@@ -982,6 +1242,100 @@
             "format": "date-time"
           }
         }
+      },
+      "AuditLogItemResponse": {
+        "required": [
+          "id",
+          "timestamp",
+          "action",
+          "result",
+          "actorUserId",
+          "actorName",
+          "targetType",
+          "targetId",
+          "targetName",
+          "correlationId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "action": {
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/AuditResult"
+          },
+          "actorUserId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "targetType": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "targetName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "correlationId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "AuditLogPageResponse": {
+        "required": [
+          "items",
+          "nextBefore"
+        ],
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogItemResponse"
+            }
+          },
+          "nextBefore": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "AuditResult": {
+        "enum": [
+          "Success",
+          "Failure",
+          "Denied"
+        ]
       },
       "AuthMethod": {
         "enum": [
@@ -1148,6 +1502,36 @@
           }
         }
       },
+      "DailyExecutionResponse": {
+        "required": [
+          "date",
+          "total",
+          "failed"
+        ],
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "failed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "DevLoginRequest": {
         "required": [
           "account",
@@ -1177,6 +1561,65 @@
                 "$ref": "#/components/schemas/UserRole"
               }
             ]
+          }
+        }
+      },
+      "ExecutionCountsResponse": {
+        "required": [
+          "running",
+          "queued",
+          "completedToday",
+          "failedToday",
+          "cancelledToday",
+          "trend"
+        ],
+        "type": "object",
+        "properties": {
+          "running": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "queued": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "completedToday": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "failedToday": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cancelledToday": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DailyExecutionResponse"
+            }
           }
         }
       },
@@ -1356,6 +1799,112 @@
           }
         }
       },
+      "OidcSettingsResponse": {
+        "required": [
+          "source",
+          "enabled",
+          "configured",
+          "tenantId",
+          "clientId",
+          "hasClientSecret",
+          "secretSource",
+          "secretUpdatedAt",
+          "secretExpiresOn",
+          "adminRole",
+          "displayName",
+          "redirectUri",
+          "updatedAt",
+          "updatedByName"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/OidcSettingsSource"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hasClientSecret": {
+            "type": "boolean"
+          },
+          "secretSource": {
+            "$ref": "#/components/schemas/OidcSettingsSource"
+          },
+          "secretUpdatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "secretExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "adminRole": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "redirectUri": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedByName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OidcSettingsSource": {
+        "enum": [
+          "None",
+          "Deployment",
+          "Database"
+        ]
+      },
+      "OidcTestResponse": {
+        "required": [
+          "ok",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "PasswordLoginRequest": {
         "required": [
           "account",
@@ -1428,6 +1977,17 @@
           }
         }
       },
+      "RuntimeStatus": {
+        "enum": [
+          "NotCreated",
+          "Created",
+          "Running",
+          "Busy",
+          "Stopped",
+          "Error",
+          "Deleted"
+        ]
+      },
       "RuntimeStatusResponse": {
         "required": [
           "status",
@@ -1451,6 +2011,34 @@
               "null",
               "string"
             ]
+          },
+          "lastActiveAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "RuntimeSummaryResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "status",
+          "lastActiveAt"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RuntimeStatus"
           },
           "lastActiveAt": {
             "type": [
@@ -1493,6 +2081,60 @@
           },
           "isEnabled": {
             "type": "boolean"
+          }
+        }
+      },
+      "SaveOidcSettingsRequest": {
+        "required": [
+          "enabled",
+          "tenantId",
+          "clientId",
+          "clientSecret",
+          "secretExpiresOn",
+          "adminRole",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientSecret": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secretExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "adminRole": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -1546,6 +2188,20 @@
           }
         }
       },
+      "TestOidcSettingsRequest": {
+        "required": [
+          "tenantId"
+        ],
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "UpdateProjectRequest": {
         "required": [
           "name",
@@ -1578,6 +2234,58 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "UserCountsResponse": {
+        "required": [
+          "total",
+          "active",
+          "disabled",
+          "admins",
+          "recentlyActive"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "active": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "disabled": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "admins": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "recentlyActive": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
