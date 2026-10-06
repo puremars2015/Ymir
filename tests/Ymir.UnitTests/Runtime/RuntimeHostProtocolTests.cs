@@ -38,6 +38,27 @@ public class RuntimeHostProtocolTests
     }
 
     [Theory]
+    [InlineData("http://host.docker.internal:5090")]
+    [InlineData("http://host.containers.internal:5090/")]
+    public void Endpoint_ContainerHostAlias_OnlyAllowedForTheClient(string value)
+    {
+        var endpoint = RuntimeHostEndpoint.Parse(value, "setting", allowContainerHostAlias: true);
+
+        Assert.True(endpoint.UsesContainerHostAlias);
+        // runtime host 監聽的位址不接受別名，只能是 loopback。
+        Assert.Throws<InvalidOperationException>(() => RuntimeHostEndpoint.Parse(value, "setting"));
+    }
+
+    [Theory]
+    [InlineData("https://host.docker.internal:5090")]
+    [InlineData("http://host.docker.internal.evil.example:5090")]
+    [InlineData("http://evil.example:5090")]
+    public void Endpoint_ContainerHostAlias_IsExactAndHttpOnly(string value)
+    {
+        Assert.Throws<InvalidOperationException>(() => RuntimeHostEndpoint.Parse(value, "setting", allowContainerHostAlias: true));
+    }
+
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("unix:relative.sock")]

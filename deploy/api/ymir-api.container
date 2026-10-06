@@ -1,0 +1,33 @@
+# Ymir API container（ADR-0008）：rootful Podman + systemd Quadlet。步驟見同目錄 README.md。
+#   複製到 /etc/containers/systemd/ymir-api.container，然後 systemctl daemon-reload && systemctl start ymir-api
+# 必改：PodmanArgs 的 <ymir-runtime gid>（getent group ymir-runtime | cut -d: -f3）。
+[Unit]
+Description=Ymir API (container; agent runtimes via ymir-runtime-host)
+Wants=network-online.target ymir-runtime-host.service
+After=network-online.target ymir-runtime-host.service
+
+[Container]
+# 事先以 podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:latest . 建置（rootful 儲存區，需 sudo）
+Image=localhost/ymir/api:latest
+Pull=never
+ContainerName=ymir-api
+# 只綁主機的 127.0.0.1:5080（image 預設 ASPNETCORE_URLS），cloudflared 從 loopback 進來（ADR-0006）；也用 127.0.0.1 連 SQL Server / LiteLLM。
+Network=host
+ReadOnly=true
+DropCapability=ALL
+NoNewPrivileges=true
+Tmpfs=/tmp:rw,size=64m
+# 連線字串、LiteLLM master key、runtime host token：權限 600、擁有者 root；範本為同目錄的 .env.example。
+EnvironmentFile=/etc/ymir/api.env
+# 主機上唯一需要的兩個資料夾；不掛載任何 container runtime socket 或使用者 workspace。
+Volume=/run/ymir-runtime:/run/ymir-runtime
+Volume=/srv/ymir/api/keys:/var/lib/ymir/keys
+# 讓容器內使用者（uid 1654）屬於 socket 的 group。用 PodmanArgs 以相容 Podman 4.x（5.x 也可改用 GroupAdd=）。
+PodmanArgs=--group-add=<ymir-runtime gid>
+
+[Service]
+Restart=on-failure
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

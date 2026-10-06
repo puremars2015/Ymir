@@ -1,4 +1,4 @@
-# Ymir API container（ADR-0008）；步驟見同目錄 README.md。
+# 備用：Linux + Docker Compose 跑 API container（ADR-0008）。正式環境建議用 rootful Podman + Quadlet（ymir-api.container），見同目錄 README.md。
 #   cd deploy/api && cp .env.example .env && docker compose up -d --build
 # Secret（連線字串、LiteLLM master key、runtime host token）只放在同目錄的 .env（.gitignore 已排除）。
 services:

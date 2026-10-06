@@ -1,0 +1,29 @@
+# Windows + Docker Desktop：API container 的開發 / 驗證設定（ADR-0005、ADR-0008）；步驟見同目錄 README.md。
+#   cd deploy\api; copy .env.windows.example .env.windows; docker compose -f compose.windows.yml up -d --build
+# 與 Linux 正式環境（ymir-api.container）的差異：
+#   - Docker Desktop 不能把 Windows 上的 Unix socket 掛進 Linux 容器：runtime host 在 Windows 上聽 127.0.0.1:5090，
+#     API 容器經 host.docker.internal 連線（Docker Desktop 轉送後是 loopback；仍需 token）。
+#   - 沒有 host network：容器內聽所有介面，但只發佈到主機的 127.0.0.1:5080。
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: src/Ymir.Api/Containerfile
+    image: localhost/ymir/api:dev
+    env_file: .env.windows
+    environment:
+      ASPNETCORE_URLS: http://+:5080
+      VibeMaker__Runtime__Remote__Endpoint: http://host.docker.internal:5090
+    ports:
+      - 127.0.0.1:5080:5080
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs:
+      - /tmp:rw,size=64m
+    volumes:
+      # Data Protection 金鑰（deploy/api/data 已被 .gitignore 排除）
+      - ./data/keys:/var/lib/ymir/keys

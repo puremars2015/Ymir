@@ -80,6 +80,7 @@
 ## 開發機
 
 - 不需要 runtime host：Development 環境的 API 預設是 `Local` runtime。在 Windows 上，API 跑在主機並使用 `Provider=Docker`。
+- **Windows + Docker Desktop 驗證「API 在容器內」**：runtime host 聽 `http://127.0.0.1:5090`，API 容器經 `host.docker.internal:5090` 連線。步驟見 [`deploy/api/README.md`](../api/README.md#windowsdocker-desktop開發--驗證)。
 - 想在本機驗證「API 在容器內」：
   ```bash
   dotnet run --project src/Ymir.RuntimeHost -- --environment Development \

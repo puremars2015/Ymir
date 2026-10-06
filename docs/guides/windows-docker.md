@@ -79,6 +79,15 @@ dotnet run --project spikes/pi-rpc-poc -- --runtime Docker --workspace-root C:\y
   --llm-url http://host.docker.internal:5199/v1 --model fake-model --prompt "[create-file] 建檔" --prompt "第二句"
 ```
 
+## 7. （選用）API 放進容器
+
+正式部署時，API 在容器內執行，Agent container 由主機上的 runtime host 管理（[ADR-0008](../adr/0008-containerized-api-runtime-host.md)）。
+在 Windows 上要驗證這個架構：
+- runtime host 跑在 Windows 主機，使用 `Provider=Docker`；
+- API 容器用 Docker Desktop 執行。
+
+步驟見 [`deploy/api/README.md` 的 Windows 一節](../../deploy/api/README.md#windowsdocker-desktop開發--驗證)。第 4 節「主機上的 API」仍然可用，兩者擇一即可。
+
 ## 效能建議
 
 `C:\` 上的目錄透過 Docker Desktop 的檔案分享掛進 container，Agent 執行大量 `npm install` 時會比較慢。
