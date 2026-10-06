@@ -114,7 +114,7 @@ public class ExecutionFlowTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
-    public async Task DisabledUser_CannotStartExecution()
+    public async Task DisabledUser_IsSignedOutOnNextRequest_AndCannotStartExecution()
     {
         var (client, conversationId) = await ArrangeAsync("flow-disabled");
         using var _ = client;
@@ -128,7 +128,8 @@ public class ExecutionFlowTests(ApiFactory factory) : IClassFixture<ApiFactory>
 
         var (response, _) = await client.SendMessageAsync(conversationId, "blocked");
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        // 既有 cookie 在停用後的下一個請求就失效（ADR-0009），不只是不能建立 execution。
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]

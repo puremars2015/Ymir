@@ -104,6 +104,30 @@ public sealed class ExecutionService(
             return null;
         }
 
+        await CancelCoreAsync(execution, currentUser.ActorName, cancellationToken).ConfigureAwait(false);
+        return new CancelExecutionResponse(executionId, SaValues.Of(execution.Status));
+    }
+
+    /// <summary>
+    /// 取消某位使用者所有尚未結束的 execution（Admin 停用帳號時，SA §12）。不檢查擁有者，只能由已授權的管理流程呼叫。
+    /// </summary>
+    public async Task<int> CancelAllForUserAsync(Guid userId, string actor, CancellationToken cancellationToken)
+    {
+        var active = await db.AgentExecutions
+            .Where(e => e.UserId == userId && (e.Status == ExecutionStatus.Queued || e.Status == ExecutionStatus.Running))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var execution in active)
+        {
+            await CancelCoreAsync(execution, actor, cancellationToken).ConfigureAwait(false);
+        }
+
+        return active.Count;
+    }
+
+    private async Task CancelCoreAsync(AgentExecution execution, string actor, CancellationToken cancellationToken)
+    {
+        var executionId = execution.Id;
         var now = timeProvider.GetUtcNow();
         if (execution.Status == ExecutionStatus.Queued)
         {
@@ -125,9 +149,8 @@ public sealed class ExecutionService(
             cancellations.TryCancel(executionId);
         }
 
-        await auditLog.WriteAsync(new AuditEntry(currentUser.ActorName, "execution.cancel", "execution", executionId.ToString("D"), AuditResult.Success, now, null), cancellationToken)
+        await auditLog.WriteAsync(new AuditEntry(actor, "execution.cancel", "execution", executionId.ToString("D"), AuditResult.Success, now, null), cancellationToken)
             .ConfigureAwait(false);
-        return new CancelExecutionResponse(executionId, SaValues.Of(execution.Status));
     }
 
     /// <summary>目前使用者是否可以讀取此 execution 的事件。</summary>

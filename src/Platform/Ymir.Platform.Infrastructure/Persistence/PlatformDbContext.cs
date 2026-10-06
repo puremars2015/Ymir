@@ -10,6 +10,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
     public DbSet<User> Users => Set<User>();
 
+    public DbSet<LocalCredential> LocalCredentials => Set<LocalCredential>();
+
     internal DbSet<AuditLogRecord> AuditLog => Set<AuditLogRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -30,6 +32,16 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             user.Property(u => u.Role).HasConversion<UpperSnakeCaseEnumConverter<UserRole>>().HasMaxLength(30);
             user.Property(u => u.Status).HasConversion<UpperSnakeCaseEnumConverter<UserStatus>>().HasMaxLength(30);
             user.HasIndex(u => new { u.Issuer, u.Subject }).IsUnique();
+        });
+
+        // 本機帳號的密碼雜湊（ADR-0009）；同一模組內，可以建 FK。
+        modelBuilder.Entity<LocalCredential>(credential =>
+        {
+            credential.ToTable("local_credentials");
+            credential.HasKey(c => c.UserId);
+            credential.Property(c => c.UserId).ValueGeneratedNever();
+            credential.Property(c => c.PasswordHash).HasMaxLength(500).IsRequired();
+            credential.HasOne<User>().WithOne().HasForeignKey<LocalCredential>(c => c.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AuditLogRecord>(audit =>

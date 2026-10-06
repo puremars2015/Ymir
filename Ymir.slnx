@@ -18,6 +18,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Ymir.IntegrationTests/Ymir.IntegrationTests.csproj" />
     <Project Path="tests/Ymir.Testing.FakeLlm/Ymir.Testing.FakeLlm.csproj" />
+    <Project Path="tests/Ymir.Testing.FakeOidc/Ymir.Testing.FakeOidc.csproj" />
     <Project Path="tests/Ymir.UnitTests/Ymir.UnitTests.csproj" />
   </Folder>
   <Folder Name="/spikes/">

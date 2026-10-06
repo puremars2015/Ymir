@@ -39,6 +39,79 @@
         }
       }
     },
+    "/api/auth/providers": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "GetLoginProviders",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginProvidersResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/password-login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "PasswordLogin",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PasswordLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me/password": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "ChangePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/dev/login": {
       "post": {
         "tags": [
@@ -513,10 +586,228 @@
           }
         }
       }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminListUsers",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminUserResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminCreateLocalUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLocalUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/disable": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminDisableUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/enable": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminEnableUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/reset-password": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminResetPassword",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdminUserResponse": {
+        "required": [
+          "id",
+          "displayName",
+          "accountName",
+          "email",
+          "role",
+          "status",
+          "authMethod",
+          "lastLoginAt",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/UserRole"
+          },
+          "status": {
+            "$ref": "#/components/schemas/UserStatus"
+          },
+          "authMethod": {
+            "$ref": "#/components/schemas/AuthMethod"
+          },
+          "lastLoginAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AuthMethod": {
+        "enum": [
+          "Oidc",
+          "Local",
+          "Dev"
+        ]
+      },
       "CancelExecutionResponse": {
         "required": [
           "executionId",
@@ -530,6 +821,27 @@
           },
           "status": {
             "type": "string"
+          }
+        }
+      },
+      "ChangePasswordRequest": {
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -597,6 +909,52 @@
           }
         }
       },
+      "CreateLocalUserRequest": {
+        "required": [
+          "account",
+          "displayName",
+          "email",
+          "role",
+          "initialPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UserRole"
+              }
+            ]
+          },
+          "initialPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "CreateProjectRequest": {
         "required": [
           "name"
@@ -640,6 +998,32 @@
           }
         }
       },
+      "LoginProvidersResponse": {
+        "required": [
+          "oidc",
+          "oidcDisplayName",
+          "password",
+          "devLogin"
+        ],
+        "type": "object",
+        "properties": {
+          "oidc": {
+            "type": "boolean"
+          },
+          "oidcDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": "boolean"
+          },
+          "devLogin": {
+            "type": "boolean"
+          }
+        }
+      },
       "MeResponse": {
         "required": [
           "id",
@@ -648,7 +1032,9 @@
           "email",
           "department",
           "role",
-          "status"
+          "status",
+          "authMethod",
+          "mustChangePassword"
         ],
         "type": "object",
         "properties": {
@@ -682,6 +1068,12 @@
           },
           "status": {
             "$ref": "#/components/schemas/UserStatus"
+          },
+          "authMethod": {
+            "$ref": "#/components/schemas/AuthMethod"
+          },
+          "mustChangePassword": {
+            "type": "boolean"
           }
         }
       },
@@ -750,6 +1142,27 @@
           }
         }
       },
+      "PasswordLoginRequest": {
+        "required": [
+          "account",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "account": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ProjectResponse": {
         "required": [
           "id",
@@ -784,6 +1197,20 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "required": [
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "newPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -947,6 +1374,9 @@
     },
     {
       "name": "Executions"
+    },
+    {
+      "name": "Admin"
     }
   ]
 }

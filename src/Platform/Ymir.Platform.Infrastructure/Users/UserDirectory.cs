@@ -7,7 +7,7 @@ namespace Ymir.Platform.Infrastructure.Users;
 
 internal sealed class UserDirectory(PlatformDbContext db, TimeProvider timeProvider) : IUserDirectory
 {
-    public async Task<User> UpsertOnLoginAsync(ExternalIdentity identity, UserRole roleForNewUser, CancellationToken cancellationToken)
+    public async Task<User> UpsertOnLoginAsync(ExternalIdentity identity, UserRole role, CancellationToken cancellationToken, bool roleManagedByIdentityProvider = false)
     {
         ArgumentNullException.ThrowIfNull(identity);
         var now = timeProvider.GetUtcNow();
@@ -17,8 +17,12 @@ internal sealed class UserDirectory(PlatformDbContext db, TimeProvider timeProvi
 
         if (user is null)
         {
-            user = User.Create(identity, roleForNewUser, now);
+            user = User.Create(identity, role, now);
             db.Users.Add(user);
+        }
+        else if (roleManagedByIdentityProvider)
+        {
+            user.SyncRole(role, now);
         }
 
         user.RecordLogin(identity, now);
@@ -30,7 +34,7 @@ internal sealed class UserDirectory(PlatformDbContext db, TimeProvider timeProvi
         {
             // 同一使用者同時第一次登入：唯一索引擋下第二筆，改讀已存在的資料。
             db.Entry(user).State = EntityState.Detached;
-            return await UpsertOnLoginAsync(identity, roleForNewUser, cancellationToken).ConfigureAwait(false);
+            return await UpsertOnLoginAsync(identity, role, cancellationToken, roleManagedByIdentityProvider).ConfigureAwait(false);
         }
 
         return user;
@@ -38,4 +42,43 @@ internal sealed class UserDirectory(PlatformDbContext db, TimeProvider timeProvi
 
     public Task<User?> FindAsync(Guid userId, CancellationToken cancellationToken) =>
         db.Users.AsNoTracking().SingleOrDefaultAsync(u => u.Id == userId, cancellationToken);
+
+    public async Task<IReadOnlyList<User>> ListAsync(string? search, int take, CancellationToken cancellationToken)
+    {
+        var query = db.Users.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim();
+            query = query.Where(u => u.DisplayName.Contains(term) || (u.AccountName != null && u.AccountName.Contains(term)) || (u.Email != null && u.Email.Contains(term)));
+        }
+
+        return await query
+            .OrderByDescending(u => u.LastLoginAt)
+            .ThenBy(u => u.DisplayName)
+            .Take(Math.Clamp(take, 1, 500))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task<User?> SetStatusAsync(Guid userId, UserStatus status, CancellationToken cancellationToken)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(u => u.Id == userId, cancellationToken).ConfigureAwait(false);
+        if (user is null)
+        {
+            return null;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        if (status == UserStatus.Disabled)
+        {
+            user.Disable(now);
+        }
+        else
+        {
+            user.Enable(now);
+        }
+
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return user;
+    }
 }

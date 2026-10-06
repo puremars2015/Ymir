@@ -66,6 +66,25 @@ public sealed class User
         UpdatedAt = now;
     }
 
+    public void Enable(DateTimeOffset now)
+    {
+        Status = UserStatus.Active;
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// 角色以企業 IdP 為準時（Entra ID app role，ADR-0009），每次登入同步；IdP 拿掉角色後下次登入就降級。
+    /// 狀態（停用）仍由 Ymir 管理，不受 IdP 影響。
+    /// </summary>
+    public void SyncRole(UserRole role, DateTimeOffset now)
+    {
+        if (Role != role)
+        {
+            Role = role;
+            UpdatedAt = now;
+        }
+    }
+
     private void ApplyProfile(ExternalIdentity identity, DateTimeOffset now)
     {
         AccountName = identity.AccountName;
