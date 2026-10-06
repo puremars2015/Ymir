@@ -3,6 +3,8 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AdminMakeTopic,
+  AdminOverview,
+  AuditLogPage,
   AdminUser,
   ApiProblem,
   CancelExecutionResponse,
@@ -68,6 +70,20 @@ export class ApiService {
 
   adminDeleteMakeTopic(topicId: string): Observable<void> {
     return this.http.delete<void>(`/api/admin/make-topics/${topicId}`);
+  }
+
+  adminOverview(utcOffsetMinutes: number): Observable<AdminOverview> {
+    return this.http.get<AdminOverview>('/api/admin/overview', {
+      params: { utcOffsetMinutes },
+    });
+  }
+
+  adminStopRuntime(userId: string): Observable<void> {
+    return this.http.post<void>(`/api/admin/runtimes/${userId}/stop`, null);
+  }
+
+  adminSearchAudit(params: Record<string, string>): Observable<AuditLogPage> {
+    return this.http.get<AuditLogPage>('/api/admin/audit', { params });
   }
 
   adminListUsers(search: string): Observable<AdminUser[]> {

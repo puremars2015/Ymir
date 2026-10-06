@@ -38,6 +38,19 @@ export const routes: Routes = [
         title: '個人設定 · Vibe Maker',
       },
       {
+        path: 'admin',
+        pathMatch: 'full',
+        canActivate: [adminGuard],
+        loadComponent: () => import('./features/admin/overview-page').then((m) => m.OverviewPage),
+        title: '管理總覽 · Vibe Maker',
+      },
+      {
+        path: 'admin/audit',
+        canActivate: [adminGuard],
+        loadComponent: () => import('./features/admin/audit-page').then((m) => m.AuditPage),
+        title: '稽核紀錄 · Vibe Maker',
+      },
+      {
         path: 'admin/users',
         canActivate: [adminGuard],
         loadComponent: () => import('./features/admin/users-page').then((m) => m.UsersPage),

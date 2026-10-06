@@ -21,6 +21,13 @@ export type CreateLocalUserRequest = Schemas['CreateLocalUserRequest'];
 export type MakeTopic = Schemas['MakeTopicResponse'];
 export type AdminMakeTopic = Schemas['AdminMakeTopicResponse'];
 export type SaveMakeTopicRequest = Schemas['SaveMakeTopicRequest'];
+export type AdminOverview = Schemas['AdminOverviewResponse'];
+export type RuntimeSummary = Schemas['RuntimeSummaryResponse'];
+export type DailyExecution = Schemas['DailyExecutionResponse'];
+export type AuditLogPage = Schemas['AuditLogPageResponse'];
+export type AuditLogItem = Schemas['AuditLogItemResponse'];
+export type AuditResult = Schemas['AuditResult'];
+export type RuntimeState = Schemas['RuntimeStatus'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {
