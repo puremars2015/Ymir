@@ -16,6 +16,7 @@ public static class VibeMakerApplicationExtensions
         services.AddScoped<UserSettingsService>();
         services.AddScoped<ConversationService>();
         services.AddScoped<ExecutionService>();
+        services.AddScoped<Application.Make.MakeTopicService>();
         services.AddScoped<Application.Users.UserDeactivationService>();
         services.AddScoped<ExecutionEventWriter>();
         services.AddScoped<ExecutionRunner>();

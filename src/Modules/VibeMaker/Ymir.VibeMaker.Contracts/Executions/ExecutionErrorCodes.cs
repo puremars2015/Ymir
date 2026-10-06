@@ -12,5 +12,11 @@ public static class ExecutionErrorCodes
     public const string AgentRuntimeError = "AGENT_RUNTIME_ERROR";
     public const string ModelProviderError = "MODEL_PROVIDER_ERROR";
     public const string ModelNotAvailable = "MODEL_NOT_AVAILABLE";
+
+    /// <summary><c>/make</c> 的主題不存在或已停用。</summary>
+    public const string MakeTopicNotAvailable = "MAKE_TOPIC_NOT_AVAILABLE";
+
+    /// <summary>只送了 <c>/make</c>：前端應顯示主題按鈕，不會送出。</summary>
+    public const string MakeDescriptionRequired = "MAKE_DESCRIPTION_REQUIRED";
     public const string ExecutionCancelled = "EXECUTION_CANCELLED";
 }

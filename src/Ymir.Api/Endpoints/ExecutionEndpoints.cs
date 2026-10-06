@@ -45,6 +45,8 @@ internal static class ExecutionEndpoints
             SubmitMessageOutcome.Conflict => ApiProblem.Create(StatusCodes.Status409Conflict, ExecutionErrorCodes.ExecutionConflict, "這個對話還有執行中的工作，請等待完成或先停止。"),
             SubmitMessageOutcome.Forbidden => ApiProblem.Create(StatusCodes.Status403Forbidden, ExecutionErrorCodes.Forbidden, "帳號已停用，無法執行 Agent。"),
             SubmitMessageOutcome.ModelNotAvailable => ApiProblem.Create(StatusCodes.Status400BadRequest, ExecutionErrorCodes.ModelNotAvailable, "選擇的模型無法使用，請重新選擇。"),
+            SubmitMessageOutcome.MakeTopicNotAvailable => ApiProblem.Create(StatusCodes.Status400BadRequest, ExecutionErrorCodes.MakeTopicNotAvailable, "這個主題已無法使用，請重新選擇。"),
+            SubmitMessageOutcome.MakeDescriptionRequired => ApiProblem.Create(StatusCodes.Status400BadRequest, ExecutionErrorCodes.MakeDescriptionRequired, "請在 /make 後面描述要做什麼，或選擇一個主題。"),
             _ => ConversationEndpoints.NotFound(),
         };
     }

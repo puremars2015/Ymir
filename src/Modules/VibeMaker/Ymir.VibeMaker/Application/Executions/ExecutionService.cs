@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Users;
+using Ymir.VibeMaker.Application.Make;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Contracts.Conversations;
@@ -20,6 +21,7 @@ public sealed class ExecutionService(
     ExecutionEventWriter eventWriter,
     IAuditLog auditLog,
     ModelCatalog models,
+    MakeTopicService makeTopics,
     TimeProvider timeProvider)
 {
     public static string EventStreamUrl(Guid executionId) => $"/api/executions/{executionId}/events";
@@ -53,6 +55,30 @@ public sealed class ExecutionService(
             return SubmitMessageResult.ModelNotAvailable;
         }
 
+        // /make 指令：由後端依主題組合送給 Agent 的完整指示；對話紀錄只保存使用者輸入的文字。
+        string? agentPrompt = null;
+        var makeDescription = MakePromptBuilder.ParseDescription(request.Content);
+        if (request.MakeTopicId is { } topicId)
+        {
+            var topic = await makeTopics.FindEnabledPromptAsync(topicId, cancellationToken).ConfigureAwait(false);
+            if (topic is null)
+            {
+                return SubmitMessageResult.MakeTopicNotAvailable;
+            }
+
+            var extra = string.Equals(makeDescription, topic.Name, StringComparison.Ordinal) ? null : makeDescription;
+            agentPrompt = MakePromptBuilder.ForTopic(topic, extra);
+        }
+        else if (makeDescription is not null)
+        {
+            if (makeDescription.Length == 0)
+            {
+                return SubmitMessageResult.MakeDescriptionRequired;
+            }
+
+            agentPrompt = MakePromptBuilder.ForDescription(makeDescription, await makeTopics.ListEnabledPromptsAsync(cancellationToken).ConfigureAwait(false));
+        }
+
         var conversation = await db.Conversations.SingleOrDefaultAsync(c => c.Id == conversationId && c.UserId == userId, cancellationToken)
             .ConfigureAwait(false);
         if (conversation is null)
@@ -70,7 +96,7 @@ public sealed class ExecutionService(
         }
 
         // 執行時的模型：這次選的 → 對話上次選的 → 預設；已不在清單的模型退回預設。
-        var execution = AgentExecution.Queue(conversation, message, request.ClientRequestId, now, models.Resolve(request.ModelId ?? conversation.ModelId));
+        var execution = AgentExecution.Queue(conversation, message, request.ClientRequestId, now, models.Resolve(request.ModelId ?? conversation.ModelId), agentPrompt);
         conversation.Touch(now);
         db.Messages.Add(message);
         db.AgentExecutions.Add(execution);
@@ -202,6 +228,8 @@ public sealed record SubmitMessageResult(SubmitMessageOutcome Outcome, SendMessa
     public static readonly SubmitMessageResult Conflict = new(SubmitMessageOutcome.Conflict, null);
     public static readonly SubmitMessageResult Forbidden = new(SubmitMessageOutcome.Forbidden, null);
     public static readonly SubmitMessageResult ModelNotAvailable = new(SubmitMessageOutcome.ModelNotAvailable, null);
+    public static readonly SubmitMessageResult MakeTopicNotAvailable = new(SubmitMessageOutcome.MakeTopicNotAvailable, null);
+    public static readonly SubmitMessageResult MakeDescriptionRequired = new(SubmitMessageOutcome.MakeDescriptionRequired, null);
 
     public static SubmitMessageResult Accept(SendMessageResponse response) => new(SubmitMessageOutcome.Accepted, response);
 }
@@ -213,4 +241,6 @@ public enum SubmitMessageOutcome
     Conflict = 2,
     Forbidden = 3,
     ModelNotAvailable = 4,
+    MakeTopicNotAvailable = 5,
+    MakeDescriptionRequired = 6,
 }

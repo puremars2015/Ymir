@@ -26,6 +26,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<UserSettings> UserSettings => Set<UserSettings>();
 
+    public DbSet<MakeTopic> MakeTopics => Set<MakeTopic>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -98,6 +100,7 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             execution.Property(e => e.Status).HasConversion<UpperSnakeCaseEnumConverter<ExecutionStatus>>().HasMaxLength(30);
             execution.Property(e => e.ErrorCode).HasMaxLength(100);
             execution.Property(e => e.ModelId).HasMaxLength(Conversation.ModelIdMaxLength);
+            execution.Property(e => e.AgentPrompt);
             execution.Property(e => e.RowVersion).IsRowVersion();
             execution.HasOne<Conversation>().WithMany().HasForeignKey(e => e.ConversationId).OnDelete(DeleteBehavior.Restrict);
             execution.HasOne<Message>().WithMany().HasForeignKey(e => e.UserMessageId).OnDelete(DeleteBehavior.Restrict);
@@ -124,6 +127,17 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             settings.HasKey(s => s.UserId);
             settings.Property(s => s.UserId).ValueGeneratedNever();
             settings.Property(s => s.SystemPrompt).HasMaxLength(Project.SystemPromptMaxLength);
+        });
+
+        modelBuilder.Entity<MakeTopic>(topic =>
+        {
+            topic.ToTable("make_topics");
+            topic.HasKey(t => t.Id);
+            topic.Property(t => t.Id).ValueGeneratedNever();
+            topic.Property(t => t.Name).HasMaxLength(MakeTopic.NameMaxLength).IsRequired();
+            topic.Property(t => t.Description).HasMaxLength(MakeTopic.DescriptionMaxLength);
+            topic.Property(t => t.Instructions).HasMaxLength(MakeTopic.InstructionsMaxLength).IsRequired();
+            topic.HasIndex(t => new { t.IsEnabled, t.SortOrder });
         });
 
         modelBuilder.ApplySnakeCaseNames();

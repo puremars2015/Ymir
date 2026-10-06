@@ -211,8 +211,10 @@ public sealed class ExecutionRunner(
     private Task<StoredExecutionEvent> AppendAsync(Guid executionId, ExecutionEvent executionEvent, CancellationToken cancellationToken) =>
         eventWriter.AppendAsync(executionId, ++_sequence, executionEvent, cancellationToken);
 
+    /// <summary>送給 Agent 的內容：<c>/make</c> 展開後的指示，否則是 USER 訊息原文。</summary>
     private async Task<string> GetPromptAsync(AgentExecution execution, CancellationToken cancellationToken) =>
-        await db.Messages.Where(m => m.Id == execution.UserMessageId).Select(m => m.Content).SingleAsync(cancellationToken).ConfigureAwait(false);
+        execution.AgentPrompt
+        ?? await db.Messages.Where(m => m.Id == execution.UserMessageId).Select(m => m.Content).SingleAsync(cancellationToken).ConfigureAwait(false);
 
     /// <summary>有專案的對話在專案目錄工作（共用檔案），未分組的對話在自己的目錄工作（ADR-0007）。</summary>
     private async Task<string> GetWorkingDirectoryAsync(AgentExecution execution, CancellationToken cancellationToken)
