@@ -11,6 +11,7 @@
 | [0005](0005-docker-for-development.md) | Docker 作為開發 / 驗證用的 container engine | 已採納 |
 | [0006](0006-cloudflare-tunnel-public-edge.md) | 以 Cloudflare Tunnel 作為 Ymir 平台的對外入口 | 已採納 |
 | [0007](0007-one-runtime-per-user.md) | 一個使用者一個 Runtime，專案是 Runtime 內的檔案群組 | 已採納 |
+| [0008](0008-containerized-api-runtime-host.md) | API 放進容器，Agent runtime 由主機上的 runtime host 管理 | 已採納 |
 
 新增 ADR 時複製以下格式：
 

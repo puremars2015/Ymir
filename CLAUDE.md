@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳號登入 → Chat → Agent（Pi）在每個使用者專屬的 Rootless Podman container（一人一個，ADR-0007）執行；專案是 container 內的檔案群組 → 經 LiteLLM 呼叫模型 → SSE 即時串流回 Angular。
+Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳號登入 → Chat → Agent（Pi）在每個使用者專屬的 Rootless Podman container（一人一個，ADR-0007）執行（正式部署時 API 在容器內，container 由主機上的 runtime host 管理，ADR-0008）；專案是 container 內的檔案群組 → 經 LiteLLM 呼叫模型 → SSE 即時串流回 Angular。
 本專案**全由 AI 開發**，請嚴格遵守下列規則；做任何架構相關的改動前，先讀相關 ADR。
 
 ## 必讀文件
@@ -21,9 +21,11 @@ src/
   Ymir.AppHost/                      .NET Aspire 本機開發編排
   Ymir.ServiceDefaults/              OpenTelemetry、health check
   Ymir.Edge/                         對外入口（Cloudflare Tunnel，ADR-0006）：可信任 proxy 的 X-Forwarded-*、Host 限制、HSTS、提供 Angular build
+  Ymir.Api/Containerfile             API image（含 Angular build；Provider=Remote，ADR-0008）
+  Ymir.RuntimeHost/                  主機服務（ADR-0008）：Unix socket + token，以 user id 管理 Agent container、WebSocket 轉送 stdio
   Platform/Ymir.Platform[.Infrastructure]/         共用核心：使用者、身份（ICurrentUser）、稽核；schema platform
   Modules/VibeMaker/Ymir.VibeMaker/                Domain/（實體、狀態機）+ Application/（Projects、Conversations、Executions 用例；IAgentHarness、IAgentRuntimeManager、IModelGateway）
-  Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/ Persistence/（EF Core，schema vibemaker）、Executions/（背景 worker、事件 bus）、PiAgent/、Containers/（Podman / Docker）、Runtime/（Local，開發用）、Dev/（Scripted harness）
+  Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/ Persistence/（EF Core，schema vibemaker）、Executions/（背景 worker、事件 bus）、PiAgent/、Containers/（Podman / Docker）、Runtime/（Local，開發用；Remote/：呼叫 runtime host）、Dev/（Scripted harness）
   Modules/VibeMaker/Ymir.VibeMaker.Contracts/      API DTO、SSE 事件契約
 tests/
   Ymir.UnitTests/                    含 Fixtures/pi-rpc/：Pi 1.0.0 的真實 RPC 錄製
@@ -33,6 +35,8 @@ web/                                 Angular 22（standalone、signals、zoneles
 runtime/agent/                       Agent runtime Containerfile
 deploy/cloudflared/                  cloudflared ingress 設定範本（指南 docs/guides/cloudflare-tunnel.md）
 deploy/litellm/                      LiteLLM proxy sample（MiniMax 國際站 + Fake LLM）；金鑰只放在 .env（已被 gitignore）
+deploy/api/                          API container 的 compose（host network、唯讀、只掛 socket 目錄與 Data Protection 金鑰）
+deploy/runtime-host/                 runtime host 的 systemd unit、設定範本與安裝指南
 spikes/pi-rpc-poc/                   技術驗證主控台程式
 ```
 
@@ -81,7 +85,9 @@ Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真
 
 模型金鑰（ADR-0004）：設定 `VibeMaker__LiteLlm__BaseUrl` 與 `VibeMaker__LiteLlm__MasterKey` 後，API 為每位使用者向 LiteLLM 發 virtual key；非 Development 未設定會拒絕啟動。本機可用 `FAKE_LLM_MASTER_KEY=<任意值>` 讓 Fake LLM 模擬 LiteLLM 的 key 管理（說明見 `deploy/litellm/README.md`）。
 
-Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用於開發 / 驗證，例如 Windows，ADR-0005；指南 `docs/guides/windows-docker.md`）| `Local`（Linux / macOS 開發用，無隔離）。
+Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用於開發 / 驗證，例如 Windows，ADR-0005；指南 `docs/guides/windows-docker.md`）| `Local`（Linux / macOS 開發用，無隔離）| `Remote`（API 在容器內，呼叫 runtime host：`VibeMaker:Runtime:Remote:Endpoint` / `Token`，ADR-0008）。Runtime host 自己用 Podman / Docker / Local。
+
+API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:dev .`（部署見 `deploy/api/README.md`、`deploy/runtime-host/README.md`）。
 
 ## 架構規則
 
@@ -103,6 +109,7 @@ Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用
 - Container 內不得出現 LiteLLM master key、DB 連線字串或 AD 憑證（ADR-0004）。環境變數以 `podman exec --env NAME` 傳遞，值不得出現在程序參數。
 - 回給瀏覽器的錯誤與 tool 事件只能是摘要：不得含 stack trace、host path、token、完整 command output（SA §10、§12）。原始細節只寫 server log。
 - `LocalRuntimeManager` 沒有隔離，只允許 Development 環境（DI 會在其他環境拒絕啟動）。
+- API container 不得掛載 container runtime socket（podman.sock / docker.sock）或使用者 workspace，只能經由 runtime host（ADR-0008）。Runtime host 的端點只接受 user id 與 runtime 內的程序規格，不得新增接受 host 路徑、image、掛載或資源設定的端點；改動協定時同步更新 `RuntimeHostProtocolTests` 與 `RuntimeHostTests`。Runtime host token 只放在部署 secret，不得進版控；不得用 rootless Podman 帳號 `ymir` 跑 API container。
 - 模型供應商金鑰（例如 `MINIMAX_API_KEY`）與 LiteLLM master key 只放在 `deploy/*/.env` 或部署環境的 secret，不得進版控、不得進 Agent container。
 - 對外公開（`Ymir:PublicEdge`，ADR-0006）不得在 Development 環境開啟；API 只綁 127.0.0.1、只信任 cloudflared 的 `X-Forwarded-*`。Tunnel 憑證不得進版控或進 container。
 

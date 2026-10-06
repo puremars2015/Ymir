@@ -454,6 +454,8 @@ EnsureRuntime
 
 ## 16. 部署拓樸（MVP）
 
+> **補充（[ADR-0008](../adr/0008-containerized-api-runtime-host.md)）**：正式部署時 API 在容器內執行，Agent Runtime Manager 拆成主機上的 runtime host（`Ymir.RuntimeHost`，Unix socket + token），API 不直接操作 Podman。
+
 ```text
 Corporate Network
 │
