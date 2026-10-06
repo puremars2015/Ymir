@@ -29,6 +29,9 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         },
         ["GET /api/conversations/{conversationId:guid}"] = r => Get($"/api/conversations/{r.ConversationId}"),
         ["GET /api/conversations/{conversationId:guid}/messages"] = r => Get($"/api/conversations/{r.ConversationId}/messages"),
+        ["GET /api/conversations/{conversationId:guid}/files/"] = r => Get($"/api/conversations/{r.ConversationId}/files"),
+        ["GET /api/conversations/{conversationId:guid}/files/download"] = r => Get($"/api/conversations/{r.ConversationId}/files/download?path=hello.txt"),
+        ["GET /api/conversations/{conversationId:guid}/files/archive"] = r => Get($"/api/conversations/{r.ConversationId}/files/archive"),
         // 列表 / 建立端點以 query / body 指定別人的資源
         ["GET /api/conversations/"] = r => Get($"/api/conversations?projectId={r.ProjectId}"),
         ["POST /api/conversations/"] = r => new HttpRequestMessage(HttpMethod.Post, "/api/conversations")
@@ -130,6 +133,12 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         var (_, sent) = await owner.SendMessageAsync(conversation.Id, "secret prompt");
         await owner.ReadEventsAsync(sent!.EventStreamUrl); // 等執行結束，擁有者之後才能再送訊息
         var resources = new OwnedResources(project.Id, conversation.Id, sent.ExecutionId);
+        // 檔案下載端點：擁有者要能下載到檔案（Agent 產生的成果放在專案目錄）
+        var ownerId = (await owner.GetFromJsonAsync<System.Text.Json.JsonElement>("/api/me", ct)).GetProperty("id").GetGuid();
+        var projectDirectory = Ymir.VibeMaker.Infrastructure.Runtime.UserDirectories.For(factory.WorkspaceRoot, ownerId)
+            .HostPathOf(Ymir.VibeMaker.Application.Runtime.RuntimePaths.ProjectDirectory(project.Id));
+        Directory.CreateDirectory(projectDirectory);
+        await File.WriteAllTextAsync(Path.Combine(projectDirectory, "hello.txt"), "owner file", ct);
 
         var failures = new List<string>();
         foreach (var (endpoint, createRequest) in ResourceRequests)

@@ -542,6 +542,92 @@
         }
       }
     },
+    "/api/conversations/{conversationId}/files": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "ListConversationFiles",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceFilesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversationId}/files/download": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "DownloadConversationFile",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversationId}/files/archive": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "DownloadConversationArchive",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/executions/{executionId}/events": {
       "get": {
         "tags": [
@@ -2314,6 +2400,49 @@
           "Active",
           "Disabled"
         ]
+      },
+      "WorkspaceFileResponse": {
+        "required": [
+          "path",
+          "size",
+          "modifiedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "modifiedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "WorkspaceFilesResponse": {
+        "required": [
+          "files",
+          "truncated"
+        ],
+        "type": "object",
+        "properties": {
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceFileResponse"
+            }
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
       }
     }
   },

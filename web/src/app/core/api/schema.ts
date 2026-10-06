@@ -244,6 +244,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/conversations/{conversationId}/files': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListConversationFiles'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/conversations/{conversationId}/files/download': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['DownloadConversationFile'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/conversations/{conversationId}/files/archive': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['DownloadConversationArchive'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/executions/{executionId}/events': {
     parameters: {
       query?: never;
@@ -741,6 +789,17 @@ export interface components {
     };
     /** @enum {unknown} */
     UserStatus: 'Active' | 'Disabled';
+    WorkspaceFileResponse: {
+      path: string;
+      /** Format: int64 */
+      size: number | string;
+      /** Format: date-time */
+      modifiedAt: string;
+    };
+    WorkspaceFilesResponse: {
+      files: components['schemas']['WorkspaceFileResponse'][];
+      truncated: boolean;
+    };
   };
   responses: never;
   parameters: never;
@@ -1187,6 +1246,70 @@ export interface operations {
         content: {
           'application/json': components['schemas']['ConversationResponse'];
         };
+      };
+    };
+  };
+  ListConversationFiles: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkspaceFilesResponse'];
+        };
+      };
+    };
+  };
+  DownloadConversationFile: {
+    parameters: {
+      query?: {
+        path?: string;
+      };
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  DownloadConversationArchive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

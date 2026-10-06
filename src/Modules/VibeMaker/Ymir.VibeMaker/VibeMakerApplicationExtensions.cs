@@ -19,6 +19,7 @@ public static class VibeMakerApplicationExtensions
         services.AddScoped<Application.Make.MakeTopicService>();
         services.AddScoped<Application.Users.UserDeactivationService>();
         services.AddScoped<Application.Admin.AdminStatsService>();
+        services.AddScoped<Application.Files.WorkspaceFileService>();
         services.AddScoped<ExecutionEventWriter>();
         services.AddScoped<ExecutionRunner>();
         services.AddScoped<ExecutionReconciler>();

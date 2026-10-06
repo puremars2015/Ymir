@@ -64,6 +64,7 @@ app.MapAuthEndpoints(app.Environment);
 app.MapProjectEndpoints();
 app.MapSettingsEndpoints();
 app.MapConversationEndpoints();
+app.MapWorkspaceFileEndpoints();
 app.MapExecutionEndpoints();
 app.MapAdminEndpoints();
 app.MapAdminOverviewEndpoints();

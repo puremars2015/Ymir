@@ -33,6 +33,7 @@ public static class VibeMakerInfrastructureExtensions
         services.AddSingleton<IExecutionDispatcher, ChannelExecutionDispatcher>();
         services.AddSingleton<IExecutionEventBus, InMemoryExecutionEventBus>();
         services.AddSingleton<IExecutionCancellationRegistry, ExecutionCancellationRegistry>();
+        services.AddSingleton<Application.Files.IWorkspaceFileReader, Files.RuntimeWorkspaceFileReader>();
         services.AddHostedService<ExecutionWorker>();
         services.Configure<ExecutionOptions>(options =>
         {
