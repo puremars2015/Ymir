@@ -18,7 +18,7 @@
 
 到 https://entra.microsoft.com → 身分識別 → 應用程式 → 應用程式註冊 → `Ymir`：
 
-1. **驗證** → 平台「Web」的重新導向 URI 兩個都要有：
+1. **驗證** → 平台「Web」的重新導向 URI 兩個都要有（✅ 已完成，2026-10-06 使用者確認）：
    - `https://ymir.thetainformation.com/signin-oidc`（正式）
    - `http://localhost:5080/signin-oidc`（本機開發）
 2. **憑證及祕密**：已建立用戶端密碼，記下**到期日**，到期前要換新（見第 4 節）。

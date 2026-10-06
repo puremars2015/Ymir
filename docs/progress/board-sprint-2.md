@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-06 13:30 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-06 13:45 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -36,7 +36,7 @@
 | 在 Linux 主機安裝 runtime host（rootless Podman、systemd、`ymir-runtime` group）並以 Quadlet 啟動 API 容器 | ⏳ | 依 [deploy/runtime-host](../../deploy/runtime-host/README.md)、[deploy/api](../../deploy/api/README.md)；**待使用者環境確認** |
 | Windows：runtime host + Docker Desktop 跑 API 容器 | ⏳ | 依 [deploy/api 的 Windows 一節](../../deploy/api/README.md#windowsdocker-desktop開發--驗證)；**待使用者環境確認** |
 | 本機帳號密碼登入（使用者追加需求） | ✅ | Admin 建立、第一次登入強制改密碼、鎖定、rate limit |
-| 使用者以 Entra 實際登入驗證 | ⏳ | 依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)；client secret 由使用者自行填入 `.env`；**待使用者環境確認** |
+| 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
 **IdP 決定**：Entra ID（tenant `e333846a-0ee2-4e2d-a13b-efc97851b892`、client `5e85a804-c308-4402-b621-0be6d023a2ac`、網域 `ymir.thetainformation.com`），見 [ADR-0009](../adr/0009-entra-id-and-local-accounts.md)。
@@ -44,6 +44,32 @@
 ---
 
 ## 💬 留言區
+
+### #018 · 合併 main 的看板衝突；redirect URI 已加入
+
+> 👤 **Claude（AI）** · 🕒 2026-10-06 13:45 · `🚧進度`
+
+- **redirect URI**：使用者確認已在 Entra 加入 `https://ymir.thetainformation.com/signin-oidc` 與 `http://localhost:5080/signin-oidc`。[entra-id.md](../guides/entra-id.md) 第 1 節已標註完成。
+- **PR #15 的衝突**：開 PR 後，main 合併了 Codex 的 #13（對話隱藏思考）與 #14（OneDrive 計畫），這兩個 PR 和 Sprint 2 都在看板新增了 #015 留言。
+  - 程式碼沒有衝突，只有這份看板衝突。
+  - 處理方式：保留 Codex 的 #015、#016 原文；Sprint 2 的留言改為 [#017](#017--企業帳號entra-id與本機帳號密碼登入使用者管理)；置頂表兩邊的項目都保留。
+  - 以 merge commit 合併 main，沒有改寫歷史。
+- **合併後的驗證（實際跑過）**：
+  - 後端：`dotnet format` 通過，`dotnet test --solution Ymir.slnx` **301 項全部通過**。
+  - 前端：`npm run lint`、`npm test`（**35 項**，含 Codex 新增的思考過濾測試）、`npm run build` 都通過；`schema.ts` 與 OpenAPI 一致。
+- **剩下由使用者做**（步驟見 [entra-id.md](../guides/entra-id.md)）：
+  1. 把用戶端密碼的「值」填進部署主機的 `deploy/api/.env`。
+  2. 企業應用程式「需要指派使用者」設為「是」，指派使用者並把自己設為 `Admin`。
+  3. 依第 5 節的驗證清單實際登入。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #017 · 企業帳號（Entra ID）與本機帳號密碼登入、使用者管理
 
