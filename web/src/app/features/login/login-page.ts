@@ -102,10 +102,26 @@ import { AuthService } from '../../core/auth/auth.service';
     </section>
   `,
   styles: `
+    :host {
+      display: grid;
+      min-height: 100dvh;
+      align-items: center;
+      padding: 2rem 1rem;
+      box-sizing: border-box;
+      background: linear-gradient(135deg, var(--surface), var(--accent-soft));
+    }
     .login {
       display: flex;
       flex-direction: column;
       gap: 1rem;
+      width: 100%;
+      max-width: 26rem;
+      margin: 0 auto;
+      box-sizing: border-box;
+      border-top: 4px solid var(--accent);
+    }
+    h1 {
+      color: var(--accent);
     }
     .sso {
       display: block;
