@@ -9,6 +9,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { newPasswordProblem, PASSWORD_MIN_LENGTH } from '../../core/auth/auth-rules';
 import { isSystemPromptTooLong, SYSTEM_PROMPT_MAX_LENGTH } from '../../core/models/model-selection';
 
 /** 個人設定：個人 global system prompt，套用到自己所有的對話（專案的 prompt 會接在後面）。 */
@@ -51,6 +52,55 @@ import { isSystemPromptTooLong, SYSTEM_PROMPT_MAX_LENGTH } from '../../core/mode
           }
         </div>
       </form>
+
+      @if (auth.user()?.authMethod === 'Local') {
+        <form class="stack password" (ngSubmit)="changePassword()">
+          <h2>變更密碼</h2>
+          <label>
+            目前密碼
+            <input
+              name="currentPassword"
+              type="password"
+              autocomplete="current-password"
+              [ngModel]="currentPassword()"
+              (ngModelChange)="currentPassword.set($event)"
+            />
+          </label>
+          <label>
+            新密碼（至少 {{ passwordMinLength }} 個字元）
+            <input
+              name="newPassword"
+              type="password"
+              autocomplete="new-password"
+              [ngModel]="newPassword()"
+              (ngModelChange)="newPassword.set($event)"
+            />
+          </label>
+          <label>
+            再輸入一次新密碼
+            <input
+              name="confirmPassword"
+              type="password"
+              autocomplete="new-password"
+              [ngModel]="confirmPassword()"
+              (ngModelChange)="confirmPassword.set($event)"
+            />
+          </label>
+          <div class="actions">
+            <button type="submit" [disabled]="changingPassword() || !currentPassword()">
+              變更密碼
+            </button>
+            @if (passwordMessage()) {
+              <span class="muted" role="status">{{ passwordMessage() }}</span>
+            }
+            @if (passwordError()) {
+              <span class="error">{{ passwordError() }}</span>
+            }
+          </div>
+        </form>
+      } @else if (auth.user()?.authMethod === 'Oidc') {
+        <p class="muted password">企業帳號的密碼請到公司的帳號系統變更。</p>
+      }
     </section>
   `,
   styles: `
@@ -79,6 +129,13 @@ import { isSystemPromptTooLong, SYSTEM_PROMPT_MAX_LENGTH } from '../../core/mode
       align-items: center;
       gap: 0.75rem;
     }
+    .password {
+      margin-top: 2.5rem;
+      h2 {
+        font-size: 1.125rem;
+        margin: 0;
+      }
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -95,6 +152,14 @@ export class SettingsPage implements OnInit {
   protected readonly error = signal<string | null>(null);
   protected readonly tooLong = computed(() => isSystemPromptTooLong(this.draft()));
   protected readonly dirty = computed(() => this.draft().trim() !== this.savedValue());
+
+  protected readonly passwordMinLength = PASSWORD_MIN_LENGTH;
+  protected readonly currentPassword = signal('');
+  protected readonly newPassword = signal('');
+  protected readonly confirmPassword = signal('');
+  protected readonly changingPassword = signal(false);
+  protected readonly passwordMessage = signal<string | null>(null);
+  protected readonly passwordError = signal<string | null>(null);
 
   ngOnInit(): void {
     this.api.getSettings().subscribe({
@@ -124,6 +189,34 @@ export class SettingsPage implements OnInit {
       error: (e: unknown) => {
         this.error.set(describeApiError(e));
         this.saving.set(false);
+      },
+    });
+  }
+
+  protected changePassword(): void {
+    this.passwordMessage.set(null);
+    const problem = newPasswordProblem(
+      this.newPassword(),
+      this.confirmPassword(),
+      this.currentPassword(),
+    );
+    if (problem) {
+      this.passwordError.set(problem);
+      return;
+    }
+    this.passwordError.set(null);
+    this.changingPassword.set(true);
+    this.auth.changePassword(this.currentPassword(), this.newPassword()).subscribe({
+      next: () => {
+        this.currentPassword.set('');
+        this.newPassword.set('');
+        this.confirmPassword.set('');
+        this.passwordMessage.set('密碼已變更');
+        this.changingPassword.set(false);
+      },
+      error: (e: unknown) => {
+        this.passwordError.set(describeApiError(e));
+        this.changingPassword.set(false);
       },
     });
   }

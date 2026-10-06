@@ -11,11 +11,17 @@ import { authGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 
 describe('authGuard', () => {
-  const run = (loggedIn: boolean) => {
+  const run = (loggedIn: boolean, mustChangePassword = false) => {
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),
-        { provide: AuthService, useValue: { ensureLoaded: () => of(loggedIn) } },
+        {
+          provide: AuthService,
+          useValue: {
+            ensureLoaded: () => of(loggedIn),
+            mustChangePassword: () => mustChangePassword,
+          },
+        },
       ],
     });
     const result = TestBed.runInInjectionContext(() =>
@@ -33,5 +39,11 @@ describe('authGuard', () => {
     const router = TestBed.inject(Router);
     expect(result instanceof UrlTree).toBe(true);
     expect(router.serializeUrl(result as UrlTree)).toBe('/login?returnUrl=%2Fconversations%2Fabc');
+  });
+
+  it('sends users who must change their password to the change-password page', async () => {
+    const result = await run(true, true);
+    const router = TestBed.inject(Router);
+    expect(router.serializeUrl(result as UrlTree)).toBe('/change-password');
   });
 });

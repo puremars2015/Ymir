@@ -2,8 +2,11 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
+  AdminUser,
   ApiProblem,
   CancelExecutionResponse,
+  CreateLocalUserRequest,
+  LoginProviders,
   ChatMessage,
   Conversation,
   Me,
@@ -30,6 +33,38 @@ export class ApiService {
 
   logout(): Observable<void> {
     return this.http.post<void>('/api/auth/logout', null);
+  }
+
+  loginProviders(): Observable<LoginProviders> {
+    return this.http.get<LoginProviders>('/api/auth/providers');
+  }
+
+  passwordLogin(account: string, password: string): Observable<Me> {
+    return this.http.post<Me>('/api/auth/password-login', { account, password });
+  }
+
+  changePassword(currentPassword: string, newPassword: string): Observable<void> {
+    return this.http.post<void>('/api/me/password', { currentPassword, newPassword });
+  }
+
+  adminListUsers(search: string): Observable<AdminUser[]> {
+    const params: Record<string, string> = search.trim() ? { search: search.trim() } : {};
+    return this.http.get<AdminUser[]>('/api/admin/users', { params });
+  }
+
+  adminCreateLocalUser(request: CreateLocalUserRequest): Observable<AdminUser> {
+    return this.http.post<AdminUser>('/api/admin/users', request);
+  }
+
+  adminSetUserEnabled(userId: string, enabled: boolean): Observable<AdminUser> {
+    return this.http.post<AdminUser>(
+      `/api/admin/users/${userId}/${enabled ? 'enable' : 'disable'}`,
+      null,
+    );
+  }
+
+  adminResetPassword(userId: string, newPassword: string): Observable<void> {
+    return this.http.post<void>(`/api/admin/users/${userId}/reset-password`, { newPassword });
   }
 
   listProjects(): Observable<Project[]> {
@@ -112,6 +147,13 @@ export class ApiService {
 }
 
 /** 從 HttpErrorResponse 取出可顯示的錯誤訊息。 */
+/** ProblemDetails 的 `code`；不是 API 錯誤時為 null。 */
+export function apiErrorCode(error: unknown): string | null {
+  return error instanceof HttpErrorResponse
+    ? ((error.error as ApiProblem | null)?.code ?? null)
+    : null;
+}
+
 export function describeApiError(error: unknown): string {
   if (error instanceof HttpErrorResponse) {
     const problem = error.error as ApiProblem | null;

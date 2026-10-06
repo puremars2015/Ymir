@@ -1,11 +1,19 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/auth/auth.guard';
+import { adminGuard, authGuard, signedInGuard } from './core/auth/auth.guard';
 
 export const routes: Routes = [
   {
     path: 'login',
     loadComponent: () => import('./features/login/login-page').then((m) => m.LoginPage),
     title: '登入 · Vibe Maker',
+  },
+  {
+    // 本機帳號必須先改密碼（ADR-0009）；放在主畫面之外，避免主畫面呼叫其他 API。
+    path: 'change-password',
+    canActivate: [signedInGuard],
+    loadComponent: () =>
+      import('./features/login/change-password-page').then((m) => m.ChangePasswordPage),
+    title: '變更密碼 · Vibe Maker',
   },
   {
     // 登入後直接進入主畫面（ChatGPT 式版面：側邊欄 + 對話）
@@ -28,6 +36,12 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/settings/settings-page').then((m) => m.SettingsPage),
         title: '個人設定 · Vibe Maker',
+      },
+      {
+        path: 'admin/users',
+        canActivate: [adminGuard],
+        loadComponent: () => import('./features/admin/users-page').then((m) => m.UsersPage),
+        title: '使用者管理 · Vibe Maker',
       },
       {
         path: 'c/:conversationId',

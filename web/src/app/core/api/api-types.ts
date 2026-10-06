@@ -13,6 +13,11 @@ export type SendMessageResponse = Schemas['SendMessageResponse'];
 export type CancelExecutionResponse = Schemas['CancelExecutionResponse'];
 export type ModelOption = Schemas['ModelResponse'];
 export type UserSettings = Schemas['UserSettingsResponse'];
+export type LoginProviders = Schemas['LoginProvidersResponse'];
+export type AuthMethod = Schemas['AuthMethod'];
+export type AdminUser = Schemas['AdminUserResponse'];
+export type UserStatus = Schemas['UserStatus'];
+export type CreateLocalUserRequest = Schemas['CreateLocalUserRequest'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {
