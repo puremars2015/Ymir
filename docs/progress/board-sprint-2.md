@@ -14,7 +14,7 @@
 
 | 工作項目 | 狀態 | 備註 |
 |---|---|---|
-| OIDC 登入（Authorization Code + PKCE，後端換 token、只發 cookie） | ✅ | Entra ID（已確認、已註冊）；見 [#015](#015--企業帳號entra-id與本機帳號密碼登入使用者管理) |
+| OIDC 登入（Authorization Code + PKCE，後端換 token、只發 cookie） | ✅ | Entra ID（已確認、已註冊）；見 [#017](#017--企業帳號entra-id與本機帳號密碼登入使用者管理) |
 | `IIdentityProvider`：IdP claims → `ExternalIdentity`（issuer + subject / oid） | ✅ | `EntraIdentityProvider`：`iss` + `oid`，角色取自 app role `Ymir.Admin` |
 | 每個請求驗證使用者狀態（停用後既有 cookie 立即失效） | ✅ | Cookie `OnValidatePrincipal` |
 | Admin API：使用者列表、停用 / 啟用、本機帳號建立 / 重設密碼（寫 audit） | ✅ | 企業帳號角色以 Entra 為準，不在 Ymir 修改 |
@@ -29,6 +29,8 @@
 | LiteLLM sample（MiniMax 國際站） | ✅ | 設定與 proxy 已用 Fake LLM 驗證；MiniMax 實連依使用者決定在沙箱**跳過**，待使用者環境確認（[#010](#010--沙箱無法使用的外部資源驗證先跳過)） |
 | Ymir 接上 LiteLLM：每位使用者的 virtual key（ADR-0004） | ✅ | 以 Fake LLM 模擬的 LiteLLM 驗證；真正的 LiteLLM + PostgreSQL 在沙箱**跳過**（image 拉不下來），見 [#011](#011--ymir-接上-litellm每位使用者的-virtual-key) |
 | 對話選模型、個人 global / 專案 system prompt | ✅ | 見 [#012](#012--對話選模型個人-global-與專案-system-prompt) |
+| 對話隱藏模型思考內容（即時回覆與歷史） | ✅ | 見 [#015](#015--對話隱藏模型思考內容)；過濾 think / thinking 區段與未完成的串流標籤 |
+| 使用者 OneDrive Workspace（Microsoft Graph） | ⏳ | 方法二已選定；目前只記錄計畫，待使用者指示實作；見 [#016](#016--記錄-onedrive-workspace-後續計畫暫不實作) 與 [計畫](../planning/onedrive-workspace-plan.md) |
 | API 放進容器 + 主機 runtime host（ADR-0008） | ✅ | 見 [#013](#013--api-放進容器agent-runtime-改由主機上的-runtime-host-管理)；沙箱以 Docker 驗證完整流程 |
 | API 容器的 engine：Linux 用 rootful Podman（Quadlet）、Windows 用 Docker Desktop | ✅ | 使用者決定；見 [#014](#014--api-容器linux-用-rootful-podmanwindows-用-docker-desktop) |
 | 在 Linux 主機安裝 runtime host（rootless Podman、systemd、`ymir-runtime` group）並以 Quadlet 啟動 API 容器 | ⏳ | 依 [deploy/runtime-host](../../deploy/runtime-host/README.md)、[deploy/api](../../deploy/api/README.md)；**待使用者環境確認** |
@@ -43,7 +45,7 @@
 
 ## 💬 留言區
 
-### #015 · 企業帳號（Entra ID）與本機帳號密碼登入、使用者管理
+### #017 · 企業帳號（Entra ID）與本機帳號密碼登入、使用者管理
 
 > 👤 **Claude（AI）** · 🕒 2026-10-06 13:30 · `✅完成`
 
@@ -88,6 +90,30 @@ Sprint 2 的主要內容完成，架構決策見 [ADR-0009](../adr/0009-entra-id
 （尚無回覆）
 
 </details>
+
+---
+
+### #016 · 記錄 OneDrive Workspace 後續計畫，暫不實作
+
+> 👤 **Codex（AI）** · 🕒 2026-10-06 13:15 · `📢公告`
+
+使用者選定方法二：透過 Microsoft Graph 串接每位使用者自己的 OneDrive，並要求「先不要改程式，先把計畫寫下來」。已新增 [計畫文件](../planning/onedrive-workspace-plan.md)，同步更新開發規劃的 workspace 存放項目。
+
+- 保留使用者專屬本機 workspace，任務前下載、任務後同步；Graph 憑證由後端保管，Agent 不取得。agent-state 與 SQL Server 資料仍留在部署環境。
+- 記錄目錄映射、同步範圍、版本衝突、重試、解除連結、後續階段與驗收條件。帳號／租戶類型、精確權限、刪除及保留政策待確認；目前不開始開發或資料搬移。
+- 驗證：對照 Microsoft 官方 Graph／授權／上傳文件，檢查 Markdown 連結與 `git diff --check`。本次只改文件，未執行程式測試，也未修改程式、資料庫或部署。
+
+---
+
+### #015 · 對話隱藏模型思考內容
+
+> 👤 **Codex（AI）** · 🕒 2026-10-06 13:06 · `✅完成`
+
+依使用者要求，對話畫面隱藏模型放在 `<think>` / `<thinking>` 內的推理內容。即時串流與歷史訊息共用純顯示 pipe；串流標籤尚未收齊時也隱藏，避免思考內容閃現。只過濾助理回答，保留使用者原文、工具狀態與資料庫內原始訊息。
+
+- 驗證：Node 24 Docker 執行 `npm run lint`、`npm test -- --watch=false`（28 項通過）、`npm run build`，全部成功；`git diff --check` 通過。
+- 已重建並部署本機網頁容器。內建瀏覽器登入既有 `docker-check`，查看含 MiniMax 思考區段的歷史對話，畫面只顯示「已建立 minimax-test.html」。本次沒有建立新測試帳號或啟動 Agent 容器。
+- 後端與 API 契約未變更；沒有呼叫真實模型，串流分段行為由新增測試驗證。
 
 ---
 

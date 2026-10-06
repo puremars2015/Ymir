@@ -24,6 +24,7 @@ import { ModelStore } from '../../core/models/model.store';
 import { NavigationStore } from '../../core/navigation/navigation.store';
 import { PendingPromptService } from '../../core/navigation/pending-prompt.service';
 import { Composer } from '../../shared/composer';
+import { AssistantText } from '../../shared/assistant-text';
 import { ModelPicker } from '../../shared/model-picker';
 
 interface LiveTurn {
@@ -39,7 +40,7 @@ interface LiveTurn {
  */
 @Component({
   selector: 'app-chat-page',
-  imports: [RouterLink, Composer, ModelPicker],
+  imports: [RouterLink, Composer, ModelPicker, AssistantText],
   templateUrl: './chat-page.html',
   styleUrl: './chat-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

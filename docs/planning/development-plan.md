@@ -154,5 +154,5 @@ Walking Skeleton 打通：Dev 登入（Cookie + XSRF）→ Workspace / 對話 �
 | 套件下載 / Egress | 內部套件鏡像（npm / PyPI / NuGet） | 公司是否已有 Nexus / Artifactory；或改用 allow-list egress proxy |
 | LiteLLM Virtual Key | 每 runtime 一把、短效、限模型與預算 | 預算額度、可用模型清單、是否依部門分帳 |
 | 企業 IdP | Entra ID（OIDC） | 實際為 Entra ID / ADFS / 純 LDAP？ |
-| Workspace 存放 | Podman Host 本機磁碟 | 是否必須放 NAS（影響 rootless 相容性）、備份頻率 |
+| Workspace 存放 | 本機工作副本 + 日後以 Microsoft Graph 串接各使用者 OneDrive | 已選定方法二，僅記錄、尚未實作；見 [OneDrive Workspace 計畫](onedrive-workspace-plan.md)；待確認帳號類型、授權、同步與保存規則 |
 | 資料保存 | Conversation / Workspace 永久保留，可封存 | 公司資料保存與刪除政策 |
