@@ -1,30 +1,39 @@
 :root {
   color-scheme: light dark;
-  --text: #1f2937;
-  --text-muted: #6b7280;
+  /* 參考 Web-Pro 官網的深藍、淺藍與白色；所有頁面共用品牌色。 */
+  --text: #20364b;
+  --text-muted: #5f7385;
   --surface: #ffffff;
-  --surface-muted: #f3f4f6;
-  --surface-active: #e9eaee;
-  --sidebar: #f7f7f8;
-  --background: #ffffff;
-  --border: #e5e7eb;
-  --accent: #2563eb;
+  --surface-muted: #f0f6fb;
+  --surface-active: #e2eff9;
+  --sidebar: #f5f9fc;
+  --background: #f8fafc;
+  --border: #d7e3ee;
+  --accent: #004ea0;
+  --accent-hover: #003d7d;
+  --accent-soft: #e2eff9;
+  --focus-ring: #0085c8;
+  --card-shadow: 0 12px 36px rgb(0 78 160 / 8%);
   --accent-contrast: #ffffff;
   --danger: #dc2626;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #e5e7eb;
-    --text-muted: #9ca3af;
-    --surface: #111827;
-    --surface-muted: #1f2937;
-    --surface-active: #2b3442;
-    --sidebar: #0b1220;
-    --background: #111827;
-    --border: #374151;
-    --accent: #60a5fa;
-    --accent-contrast: #030712;
+    --text: #e7f1fa;
+    --text-muted: #a3b8ca;
+    --surface: #142a3e;
+    --surface-muted: #1b354c;
+    --surface-active: #204461;
+    --sidebar: #102438;
+    --background: #0e1e2e;
+    --border: #365269;
+    --accent: #85c7ff;
+    --accent-hover: #addcff;
+    --accent-soft: #204461;
+    --focus-ring: #85c7ff;
+    --card-shadow: 0 12px 36px rgb(0 0 0 / 20%);
+    --accent-contrast: #0e1e2e;
     --danger: #f87171;
   }
 }
@@ -72,6 +81,17 @@ textarea {
   font: inherit;
 }
 
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--accent);
+}
+
 button {
   padding: 0.625rem 1.125rem;
   border-radius: 8px;
@@ -80,6 +100,10 @@ button {
   color: var(--accent-contrast);
   font: inherit;
   cursor: pointer;
+
+  &:hover:not(:disabled):not(.secondary):not(.link) {
+    background: var(--accent-hover);
+  }
 
   &:disabled {
     opacity: 0.5;
@@ -107,6 +131,10 @@ a.button {
   color: var(--accent-contrast);
   text-decoration: none;
   font: inherit;
+
+  &:hover {
+    background: var(--accent-hover);
+  }
 }
 
 .danger-text {
@@ -126,6 +154,7 @@ a.button {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1.5rem;
+  box-shadow: var(--card-shadow);
 }
 
 .narrow {

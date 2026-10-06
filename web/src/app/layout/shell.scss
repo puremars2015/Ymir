@@ -29,7 +29,7 @@
 }
 
 .brand {
-  color: var(--text);
+  color: var(--accent);
   text-decoration: none;
   font-size: 0.95rem;
 
@@ -75,12 +75,17 @@
 
   &.active {
     background: var(--surface-active);
+    color: var(--accent);
+    box-shadow: inset 3px 0 var(--accent);
     font-weight: 600;
   }
 }
 
 .new-chat {
   font-weight: 500;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--border);
 }
 
 .sections {
