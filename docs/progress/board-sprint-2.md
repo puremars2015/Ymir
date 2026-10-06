@@ -29,6 +29,7 @@
 | LiteLLM sample（MiniMax 國際站） | ✅ | 設定與 proxy 已用 Fake LLM 驗證；MiniMax 實連依使用者決定在沙箱**跳過**，待使用者環境確認（[#010](#010--沙箱無法使用的外部資源驗證先跳過)） |
 | Ymir 接上 LiteLLM：每位使用者的 virtual key（ADR-0004） | ✅ | 以 Fake LLM 模擬的 LiteLLM 驗證；真正的 LiteLLM + PostgreSQL 在沙箱**跳過**（image 拉不下來），見 [#011](#011--ymir-接上-litellm每位使用者的-virtual-key) |
 | 對話選模型、個人 global / 專案 system prompt | ✅ | 見 [#012](#012--對話選模型個人-global-與專案-system-prompt) |
+| 對話隱藏模型思考內容（即時回覆與歷史） | ✅ | 見 #015；過濾 think / thinking 區段與未完成的串流標籤 |
 | API 放進容器 + 主機 runtime host（ADR-0008） | ✅ | 見 [#013](#013--api-放進容器agent-runtime-改由主機上的-runtime-host-管理)；沙箱以 Docker 驗證完整流程 |
 | API 容器的 engine：Linux 用 rootful Podman（Quadlet）、Windows 用 Docker Desktop | ✅ | 使用者決定；見 [#014](#014--api-容器linux-用-rootful-podmanwindows-用-docker-desktop) |
 | 在 Linux 主機安裝 runtime host（rootless Podman、systemd、`ymir-runtime` group）並以 Quadlet 啟動 API 容器 | ⏳ | 依 [deploy/runtime-host](../../deploy/runtime-host/README.md)、[deploy/api](../../deploy/api/README.md)；**待使用者環境確認** |
@@ -40,6 +41,18 @@
 ---
 
 ## 💬 留言區
+
+### #015 · 對話隱藏模型思考內容
+
+> 👤 **Codex（AI）** · 🕒 2026-10-06 13:06 · `✅完成`
+
+依使用者要求，對話畫面隱藏模型放在 `<think>` / `<thinking>` 內的推理內容。即時串流與歷史訊息共用純顯示 pipe；串流標籤尚未收齊時也隱藏，避免思考內容閃現。只過濾助理回答，保留使用者原文、工具狀態與資料庫內原始訊息。
+
+- 驗證：Node 24 Docker 執行 `npm run lint`、`npm test -- --watch=false`（28 項通過）、`npm run build`，全部成功；`git diff --check` 通過。
+- 已重建並部署本機網頁容器。內建瀏覽器登入既有 `docker-check`，查看含 MiniMax 思考區段的歷史對話，畫面只顯示「已建立 minimax-test.html」。本次沒有建立新測試帳號或啟動 Agent 容器。
+- 後端與 API 契約未變更；沒有呼叫真實模型，串流分段行為由新增測試驗證。
+
+---
 
 ### #014 · API 容器：Linux 用 rootful Podman，Windows 用 Docker Desktop
 

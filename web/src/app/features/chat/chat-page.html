@@ -11,16 +11,20 @@
 <div class="scroller">
   <ol class="turns">
     @for (message of messages(); track message.id) {
-      <li
-        class="turn"
-        [class.user]="message.role === 'USER'"
-        [class.assistant]="message.role !== 'USER'"
-        [class.error-message]="message.messageType === 'ERROR'"
-      >
-        <div class="bubble">
-          <span class="text">{{ message.content }}</span>
-        </div>
-      </li>
+      @let content =
+        message.role === 'ASSISTANT' ? (message.content | assistantText) : message.content;
+      @if (content) {
+        <li
+          class="turn"
+          [class.user]="message.role === 'USER'"
+          [class.assistant]="message.role !== 'USER'"
+          [class.error-message]="message.messageType === 'ERROR'"
+        >
+          <div class="bubble">
+            <span class="text">{{ content }}</span>
+          </div>
+        </li>
+      }
     }
     @if (live(); as turn) {
       <!-- 執行中尚未重新載入歷史，先顯示送出的訊息；結束後以後端保存的訊息取代 -->
@@ -37,8 +41,8 @@
               <span class="tool-name">{{ tool.tool }}</span> <code>{{ tool.summary }}</code>
             </p>
           }
-          @if (turn.view.text) {
-            <p class="text">{{ turn.view.text }}</p>
+          @if (turn.view.text | assistantText: true; as text) {
+            <p class="text">{{ text }}</p>
           } @else if (!turn.view.statusText && !turn.view.tools.length) {
             <p class="status typing" aria-label="Agent 思考中">●●●</p>
           }
