@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ymir.Api\Ymir.Api.csproj" />
+    <ProjectReference Include="..\..\src\Ymir.RuntimeHost\Ymir.RuntimeHost.csproj" />
     <ProjectReference Include="..\Ymir.Testing.FakeLlm\Ymir.Testing.FakeLlm.csproj" />
   </ItemGroup>
 </Project>

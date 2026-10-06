@@ -18,6 +18,7 @@ builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 builder.Services.AddOpenApi();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddYmirDataProtection(builder.Configuration);
 builder.Services.AddYmirAuth(builder.Environment);
 builder.Services.AddPublicEdge(builder.Configuration, builder.Environment);
 builder.Services.AddPlatformInfrastructure(connectionString);

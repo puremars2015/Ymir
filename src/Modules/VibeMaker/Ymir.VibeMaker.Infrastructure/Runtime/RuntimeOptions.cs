@@ -41,6 +41,9 @@ public sealed class RuntimeOptions
     /// <summary>Container CLI；未設定時依 <see cref="Provider"/> 使用 <c>podman</c> 或 <c>docker</c>。</summary>
     public string? ContainerExecutable { get; set; }
 
+    /// <summary><see cref="RuntimeProvider.Remote"/> 時連線的 runtime host（ADR-0008）。</summary>
+    public RemoteRuntimeOptions Remote { get; set; } = new();
+
     internal string ResolvedNetwork => Network ?? (Provider == RuntimeProvider.Docker ? "bridge" : "slirp4netns");
 
     internal string ResolvedExecutable => ContainerExecutable ?? (Provider == RuntimeProvider.Docker ? "docker" : "podman");
@@ -55,4 +58,20 @@ public enum RuntimeProvider
 
     /// <summary>Docker（非 rootless）。只用於沒有 Linux 主機時的開發與驗證，正式環境不支援（ADR-0005）。</summary>
     Docker = 2,
+
+    /// <summary>
+    /// 呼叫主機上的 runtime host 服務（<c>Ymir.RuntimeHost</c>，ADR-0008）。API 在容器內執行時使用：
+    /// API 不需要 Podman，也不掛載任何 container runtime socket。
+    /// </summary>
+    Remote = 3,
+}
+
+/// <summary>Runtime host 的連線設定（ADR-0008）。</summary>
+public sealed class RemoteRuntimeOptions
+{
+    /// <summary><c>unix:/run/ymir-runtime/runtime.sock</c>（建議）或 loopback 的 <c>http://127.0.0.1:5090</c>。</summary>
+    public string? Endpoint { get; set; }
+
+    /// <summary>與 runtime host 共用的 bearer token（至少 32 字元），只放在部署環境的 secret / .env。</summary>
+    public string? Token { get; set; }
 }

@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-05 18:12 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-06 09:58 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -29,6 +29,8 @@
 | LiteLLM sample（MiniMax 國際站） | ✅ | 設定與 proxy 已用 Fake LLM 驗證；MiniMax 實連依使用者決定在沙箱**跳過**，待使用者環境確認（[#010](#010--沙箱無法使用的外部資源驗證先跳過)） |
 | Ymir 接上 LiteLLM：每位使用者的 virtual key（ADR-0004） | ✅ | 以 Fake LLM 模擬的 LiteLLM 驗證；真正的 LiteLLM + PostgreSQL 在沙箱**跳過**（image 拉不下來），見 [#011](#011--ymir-接上-litellm每位使用者的-virtual-key) |
 | 對話選模型、個人 global / 專案 system prompt | ✅ | 見 [#012](#012--對話選模型個人-global-與專案-system-prompt) |
+| API 放進容器 + 主機 runtime host（ADR-0008） | ✅ | 見 [#013](#013--api-放進容器agent-runtime-改由主機上的-runtime-host-管理)；沙箱以 Docker 驗證完整流程 |
+| 在 Linux 主機安裝 runtime host（rootless Podman、systemd、`ymir-runtime` group）並啟動 API 容器 | ⏳ | 依 [deploy/runtime-host](../../deploy/runtime-host/README.md)、[deploy/api](../../deploy/api/README.md)；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
 **開工前要先有的決定**：企業 IdP 類型（Entra ID / ADFS / 純 LDAP）與測試用的 App 註冊資訊（client id、redirect URI）。
@@ -36,6 +38,65 @@
 ---
 
 ## 💬 留言區
+
+### #013 · API 放進容器，Agent runtime 改由主機上的 runtime host 管理
+
+> 👤 **Claude（AI）** · 🕒 2026-10-06 09:58 · `✅完成`
+
+依使用者選擇的 **B 方案** 完成，架構決策見 [ADR-0008](../adr/0008-containerized-api-runtime-host.md)。
+
+- **為什麼不直接把 Podman socket 掛進 API 容器**：API 被攻破時，攻擊者就能建立任意 container、掛載主機路徑。
+- **改成主機上的小服務 `Ymir.RuntimeHost`**，以 rootless Podman 專用帳號 `ymir` 執行：
+  - 聽 Unix socket `/run/ymir-runtime/runtime.sock`（660，group `ymir-runtime`），每個請求都要 bearer token。
+  - **只接受 user id**：確保 runtime、在 runtime 內執行程序。
+  - image、掛載、資源限制、host 路徑全部由 runtime host 自己的設定決定，沒有任何端點能指定。
+  - 程序規格在 client 與 server 都會檢查：以 `-` 開頭的執行檔、環境變數名稱、NUL、工作目錄允許清單。
+  - stdin / stdout 經 WebSocket 轉送；API 斷線時程序一定會被結束。
+- **API 端**新增 `VibeMaker:Runtime:Provider=Remote`。`PiAgentHarness`、`ExecutionRunner` 都不用改。
+- **API image**（`src/Ymir.Api/Containerfile`）：
+  - 內容：Angular build + API，非 root（uid 1654），預設 Production + Remote。
+  - `deploy/api/compose.yml`：host network（仍只綁 `127.0.0.1:5080`，ADR-0006 不變）、唯讀、drop 全部 capabilities。
+  - **只掛兩個主機資料夾**：
+    - socket 目錄；
+    - Data Protection 金鑰：新設定 `Ymir:DataProtection:KeysPath`，容器重建後登入仍有效。
+- **部署檔**：`deploy/runtime-host/`（systemd unit、設定範本、安裝步驟）、`deploy/api/`（compose、`.env.example`、README）。
+- **開發方式不變**：Development 的 API 仍在主機上跑 Local runtime；Windows 仍用 Docker provider。
+
+截圖（API 在容器內時的完整流程）：[未分組對話](screenshots/api-in-container/02-chat.png) · [專案內對話](screenshots/api-in-container/03-project-chat.png)
+
+**驗證（實際跑過）**
+- 後端：
+  - `dotnet format` 通過；`dotnet test --solution Ymir.slnx` **248 項全部通過**（新增 57 項）。
+  - 單元測試：位址只接受 Unix socket 或 loopback、token 強度與比對、程序規格驗證、socket 權限不允許 other。
+  - 整合測試：用真正的 runtime host（Kestrel + Unix socket）驗證以下項目：
+    - stdio（約 100 KB 中文，跨多個 frame）、exit code、stderr、環境變數、工作目錄、kill；
+    - API 異常斷線後主機上的程序被結束；
+    - 錯誤或沒有 token 時回 401；
+    - 不合法的規格在 server 端也會被拒絕；
+    - 真實 Pi 經 runtime host 建檔與取消；
+    - 正式 API 流程在 `Provider=Remote` 下完成對話，檔案只出現在 runtime host 的目錄。
+- 沙箱實測，接近正式部署：
+  1. `podman build` 建出 API image（321 MB）。
+  2. runtime host 以 `Provider=Docker` 執行，socket 為 `srw-rw---- root:ymir-runtime`。
+  3. API 容器：唯讀、drop ALL、`--group-add ymir-runtime`，只掛 socket 目錄與金鑰目錄；容器內沒有任何 container CLI 或 runtime socket。
+  4. `npm run e2e` 對 `http://127.0.0.1:5080`（容器內的 API 直接提供 Angular）**12 個步驟全部通過**。Agent container `ymir-user-*` 由 runtime host 建立，檔案寫進主機的 workspace 目錄。
+  5. runtime host 的 log 中沒有 token 或模型金鑰。
+  6. 反向測試：沒有 `ymir-runtime` group 的容器連 socket 目錄得到 `Permission denied`。
+- **未驗證、待使用者環境確認**：
+  - Linux 主機上的 rootless Podman + systemd 安裝流程（沙箱是 rootful 環境，Agent container 改用 Docker）。
+  - API 容器以 rootless Podman 執行時 `--group-add keep-groups` 的行為。
+  - 沙箱建置 image 時為了通過代理，額外帶了 CA 憑證，這只用於驗證；`Containerfile` 本身沒有改。
+
+**待決定**：正式主機要用哪個 engine 跑 API 容器（建議 Docker 或 rootful Podman，`group_add` 最單純），以及 runtime host 用 framework-dependent（主機裝 .NET 10 runtime）還是 self-contained 發行。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #012 · 對話選模型、個人 global 與專案 system prompt
 

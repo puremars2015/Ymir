@@ -85,6 +85,12 @@ cloudflared tunnel ingress rule https://ymir.example.com/health   # 應對應到
 
 ## 4. 以 Production 設定啟動 API
 
+> **正式部署建議把 API 放進容器**（[ADR-0008](../adr/0008-containerized-api-runtime-host.md)）：
+> - 先安裝主機上的 runtime host（[`deploy/runtime-host`](../../deploy/runtime-host/README.md)），再用 [`deploy/api`](../../deploy/api/README.md) 啟動 API 容器。
+> - API 容器使用 host network，同樣只綁 `127.0.0.1:5080`，本節的 Public Edge 設定改寫在 `deploy/api/.env`。
+>
+> 下面是直接在主機上執行 API 的方式，適合 Windows 開發機驗證。
+
 ```powershell
 cd web; npm ci; npm run build; cd ..           # 產生 web\dist\ymir-web\browser
 dotnet publish src\Ymir.Api -c Release -o out\api

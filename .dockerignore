@@ -1,0 +1,13 @@
+# container build context（src/Ymir.Api/Containerfile）；Podman 與 Docker 都會讀這個檔案。
+**/bin/
+**/obj/
+**/node_modules/
+web/dist/
+web/.angular/
+**/.env
+.git/
+docs/
+documents/
+spikes/
+tests/
+deploy/

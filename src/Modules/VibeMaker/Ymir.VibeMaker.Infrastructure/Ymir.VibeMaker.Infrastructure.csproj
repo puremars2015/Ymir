@@ -11,5 +11,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Ymir.UnitTests" />
     <InternalsVisibleTo Include="Ymir.IntegrationTests" />
+    <!-- runtime host 共用 RuntimeHostProtocol 與 HostProcess（ADR-0008） -->
+    <InternalsVisibleTo Include="Ymir.RuntimeHost" />
   </ItemGroup>
 </Project>

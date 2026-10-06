@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Ymir.Api.Problems;
 using Ymir.VibeMaker.Contracts.Executions;
 
@@ -14,6 +15,21 @@ internal static class AuthSetup
 {
     public const string XsrfCookieName = "XSRF-TOKEN";
     public const string XsrfHeaderName = "X-XSRF-TOKEN";
+
+    /// <summary>
+    /// Data Protection 金鑰（cookie、antiforgery 都靠它）：設定 <c>Ymir:DataProtection:KeysPath</c> 時存到該目錄。
+    /// API 在容器內執行時必須設定並掛載主機目錄，否則容器重建後所有登入都會失效（ADR-0002、ADR-0008）。
+    /// </summary>
+    public static IServiceCollection AddYmirDataProtection(this IServiceCollection services, IConfiguration configuration)
+    {
+        var dataProtection = services.AddDataProtection().SetApplicationName("Ymir");
+        if (configuration["Ymir:DataProtection:KeysPath"] is { Length: > 0 } keysPath)
+        {
+            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+        }
+
+        return services;
+    }
 
     public static IServiceCollection AddYmirAuth(this IServiceCollection services, IHostEnvironment environment)
     {

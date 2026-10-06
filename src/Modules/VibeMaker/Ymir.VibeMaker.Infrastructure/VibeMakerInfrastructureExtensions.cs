@@ -14,6 +14,7 @@ using Ymir.VibeMaker.Infrastructure.LiteLlm;
 using Ymir.VibeMaker.Infrastructure.Persistence;
 using Ymir.VibeMaker.Infrastructure.PiAgent;
 using Ymir.VibeMaker.Infrastructure.Runtime;
+using Ymir.VibeMaker.Infrastructure.Runtime.Remote;
 
 namespace Ymir.VibeMaker.Infrastructure;
 
@@ -46,7 +47,7 @@ public static class VibeMakerInfrastructureExtensions
 
     /// <summary>
     /// 只註冊 Agent runtime 與 harness（PoC 等不需要資料庫的程式使用）。設定：
-    /// <c>VibeMaker:Runtime:Provider</c> = Podman | Docker | Local；<c>VibeMaker:Harness</c> = Pi | Scripted。
+    /// <c>VibeMaker:Runtime:Provider</c> = Podman | Docker | Local | Remote；<c>VibeMaker:Harness</c> = Pi | Scripted。
     /// Local runtime 沒有隔離，非 Development 環境會拒絕啟動。
     /// </summary>
     public static IServiceCollection AddVibeMakerAgentRuntime(
@@ -59,8 +60,44 @@ public static class VibeMakerInfrastructureExtensions
         AddModelGateway(services, configuration, isDevelopment);
 
         var runtimeProvider = configuration.GetSection(RuntimeOptions.SectionName).GetValue(nameof(RuntimeOptions.Provider), RuntimeProvider.Podman);
+        if (runtimeProvider == RuntimeProvider.Remote)
+        {
+            // API 在容器內：runtime 由主機上的 runtime host 管理（ADR-0008），任何環境都可以使用。
+            services.AddSingleton<IAgentRuntimeManager, RemoteRuntimeManager>();
+        }
+        else
+        {
+            services.AddVibeMakerRuntimeManager(configuration, isDevelopment);
+        }
+
+        var harness = configuration.GetValue("VibeMaker:Harness", HarnessKind.Pi);
+        if (harness == HarnessKind.Scripted)
+        {
+            services.AddSingleton<IAgentHarness, ScriptedAgentHarness>();
+        }
+        else
+        {
+            services.AddSingleton<IAgentHarness, PiAgentHarness>();
+        }
+
+        return services;
+    }
+
+    /// <summary>
+    /// 只註冊直接管理 runtime 的 provider（Podman / Docker / Local），runtime host（<c>Ymir.RuntimeHost</c>，ADR-0008）使用。
+    /// Local runtime 沒有隔離，非 Development 環境會拒絕啟動；Remote 在這裡不允許（runtime host 不能再轉給另一個 runtime host）。
+    /// </summary>
+    public static IServiceCollection AddVibeMakerRuntimeManager(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        bool isDevelopment)
+    {
+        services.Configure<RuntimeOptions>(configuration.GetSection(RuntimeOptions.SectionName));
+        var runtimeProvider = configuration.GetSection(RuntimeOptions.SectionName).GetValue(nameof(RuntimeOptions.Provider), RuntimeProvider.Podman);
         switch (runtimeProvider)
         {
+            case RuntimeProvider.Remote:
+                throw new InvalidOperationException("VibeMaker:Runtime:Provider=Remote cannot be used by the runtime host itself; use Podman.");
             case RuntimeProvider.Local when !isDevelopment:
                 throw new InvalidOperationException("VibeMaker:Runtime:Provider=Local has no isolation and is only allowed in Development.");
             case RuntimeProvider.Local when OperatingSystem.IsWindows():
@@ -72,16 +109,6 @@ public static class VibeMakerInfrastructureExtensions
             default:
                 services.AddSingleton<IAgentRuntimeManager, ContainerRuntimeManager>();
                 break;
-        }
-
-        var harness = configuration.GetValue("VibeMaker:Harness", HarnessKind.Pi);
-        if (harness == HarnessKind.Scripted)
-        {
-            services.AddSingleton<IAgentHarness, ScriptedAgentHarness>();
-        }
-        else
-        {
-            services.AddSingleton<IAgentHarness, PiAgentHarness>();
         }
 
         return services;

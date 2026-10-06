@@ -3,6 +3,7 @@
     <Project Path="src/Ymir.Api/Ymir.Api.csproj" />
     <Project Path="src/Ymir.AppHost/Ymir.AppHost.csproj" />
     <Project Path="src/Ymir.Edge/Ymir.Edge.csproj" />
+    <Project Path="src/Ymir.RuntimeHost/Ymir.RuntimeHost.csproj" />
     <Project Path="src/Ymir.ServiceDefaults/Ymir.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/src/Platform/">
