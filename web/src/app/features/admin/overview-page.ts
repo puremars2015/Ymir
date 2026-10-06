@@ -16,7 +16,13 @@ import {
 } from '../../core/admin/admin-rules';
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { localToday, oidcWarnings } from '../../core/admin/oidc-settings-rules';
-import { AdminOverview, OidcSettings, RuntimeSummary } from '../../core/api/api-types';
+import { tunnelWarnings } from '../../core/admin/tunnel-settings-rules';
+import {
+  AdminOverview,
+  OidcSettings,
+  RuntimeSummary,
+  TunnelSettings,
+} from '../../core/api/api-types';
 import { AdminTabs } from './admin-tabs';
 
 /** Admin 總覽（ADR-0010）：使用者、Agent 執行狀況、各使用者的執行環境。 */
@@ -338,9 +344,14 @@ export class OverviewPage implements OnInit {
 
   protected readonly overview = signal<AdminOverview | null>(null);
   private readonly oidc = signal<OidcSettings | null>(null);
+  private readonly tunnel = signal<TunnelSettings | null>(null);
   protected readonly warnings = computed(() => {
     const oidc = this.oidc();
-    return oidc ? oidcWarnings(oidc, localToday()) : [];
+    const tunnel = this.tunnel();
+    return [
+      ...(tunnel ? tunnelWarnings(tunnel) : []),
+      ...(oidc ? oidcWarnings(oidc, localToday()) : []),
+    ];
   });
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
@@ -364,6 +375,10 @@ export class OverviewPage implements OnInit {
     this.api.adminGetOidcSettings().subscribe({
       next: (settings) => this.oidc.set(settings),
       error: () => this.oidc.set(null),
+    });
+    this.api.adminGetTunnelSettings().subscribe({
+      next: (settings) => this.tunnel.set(settings),
+      error: () => this.tunnel.set(null),
     });
   }
 

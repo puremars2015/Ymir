@@ -21,6 +21,7 @@ import {
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { OidcSettings, OidcTestResult } from '../../core/api/api-types';
 import { AdminTabs } from './admin-tabs';
+import { TunnelSettingsCard } from './tunnel-settings-card';
 
 /**
  * 系統設定（ADR-0010）：企業帳號（Entra ID）登入。
@@ -28,7 +29,7 @@ import { AdminTabs } from './admin-tabs';
  */
 @Component({
   selector: 'app-settings-page',
-  imports: [AdminTabs, DatePipe, FormsModule],
+  imports: [AdminTabs, DatePipe, FormsModule, TunnelSettingsCard],
   template: `
     <section class="admin">
       <app-admin-tabs />
@@ -183,6 +184,8 @@ import { AdminTabs } from './admin-tabs';
           <p class="error" role="alert">{{ error() }}</p>
         }
       </article>
+
+      <app-tunnel-settings-card />
     </section>
   `,
   styles: `

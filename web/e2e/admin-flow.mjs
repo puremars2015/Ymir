@@ -160,4 +160,22 @@ if (await after.locator('a.sso').count())
   throw new Error('company login still offered after reset');
 step('reset to deployment settings removes the company login');
 
+// 10. 系統設定：Cloudflare Tunnel。開發環境沒有 runtime host → token 欄位停用；對外網域可以設定與還原
+await admin.click('app-admin-tabs a:has-text("系統設定")');
+const tunnelCard = admin.locator('app-tunnel-settings-card');
+await tunnelCard.locator('.state:has-text("此部署不支援")').waitFor();
+if (!(await tunnelCard.locator('input[name=tunnelToken]').isDisabled()))
+  throw new Error('token input must be disabled without a runtime host');
+await tunnelCard.locator('input[name=hostname]').fill('https://bad.example.com');
+await tunnelCard.locator('text=請輸入網域名稱').waitFor();
+await tunnelCard.locator('input[name=hostname]').fill('ymir.e2e-example.com');
+await tunnelCard.locator('button:has-text("儲存網域")').click();
+await tunnelCard.locator('[role=status]:has-text("ymir.e2e-example.com")').waitFor();
+await tunnelCard.locator('code:has-text("https://ymir.e2e-example.com/signin-oidc")').waitFor();
+await admin.screenshot({ path: `${outDir}/05-settings-tunnel.png`, fullPage: true });
+await tunnelCard.locator('input[name=hostname]').fill('');
+await tunnelCard.locator('button:has-text("儲存網域")').click();
+await tunnelCard.locator('[role=status]:has-text("已還原")').waitFor();
+step('tunnel card: unavailable without runtime host; public hostname set and reset');
+
 await browser.close();
