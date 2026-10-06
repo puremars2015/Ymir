@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Ymir.IntegrationTests.PiAgent;
 using Ymir.RuntimeHost;
@@ -29,6 +30,13 @@ public sealed class RuntimeHostFixture : IAsyncLifetime
 
     public FakeLlmServer FakeLlm { get; private set; } = null!;
 
+    /// <summary>Tunnel 管理以 SystemdUser 模式開啟，但重啟服務改由 fake 記錄（沙箱沒有 systemd user session）。</summary>
+    public FakeTunnelServiceController Tunnel { get; } = new();
+
+    public string TunnelEnvFile => Path.Combine(WorkspaceRoot, "tunnel", "cloudflared.env");
+
+    public IServiceProvider Services => _host!.Services;
+
     internal RemoteRuntimeManager RuntimeManager { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
@@ -42,7 +50,10 @@ public sealed class RuntimeHostFixture : IAsyncLifetime
             "--RuntimeHost:SocketMode=600",
             "--VibeMaker:Runtime:Provider=Local",
             $"--VibeMaker:Runtime:WorkspaceRoot={WorkspaceRoot}",
-        ]);
+            "--RuntimeHost:Tunnel:Mode=SystemdUser",
+            $"--RuntimeHost:Tunnel:EnvFile={TunnelEnvFile}",
+        ],
+        services => services.AddSingleton<ITunnelServiceController>(Tunnel));
         await _host.StartAsync(CancellationToken.None);
         RuntimeManager = CreateManager(Token);
     }
@@ -85,4 +96,30 @@ public sealed class RuntimeHostFixture : IAsyncLifetime
 
         File.Delete(SocketPath);
     }
+}
+
+/// <summary>測試用：記錄重啟次數，可模擬重啟失敗。</summary>
+public sealed class FakeTunnelServiceController : ITunnelServiceController
+{
+    private int _restarts;
+
+    public int Restarts => _restarts;
+
+    public bool Active { get; set; }
+
+    public bool FailRestart { get; set; }
+
+    public Task RestartAsync(CancellationToken cancellationToken)
+    {
+        if (FailRestart)
+        {
+            throw new InvalidOperationException("simulated restart failure");
+        }
+
+        Interlocked.Increment(ref _restarts);
+        Active = true;
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> IsActiveAsync(CancellationToken cancellationToken) => Task.FromResult(Active);
 }

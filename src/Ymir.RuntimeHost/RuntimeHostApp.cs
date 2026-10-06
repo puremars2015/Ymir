@@ -17,7 +17,10 @@ public static class RuntimeHostApp
 {
     public const string SectionName = "RuntimeHost";
 
-    public static WebApplication Build(string[] args)
+    public static WebApplication Build(string[] args) => Build(args, configureServices: null);
+
+    /// <param name="configureServices">測試用：在預設註冊之後替換服務（例如 fake 的 tunnel 服務控制器）。</param>
+    public static WebApplication Build(string[] args, Action<IServiceCollection>? configureServices)
     {
         var builder = WebApplication.CreateBuilder(args);
         var options = builder.Configuration.GetSection(SectionName).Get<RuntimeHostOptions>() ?? new RuntimeHostOptions();
@@ -54,6 +57,12 @@ public static class RuntimeHostApp
         builder.Services.AddSingleton<RuntimeRegistry>();
         builder.Services.AddSingleton<ProcessBridge>();
 
+        var tunnel = builder.Configuration.GetSection($"{SectionName}:Tunnel").Get<TunnelOptions>() ?? new TunnelOptions();
+        builder.Services.AddSingleton(tunnel);
+        builder.Services.AddSingleton<ITunnelServiceController>(_ => new SystemdTunnelServiceController(tunnel.Unit));
+        builder.Services.AddSingleton<TunnelManager>();
+        configureServices?.Invoke(builder.Services);
+
         var app = builder.Build();
         if (endpoint.SocketPath is { } path)
         {
@@ -71,6 +80,7 @@ public static class RuntimeHostApp
         app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });
         app.MapGet("/health", () => Results.Text("ok"));
         app.MapRuntimeEndpoints();
+        app.MapEdgeEndpoints();
         return app;
     }
 
