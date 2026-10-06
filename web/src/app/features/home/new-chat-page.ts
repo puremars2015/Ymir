@@ -18,6 +18,7 @@ import { ModelPicker } from '../../shared/model-picker';
 /** 登入後的首頁：像 ChatGPT 一樣直接輸入就開始一個未分組的新對話。 */
 @Component({
   selector: 'app-new-chat-page',
+  host: { class: 'chat-surface' },
   imports: [Composer, ModelPicker],
   template: `
     <section class="welcome">
