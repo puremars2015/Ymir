@@ -44,6 +44,13 @@ export const routes: Routes = [
         title: '使用者管理 · Vibe Maker',
       },
       {
+        path: 'admin/make-topics',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./features/admin/make-topics-page').then((m) => m.MakeTopicsPage),
+        title: 'Make 主題 · Vibe Maker',
+      },
+      {
         path: 'c/:conversationId',
         loadComponent: () => import('./features/chat/chat-page').then((m) => m.ChatPage),
         title: '對話 · Vibe Maker',

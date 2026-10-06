@@ -6,6 +6,7 @@ import {
   OnInit,
   signal,
 } from '@angular/core';
+import { ComposerSubmission } from '../../core/make/make-command';
 import { describeApiError } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { resolveModel } from '../../core/models/model-selection';
@@ -90,14 +91,16 @@ export class NewChatPage implements OnInit {
     return name ? `${name}，今天想做什麼？` : '今天想做什麼？';
   }
 
-  protected start(prompt: string): void {
+  protected start(submission: ComposerSubmission): void {
     this.busy.set(true);
     this.error.set(null);
-    this.starter.start(null, prompt, this.selectedModel()).subscribe({
-      error: (e: unknown) => {
-        this.error.set(describeApiError(e));
-        this.busy.set(false);
-      },
-    });
+    this.starter
+      .start(null, submission.content, this.selectedModel(), submission.makeTopicId)
+      .subscribe({
+        error: (e: unknown) => {
+          this.error.set(describeApiError(e));
+          this.busy.set(false);
+        },
+      });
   }
 }

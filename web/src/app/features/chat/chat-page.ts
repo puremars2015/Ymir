@@ -9,6 +9,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { ComposerSubmission } from '../../core/make/make-command';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
@@ -87,14 +88,22 @@ export class ChatPage {
     this.modelStore.remember(modelId);
   }
 
-  protected send(prompt: string, modelId: string | null = this.selectedModel()): void {
+  protected submit(submission: ComposerSubmission): void {
+    this.send(submission.content, this.selectedModel(), submission.makeTopicId);
+  }
+
+  protected send(
+    prompt: string,
+    modelId: string | null = this.selectedModel(),
+    makeTopicId: string | null = null,
+  ): void {
     if (this.live()) {
       return;
     }
 
     const conversationId = this.conversationId();
     this.error.set(null);
-    this.api.sendMessage(conversationId, prompt, modelId).subscribe({
+    this.api.sendMessage(conversationId, prompt, modelId, makeTopicId).subscribe({
       next: (accepted) => {
         if (conversationId !== this.conversationId()) {
           return; // 送出後使用者已切到別的對話；執行在背景繼續，回來時看歷史即可
@@ -144,7 +153,7 @@ export class ChatPage {
         if (pending.modelId) {
           this.chosenModel.set(pending.modelId);
         }
-        this.send(pending.prompt, pending.modelId);
+        this.send(pending.prompt, pending.modelId, pending.makeTopicId);
       }
     });
   }

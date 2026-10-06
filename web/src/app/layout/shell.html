@@ -122,9 +122,9 @@
         @if (auth.isAdmin()) {
           <a
             routerLink="/admin/users"
-            routerLinkActive="active"
             class="settings-link"
-            title="使用者管理"
+            [class.active]="adminActive()"
+            title="管理（使用者、Make 主題）"
             >管理</a
           >
         }

@@ -2,11 +2,13 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
+  AdminMakeTopic,
   AdminUser,
   ApiProblem,
   CancelExecutionResponse,
   CreateLocalUserRequest,
   LoginProviders,
+  MakeTopic,
   ChatMessage,
   Conversation,
   Me,
@@ -14,6 +16,7 @@ import {
   SendMessageResponse,
   Project,
   RuntimeStatus,
+  SaveMakeTopicRequest,
   UserRole,
   UserSettings,
 } from './api-types';
@@ -45,6 +48,26 @@ export class ApiService {
 
   changePassword(currentPassword: string, newPassword: string): Observable<void> {
     return this.http.post<void>('/api/me/password', { currentPassword, newPassword });
+  }
+
+  listMakeTopics(): Observable<MakeTopic[]> {
+    return this.http.get<MakeTopic[]>('/api/make-topics');
+  }
+
+  adminListMakeTopics(): Observable<AdminMakeTopic[]> {
+    return this.http.get<AdminMakeTopic[]>('/api/admin/make-topics');
+  }
+
+  adminCreateMakeTopic(request: SaveMakeTopicRequest): Observable<AdminMakeTopic> {
+    return this.http.post<AdminMakeTopic>('/api/admin/make-topics', request);
+  }
+
+  adminUpdateMakeTopic(topicId: string, request: SaveMakeTopicRequest): Observable<AdminMakeTopic> {
+    return this.http.put<AdminMakeTopic>(`/api/admin/make-topics/${topicId}`, request);
+  }
+
+  adminDeleteMakeTopic(topicId: string): Observable<void> {
+    return this.http.delete<void>(`/api/admin/make-topics/${topicId}`);
   }
 
   adminListUsers(search: string): Observable<AdminUser[]> {
@@ -132,12 +155,14 @@ export class ApiService {
     conversationId: string,
     content: string,
     modelId: string | null = null,
+    makeTopicId: string | null = null,
     clientRequestId: string = crypto.randomUUID(),
   ): Observable<SendMessageResponse> {
     return this.http.post<SendMessageResponse>(`/api/conversations/${conversationId}/messages`, {
       content,
       clientRequestId,
       modelId,
+      makeTopicId,
     });
   }
 

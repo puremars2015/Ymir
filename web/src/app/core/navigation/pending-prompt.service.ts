@@ -3,6 +3,8 @@ import { Injectable } from '@angular/core';
 export interface PendingPrompt {
   prompt: string;
   modelId: string | null;
+  /** 從 `/make` 主題按鈕開始的新對話。 */
+  makeTopicId: string | null;
 }
 
 /**

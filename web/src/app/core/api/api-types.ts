@@ -18,6 +18,9 @@ export type AuthMethod = Schemas['AuthMethod'];
 export type AdminUser = Schemas['AdminUserResponse'];
 export type UserStatus = Schemas['UserStatus'];
 export type CreateLocalUserRequest = Schemas['CreateLocalUserRequest'];
+export type MakeTopic = Schemas['MakeTopicResponse'];
+export type AdminMakeTopic = Schemas['AdminMakeTopicResponse'];
+export type SaveMakeTopicRequest = Schemas['SaveMakeTopicRequest'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

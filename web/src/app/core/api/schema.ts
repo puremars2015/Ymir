@@ -148,6 +148,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/make-topics': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListMakeTopics'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/projects': {
     parameters: {
       query?: never;
@@ -325,10 +341,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/make-topics': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminListMakeTopics'];
+    put?: never;
+    post: operations['AdminCreateMakeTopic'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/make-topics/{topicId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['AdminUpdateMakeTopic'];
+    post?: never;
+    delete: operations['AdminDeleteMakeTopic'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AdminMakeTopicResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      description: null | string;
+      instructions: string;
+      /** Format: int32 */
+      sortOrder: number | string;
+      isEnabled: boolean;
+      /** Format: date-time */
+      updatedAt: string;
+    };
     AdminUserResponse: {
       /** Format: uuid */
       id: string;
@@ -393,6 +453,14 @@ export interface components {
       password: boolean;
       devLogin: boolean;
     };
+    MakeTopicResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      description: null | string;
+      /** Format: int32 */
+      sortOrder: number | string;
+    };
     MeResponse: {
       /** Format: uuid */
       id: string;
@@ -448,11 +516,21 @@ export interface components {
       /** Format: date-time */
       lastActiveAt: null | string;
     };
+    SaveMakeTopicRequest: {
+      name: string;
+      description: null | string;
+      instructions: string;
+      /** Format: int32 */
+      sortOrder: number | string;
+      isEnabled: boolean;
+    };
     SendMessageRequest: {
       content: string;
       /** Format: uuid */
       clientRequestId: string;
       modelId?: null | string;
+      /** Format: uuid */
+      makeTopicId?: null | string;
     };
     SendMessageResponse: {
       /** Format: uuid */
@@ -696,6 +774,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SendMessageResponse'];
+        };
+      };
+    };
+  };
+  ListMakeTopics: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MakeTopicResponse'][];
         };
       };
     };
@@ -1052,6 +1150,96 @@ export interface operations {
         'application/json': components['schemas']['ResetPasswordRequest'];
       };
     };
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AdminListMakeTopics: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminMakeTopicResponse'][];
+        };
+      };
+    };
+  };
+  AdminCreateMakeTopic: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveMakeTopicRequest'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminMakeTopicResponse'];
+        };
+      };
+    };
+  };
+  AdminUpdateMakeTopic: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        topicId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveMakeTopicRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminMakeTopicResponse'];
+        };
+      };
+    };
+  };
+  AdminDeleteMakeTopic: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        topicId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description No Content */
       204: {

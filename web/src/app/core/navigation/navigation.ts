@@ -1,3 +1,4 @@
+import { stripMakeCommand } from '../make/make-command';
 import { Conversation, Project } from '../api/api-types';
 
 export const TITLE_MAX_LENGTH = 40;
@@ -7,8 +8,9 @@ export const TITLE_MAX_LENGTH = 40;
  * 後端標題上限 300 字（SA §8），這裡取更短的長度讓側邊欄好讀。
  */
 export function deriveTitle(firstMessage: string, maxLength = TITLE_MAX_LENGTH): string {
+  // `/make 小工具架設` 的標題用「小工具架設」
   const line =
-    firstMessage
+    stripMakeCommand(firstMessage)
       .split(/\r?\n/)
       .map((l) => l.trim().replace(/\s+/g, ' '))
       .find((l) => l.length > 0) ?? '';
