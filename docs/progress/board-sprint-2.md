@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-06 13:45 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-06 15:10 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -36,6 +36,9 @@
 | 在 Linux 主機安裝 runtime host（rootless Podman、systemd、`ymir-runtime` group）並以 Quadlet 啟動 API 容器 | ⏳ | 依 [deploy/runtime-host](../../deploy/runtime-host/README.md)、[deploy/api](../../deploy/api/README.md)；**待使用者環境確認** |
 | Windows：runtime host + Docker Desktop 跑 API 容器 | ⏳ | 依 [deploy/api 的 Windows 一節](../../deploy/api/README.md#windowsdocker-desktop開發--驗證)；**待使用者環境確認** |
 | 本機帳號密碼登入（使用者追加需求） | ✅ | Admin 建立、第一次登入強制改密碼、鎖定、rate limit |
+| 對話 `/make` 指令：主題按鈕（小工具架設、網站系統架設）、`/make 描述` 由 Agent 判斷主題 | ✅ | 見 [#019](#019--對話-make-指令與-make-主題管理)；真實模型是否照指示先問需求**待使用者環境確認** |
+| Admin「Make 主題」管理頁（新增、編輯、排序、停用、刪除） | ✅ | 見 [#019](#019--對話-make-指令與-make-主題管理) |
+| 後台系統設定：Entra ID 設定欄位、Cloudflare Tunnel token 與網域 | ⏳ | 使用者要求先記錄，之後做後台時加入；需先寫新 ADR，見 [開發規劃](../planning/development-plan.md#後台系統設定待辦功能) |
 | 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
@@ -44,6 +47,39 @@
 ---
 
 ## 💬 留言區
+
+### #019 · 對話 `/make` 指令與 Make 主題管理
+
+> 👤 **Claude（AI）** · 🕒 2026-10-06 15:10 · `✅完成`
+
+- **需求**（使用者確認）：
+  - 只送出 `/make` 時顯示主題按鈕；
+  - 點按鈕直接送出，Agent 先問需求；
+  - `/make 描述` 由 Agent 判斷適合哪個主題；
+  - 主題由管理員在網頁上管理。
+- **做法**：
+  - 給 Agent 的完整指示由後端組合（`MakePromptBuilder`），存在 `AgentExecution.AgentPrompt`。對話紀錄只保留使用者打的短文字（例如「/make 小工具架設」）。主題的建置指示不經過前端。
+  - `SendMessageRequest` 新增 `makeTopicId`。停用或不存在的主題回 400 `MAKE_TOPIC_NOT_AVAILABLE`；只送 `/make` 回 400 `MAKE_DESCRIPTION_REQUIRED`（前端不會送，這是防呆）。
+  - 新資料表 `vibemaker.make_topics`，migration 預設兩個主題：「小工具架設」「網站系統架設」。
+  - API：`GET /api/make-topics`（已登入）；`/api/admin/make-topics` 的 GET / POST / PUT / DELETE（AdminPolicy + antiforgery，寫 audit）。已加入授權矩陣與 OpenAPI 快照。
+  - 前端：輸入框打 `/` 出現 `/make` 提示；只送出 `/make` 時在輸入框上方顯示主題按鈕；新對話標題去掉 `/make`。管理區新增分頁「Make 主題」，可新增、編輯、上移 / 下移、停用、刪除。
+- **另外記錄**（使用者要求，尚未實作）：之後做後台時要加入 Entra ID 設定欄位（ID、secret 等）與 Cloudflare Tunnel 的 token、對應網域。兩項都會改變現有安全規則，實作前要先寫新 ADR。已記在 [開發規劃](../planning/development-plan.md#後台系統設定待辦功能)。
+- **驗證（實際跑過）**：
+  - 後端：`dotnet test --solution Ymir.slnx` **323 項全部通過**。包含 `MakePromptBuilder` 單元測試，以及 6 個 `/make` 整合測試：Fake LLM 收到的內容含主題指示與「先問需求」、主題清單、400 錯誤、admin CRUD、停用的主題不列出。
+  - 前端：`npm run lint`、`npm test`（**54 項**）、`npm run build` 都通過；`npm run api:generate` 後 `schema.ts` 與 OpenAPI 一致。
+  - 端對端（Fake LLM + 真實 Pi）：
+    - 新增的 `npm run e2e:make` **10 個步驟全部通過**：`/` 提示 → `/make` 顯示兩個主題 → 點主題送出並收到回覆 → `/make 一個計算機` → Admin 新增主題、上移 → 輸入框出現新主題 → 停用後消失 → 刪除。
+    - 原本的 `npm run e2e`（12 步）與 `npm run e2e:auth`（6 步）也全部通過。
+- **未驗證、待使用者環境確認**：真實模型（MiniMax）是否照指示先問需求、判斷主題並回「主題：…」。Fake LLM 只能驗證送出的內容正確。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #018 · 合併 main 的看板衝突；redirect URI 已加入
 

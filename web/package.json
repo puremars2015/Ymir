@@ -10,7 +10,8 @@
     "lint": "ng lint",
     "api:generate": "npx -y -p typescript@5.9 -p openapi-typescript@7.13.0 openapi-typescript ../src/Ymir.Api/openapi/v1.json -o src/app/core/api/schema.ts && prettier --write src/app/core/api/schema.ts",
     "e2e": "node e2e/chat-flow.mjs",
-    "e2e:auth": "node e2e/auth-flow.mjs"
+    "e2e:auth": "node e2e/auth-flow.mjs",
+    "e2e:make": "node e2e/make-flow.mjs"
   },
   "private": true,
   "packageManager": "npm@11.19.0",
