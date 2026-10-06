@@ -21,7 +21,11 @@
           [class.error-message]="message.messageType === 'ERROR'"
         >
           <div class="bubble">
-            <span class="text">{{ content }}</span>
+            @if (message.role === 'ASSISTANT' && message.messageType !== 'ERROR') {
+              <app-markdown [text]="content" />
+            } @else {
+              <span class="text">{{ content }}</span>
+            }
           </div>
         </li>
       }
@@ -42,7 +46,7 @@
             </p>
           }
           @if (turn.view.text | assistantText: true; as text) {
-            <p class="text">{{ text }}</p>
+            <app-markdown [text]="text" />
           } @else if (!turn.view.statusText && !turn.view.tools.length) {
             <p class="status typing" aria-label="Agent 思考中">●●●</p>
           }
