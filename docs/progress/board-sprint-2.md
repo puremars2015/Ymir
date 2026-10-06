@@ -14,6 +14,7 @@
 
 | 工作項目 | 狀態 | 備註 |
 |---|---|---|
+| Web-Pro 品牌配色（登入、側欄、對話、表單與管理頁） | ✅ | 見 [#023](#023--web-pro-品牌配色)；lint/build 與登入預覽通過，完整驗證由 PR CI 執行 |
 | OIDC 登入（Authorization Code + PKCE，後端換 token、只發 cookie） | ✅ | Entra ID（已確認、已註冊）；見 [#017](#017--企業帳號entra-id與本機帳號密碼登入使用者管理) |
 | `IIdentityProvider`：IdP claims → `ExternalIdentity`（issuer + subject / oid） | ✅ | `EntraIdentityProvider`：`iss` + `oid`，角色取自 app role `Ymir.Admin` |
 | 每個請求驗證使用者狀態（停用後既有 cookie 立即失效） | ✅ | Cookie `OnValidatePrincipal` |
