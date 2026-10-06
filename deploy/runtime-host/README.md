@@ -71,11 +71,30 @@
 | `RuntimeHost__Listen` | `unix:/run/ymir-runtime/runtime.sock`（建議）；或只限 loopback 的 `http://127.0.0.1:5090`（例如 Windows 開發機） |
 | `RuntimeHost__Token` | 與 API 共用的 bearer token，至少 32 字元；只放在 `/etc/ymir/runtime-host.env` |
 | `RuntimeHost__SocketMode` | socket 權限（八進位），預設 `660`；不允許 other 存取 |
+| `RuntimeHost__Tunnel__Mode` | `SystemdUser`：由管理介面設定 Cloudflare Tunnel token（ADR-0010）；`Disabled`（預設）：不開放 |
+| `RuntimeHost__Tunnel__EnvFile` / `Unit` | 預設 `~ymir/.config/ymir/cloudflared.env`、`ymir-cloudflared.service`，一般不需要改 |
 | `VibeMaker__Runtime__*` | Agent container 的設定（Provider、WorkspaceRoot、Image、資源限制、Network、SelinuxRelabel），與原本 API 的設定相同 |
 
 - Runtime host 的 `Provider` 只能是 `Podman`、`Docker`（開發 / 驗證）或 `Local`（Development 環境才允許）；設成 `Remote` 會拒絕啟動。
 - 回給 API 的錯誤只有摘要；詳細內容（stderr、podman 錯誤）只寫在 runtime host 的 log。
 - 程序的環境變數（例如 LiteLLM virtual key）只以名稱傳給 `podman exec --env NAME`，值不會出現在程序參數或 log 中。
+
+## Cloudflare Tunnel 由管理介面設定（ADR-0010）
+
+runtime host 以 `ymir` 帳號執行，cloudflared 也改成同一個帳號的 rootless Podman Quadlet user service，所以 runtime host 不需要 root 就能寫入 token 並重啟：
+
+1. 安裝 Quadlet（一次）：
+   ```bash
+   sudo -u ymir mkdir -p ~ymir/.config/containers/systemd ~ymir/.config/ymir
+   sudo install -o ymir -g ymir -m 644 deploy/cloudflared/ymir-cloudflared.container ~ymir/.config/containers/systemd/
+   sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) systemctl --user daemon-reload
+   ```
+2. `/etc/ymir/runtime-host.env` 設定 `RuntimeHost__Tunnel__Mode=SystemdUser`，重啟 runtime host：`sudo systemctl restart ymir-runtime-host`。
+3. 用 Admin 登入 Ymir →「管理 → 系統設定 → 對外連線」貼上 token，按「套用 token」。狀態變成「已連線」即完成。
+4. 如果原本用 `deploy/cloudflared/compose.yml` 跑 cloudflared，先停掉（`docker compose down`），並刪除 repo 目錄裡的 `.env`，避免同一個 tunnel 跑兩份、token 留在 repo 目錄。
+
+- token 只存在 `~ymir/.config/ymir/cloudflared.env`（600）與 cloudflared container 內；API、資料庫、log 都沒有。
+- 檢查：`sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) systemctl --user status ymir-cloudflared`。
 
 ## 開發機
 

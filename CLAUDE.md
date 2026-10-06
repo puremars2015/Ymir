@@ -92,7 +92,7 @@ cd web && npm start                                  # http://localhost:4200，/
 
 Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真正的 Pi：設定 `VibeMaker__Harness=Pi` 並啟動 Fake LLM。
 
-管理介面（ADR-0010）：`/admin` 總覽、使用者、Make 主題、稽核紀錄；端點在 `src/Ymir.Api/Endpoints/Admin*.cs`，跨模組資料（使用者名稱 + Vibe Maker 統計）在 Api 層組合。稽核只讀查詢用 `IAuditLogQuery`，寫入仍只經由 `IAuditLog`。
+管理介面（ADR-0010）：`/admin` 總覽、使用者、Make 主題、系統設定（Entra ID、Cloudflare Tunnel token 與對外網域）、稽核紀錄；端點在 `src/Ymir.Api/Endpoints/Admin*.cs`，跨模組資料（使用者名稱 + Vibe Maker 統計）在 Api 層組合。稽核只讀查詢用 `IAuditLogQuery`，寫入仍只經由 `IAuditLog`。
 
 對話檔案（Agent 產生的成果）：`GET /api/conversations/{id}/files`、`/files/download?path=`、`/files/archive`（zip）。經 `IWorkspaceFileReader` 在使用者 runtime 內執行 `find` / `bash` 讀取，所以 Remote（runtime host）也適用；路徑經 stdin 傳入、runtime 內以 realpath 確認不逃出工作目錄；下載一律附件（octet-stream、nosniff、CSP sandbox），不得在 Ymir 網域上直接開啟 Agent 產生的 HTML。
 
@@ -129,7 +129,7 @@ API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:de
 - API container 不得掛載 container runtime socket（podman.sock / docker.sock）或使用者 workspace，只能經由 runtime host（ADR-0008）。Runtime host 的端點只接受 user id 與 runtime 內的程序規格，不得新增接受 host 路徑、image、掛載或資源設定的端點；改動協定時同步更新 `RuntimeHostProtocolTests` 與 `RuntimeHostTests`。Runtime host token 只放在部署 secret，不得進版控；不得用 rootless Podman 帳號 `ymir` 跑 API container。
 - 不得保存 IdP token（`SaveTokens=false`）；登入後導回位址只接受站內相對路徑（`SafeRedirect`）。Entra client secret 只放在 `deploy/api/.env`、部署 secret，或經管理介面以 Data Protection 加密存進 `platform.system_settings`（ADR-0010）；任何 API 回應、稽核、log 都不得包含 secret 值，`ISystemSettingsStore.SetAsync`（明文）不得用來存機密。本機帳號密碼只存 `PasswordHasher` 雜湊，不得記錄、回傳或寫入 log；登入端點的錯誤訊息不得區分「帳號不存在」與「密碼錯誤」。
 - 模型供應商金鑰（例如 `MINIMAX_API_KEY`）與 LiteLLM master key 只放在 `deploy/*/.env` 或部署環境的 secret，不得進版控、不得進 Agent container。
-- 對外公開（`Ymir:PublicEdge`，ADR-0006）不得在 Development 環境開啟；API 只綁 127.0.0.1、只信任 cloudflared 的 `X-Forwarded-*`。Tunnel 憑證不得進版控或進 container。
+- 對外公開（`Ymir:PublicEdge`，ADR-0006）不得在 Development 環境開啟；API 只綁 127.0.0.1、只信任 cloudflared 的 `X-Forwarded-*`。Tunnel 憑證不得進版控、不得進 API 或 Agent container；由管理介面設定時只經 runtime host 寫入 `ymir` 帳號的 600 檔案（ADR-0010），API 與資料庫不得保存、回應與稽核不得包含 token。Runtime host 的 tunnel 端點只接受 token 字串，檔案位置與服務名稱只來自 runtime host 設定；新增端點時同步更新 `TunnelEndpointTests.RuntimeHost_ExposesOnlyTheReviewedEndpoints`。
 
 ## 程式風格
 
