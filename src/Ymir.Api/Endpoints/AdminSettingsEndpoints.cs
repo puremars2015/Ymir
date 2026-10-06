@@ -1,10 +1,13 @@
 using Microsoft.Extensions.Options;
 using Ymir.Api.Auth;
+using Ymir.Api.Edge;
 using Ymir.Api.Problems;
+using Ymir.Edge;
 using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Settings;
 using Ymir.Platform.Users;
+using Ymir.VibeMaker.Infrastructure.Runtime.Remote;
 
 namespace Ymir.Api.Endpoints;
 
@@ -22,6 +25,10 @@ internal static class AdminSettingsEndpoints
         group.MapPut("/oidc", SaveOidcAsync).WithName("AdminSaveOidcSettings").Produces<OidcSettingsResponse>();
         group.MapDelete("/oidc", ResetOidcAsync).WithName("AdminResetOidcSettings").Produces<OidcSettingsResponse>();
         group.MapPost("/oidc/test", TestOidcAsync).WithName("AdminTestOidcSettings").Produces<OidcTestResponse>();
+
+        group.MapGet("/tunnel", GetTunnelAsync).WithName("AdminGetTunnelSettings").Produces<TunnelSettingsResponse>();
+        group.MapPut("/tunnel/token", SetTunnelTokenAsync).WithName("AdminSetTunnelToken").Produces<TunnelSettingsResponse>();
+        group.MapPut("/tunnel/hostname", SetPublicHostnameAsync).WithName("AdminSetPublicHostname").Produces<TunnelSettingsResponse>();
         return endpoints;
     }
 
@@ -107,6 +114,95 @@ internal static class AdminSettingsEndpoints
         return new OidcTestResponse(result.Ok, result.Message);
     }
 
+    private static async Task<TunnelSettingsResponse> GetTunnelAsync(
+        ITunnelManagement tunnel,
+        PublicHostnameSettings hostnames,
+        PublicEdgeOptions edge,
+        CancellationToken cancellationToken) =>
+        await ToTunnelResponseAsync(tunnel, edge, await hostnames.RefreshAsync(cancellationToken), cancellationToken);
+
+    /// <summary>
+    /// Tunnel token 只轉送給主機上的 runtime host（ADR-0010）：API 不保存、不寫入資料庫或 log，回應與稽核也不包含。
+    /// </summary>
+    private static async Task<IResult> SetTunnelTokenAsync(
+        SetTunnelTokenRequest request,
+        ITunnelManagement tunnel,
+        PublicHostnameSettings hostnames,
+        PublicEdgeOptions edge,
+        ICurrentUser currentUser,
+        IAuditLog auditLog,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        var token = request.Token?.Trim() ?? string.Empty;
+        var outcome = await tunnel.SetTokenAsync(token, cancellationToken);
+        switch (outcome)
+        {
+            case TunnelTokenOutcome.Unavailable:
+                return ApiProblem.Create(StatusCodes.Status409Conflict, "TUNNEL_MANAGEMENT_UNAVAILABLE", "這個部署沒有開放由網頁管理 Cloudflare Tunnel，請依部署指南在主機上設定。");
+            case TunnelTokenOutcome.Invalid:
+                return ApiProblem.Create(StatusCodes.Status400BadRequest, "VALIDATION_FAILED", "Tunnel token 格式不正確，請從 Cloudflare dashboard 重新複製。");
+            case TunnelTokenOutcome.Failed:
+                await auditLog.WriteAsync(new AuditEntry(currentUser.ActorName, "admin.settings.tunnel.token", "setting", "tunnel.token", AuditResult.Failure, timeProvider.GetUtcNow(), null), cancellationToken);
+                return ApiProblem.Create(StatusCodes.Status502BadGateway, "TUNNEL_APPLY_FAILED", "已儲存 token，但重新啟動 Cloudflare Tunnel 失敗，請查看主機的 runtime host 記錄。");
+        }
+
+        await auditLog.WriteAsync(new AuditEntry(currentUser.ActorName, "admin.settings.tunnel.token", "setting", "tunnel.token", AuditResult.Success, timeProvider.GetUtcNow(), null), cancellationToken);
+        return TypedResults.Ok(await ToTunnelResponseAsync(tunnel, edge, await hostnames.GetAsync(cancellationToken), cancellationToken));
+    }
+
+    private static async Task<IResult> SetPublicHostnameAsync(
+        SetPublicHostnameRequest request,
+        ITunnelManagement tunnel,
+        PublicHostnameSettings hostnames,
+        PublicEdgeOptions edge,
+        ISystemSettingsStore store,
+        ICurrentUser currentUser,
+        IAuditLog auditLog,
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        var hostname = request.Hostname?.Trim().ToLowerInvariant() ?? string.Empty;
+        if (hostname.Length == 0)
+        {
+            await store.DeleteAsync([PublicHostnameSettings.Key], cancellationToken);
+        }
+        else if (!PublicEdgeHostnames.IsValid(hostname))
+        {
+            return ApiProblem.Create(StatusCodes.Status400BadRequest, "VALIDATION_FAILED", "請輸入網域名稱，例如 ymir.example.com（不含 https:// 與路徑）。");
+        }
+        else
+        {
+            await store.SetAsync(PublicHostnameSettings.Key, hostname, currentUser.ActorName, cancellationToken);
+        }
+
+        var current = await hostnames.RefreshAsync(cancellationToken);
+        await auditLog.WriteAsync(
+            new AuditEntry(currentUser.ActorName, hostname.Length == 0 ? "admin.settings.tunnel.hostname_reset" : "admin.settings.tunnel.hostname", "setting", PublicHostnameSettings.Key, AuditResult.Success, timeProvider.GetUtcNow(), null),
+            cancellationToken);
+        return TypedResults.Ok(await ToTunnelResponseAsync(tunnel, edge, current, cancellationToken));
+    }
+
+    private static async Task<TunnelSettingsResponse> ToTunnelResponseAsync(
+        ITunnelManagement tunnel,
+        PublicEdgeOptions edge,
+        SystemSettingValue? hostnameOverride,
+        CancellationToken cancellationToken)
+    {
+        var state = await tunnel.GetStatusAsync(cancellationToken);
+        var hostname = hostnameOverride?.Value ?? (string.IsNullOrWhiteSpace(edge.PublicHostname) ? null : edge.PublicHostname.Trim());
+        var source = hostnameOverride is not null ? OidcSettingsSource.Database : hostname is null ? OidcSettingsSource.None : OidcSettingsSource.Deployment;
+        return new TunnelSettingsResponse(
+            edge.Enabled,
+            hostname,
+            source,
+            state.ManagementAvailable,
+            state.Configured,
+            state.Active,
+            state.UpdatedAt,
+            hostname is null ? null : $"https://{hostname}{OidcSignIn.CallbackPath}");
+    }
+
     /// <summary>
     /// 停用企業帳號登入後必須還有其他方式能進來管理（ADR-0010）：本機帳號登入開啟，且至少有一個啟用中的本機 Admin。
     /// </summary>
@@ -171,3 +267,21 @@ public sealed record OidcSettingsResponse(
     string RedirectUri,
     DateTimeOffset? UpdatedAt,
     string? UpdatedByName);
+
+public sealed record SetTunnelTokenRequest(string? Token);
+
+/// <param name="Hostname">空字串表示還原為部署設定。</param>
+public sealed record SetPublicHostnameRequest(string? Hostname);
+
+/// <param name="PublicEdgeEnabled">部署設定是否開啟對外公開（<c>Ymir:PublicEdge:Enabled</c>，只能在部署設定修改）。</param>
+/// <param name="ManagementAvailable">這個部署能否由網頁設定 tunnel token。</param>
+/// <param name="TokenUpdatedAt">runtime host 上 token 檔案的更新時間；token 本身永遠不回傳。</param>
+public sealed record TunnelSettingsResponse(
+    bool PublicEdgeEnabled,
+    string? Hostname,
+    OidcSettingsSource HostnameSource,
+    bool ManagementAvailable,
+    bool Configured,
+    bool Active,
+    DateTimeOffset? TokenUpdatedAt,
+    string? RedirectUri);

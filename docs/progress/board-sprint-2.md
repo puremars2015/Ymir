@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-06 17:45 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-06 21:45 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -46,7 +46,7 @@
 | 管理介面：總覽儀表板、停止執行環境、稽核紀錄（ADR-0010） | ✅ | 見 [#021](#021--管理介面總覽與稽核紀錄adr-0010) |
 | 系統設定：Entra ID（網頁設定、secret 加密存 DB、不重啟生效） | ✅ | 見 [#022](#022--系統設定entra-id-可在管理介面設定不重啟生效)；真實 Entra **待使用者環境確認** |
 | AI 產生的檔案可下載（單檔、zip，使用者回報） | ✅ | 見 [#025](#025--ai-產生的檔案可以下載使用者回報) |
-| 系統設定：Cloudflare Tunnel（token 交給 runtime host、網域可改） | 🚧 | ADR-0010 已定案；因檔案下載優先而暫緩，下一個 PR |
+| 系統設定：Cloudflare Tunnel（token 交給 runtime host、網域可改） | ✅ | 見 [#028](#028--系統設定cloudflare-tunnel-token-與對外網域)；真實 Cloudflare / systemd **待使用者環境確認** |
 | 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
@@ -55,6 +55,65 @@
 ---
 
 ## 💬 留言區
+
+### #028 · 系統設定：Cloudflare Tunnel token 與對外網域
+
+> 👤 **Claude（AI）** · 🕒 2026-10-06 21:45 · `✅完成`
+
+- **做法**（ADR-0010 第 4 點）：
+  - **runtime host**：
+    - cloudflared 改成以 `ymir` 帳號執行的 rootless Podman Quadlet user service（新增 `deploy/cloudflared/ymir-cloudflared.container`）。
+    - runtime host 本來就是 `ymir`，所以不需要 root：token 寫進 `~ymir/.config/ymir/cloudflared.env`（600），再以 `systemctl --user restart` 重啟。
+    - 新設定 `RuntimeHost:Tunnel:Mode`，預設 `Disabled`。
+    - 新端點：`GET /v1/edge/tunnel`、`PUT /v1/edge/tunnel-token`。
+    - token 驗證：只允許 base64 字元、長度 100～4096。regex 用 `\z`，因為 .NET 的 `$` 會放行結尾換行，可能被用來注入 env 檔。
+    - 寫檔方式：暫存檔建立時就是 600，再以 rename 取代原檔。
+    - 以參數清單執行 `systemctl`，不經 shell。
+    - 新增路由清單測試，固定 runtime host 只能有哪些端點。
+  - **API**：
+    - `ITunnelManagement`：Remote 部署時轉送給 runtime host；其他 provider 回傳「此部署不支援」。
+    - token 不保存，也不出現在回應、稽核、log。
+  - **對外網域**：
+    - `Ymir.Edge` 的 Host 限制原本在啟動時固定在 `HostFilteringOptions`，改成每個請求讀目前值（`IPublicHostnameSource`），管理介面改網域後**不必重啟**。`/health` 的隱藏規則也跟著改。
+    - 網域存在 `system_settings`，快取 30 秒，資料庫裡的不合法值會被忽略。
+  - **端點**：`GET /api/admin/settings/tunnel`、`PUT .../tunnel/token`、`PUT .../tunnel/hostname`（空字串表示還原）。
+  - **前端**：「系統設定」新增「對外連線」卡片。
+    - 狀態燈號；
+    - token 欄位只能寫入，也可以直接貼上 Cloudflare 提供的整行指令；
+    - 對外網域可以設定與還原；
+    - 改網域後提示要同步 Cloudflare 的 Public Hostname 與 Entra 的 redirect URI；
+    - 總覽在 tunnel 未連線時顯示警告。
+  - **文件**：
+    - `deploy/runtime-host/README.md` 新增「Cloudflare Tunnel 由管理介面設定」；
+    - `docs/guides/cloudflare-tunnel.md` 新增方式 C 與「對外網域」；
+    - 設定範本加上 `RuntimeHost__Tunnel__Mode`；
+    - CLAUDE.md 安全紅線補上 tunnel token 的規則。
+- **驗證（實際跑過）**：
+  - 後端：`dotnet test --solution Ymir.slnx` **425 項全部通過**。新增：
+    - tunnel 單元測試 20 項：token 規則、unit 名稱、atomic 600 寫檔、Disabled 模式；
+    - runtime host 整合測試 9 項：寫檔與重啟、非法 token 不動檔案、結尾換行被拒、重啟失敗回 502、需要 token、路由清單；
+    - Edge 10 項：網域覆寫不重啟即生效、網域驗證；
+    - API：開發環境不支援並回 409、網域設定與還原、**經真實 runtime host 轉送 token 且回應與稽核都不含 token**；
+    - 授權矩陣加入 3 個端點；OpenAPI 快照已更新。
+  - 前端：`npm run lint`、`npm test`（**82 項**）、`npm run build` 都通過。
+  - 端對端：
+    - `e2e:admin` **12 步全部通過**，新增 Tunnel 卡片：開發環境顯示「此部署不支援」、token 欄位停用、網域格式檢查、設定與還原；
+    - `e2e`（14）、`e2e:make`（10）、`e2e:auth`（6）都通過。
+- **未驗證、待使用者環境確認**：
+  - 真實的 Cloudflare token；
+  - `ymir` 帳號的 systemd user service 與 Quadlet；
+  - 重啟後實際連線。
+  - 沙箱沒有 systemd user session，以 fake 服務控制器替代驗證。
+  - 在 Linux 主機上請依 `deploy/runtime-host/README.md` 新增的章節安裝。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #027 · 對話文字改為黑色
 
@@ -73,6 +132,9 @@
 - **範圍**：新對話與對話閱讀區套用白底色票（含系統深色模式），管理頁保留原本色票；保留主分支最新的檔案下載功能。
 - **驗證**：前端 lint、正式版 build 與 API publish 通過；用目前 SCSS 產生不需登入的靜態對話版面預覽，瀏覽器無 console error。尚未使用登入帳號驗證實際對話畫面，完整測試由 PR CI 執行。
 - **部署**：CI 全部通過後合併並更新目前的網頁與 API，保留 OIDC / Cloudflare Tunnel 設定；不變更使用者資料。
+
+---
+
 ### #025 · AI 產生的檔案可以下載（使用者回報）
 
 > 👤 **Claude（AI）** · 🕒 2026-10-06 17:45 · `✅完成`

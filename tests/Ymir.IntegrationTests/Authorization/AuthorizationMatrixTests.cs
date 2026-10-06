@@ -74,6 +74,15 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["POST /api/admin/runtimes/{userId:guid}/stop"] = () => new HttpRequestMessage(HttpMethod.Post, $"/api/admin/runtimes/{Guid.NewGuid()}/stop"),
         ["GET /api/admin/audit"] = () => Get("/api/admin/audit"),
         ["GET /api/admin/settings/oidc"] = () => Get("/api/admin/settings/oidc"),
+        ["GET /api/admin/settings/tunnel"] = () => Get("/api/admin/settings/tunnel"),
+        ["PUT /api/admin/settings/tunnel/token"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/tunnel/token")
+        {
+            Content = JsonContent.Create(new SetTunnelTokenRequest(new string('A', 150))),
+        },
+        ["PUT /api/admin/settings/tunnel/hostname"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/tunnel/hostname")
+        {
+            Content = JsonContent.Create(new SetPublicHostnameRequest("intruder.example.com")),
+        },
         ["PUT /api/admin/settings/oidc"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/oidc")
         {
             Content = JsonContent.Create(new SaveOidcSettingsRequest(true, Guid.NewGuid().ToString(), "intruder", "intruder-secret", null, "Ymir.Admin", "intruder")),

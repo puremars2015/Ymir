@@ -18,6 +18,10 @@ public sealed class RemoteRuntimeApiFactory : ApiFactory
 
     public string HostWorkspaceRoot => _runtimeHost.WorkspaceRoot;
 
+    public FakeTunnelServiceController Tunnel => _runtimeHost.Tunnel;
+
+    public string TunnelEnvFile => _runtimeHost.TunnelEnvFile;
+
     protected override void Configure(IWebHostBuilder builder)
     {
         _runtimeHost.InitializeAsync().AsTask().GetAwaiter().GetResult();
@@ -42,6 +46,37 @@ public sealed class RemoteRuntimeApiFactory : ApiFactory
 
 public class RemoteRuntimeApiTests(RemoteRuntimeApiFactory factory) : IClassFixture<RemoteRuntimeApiFactory>
 {
+    /// <summary>ADR-0010：管理介面的 tunnel token 經 API 轉給 runtime host；API 回應與稽核都不含 token。</summary>
+    [Fact]
+    public async Task TunnelToken_IsForwardedToTheRuntimeHost_AndNeverEchoed()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var token = "eyJhIjoi" + new string('Q', 150) + "fQ==";
+        using var admin = await factory.LoginAsync($"tunnel-admin-{Guid.NewGuid():N}", Ymir.Platform.Users.UserRole.Admin);
+
+        var before = await admin.GetFromJsonAsync<TunnelSettingsResponse>("/api/admin/settings/tunnel", JsonDefaults.Options, ct);
+        var restarts = factory.Tunnel.Restarts;
+        using var set = await admin.PutAsJsonAsync("/api/admin/settings/tunnel/token", new SetTunnelTokenRequest(token), ct);
+        var body = await set.Content.ReadAsStringAsync(ct);
+
+        Assert.True(before!.ManagementAvailable);
+        Assert.Equal(System.Net.HttpStatusCode.OK, set.StatusCode);
+        Assert.DoesNotContain(token, body, StringComparison.Ordinal);
+        var after = System.Text.Json.JsonSerializer.Deserialize<TunnelSettingsResponse>(body, JsonDefaults.Options)!;
+        Assert.True(after.Configured);
+        Assert.True(after.Active);
+        Assert.NotNull(after.TokenUpdatedAt);
+        Assert.Equal(restarts + 1, factory.Tunnel.Restarts);
+        Assert.Equal($"TUNNEL_TOKEN={token}\n", await File.ReadAllTextAsync(factory.TunnelEnvFile, ct));
+
+        var audit = await admin.GetStringAsync("/api/admin/audit?action=admin.settings.tunnel", ct);
+        Assert.Contains("admin.settings.tunnel.token", audit, StringComparison.Ordinal);
+        Assert.DoesNotContain(token, audit, StringComparison.Ordinal);
+
+        using var invalid = await admin.PutAsJsonAsync("/api/admin/settings/tunnel/token", new SetTunnelTokenRequest("not a token"), ct);
+        Assert.Equal(System.Net.HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
+
     [Fact]
     public async Task SendMessage_RunsPiThroughRuntimeHost()
     {

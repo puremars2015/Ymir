@@ -26,7 +26,8 @@
 
 有兩種方式，擇一即可：
 
-- **方式 A：Token 模式 + container（建議，目前使用中）**：在 Cloudflare dashboard 建立 tunnel 與 Public Hostname，用 Docker 跑 cloudflared。見 [2A](#2a-token-模式--docker)。
+- **方式 C：Token 模式 + 管理介面（Linux 正式主機建議）**：cloudflared 以 `ymir` 帳號的 Quadlet 執行，token 在 Ymir 的「管理 → 系統設定 → 對外連線」貼上即可，不必登入主機改檔案（ADR-0010）。安裝步驟見 [deploy/runtime-host/README.md](../../deploy/runtime-host/README.md#cloudflare-tunnel-由管理介面設定adr-0010)；Cloudflare dashboard 端的設定與 2A 的第 1、2 步相同。
+- **方式 A：Token 模式 + container（Windows 開發機，或還沒安裝 runtime host 時）**：在 Cloudflare dashboard 建立 tunnel 與 Public Hostname，用 Docker 跑 cloudflared。見 [2A](#2a-token-模式--docker)。
 - **方式 B：本機設定檔**：用 `cloudflared` CLI 建立 tunnel，ingress 寫在 `config.yml`（下方步驟與第 3 節）。
 
 ### 2A. Token 模式 + Docker
@@ -82,6 +83,14 @@ cloudflared tunnel ingress validate
 cloudflared tunnel ingress rule https://ymir.example.com/api/me   # 應對應到 http://127.0.0.1:5080
 cloudflared tunnel ingress rule https://ymir.example.com/health   # 應對應到 http_status:404
 ```
+
+## 對外網域
+
+- 部署設定 `Ymir__PublicEdge__PublicHostname` 是預設值；Admin 可以在「管理 → 系統設定 → 對外連線」改成其他網域，存檔後立即生效，不必重啟 API。
+- 改網域時要同步兩個地方（頁面上也會提示）：
+  1. Cloudflare dashboard 的 Public Hostname（service `http://127.0.0.1:5080`）；
+  2. Entra 應用程式的重新導向 URI `https://<新網域>/signin-oidc`。
+- `Ymir__PublicEdge__Enabled` 只能在部署設定開啟，Development 環境照舊拒絕。
 
 ## 4. 以 Production 設定啟動 API
 

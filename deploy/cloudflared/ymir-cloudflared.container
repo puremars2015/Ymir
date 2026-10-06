@@ -1,0 +1,31 @@
+# Cloudflare Tunnel（token 模式）的 rootless Podman Quadlet user service（ADR-0006、ADR-0010）。
+# 以 runtime host 的帳號 ymir 執行，讓管理介面設定的 token 由 runtime host 寫入並重啟，不需要 root：
+#   sudo -u ymir mkdir -p ~ymir/.config/containers/systemd ~ymir/.config/ymir
+#   sudo install -o ymir -g ymir -m 644 ymir-cloudflared.container ~ymir/.config/containers/systemd/
+#   sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) systemctl --user daemon-reload
+# token 檔 ~ymir/.config/ymir/cloudflared.env（600，內容 TUNNEL_TOKEN=...）由管理介面「系統設定 → 對外連線」寫入；
+# 也可以手動建立後執行 systemctl --user start ymir-cloudflared。token 不得進版控或其他 container。
+[Unit]
+Description=Ymir Cloudflare Tunnel (cloudflared)
+Wants=network-online.target
+After=network-online.target
+
+[Container]
+# 固定版本，不用 latest；升級前先跑 docs/guides/cloudflare-tunnel.md 第 6 節的驗證清單。
+Image=docker.io/cloudflare/cloudflared:2026.9.3
+ContainerName=ymir-cloudflared
+Exec=tunnel --no-autoupdate run
+# token 以環境變數傳入，不出現在程序參數（ps）中。
+EnvironmentFile=%h/.config/ymir/cloudflared.env
+# Cloudflare dashboard 的 Public Hostname service 填 http://127.0.0.1:5080（API 只綁 loopback）。
+Network=host
+ReadOnly=true
+DropCapability=ALL
+NoNewPrivileges=true
+
+[Service]
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

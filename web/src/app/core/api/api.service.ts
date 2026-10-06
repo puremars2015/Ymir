@@ -8,6 +8,7 @@ import {
   OidcSettings,
   OidcTestResult,
   SaveOidcSettingsRequest,
+  TunnelSettings,
   WorkspaceFiles,
   AdminUser,
   ApiProblem,
@@ -104,6 +105,18 @@ export class ApiService {
 
   adminTestOidcSettings(tenantId: string): Observable<OidcTestResult> {
     return this.http.post<OidcTestResult>('/api/admin/settings/oidc/test', { tenantId });
+  }
+
+  adminGetTunnelSettings(): Observable<TunnelSettings> {
+    return this.http.get<TunnelSettings>('/api/admin/settings/tunnel');
+  }
+
+  adminSetTunnelToken(token: string): Observable<TunnelSettings> {
+    return this.http.put<TunnelSettings>('/api/admin/settings/tunnel/token', { token });
+  }
+
+  adminSetPublicHostname(hostname: string): Observable<TunnelSettings> {
+    return this.http.put<TunnelSettings>('/api/admin/settings/tunnel/hostname', { hostname });
   }
 
   listConversationFiles(conversationId: string): Observable<WorkspaceFiles> {

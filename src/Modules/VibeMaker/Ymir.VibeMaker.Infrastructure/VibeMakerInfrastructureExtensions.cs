@@ -65,10 +65,12 @@ public static class VibeMakerInfrastructureExtensions
         {
             // API 在容器內：runtime 由主機上的 runtime host 管理（ADR-0008），任何環境都可以使用。
             services.AddSingleton<IAgentRuntimeManager, RemoteRuntimeManager>();
+            services.AddSingleton<ITunnelManagement, RuntimeHostTunnelManagement>();
         }
         else
         {
             services.AddVibeMakerRuntimeManager(configuration, isDevelopment);
+            services.AddSingleton<ITunnelManagement, UnavailableTunnelManagement>();
         }
 
         var harness = configuration.GetValue("VibeMaker:Harness", HarnessKind.Pi);

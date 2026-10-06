@@ -89,6 +89,26 @@ internal static partial class RuntimeHostProtocol
         return RuntimePaths.IsAllowedWorkingDirectory(spec.WorkingDirectory) ? null : "Working directory is not an allowed runtime path.";
     }
 
+    /// <summary>
+    /// Cloudflare Tunnel 管理（ADR-0010）：唯一不以 user id 區分的端點。只接受 token 字串，
+    /// 檔案位置與要重啟的服務都由 runtime host 的設定決定。
+    /// </summary>
+    public const string TunnelPath = "/v1/edge/tunnel";
+
+    public const string TunnelTokenPath = "/v1/edge/tunnel-token";
+
+    public const int MinimumTunnelTokenLength = 100;
+
+    public const int MaximumTunnelTokenLength = 4096;
+
+    /// <summary>Cloudflare 的 tunnel token 是 base64 字串；只允許這些字元，寫進 env 檔時就無法注入換行或其他設定。</summary>
+    public static bool IsValidTunnelToken(string? token) =>
+        token is { Length: >= MinimumTunnelTokenLength and <= MaximumTunnelTokenLength } && TunnelTokenPattern().IsMatch(token);
+
+    // \z 而不是 $：.NET 的 $ 在結尾的 \n 之前就成立，會放行帶換行的 token。
+    [GeneratedRegex(@"^[A-Za-z0-9+/=_.-]+\z", RegexOptions.CultureInvariant)]
+    private static partial Regex TunnelTokenPattern();
+
     [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]{0,127}$", RegexOptions.CultureInvariant)]
     private static partial Regex EnvironmentVariableName();
 }
@@ -183,3 +203,9 @@ internal sealed record ProcessControlMessage(string Type, int? ExitCode = null, 
     public const string CloseStdin = "closeStdin";
     public const string Kill = "kill";
 }
+
+/// <summary><c>GET /v1/edge/tunnel</c> 的回應。<paramref name="ManagementEnabled"/> 為 false 表示這台主機沒有開放由網頁管理 tunnel。</summary>
+internal sealed record TunnelStatusMessage(bool ManagementEnabled, bool Configured, bool Active, DateTimeOffset? UpdatedAt);
+
+/// <summary><c>PUT /v1/edge/tunnel-token</c> 的 body。</summary>
+internal sealed record TunnelTokenMessage(string Token);
