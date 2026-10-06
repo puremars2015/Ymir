@@ -67,6 +67,7 @@ app.MapConversationEndpoints();
 app.MapExecutionEndpoints();
 app.MapAdminEndpoints();
 app.MapAdminOverviewEndpoints();
+app.MapAdminSettingsEndpoints();
 app.MapMakeTopicEndpoints();
 app.MapDefaultEndpoints();
 

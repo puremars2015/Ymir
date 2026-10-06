@@ -12,7 +12,7 @@ using Ymir.Testing.FakeOidc;
 namespace Ymir.IntegrationTests.Auth;
 
 /// <summary>API + Fake OIDC（模擬 Entra ID）：企業帳號登入（ADR-0009）。</summary>
-public sealed class OidcApiFactory : ApiFactory
+public class OidcApiFactory : ApiFactory
 {
     public const string ClientId = "ymir-integration";
     public const string ClientSecret = "integration-client-secret";
@@ -60,6 +60,8 @@ public sealed class OidcApiFactory : ApiFactory
         {
             await _oidc.Value.DisposeAsync();
         }
+
+        GC.SuppressFinalize(this);
     }
 }
 

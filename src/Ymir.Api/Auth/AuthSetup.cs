@@ -1,9 +1,12 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 using Ymir.Api.Problems;
 using Ymir.Platform.Infrastructure.Identity;
 using Ymir.Platform.Users;
@@ -52,7 +55,16 @@ internal static class AuthSetup
         ValidateLoginMethods(authOptions, environment);
         services.AddSingleton<EntraIdentityProvider>();
 
-        var authentication = services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+        // 企業帳號設定可由管理介面修改（ADR-0010）：scheme 由 OidcSettingsProvider 依目前設定動態註冊。
+        services.AddSingleton<OidcSettingsProvider>();
+        services.AddSingleton<IOidcSettingsSource>(sp => sp.GetRequiredService<OidcSettingsProvider>());
+        services.AddSingleton<IConfigureOptions<OpenIdConnectOptions>, ConfigureOidcOptions>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IPostConfigureOptions<OpenIdConnectOptions>, OpenIdConnectPostConfigureOptions>());
+        services.AddHostedService<OidcSettingsWarmup>();
+        services.AddHttpClient(OidcSettingsTester.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(10));
+        services.AddSingleton<OidcSettingsTester>();
+
+        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>
             {
                 options.Cookie.Name = "ymir.auth";
@@ -69,11 +81,6 @@ internal static class AuthSetup
                 // 每個請求確認帳號仍有效：Admin 停用後，既有 cookie 在下一個請求就失效（ADR-0009）。
                 options.Events.OnValidatePrincipal = CookiePrincipalValidator.ValidateAsync;
             });
-
-        if (authOptions.Oidc.IsConfigured)
-        {
-            authentication.AddOpenIdConnect(OidcScheme, options => OidcSignIn.Configure(options, authOptions.Oidc, environment));
-        }
 
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
@@ -138,8 +145,7 @@ internal static class AuthSetup
 
         if (options.Oidc.IsConfigured)
         {
-            if (!Uri.TryCreate(options.Oidc.Authority, UriKind.Absolute, out var authority)
-                || (authority.Scheme != Uri.UriSchemeHttps && !(environment.IsDevelopment() && authority.IsLoopback)))
+            if (!IsAllowedAuthority(options.Oidc.Authority, environment))
             {
                 throw new InvalidOperationException("Ymir:Auth:Oidc:Authority must be an https URL (http is allowed only for loopback in Development).");
             }
@@ -149,7 +155,17 @@ internal static class AuthSetup
                 throw new InvalidOperationException("Ymir:Auth:Oidc:ClientSecret is required (keep it in deploy/api/.env, ADR-0009).");
             }
         }
+
+        if (!IsAllowedAuthority(options.Oidc.AuthorityHost, environment))
+        {
+            throw new InvalidOperationException("Ymir:Auth:Oidc:AuthorityHost must be an https URL (http is allowed only for loopback in Development).");
+        }
     }
+
+    /// <summary>OIDC authority 必須是 https；只有 Development 的 loopback 可以用 http（Fake OIDC）。</summary>
+    internal static bool IsAllowedAuthority(string? value, IHostEnvironment environment) =>
+        Uri.TryCreate(value, UriKind.Absolute, out var authority)
+        && (authority.Scheme == Uri.UriSchemeHttps || (environment.IsDevelopment() && authority.Scheme == Uri.UriSchemeHttp && authority.IsLoopback));
 
     /// <summary>
     /// 本機帳號必須先改密碼時（ADR-0009），只允許查詢自己、改密碼、登出；其他 API 一律 403。

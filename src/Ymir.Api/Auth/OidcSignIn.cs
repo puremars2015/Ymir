@@ -16,8 +16,9 @@ internal static class OidcSignIn
 {
     public const string CallbackPath = "/signin-oidc";
 
-    public static void Configure(OpenIdConnectOptions options, OidcLoginOptions settings, IHostEnvironment environment)
+    public static void Configure(OpenIdConnectOptions options, EffectiveOidcSettings settings, IHostEnvironment environment)
     {
+        ArgumentNullException.ThrowIfNull(settings);
         options.Authority = settings.Authority;
         options.ClientId = settings.ClientId;
         options.ClientSecret = settings.ClientSecret;

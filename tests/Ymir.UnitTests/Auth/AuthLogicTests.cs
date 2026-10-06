@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
 using Ymir.Api.Auth;
 using Ymir.Platform.Users;
 
@@ -9,7 +8,7 @@ namespace Ymir.UnitTests.Auth;
 /// <summary>ADR-0009：Entra claim 對應、導回位址、本機帳號規則、登入方式設定檢查。</summary>
 public class AuthLogicTests
 {
-    private static EntraIdentityProvider Provider() => new(Options.Create(new YmirAuthOptions()));
+    private static EntraIdentityProvider Provider() => new(new StaticOidcSettings(EffectiveOidcSettings.FromDeployment(new OidcLoginOptions())));
 
     private static ClaimsPrincipal Principal(params (string Type, string Value)[] claims) =>
         new(new ClaimsIdentity(claims.Select(c => new Claim(c.Type, c.Value)), "oidc"));
@@ -104,7 +103,7 @@ public class AuthLogicTests
         Assert.Equal(ok, LocalAccounts.IsStrongEnough(password));
     }
 
-    private sealed class FakeEnvironment(string name) : IHostEnvironment
+    internal sealed class FakeEnvironment(string name) : IHostEnvironment
     {
         public string EnvironmentName { get; set; } = name;
 
@@ -146,4 +145,10 @@ public class AuthLogicTests
             new YmirAuthOptions { Oidc = { Authority = "http://127.0.0.1:5299/t/v2.0", ClientId = "c", ClientSecret = "s" } },
             new FakeEnvironment(Environments.Development));
     }
+}
+
+/// <summary>測試用：固定的 OIDC 設定來源。</summary>
+internal sealed class StaticOidcSettings(EffectiveOidcSettings current) : IOidcSettingsSource
+{
+    public EffectiveOidcSettings Current { get; set; } = current;
 }

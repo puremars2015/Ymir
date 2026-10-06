@@ -72,6 +72,9 @@ internal sealed class UserDirectory(PlatformDbContext db, TimeProvider timeProvi
         return await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).ToListAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    public Task<bool> HasActiveLocalAdminAsync(CancellationToken cancellationToken) =>
+        db.Users.AsNoTracking().AnyAsync(u => u.Issuer == LocalAccounts.Issuer && u.Role == UserRole.Admin && u.Status == UserStatus.Active, cancellationToken);
+
     public async Task<UserStatistics> GetStatisticsAsync(DateTimeOffset activeSince, CancellationToken cancellationToken)
     {
         var counts = await db.Users.AsNoTracking()

@@ -70,6 +70,16 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["GET /api/admin/overview"] = () => Get("/api/admin/overview?utcOffsetMinutes=480"),
         ["POST /api/admin/runtimes/{userId:guid}/stop"] = () => new HttpRequestMessage(HttpMethod.Post, $"/api/admin/runtimes/{Guid.NewGuid()}/stop"),
         ["GET /api/admin/audit"] = () => Get("/api/admin/audit"),
+        ["GET /api/admin/settings/oidc"] = () => Get("/api/admin/settings/oidc"),
+        ["PUT /api/admin/settings/oidc"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/oidc")
+        {
+            Content = JsonContent.Create(new SaveOidcSettingsRequest(true, Guid.NewGuid().ToString(), "intruder", "intruder-secret", null, "Ymir.Admin", "intruder")),
+        },
+        ["DELETE /api/admin/settings/oidc"] = () => new HttpRequestMessage(HttpMethod.Delete, "/api/admin/settings/oidc"),
+        ["POST /api/admin/settings/oidc/test"] = () => new HttpRequestMessage(HttpMethod.Post, "/api/admin/settings/oidc/test")
+        {
+            Content = JsonContent.Create(new TestOidcSettingsRequest(Guid.NewGuid().ToString())),
+        },
     };
 
     /// <summary>不以資源 id 存取的端點（只會操作目前使用者自己的資料，或是匿名端點）。</summary>

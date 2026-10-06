@@ -908,6 +908,102 @@
         }
       }
     },
+    "/api/admin/settings/oidc": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetOidcSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveOidcSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveOidcSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminResetOidcSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/settings/oidc/test": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminTestOidcSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestOidcSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OidcTestResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/make-topics": {
       "get": {
         "tags": [
@@ -1703,6 +1799,112 @@
           }
         }
       },
+      "OidcSettingsResponse": {
+        "required": [
+          "source",
+          "enabled",
+          "configured",
+          "tenantId",
+          "clientId",
+          "hasClientSecret",
+          "secretSource",
+          "secretUpdatedAt",
+          "secretExpiresOn",
+          "adminRole",
+          "displayName",
+          "redirectUri",
+          "updatedAt",
+          "updatedByName"
+        ],
+        "type": "object",
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/OidcSettingsSource"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hasClientSecret": {
+            "type": "boolean"
+          },
+          "secretSource": {
+            "$ref": "#/components/schemas/OidcSettingsSource"
+          },
+          "secretUpdatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "secretExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "adminRole": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "redirectUri": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedByName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "OidcSettingsSource": {
+        "enum": [
+          "None",
+          "Deployment",
+          "Database"
+        ]
+      },
+      "OidcTestResponse": {
+        "required": [
+          "ok",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "PasswordLoginRequest": {
         "required": [
           "account",
@@ -1882,6 +2084,60 @@
           }
         }
       },
+      "SaveOidcSettingsRequest": {
+        "required": [
+          "enabled",
+          "tenantId",
+          "clientId",
+          "clientSecret",
+          "secretExpiresOn",
+          "adminRole",
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientSecret": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secretExpiresOn": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date"
+          },
+          "adminRole": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "SendMessageRequest": {
         "required": [
           "content",
@@ -1929,6 +2185,20 @@
           },
           "eventStreamUrl": {
             "type": "string"
+          }
+        }
+      },
+      "TestOidcSettingsRequest": {
+        "required": [
+          "tenantId"
+        ],
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

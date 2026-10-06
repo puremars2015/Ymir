@@ -19,6 +19,9 @@ public interface IUserDirectory
     /// <summary>依 id 批次取得使用者（稽核頁、總覽顯示名稱用）；找不到的 id 不會出現在結果中。</summary>
     Task<IReadOnlyList<User>> FindManyAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken);
 
+    /// <summary>是否還有啟用中的本機 Admin（停用企業帳號登入前的防鎖死檢查，ADR-0010）。</summary>
+    Task<bool> HasActiveLocalAdminAsync(CancellationToken cancellationToken);
+
     /// <summary>總覽統計（Admin 總覽，ADR-0010）。</summary>
     Task<UserStatistics> GetStatisticsAsync(DateTimeOffset activeSince, CancellationToken cancellationToken);
 
