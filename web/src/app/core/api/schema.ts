@@ -341,6 +341,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/overview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetOverview'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/runtimes/{userId}/stop': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['AdminStopRuntime'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/audit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminSearchAudit'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/make-topics': {
     parameters: {
       query?: never;
@@ -389,6 +437,11 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    AdminOverviewResponse: {
+      users: components['schemas']['UserCountsResponse'];
+      executions: components['schemas']['ExecutionCountsResponse'];
+      runtimes: components['schemas']['RuntimeSummaryResponse'][];
+    };
     AdminUserResponse: {
       /** Format: uuid */
       id: string;
@@ -403,6 +456,28 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
     };
+    AuditLogItemResponse: {
+      /** Format: int64 */
+      id: number | string;
+      /** Format: date-time */
+      timestamp: string;
+      action: string;
+      result: components['schemas']['AuditResult'];
+      /** Format: uuid */
+      actorUserId: null | string;
+      actorName: string;
+      targetType: string;
+      targetId: string;
+      targetName: null | string;
+      correlationId: null | string;
+    };
+    AuditLogPageResponse: {
+      items: components['schemas']['AuditLogItemResponse'][];
+      /** Format: int64 */
+      nextBefore: null | number | string;
+    };
+    /** @enum {unknown} */
+    AuditResult: 'Success' | 'Failure' | 'Denied';
     /** @enum {unknown} */
     AuthMethod: 'Oidc' | 'Local' | 'Dev';
     CancelExecutionResponse: {
@@ -442,10 +517,31 @@ export interface components {
     CreateProjectRequest: {
       name: string;
     };
+    DailyExecutionResponse: {
+      /** Format: date */
+      date: string;
+      /** Format: int32 */
+      total: number | string;
+      /** Format: int32 */
+      failed: number | string;
+    };
     DevLoginRequest: {
       account: null | string;
       displayName: null | string;
       role: null | components['schemas']['UserRole'];
+    };
+    ExecutionCountsResponse: {
+      /** Format: int32 */
+      running: number | string;
+      /** Format: int32 */
+      queued: number | string;
+      /** Format: int32 */
+      completedToday: number | string;
+      /** Format: int32 */
+      failedToday: number | string;
+      /** Format: int32 */
+      cancelledToday: number | string;
+      trend: components['schemas']['DailyExecutionResponse'][];
     };
     LoginProvidersResponse: {
       oidc: boolean;
@@ -509,10 +605,20 @@ export interface components {
     ResetPasswordRequest: {
       newPassword: null | string;
     };
+    /** @enum {unknown} */
+    RuntimeStatus: 'NotCreated' | 'Created' | 'Running' | 'Busy' | 'Stopped' | 'Error' | 'Deleted';
     RuntimeStatusResponse: {
       status: string;
       provider: null | string;
       imageVersion: null | string;
+      /** Format: date-time */
+      lastActiveAt: null | string;
+    };
+    RuntimeSummaryResponse: {
+      /** Format: uuid */
+      userId: string;
+      displayName: string;
+      status: components['schemas']['RuntimeStatus'];
       /** Format: date-time */
       lastActiveAt: null | string;
     };
@@ -545,6 +651,18 @@ export interface components {
     };
     UpdateUserSettingsRequest: {
       systemPrompt: null | string;
+    };
+    UserCountsResponse: {
+      /** Format: int32 */
+      total: number | string;
+      /** Format: int32 */
+      active: number | string;
+      /** Format: int32 */
+      disabled: number | string;
+      /** Format: int32 */
+      admins: number | string;
+      /** Format: int32 */
+      recentlyActive: number | string;
     };
     /** @enum {unknown} */
     UserRole: 'User' | 'Admin';
@@ -1157,6 +1275,76 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  AdminGetOverview: {
+    parameters: {
+      query?: {
+        utcOffsetMinutes?: number | string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminOverviewResponse'];
+        };
+      };
+    };
+  };
+  AdminStopRuntime: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AdminSearchAudit: {
+    parameters: {
+      query?: {
+        action?: string;
+        userId?: string;
+        result?: components['schemas']['AuditResult'];
+        from?: string;
+        to?: string;
+        before?: number | string;
+        take?: number | string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuditLogPageResponse'];
+        };
       };
     };
   };

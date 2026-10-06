@@ -1,6 +1,6 @@
 # ADR-0009：企業帳號（Entra ID OIDC）與本機帳號密碼登入
 
-- 狀態：已採納（實作 ADR-0002 的 BFF + HttpOnly Cookie；SA §4、驗收條件 #1）
+- 狀態：已採納（實作 ADR-0002 的 BFF + HttpOnly Cookie；SA §4、驗收條件 #1）；Entra 設定可由管理介面修改，見 [ADR-0010](0010-admin-editable-system-settings.md)
 - 日期：2026-10-06
 
 ## 背景

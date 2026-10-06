@@ -56,6 +56,9 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             audit.Property(a => a.CorrelationId).HasMaxLength(100);
             audit.HasIndex(a => a.Timestamp);
             audit.HasIndex(a => new { a.TargetType, a.TargetId });
+            // 稽核頁依動作前綴與操作者篩選（ADR-0010）
+            audit.HasIndex(a => a.Action);
+            audit.HasIndex(a => a.Actor);
         });
 
         modelBuilder.ApplySnakeCaseNames();

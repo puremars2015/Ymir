@@ -60,6 +60,37 @@ internal sealed class UserDirectory(PlatformDbContext db, TimeProvider timeProvi
             .ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<User>> FindManyAsync(IReadOnlyCollection<Guid> userIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(userIds);
+        if (userIds.Count == 0)
+        {
+            return [];
+        }
+
+        var ids = userIds.Distinct().ToList();
+        return await db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<UserStatistics> GetStatisticsAsync(DateTimeOffset activeSince, CancellationToken cancellationToken)
+    {
+        var counts = await db.Users.AsNoTracking()
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Disabled = g.Count(u => u.Status == UserStatus.Disabled),
+                Admins = g.Count(u => u.Role == UserRole.Admin && u.Status == UserStatus.Active),
+                Recent = g.Count(u => u.LastLoginAt >= activeSince),
+            })
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return counts is null
+            ? new UserStatistics(0, 0, 0, 0, 0)
+            : new UserStatistics(counts.Total, counts.Total - counts.Disabled, counts.Disabled, counts.Admins, counts.Recent);
+    }
+
     public async Task<User?> SetStatusAsync(Guid userId, UserStatus status, CancellationToken cancellationToken)
     {
         var user = await db.Users.SingleOrDefaultAsync(u => u.Id == userId, cancellationToken).ConfigureAwait(false);
