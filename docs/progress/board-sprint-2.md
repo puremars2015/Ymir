@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-06 10:50 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-06 13:15 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -30,6 +30,7 @@
 | Ymir 接上 LiteLLM：每位使用者的 virtual key（ADR-0004） | ✅ | 以 Fake LLM 模擬的 LiteLLM 驗證；真正的 LiteLLM + PostgreSQL 在沙箱**跳過**（image 拉不下來），見 [#011](#011--ymir-接上-litellm每位使用者的-virtual-key) |
 | 對話選模型、個人 global / 專案 system prompt | ✅ | 見 [#012](#012--對話選模型個人-global-與專案-system-prompt) |
 | 對話隱藏模型思考內容（即時回覆與歷史） | ✅ | 見 #015；過濾 think / thinking 區段與未完成的串流標籤 |
+| 使用者 OneDrive Workspace（Microsoft Graph） | ⏳ | 方法二已選定；目前只記錄計畫，待使用者指示實作；見 #016 與 [計畫](../planning/onedrive-workspace-plan.md) |
 | API 放進容器 + 主機 runtime host（ADR-0008） | ✅ | 見 [#013](#013--api-放進容器agent-runtime-改由主機上的-runtime-host-管理)；沙箱以 Docker 驗證完整流程 |
 | API 容器的 engine：Linux 用 rootful Podman（Quadlet）、Windows 用 Docker Desktop | ✅ | 使用者決定；見 [#014](#014--api-容器linux-用-rootful-podmanwindows-用-docker-desktop) |
 | 在 Linux 主機安裝 runtime host（rootless Podman、systemd、`ymir-runtime` group）並以 Quadlet 啟動 API 容器 | ⏳ | 依 [deploy/runtime-host](../../deploy/runtime-host/README.md)、[deploy/api](../../deploy/api/README.md)；**待使用者環境確認** |
@@ -41,6 +42,18 @@
 ---
 
 ## 💬 留言區
+
+### #016 · 記錄 OneDrive Workspace 後續計畫，暫不實作
+
+> 👤 **Codex（AI）** · 🕒 2026-10-06 13:15 · `📢公告`
+
+使用者選定方法二：透過 Microsoft Graph 串接每位使用者自己的 OneDrive，並要求「先不要改程式，先把計畫寫下來」。已新增 [計畫文件](../planning/onedrive-workspace-plan.md)，同步更新開發規劃的 workspace 存放項目。
+
+- 保留使用者專屬本機 workspace，任務前下載、任務後同步；Graph 憑證由後端保管，Agent 不取得。agent-state 與 SQL Server 資料仍留在部署環境。
+- 記錄目錄映射、同步範圍、版本衝突、重試、解除連結、後續階段與驗收條件。帳號／租戶類型、精確權限、刪除及保留政策待確認；目前不開始開發或資料搬移。
+- 驗證：對照 Microsoft 官方 Graph／授權／上傳文件，檢查 Markdown 連結與 `git diff --check`。本次只改文件，未執行程式測試，也未修改程式、資料庫或部署。
+
+---
 
 ### #015 · 對話隱藏模型思考內容
 
