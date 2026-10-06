@@ -105,7 +105,7 @@ step('chat inside the project (breadcrumb + nested in sidebar)');
 
 // 5. 停止執行中的 Agent
 await sendPrompt('[slow] 請慢慢講');
-await page.waitForSelector('.turn.live .text:not(:empty)');
+await page.waitForSelector('.turn.live app-markdown .markdown:not(:empty)');
 await page.click('button[aria-label="停止"]');
 await waitIdle();
 await page.waitForSelector('button[aria-label="送出"]');
@@ -125,6 +125,31 @@ const last = await page.locator('.turn.assistant').last().innerText();
 if (!last.includes('使用者訊息')) throw new Error(`unexpected reply: ${last}`);
 step(`session continued: "${last.trim()}"`);
 await page.screenshot({ path: `${outDir}/03-project-chat.png` });
+
+// 6b. Agent 回覆以 Markdown 排版（標題、程式碼區塊 + 複製、表格），不顯示原始語法
+await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+await sendPrompt('[markdown] 給我指令');
+await page.waitForSelector('.turn.live app-markdown pre code'); // 串流中（含未閉合的 code fence）就排版
+await waitIdle();
+const reply = page.locator('.turn.assistant:not(.live) app-markdown').last();
+await reply.locator('h2:has-text("啟用本機管理員帳戶")').waitFor();
+await reply
+  .locator('pre code.language-cmd:has-text("net user Administrator /active:yes")')
+  .waitFor();
+await reply.locator('table td code:has-text("/active:no")').waitFor();
+const replyText = await reply.innerText();
+if (replyText.includes('##') || replyText.includes('```'))
+  throw new Error(`raw markdown shown: ${replyText}`);
+await reply.locator('pre .code-copy').click();
+await reply.locator('pre .code-copy:has-text("已複製")').waitFor();
+const copied = await page.evaluate(() => navigator.clipboard.readText());
+if (copied.trim() !== 'net user Administrator /active:yes')
+  throw new Error(`unexpected clipboard: ${copied}`);
+await page.screenshot({ path: `${outDir}/09-markdown.png` });
+await page.emulateMedia({ colorScheme: 'dark' });
+await page.screenshot({ path: `${outDir}/10-markdown-dark.png` });
+await page.emulateMedia({ colorScheme: 'light' });
+step('assistant markdown rendered (heading, code block with copy, table)');
 
 // 7. 專案頁列出對話；側邊欄切換對話
 await page.click('.chat-header .crumb');
