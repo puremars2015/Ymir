@@ -123,6 +123,15 @@ export class ApiService {
     return this.http.get<WorkspaceFiles>(`/api/conversations/${conversationId}/files`);
   }
 
+  /** 檔案預覽：沿用下載端點，以文字或 blob 取回（不在 Ymir 網域上直接開啟檔案）。 */
+  fetchFileText(url: string): Observable<string> {
+    return this.http.get(url, { responseType: 'text' });
+  }
+
+  fetchFileBlob(url: string): Observable<Blob> {
+    return this.http.get(url, { responseType: 'blob' });
+  }
+
   adminListUsers(search: string): Observable<AdminUser[]> {
     const params: Record<string, string> = search.trim() ? { search: search.trim() } : {};
     return this.http.get<AdminUser[]>('/api/admin/users', { params });
@@ -193,6 +202,19 @@ export class ApiService {
   /** projectId 為 null 時建立未分組的對話。 */
   createConversation(projectId: string | null, title: string): Observable<Conversation> {
     return this.http.post<Conversation>('/api/conversations', { projectId, title });
+  }
+
+  renameConversation(conversationId: string, title: string): Observable<Conversation> {
+    return this.http.patch<Conversation>(`/api/conversations/${conversationId}`, { title });
+  }
+
+  /** 「刪除」= 封存：從清單隱藏，訊息與檔案保留。 */
+  archiveConversation(conversationId: string): Observable<void> {
+    return this.http.delete<void>(`/api/conversations/${conversationId}`);
+  }
+
+  archiveProject(projectId: string): Observable<void> {
+    return this.http.delete<void>(`/api/projects/${projectId}`);
   }
 
   getConversation(conversationId: string): Observable<Conversation> {

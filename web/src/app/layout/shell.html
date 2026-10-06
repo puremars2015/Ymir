@@ -51,7 +51,7 @@
         <ul class="items">
           @for (group of store.groups().projects; track group.project.id) {
             <li class="project">
-              <div class="row">
+              <div class="row has-menu" [class.menu-open]="isMenuOpen('project', group.project.id)">
                 <button
                   type="button"
                   class="icon chevron"
@@ -62,24 +62,35 @@
                 >
                   ›
                 </button>
-                <a
-                  [routerLink]="['/projects', group.project.id]"
-                  routerLinkActive="active"
-                  class="item project-link"
-                >
-                  <span aria-hidden="true">📁</span> {{ group.project.name }}
-                </a>
+                @if (isEditing('project', group.project.id)) {
+                  <ng-container *ngTemplateOutlet="renameInput" />
+                } @else {
+                  <a
+                    [routerLink]="['/projects', group.project.id]"
+                    routerLinkActive="active"
+                    class="item project-link"
+                  >
+                    <span aria-hidden="true">📁</span> {{ group.project.name }}
+                  </a>
+                  <ng-container
+                    *ngTemplateOutlet="
+                      itemMenu;
+                      context: {
+                        kind: 'project',
+                        id: group.project.id,
+                        name: group.project.name,
+                      }
+                    "
+                  />
+                }
               </div>
               @if (isExpanded(group.project.id)) {
                 <ul class="items nested">
                   @for (conversation of group.conversations; track conversation.id) {
                     <li>
-                      <a
-                        [routerLink]="['/c', conversation.id]"
-                        routerLinkActive="active"
-                        class="item"
-                        >{{ conversation.title }}</a
-                      >
+                      <ng-container
+                        *ngTemplateOutlet="conversationItem; context: { $implicit: conversation }"
+                      />
                     </li>
                   } @empty {
                     <li class="muted empty">還沒有對話</li>
@@ -100,9 +111,9 @@
         <ul class="items">
           @for (conversation of store.groups().ungrouped; track conversation.id) {
             <li>
-              <a [routerLink]="['/c', conversation.id]" routerLinkActive="active" class="item">{{
-                conversation.title
-              }}</a>
+              <ng-container
+                *ngTemplateOutlet="conversationItem; context: { $implicit: conversation }"
+              />
             </li>
           } @empty {
             <li class="muted empty">還沒有對話</li>
@@ -110,6 +121,71 @@
         </ul>
       </section>
     </nav>
+
+    <ng-template #conversationItem let-conversation>
+      <div class="row has-menu" [class.menu-open]="isMenuOpen('conversation', conversation.id)">
+        @if (isEditing('conversation', conversation.id)) {
+          <ng-container *ngTemplateOutlet="renameInput" />
+        } @else {
+          <a
+            [routerLink]="['/c', conversation.id]"
+            routerLinkActive="active"
+            class="item conversation-link"
+            [title]="conversation.title"
+            >{{ conversation.title }}</a
+          >
+          <ng-container
+            *ngTemplateOutlet="
+              itemMenu;
+              context: { kind: 'conversation', id: conversation.id, name: conversation.title }
+            "
+          />
+        }
+      </div>
+    </ng-template>
+
+    <!-- 每個項目的「⋯」選單：重新命名、刪除（封存） -->
+    <ng-template #itemMenu let-kind="kind" let-id="id" let-name="name">
+      <button
+        type="button"
+        class="icon more"
+        [attr.aria-label]="name + ' 的選項'"
+        [attr.aria-expanded]="isMenuOpen(kind, id)"
+        title="選項"
+        (click)="toggleMenu(kind, id, $event)"
+      >
+        ⋯
+      </button>
+      @if (isMenuOpen(kind, id)) {
+        <div class="menu" role="menu">
+          <button type="button" role="menuitem" (click)="startRename(kind, id, name)">
+            重新命名
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            class="danger-text"
+            (click)="remove(kind, id, name)"
+          >
+            刪除
+          </button>
+        </div>
+      }
+    </ng-template>
+
+    <ng-template #renameInput>
+      <input
+        #renameField
+        class="rename"
+        aria-label="新名稱"
+        maxlength="300"
+        [value]="renameText()"
+        (input)="renameText.set(renameField.value)"
+        (keydown.enter)="commitRename()"
+        (keydown.escape)="cancelRename()"
+        (blur)="commitRename()"
+      />
+    </ng-template>
 
     @if (error()) {
       <p class="error sidebar-error">{{ error() }}</p>

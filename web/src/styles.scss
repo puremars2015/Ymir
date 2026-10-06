@@ -120,7 +120,8 @@ button {
   font: inherit;
   cursor: pointer;
 
-  &:hover:not(:disabled):not(.secondary):not(.link) {
+  /* :not(a, b) 的權重只算最高的一項，元件自己的 :hover 樣式（例如透明的圖示按鈕）才蓋得過 */
+  &:hover:not(:disabled, .secondary, .link) {
     background: var(--accent-hover);
   }
 

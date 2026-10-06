@@ -13,6 +13,7 @@ const page = await browser.newPage({
   acceptDownloads: true,
 });
 const step = (name) => console.log(`✔ ${name}`);
+page.on('dialog', (dialog) => void dialog.accept()); // 刪除前的確認
 const composer = 'app-composer textarea';
 const sendPrompt = async (text) => {
   await page.fill(composer, text);
@@ -84,8 +85,13 @@ if (fileDownload.suggestedFilename() !== 'hello.txt')
 const fileContent = readFileSync(await fileDownload.path(), 'utf8');
 if (fileContent !== 'Hello from Ymir') throw new Error(`unexpected content: ${fileContent}`);
 await page.click('button.files-toggle');
-await page.waitForSelector('app-files-panel a.file:has-text("hello.txt")');
+await page.waitForSelector('app-files-panel li.file:has-text("hello.txt")');
 await page.screenshot({ path: `${outDir}/02b-files.png` });
+// 點檔名預覽：文字以原始碼顯示
+await page.click('app-files-panel button.open:has-text("hello.txt")');
+await page.waitForSelector('app-files-panel pre.code:has-text("Hello from Ymir")');
+await page.screenshot({ path: `${outDir}/02c-file-preview.png` });
+await page.click('app-files-panel .preview-head button:has-text("返回")');
 const [zipDownload] = await Promise.all([
   page.waitForEvent('download'),
   page.click('app-files-panel a.archive'),
@@ -98,7 +104,7 @@ if (!disposition.startsWith('attachment') || !/filename\*=UTF-8''.+\.zip/.test(d
 const zipBytes = readFileSync(await zipDownload.path());
 if (zipBytes[0] !== 0x50 || zipBytes[1] !== 0x4b) throw new Error('archive is not a zip file');
 await page.click('app-files-panel button.close');
-step('agent-created file downloadable (inline chip, files panel, zip)');
+step('agent-created file previewable and downloadable (inline chip, files panel, zip)');
 
 // 3. 重新整理後歷史仍在
 await page.reload();
@@ -131,13 +137,18 @@ await page.waitForSelector('.chat-header .crumb:has-text("行銷網站")');
 await page.waitForSelector('.project .nested a.item.active:has-text("在專案裡建立檔案")');
 step('chat inside the project (breadcrumb + nested in sidebar)');
 
-// 5. 停止執行中的 Agent
+// 5. 執行中重新整理頁面 → 自動接回串流（不重複顯示使用者訊息）→ 停止
 await sendPrompt('[slow] 請慢慢講');
 await page.waitForSelector('.turn.live app-markdown .markdown:not(:empty)');
+await page.reload();
+await page.waitForSelector('.turn.live app-markdown .markdown:not(:empty)', { timeout: 15000 });
+const slowPrompts = await page.locator('.turn.user:has-text("[slow] 請慢慢講")').count();
+if (slowPrompts !== 1) throw new Error(`resumed turn shows the prompt ${slowPrompts} times`);
+await page.screenshot({ path: `${outDir}/03a-resumed.png` });
 await page.click('button[aria-label="停止"]');
 await waitIdle();
 await page.waitForSelector('button[aria-label="送出"]');
-step('cancelled running execution');
+step('re-attached to the running execution after reload, then cancelled');
 
 // 6. 同一對話繼續（session 續接）
 const before = await page.locator('.turn.assistant:not(.live)').count();
@@ -179,13 +190,64 @@ await page.screenshot({ path: `${outDir}/10-markdown-dark.png` });
 await page.emulateMedia({ colorScheme: 'light' });
 step('assistant markdown rendered (heading, code block with copy, table)');
 
+// 6c. 複製整則回覆（Markdown 原文）
+await page.locator('.turn.assistant:not(.live) .copy-reply').last().click();
+await page.locator('.turn.assistant:not(.live) .copy-reply:has-text("已複製")').last().waitFor();
+const copiedReply = await page.evaluate(() => navigator.clipboard.readText());
+if (!copiedReply.includes('## 啟用本機管理員帳戶'))
+  throw new Error(`reply copy is not the raw markdown: ${copiedReply}`);
+step('copied a whole reply as markdown');
+
+// 6d. 標題點兩下改名，側邊欄同步
+await page.dblclick('.chat-header .title');
+await page.fill('.chat-header .title-input', '管理員指令');
+await page.press('.chat-header .title-input', 'Enter');
+await page.waitForSelector('.chat-header .title:has-text("管理員指令")');
+await page.waitForSelector('.project .nested a.item.active:has-text("管理員指令")');
+await page.reload();
+await page.waitForSelector('.chat-header .title:has-text("管理員指令")');
+step('renamed the conversation from the chat title');
+
 // 7. 專案頁列出對話；側邊欄切換對話
 await page.click('.chat-header .crumb');
-await page.waitForSelector('app-project-page .conversations a:has-text("在專案裡建立檔案")');
+await page.waitForSelector('app-project-page .conversations a:has-text("管理員指令")');
 await page.screenshot({ path: `${outDir}/04-project.png` });
 await page.click('.sidebar .section:has-text("聊天") a.item:has-text("幫我建立一個檔案")');
 await page.waitForSelector('.turn.assistant:has-text("已完成")');
 step('project page lists its chats; switching chats from the sidebar');
+
+// 7b. 側邊欄「⋯」選單：專案改名
+const projectRow = page.locator('.sidebar .project .row.has-menu').first();
+await projectRow.hover();
+await projectRow.locator('button.more').click();
+await page.waitForSelector('.sidebar .menu');
+await page.screenshot({ path: `${outDir}/11-item-menu.png` });
+await page.click('.sidebar .menu button:has-text("重新命名")');
+await page.fill('.sidebar input.rename', '行銷網站 2026');
+await page.press('.sidebar input.rename', 'Enter');
+await page.waitForSelector('.sidebar .project a.item:has-text("行銷網站 2026")');
+step('renamed the project from the sidebar menu');
+
+// 7c. 刪除目前開啟的對話 → 從側邊欄消失並回到首頁
+const chatRow = page.locator('.sidebar .section:has-text("聊天") .row.has-menu').first();
+await chatRow.hover();
+await chatRow.locator('button.more').click();
+await page.click('.sidebar .menu button:has-text("刪除")');
+await page.waitForSelector('app-new-chat-page h1');
+if ((await page.locator('.sidebar a.item:has-text("幫我建立一個檔案")').count()) !== 0)
+  throw new Error('archived conversation still in the sidebar');
+step('deleted (archived) the open conversation');
+
+// 7d. 刪除專案（連同專案內的對話）
+await projectRow.hover();
+await projectRow.locator('button.more').click();
+await page.click('.sidebar .menu button:has-text("刪除")');
+await page.waitForSelector('.sidebar .project', { state: 'detached' });
+await page.reload();
+await page.waitForSelector('.sidebar .section-header:has-text("專案")');
+if ((await page.locator('.sidebar .project').count()) !== 0)
+  throw new Error('archived project still listed after reload');
+step('deleted (archived) the project and its chats');
 
 // 8. 窄螢幕：側欄變抽屜
 await page.setViewportSize({ width: 390, height: 780 });

@@ -64,3 +64,72 @@ export function fileIcon(path: string): string {
   const dot = path.lastIndexOf('.');
   return (dot >= 0 && ICONS[path.slice(dot + 1).toLowerCase()]) || '📄';
 }
+
+export type PreviewKind = 'text' | 'markdown' | 'image' | 'too-large' | 'unsupported';
+
+/** 文字預覽的上限；更大的檔案請下載。 */
+export const MAX_TEXT_PREVIEW_BYTES = 512 * 1024;
+export const MAX_IMAGE_PREVIEW_BYTES = 10 * 1024 * 1024;
+
+const TEXT_EXTENSIONS = new Set([
+  'txt',
+  'log',
+  'html',
+  'htm',
+  'css',
+  'scss',
+  'js',
+  'mjs',
+  'cjs',
+  'ts',
+  'tsx',
+  'jsx',
+  'json',
+  'py',
+  'csv',
+  'tsv',
+  'xml',
+  'yml',
+  'yaml',
+  'toml',
+  'ini',
+  'sh',
+  'sql',
+  'cs',
+  'java',
+  'go',
+  'rs',
+  'rb',
+  'php',
+  'c',
+  'h',
+  'cpp',
+  'vue',
+  'svelte',
+]);
+const TEXT_NAMES = new Set(['dockerfile', 'containerfile', 'makefile', 'readme', 'license']);
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
+
+/**
+ * 檔案面板的預覽方式。文字一律以文字綁定顯示（HTML 只看原始碼、不執行），
+ * 圖片以 blob URL 放進 <img>（不會執行 SVG 內的腳本）。
+ */
+export function previewKind(path: string, size: number | string): PreviewKind {
+  const name = fileName(path).toLowerCase();
+  const dot = name.lastIndexOf('.');
+  const extension = dot > 0 ? name.slice(dot + 1) : '';
+  const bytes = Number(size);
+  if (IMAGE_EXTENSIONS.has(extension)) {
+    return bytes <= MAX_IMAGE_PREVIEW_BYTES ? 'image' : 'too-large';
+  }
+  const kind: PreviewKind | null =
+    extension === 'md' || extension === 'markdown'
+      ? 'markdown'
+      : TEXT_EXTENSIONS.has(extension) || (!extension && TEXT_NAMES.has(name))
+        ? 'text'
+        : null;
+  if (!kind) {
+    return 'unsupported';
+  }
+  return bytes <= MAX_TEXT_PREVIEW_BYTES ? kind : 'too-large';
+}

@@ -7,6 +7,7 @@ import {
   fileIcon,
   fileName,
   formatSize,
+  previewKind,
 } from './workspace-files';
 
 const file = (path: string, size = 1, modifiedAt = '2026-10-06T00:00:00Z'): WorkspaceFile => ({
@@ -51,5 +52,33 @@ describe('workspace files', () => {
   it('picks an icon by extension', () => {
     expect(fileIcon('calculator.HTML')).toBe('🌐');
     expect(fileIcon('README')).toBe('📄');
+  });
+});
+
+describe('previewKind', () => {
+  it('文字與程式碼以原始碼預覽', () => {
+    expect(previewKind('index.html', 1200)).toBe('text');
+    expect(previewKind('src/app.ts', '300')).toBe('text');
+    expect(previewKind('Dockerfile', 50)).toBe('text');
+  });
+
+  it('Markdown 以排版後的內容預覽', () => {
+    expect(previewKind('docs/README.md', 10)).toBe('markdown');
+  });
+
+  it('圖片以 <img> 預覽', () => {
+    expect(previewKind('logo.SVG', 2048)).toBe('image');
+    expect(previewKind('a/b/photo.jpeg', 1024)).toBe('image');
+  });
+
+  it('太大的檔案請使用者下載', () => {
+    expect(previewKind('data.json', 512 * 1024 + 1)).toBe('too-large');
+    expect(previewKind('big.png', 11 * 1024 * 1024)).toBe('too-large');
+  });
+
+  it('其他類型無法預覽', () => {
+    expect(previewKind('archive.zip', 10)).toBe('unsupported');
+    expect(previewKind('report.pdf', 10)).toBe('unsupported');
+    expect(previewKind('noextension', 10)).toBe('unsupported');
   });
 });

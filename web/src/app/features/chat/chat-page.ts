@@ -1,17 +1,20 @@
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   computed,
   DestroyRef,
   effect,
+  ElementRef,
   inject,
+  Injector,
   input,
   signal,
   untracked,
 } from '@angular/core';
 import { ComposerSubmission } from '../../core/make/make-command';
 import { RouterLink } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { forkJoin, Subscription } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { ChatMessage, Conversation, WorkspaceFile } from '../../core/api/api-types';
 import {
@@ -20,6 +23,8 @@ import {
   initialExecutionView,
 } from '../../core/executions/execution-state';
 import { ExecutionStreamService } from '../../core/executions/execution-stream.service';
+import { resumeTurnFrom } from '../../core/executions/resume-turn';
+import { normalizeTitle } from '../../core/navigation/navigation-edits';
 import {
   changedFiles,
   fileDownloadUrl,
@@ -62,6 +67,8 @@ export class ChatPage {
   private readonly store = inject(NavigationStore);
   private readonly pending = inject(PendingPromptService);
   protected readonly modelStore = inject(ModelStore);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   readonly conversationId = input.required<string>();
   protected readonly conversation = signal<Conversation | null>(null);
@@ -90,7 +97,12 @@ export class ChatPage {
   protected readonly filesOpen = signal(false);
   /** 剛結束的這一輪新增 / 修改的檔案，顯示在回覆下方方便直接下載。 */
   protected readonly turnFiles = signal<WorkspaceFile[]>([]);
-  private filesBeforeTurn: WorkspaceFile[] = [];
+  /** 送出前的檔案清單；接回執行中的工作時不知道執行前的狀態，為 null（不顯示這一輪的檔案）。 */
+  private filesBeforeTurn: WorkspaceFile[] | null = null;
+
+  protected readonly editingTitle = signal(false);
+  protected readonly titleDraft = signal('');
+  protected readonly copiedId = signal<string | null>(null);
 
   private stream: Subscription | null = null;
 
@@ -129,19 +141,78 @@ export class ChatPage {
           return; // 送出後使用者已切到別的對話；執行在背景繼續，回來時看歷史即可
         }
         this.store.touch(conversationId);
-        this.filesBeforeTurn = this.files();
-        this.turnFiles.set([]);
-        this.live.set({ prompt, executionId: accepted.executionId, view: initialExecutionView() });
-        this.stream = this.streams.stream(accepted.eventStreamUrl).subscribe({
-          next: (event) =>
-            this.live.update((turn) =>
-              turn ? { ...turn, view: applyExecutionEvent(turn.view, event) } : turn,
-            ),
-          error: (error: unknown) => this.finish(conversationId, describeApiError(error)),
-          complete: () => this.finish(conversationId, null),
-        });
+        this.attach(conversationId, prompt, accepted.executionId, accepted.eventStreamUrl);
       },
       error: (error: unknown) => this.error.set(describeApiError(error)),
+    });
+  }
+
+  /** 訂閱 execution 的 SSE，以 live turn 顯示；送出新訊息與重新接回執行中的工作共用。 */
+  private attach(
+    conversationId: string,
+    prompt: string,
+    executionId: string,
+    url: string,
+    resumed = false,
+  ): void {
+    this.filesBeforeTurn = resumed ? null : this.files();
+    this.turnFiles.set([]);
+    this.live.set({ prompt, executionId, view: initialExecutionView() });
+    this.stream = this.streams.stream(url).subscribe({
+      next: (event) =>
+        this.live.update((turn) =>
+          turn ? { ...turn, view: applyExecutionEvent(turn.view, event) } : turn,
+        ),
+      error: (error: unknown) => this.finish(conversationId, describeApiError(error)),
+      complete: () => this.finish(conversationId, null),
+    });
+  }
+
+  /** 標題點兩下改名；Enter / 離開輸入框存檔，Esc 取消。 */
+  protected startRename(): void {
+    const title = this.conversation()?.title;
+    if (title !== undefined) {
+      this.titleDraft.set(title);
+      this.editingTitle.set(true);
+      afterNextRender(
+        () => {
+          const input = this.host.nativeElement.querySelector<HTMLInputElement>('.title-input');
+          input?.focus();
+          input?.select();
+        },
+        { injector: this.injector },
+      );
+    }
+  }
+
+  protected commitRename(): void {
+    if (!this.editingTitle()) {
+      return;
+    }
+    this.editingTitle.set(false);
+    const conversation = this.conversation();
+    const title = normalizeTitle(this.titleDraft());
+    if (!conversation || !title || title === conversation.title) {
+      return;
+    }
+    this.conversation.set({ ...conversation, title });
+    this.store.renameConversation(conversation.id, title).subscribe({
+      error: (error: unknown) => {
+        this.conversation.set(conversation);
+        this.error.set(describeApiError(error));
+      },
+    });
+  }
+
+  /** 複製 Agent 回覆的 Markdown 原文。 */
+  protected copy(message: ChatMessage, text: string): void {
+    void navigator.clipboard?.writeText(text).then(() => {
+      this.copiedId.set(message.id);
+      setTimeout(() => {
+        if (this.copiedId() === message.id) {
+          this.copiedId.set(null);
+        }
+      }, 1500);
     });
   }
 
@@ -162,31 +233,53 @@ export class ChatPage {
     this.error.set(null);
     this.chosenModel.set(null);
     this.conversation.set(null);
+    this.editingTitle.set(false);
     this.messages.set([]);
     this.files.set([]);
     this.turnFiles.set([]);
     this.refreshFiles();
 
-    this.api.getConversation(conversationId).subscribe({
-      next: (conversation) => this.conversation.set(conversation),
-      error: (error: unknown) => this.error.set(describeApiError(error)),
-    });
-    this.reloadMessages(conversationId, () => {
-      // 從首頁 / 專案頁「直接開聊」：送出暫存的第一則訊息
-      const pending = this.pending.take(conversationId);
-      if (pending) {
-        if (pending.modelId) {
-          this.chosenModel.set(pending.modelId);
+    forkJoin([
+      this.api.getConversation(conversationId),
+      this.api.listMessages(conversationId),
+    ]).subscribe({
+      next: ([conversation, messages]) => {
+        if (conversationId !== this.conversationId()) {
+          return;
         }
-        this.send(pending.prompt, pending.modelId, pending.makeTopicId);
-      }
+        this.conversation.set(conversation);
+        // 重新整理或切回來時 Agent 仍在執行：接回它的串流（事件從頭重播）
+        const resumed = resumeTurnFrom(messages, conversation.activeExecutionId);
+        if (resumed) {
+          this.messages.set(resumed.history);
+          this.attach(
+            conversationId,
+            resumed.prompt,
+            resumed.executionId,
+            `/api/executions/${resumed.executionId}/events`,
+            true,
+          );
+          return;
+        }
+        this.messages.set(messages);
+        // 從首頁 / 專案頁「直接開聊」：送出暫存的第一則訊息
+        const pending = this.pending.take(conversationId);
+        if (pending) {
+          if (pending.modelId) {
+            this.chosenModel.set(pending.modelId);
+          }
+          this.send(pending.prompt, pending.modelId, pending.makeTopicId);
+        }
+      },
+      error: (error: unknown) => this.error.set(describeApiError(error)),
     });
   }
 
   private finish(conversationId: string, error: string | null): void {
     this.error.set(error);
     this.reloadMessages(conversationId, () => this.live.set(null));
-    this.refreshFiles((files) => this.turnFiles.set(changedFiles(this.filesBeforeTurn, files)));
+    const before = this.filesBeforeTurn;
+    this.refreshFiles((files) => this.turnFiles.set(before ? changedFiles(before, files) : []));
   }
 
   protected refreshFiles(after?: (files: WorkspaceFile[]) => void): void {

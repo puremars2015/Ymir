@@ -3,6 +3,12 @@ import { forkJoin, Observable, tap } from 'rxjs';
 import { ApiService } from '../api/api.service';
 import { Conversation, Project } from '../api/api-types';
 import { groupConversations } from './navigation';
+import {
+  renameConversationIn,
+  renameProjectIn,
+  withoutConversation,
+  withoutProject,
+} from './navigation-edits';
 
 /** 側邊欄的資料（專案與對話）。建立專案 / 對話、送出訊息後更新，讓側邊欄立即反映。 */
 @Injectable({ providedIn: 'root' })
@@ -45,6 +51,58 @@ export class NavigationStore {
   /** 專案改名或更新設定後同步側邊欄。 */
   replaceProject(project: Project): void {
     this.projects.update((list) => list.map((p) => (p.id === project.id ? project : p)));
+  }
+
+  /** 改名：先更新畫面，失敗時還原。 */
+  renameConversation(conversationId: string, title: string): Observable<Conversation> {
+    const before = this.conversations();
+    this.conversations.set(renameConversationIn(before, conversationId, title));
+    return this.api.renameConversation(conversationId, title).pipe(
+      tap({
+        next: (conversation) =>
+          this.conversations.update((list) =>
+            list.map((c) => (c.id === conversation.id ? conversation : c)),
+          ),
+        error: () => this.conversations.set(before),
+      }),
+    );
+  }
+
+  renameProject(projectId: string, name: string): Observable<Project> {
+    const before = this.projects();
+    this.projects.set(renameProjectIn(before, projectId, name));
+    return this.api.updateProject(projectId, { name }).pipe(
+      tap({
+        next: (project) => this.replaceProject(project),
+        error: () => this.projects.set(before),
+      }),
+    );
+  }
+
+  /** 「刪除」對話（封存）：先從側邊欄移除，失敗時還原。 */
+  archiveConversation(conversationId: string): Observable<void> {
+    const before = this.conversations();
+    this.conversations.set(withoutConversation(before, conversationId));
+    return this.api
+      .archiveConversation(conversationId)
+      .pipe(tap({ error: () => this.conversations.set(before) }));
+  }
+
+  /** 「刪除」專案（封存）：專案內的對話一起移除。 */
+  archiveProject(projectId: string): Observable<void> {
+    const projects = this.projects();
+    const conversations = this.conversations();
+    const next = withoutProject(projects, conversations, projectId);
+    this.projects.set(next.projects);
+    this.conversations.set(next.conversations);
+    return this.api.archiveProject(projectId).pipe(
+      tap({
+        error: () => {
+          this.projects.set(projects);
+          this.conversations.set(conversations);
+        },
+      }),
+    );
   }
 
   project(projectId: string | null | undefined): Project | undefined {
