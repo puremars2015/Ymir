@@ -73,6 +73,8 @@ cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e -- <截圖目錄>
 # 登入流程（另需 Fake OIDC，API 設定 Ymir__Auth__Oidc__* 指向它，見 docs/guides/entra-id.md）
 dotnet run --project tests/Ymir.Testing.FakeOidc      # http://127.0.0.1:5299，client ymir-dev / ymir-dev-secret
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:auth -- <截圖目錄>
+# /make 指令與 Make 主題管理（同 e2e 的前置；以 Dev 登入 Admin）
+cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:make -- <截圖目錄>
 
 # 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
 dotnet run --project src/Ymir.AppHost
@@ -86,6 +88,8 @@ cd web && npm start                                  # http://localhost:4200，/
 登入（ADR-0009）：企業帳號 `Ymir__Auth__Oidc__Authority` / `ClientId` / `ClientSecret`（Entra ID，設定值見 `docs/guides/entra-id.md`）；本機帳號 `Ymir__Auth__LocalAccounts__Enabled`（預設開啟，由 Admin 建立，第一個 Admin 可用 `dotnet Ymir.Api.dll create-local-admin <帳號>`）；Development 另有 `/api/dev/login`。
 
 Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真正的 Pi：設定 `VibeMaker__Harness=Pi` 並啟動 Fake LLM。
+
+`/make`：對話輸入 `/make` 顯示管理員設定的主題按鈕（`vibemaker.make_topics`，Admin 在「管理 → Make 主題」維護）；給 Agent 的完整指示由後端 `MakePromptBuilder` 組合並存在 `AgentExecution.AgentPrompt`，對話紀錄只保留使用者輸入的文字。
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
 

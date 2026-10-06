@@ -156,3 +156,14 @@ Walking Skeleton 打通：Dev 登入（Cookie + XSRF）→ Workspace / 對話 �
 | 企業 IdP | Entra ID（OIDC） | 實際為 Entra ID / ADFS / 純 LDAP？ |
 | Workspace 存放 | 本機工作副本 + 日後以 Microsoft Graph 串接各使用者 OneDrive | 已選定方法二，僅記錄、尚未實作；見 [OneDrive Workspace 計畫](onedrive-workspace-plan.md)；待確認帳號類型、授權、同步與保存規則 |
 | 資料保存 | Conversation / Workspace 永久保留，可封存 | 公司資料保存與刪除政策 |
+
+---
+
+## 後台（系統設定）待辦功能
+
+> 使用者於 2026-10-06 提出，**僅記錄、尚未實作**。目前這些值都放在部署主機的 `.env` 或 secret（見 `docs/guides/entra-id.md`、`docs/guides/cloudflare-tunnel.md`）。實作前要先寫新 ADR，因為兩項都會改變現有安全規則（ADR-0006、ADR-0009 與 CLAUDE.md 安全紅線）。
+
+| # | 功能 | 內容 | 實作前要決定的事 |
+|---|---|---|---|
+| 1 | Microsoft Entra 登入設定 | 後台欄位：Tenant ID、Client ID、Client secret（只能寫入、不回顯，顯示到期日）、Admin app role、登入按鈕名稱、啟用 / 停用 | secret 存 DB 要用 Data Protection 加密；改設定後 OIDC handler 要重新載入而不必重啟；設定錯誤時不能把 Admin 鎖在外面（本機帳號登入保留為備援）；每次修改寫 audit |
+| 2 | Cloudflare Tunnel 設定 | 後台欄位：Tunnel token（只能寫入、不回顯）、對外網域（hostname） | 目前 ADR-0006 規定 tunnel 憑證不得進 container，而 API 跑在容器內（ADR-0008），所以 token 不能交給 API 直接啟動 cloudflared；可能做法是由主機上的服務（例如 runtime host 或獨立的 edge 管理服務）保存 token、重啟 cloudflared，API 只轉送；對外網域變更時要同步更新 Entra 的 redirect URI（後台提示）與 `Ymir:PublicEdge` 的 Host 限制 |

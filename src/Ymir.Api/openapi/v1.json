@@ -258,6 +258,29 @@
         }
       }
     },
+    "/api/make-topics": {
+      "get": {
+        "tags": [
+          "Make"
+        ],
+        "operationId": "ListMakeTopics",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MakeTopicResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/projects": {
       "get": {
         "tags": [
@@ -742,10 +765,169 @@
           }
         }
       }
+    },
+    "/api/admin/make-topics": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminListMakeTopics",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AdminMakeTopicResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminCreateMakeTopic",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveMakeTopicRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMakeTopicResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/make-topics/{topicId}": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminUpdateMakeTopic",
+        "parameters": [
+          {
+            "name": "topicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveMakeTopicRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMakeTopicResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminDeleteMakeTopic",
+        "parameters": [
+          {
+            "name": "topicId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdminMakeTopicResponse": {
+        "required": [
+          "id",
+          "name",
+          "description",
+          "instructions",
+          "sortOrder",
+          "isEnabled",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instructions": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isEnabled": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "AdminUserResponse": {
         "required": [
           "id",
@@ -1024,6 +1206,38 @@
           }
         }
       },
+      "MakeTopicResponse": {
+        "required": [
+          "id",
+          "name",
+          "description",
+          "sortOrder"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "MeResponse": {
         "required": [
           "id",
@@ -1247,6 +1461,41 @@
           }
         }
       },
+      "SaveMakeTopicRequest": {
+        "required": [
+          "name",
+          "description",
+          "instructions",
+          "sortOrder",
+          "isEnabled"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instructions": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "isEnabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "SendMessageRequest": {
         "required": [
           "content",
@@ -1266,6 +1515,13 @@
               "null",
               "string"
             ]
+          },
+          "makeTopicId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -1365,6 +1621,9 @@
     },
     {
       "name": "Conversations"
+    },
+    {
+      "name": "Make"
     },
     {
       "name": "Projects"

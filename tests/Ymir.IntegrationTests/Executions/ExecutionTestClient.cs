@@ -9,11 +9,11 @@ namespace Ymir.IntegrationTests.Executions;
 internal static class ExecutionTestClient
 {
     public static async Task<(HttpResponseMessage Response, SendMessageResponse? Body)> SendMessageAsync(
-        this HttpClient client, Guid conversationId, string content, Guid? clientRequestId = null, string? modelId = null)
+        this HttpClient client, Guid conversationId, string content, Guid? clientRequestId = null, string? modelId = null, Guid? makeTopicId = null)
     {
         var response = await client.PostAsJsonAsync(
             $"/api/conversations/{conversationId}/messages",
-            new SendMessageRequest(content, clientRequestId ?? Guid.NewGuid(), modelId),
+            new SendMessageRequest(content, clientRequestId ?? Guid.NewGuid(), modelId, makeTopicId),
             TestContext.Current.CancellationToken);
         var body = response.IsSuccessStatusCode
             ? await response.Content.ReadFromJsonAsync<SendMessageResponse>(JsonDefaults.Options, TestContext.Current.CancellationToken)

@@ -9,6 +9,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { ComposerSubmission } from '../../core/make/make-command';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -84,15 +85,17 @@ export class ProjectPage implements OnInit {
     this.modelStore.load();
   }
 
-  protected start(project: Project, prompt: string): void {
+  protected start(project: Project, submission: ComposerSubmission): void {
     this.busy.set(true);
     this.error.set(null);
-    this.starter.start(project.id, prompt, this.selectedModel()).subscribe({
-      error: (e: unknown) => {
-        this.error.set(describeApiError(e));
-        this.busy.set(false);
-      },
-    });
+    this.starter
+      .start(project.id, submission.content, this.selectedModel(), submission.makeTopicId)
+      .subscribe({
+        error: (e: unknown) => {
+          this.error.set(describeApiError(e));
+          this.busy.set(false);
+        },
+      });
   }
 
   protected saveSettings(project: Project): void {

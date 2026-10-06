@@ -17,10 +17,11 @@ export class ChatStarter {
     projectId: string | null,
     firstMessage: string,
     modelId: string | null,
+    makeTopicId: string | null = null,
   ): Observable<Conversation> {
     return this.store.createConversation(projectId, deriveTitle(firstMessage)).pipe(
       tap((conversation) => {
-        this.pending.set(conversation.id, { prompt: firstMessage, modelId });
+        this.pending.set(conversation.id, { prompt: firstMessage, modelId, makeTopicId });
         void this.router.navigate(['/c', conversation.id]);
       }),
     );

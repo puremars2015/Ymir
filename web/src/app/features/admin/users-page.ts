@@ -18,6 +18,7 @@ import {
   PASSWORD_MIN_LENGTH,
 } from '../../core/auth/auth-rules';
 import { AuthService } from '../../core/auth/auth.service';
+import { AdminTabs } from './admin-tabs';
 
 /**
  * 使用者管理（Admin，SA §4、ADR-0009）：停用 / 啟用帳號、建立本機帳號、重設本機帳號密碼。
@@ -25,9 +26,10 @@ import { AuthService } from '../../core/auth/auth.service';
  */
 @Component({
   selector: 'app-users-page',
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, AdminTabs],
   template: `
     <section class="admin">
+      <app-admin-tabs />
       <header class="head">
         <h1>使用者管理</h1>
         <button type="button" (click)="toggleCreate()">
