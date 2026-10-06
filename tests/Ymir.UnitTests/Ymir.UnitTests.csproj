@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Modules\VibeMaker\Ymir.VibeMaker.Infrastructure\Ymir.VibeMaker.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\Ymir.RuntimeHost\Ymir.RuntimeHost.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Fixtures\**\*" CopyToOutputDirectory="PreserveNewest" />
