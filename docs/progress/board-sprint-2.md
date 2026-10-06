@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-06 15:45 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-06 16:45 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -39,7 +39,9 @@
 | 對話 `/make` 指令：主題按鈕（小工具架設、網站系統架設）、`/make 描述` 由 Agent 判斷主題 | ✅ | 見 [#019](#019--對話-make-指令與-make-主題管理)；真實模型是否照指示先問需求**待使用者環境確認** |
 | Admin「Make 主題」管理頁（新增、編輯、排序、停用、刪除） | ✅ | 見 [#019](#019--對話-make-指令與-make-主題管理) |
 | Agent 回覆以 Markdown 排版（程式碼區塊可複製） | ✅ | 見 [#020](#020--agent-回覆以-markdown-排版) |
-| 後台系統設定：Entra ID 設定欄位、Cloudflare Tunnel token 與網域 | ⏳ | 使用者要求先記錄，之後做後台時加入；需先寫新 ADR，見 [開發規劃](../planning/development-plan.md#後台系統設定待辦功能) |
+| 管理介面：總覽儀表板、停止執行環境、稽核紀錄（ADR-0010） | ✅ | 見 [#021](#021--管理介面總覽與稽核紀錄adr-0010) |
+| 系統設定：Entra ID（網頁設定、secret 加密存 DB、不重啟生效） | 🚧 | ADR-0010 已定案；下一個 PR |
+| 系統設定：Cloudflare Tunnel（token 交給 runtime host、網域可改） | ⏳ | ADR-0010 已定案；Entra 之後 |
 | 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
@@ -48,6 +50,56 @@
 ---
 
 ## 💬 留言區
+
+### #021 · 管理介面：總覽與稽核紀錄（ADR-0010）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-06 16:45 · `🚧進度`
+
+- **範圍**（使用者確認）：
+  - 管理總覽；
+  - 稽核紀錄；
+  - 系統設定：Entra ID；
+  - 系統設定：Cloudflare Tunnel。
+  - 分三個 PR 做，這是第一個。
+- **ADR-0010**（[docs/adr/0010](../adr/0010-admin-editable-system-settings.md)）：
+  - 系統設定存在 `platform.system_settings`，生效值為「資料庫 > `.env`」。
+  - Entra secret 以 Data Protection 加密，只能寫入、不回顯。Authority 由 Tenant ID 組成，避免 SSRF。不重啟即生效。
+  - Tunnel token 經 runtime host 寫進 `~ymir/.config/ymir/cloudflared.env`（600）。cloudflared 改成 `ymir` 帳號的 rootless Podman Quadlet user service，runtime host 不需要提升權限。
+  - 修訂了 ADR-0006 第 4 點與 ADR-0009 的設定來源。
+- **這次完成**：
+  - **總覽** `/admin`：
+    - 使用者數；
+    - Agent 執行中與排隊數；
+    - 今日完成 / 失敗 / 取消；
+    - 近 7 天長條圖（失敗以紅色標示）；
+    - 各使用者的執行環境，可「停止」（寫入稽核 `admin.runtime.stop`，檔案保留，下次送訊息自動重啟），也可直接看該使用者的稽核紀錄。
+    - 「今天」依瀏覽器時區切日，伺服器不依賴時區資料庫。
+  - **稽核紀錄** `/admin/audit`：
+    - 可依動作類型、結果、日期篩選；點操作者可篩選該使用者；
+    - 動作顯示中文說明與代碼，使用者 id 顯示成名稱；
+    - 「載入更多」往前翻（keyset 分頁）。
+  - **後端**：
+    - `IAuditLogQuery`（Platform，唯讀）；
+    - `AdminStatsService`（Vibe Maker）；
+    - 跨模組資料在 Api 層組合；
+    - migration：`audit_log` 的 action / actor index、`agent_executions.created_at` index。
+  - 管理區分頁改為「總覽 / 使用者 / Make 主題 / 稽核紀錄」，左下角「管理」改連到總覽。
+- **驗證（實際跑過）**：
+  - 後端：`dotnet test --solution Ymir.slnx` **328 項全部通過**，新增 5 個整合測試：總覽數字、位移範圍、停止 runtime 與稽核、沒有 runtime 時回 404、稽核篩選與分頁。授權矩陣加入 3 個 Admin 端點。`dotnet format` 通過，OpenAPI 快照已更新。
+  - 前端：`npm run lint`、`npm test`（**67 項**）、`npm run build` 都通過。
+  - 端對端：
+    - 新增的 `npm run e2e:admin` **6 步全部通過**：一般使用者看不到「管理」→ 總覽 → 停止執行環境 → 跳到該使用者的稽核紀錄 → 動作篩選 → 窄螢幕。
+    - `npm run e2e`（13）、`e2e:make`（10）、`e2e:auth`（6）都通過；`e2e:make` 與 `e2e:auth` 已配合新的管理首頁調整。
+- **下一步**：PR B，Entra 設定頁。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #020 · Agent 回覆以 Markdown 排版
 
