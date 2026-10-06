@@ -63,6 +63,15 @@ API 容器化後，可行的做法有三種：
      - `/run/ymir-runtime`（runtime host 的 socket）；
      - Data Protection 金鑰目錄（新設定 `Ymir:DataProtection:KeysPath`）。
    - 不掛載任何 container runtime socket，也不掛載使用者 workspace。
+   - **Engine（使用者決定，2026-10-06）**：
+     - **Linux 正式主機用 rootful Podman**，以 systemd Quadlet（`deploy/api/ymir-api.container`）管理。
+       `--group-add` 可以直接帶入 `ymir-runtime` 的 gid，不受 rootless user namespace 影響。
+       Agent container 仍由 `ymir` 帳號的 rootless Podman 執行（runtime host），兩者分開。
+     - **Windows 開發機用 Docker Desktop**（`deploy/api/compose.windows.yml`）。
+       Docker Desktop 無法把 Windows 上的 Unix socket 掛進 Linux 容器，所以 runtime host 改聽 Windows 主機的 `127.0.0.1:5090`，
+       API 容器經 `host.docker.internal` 連線（每個請求仍要 token）。
+       這兩個主機別名只允許用在 client 端（`VibeMaker:Runtime:Remote:Endpoint`），使用時 API 會記錄警告；runtime host 監聽的位址仍只能是 loopback。
+       只用於開發與驗證（ADR-0005），不可對外公開。
 7. **開發環境不變**：
    - Development 的 API 仍在主機執行，使用 `Local` runtime。
    - Windows 上使用 `Docker` provider（ADR-0005）。
@@ -72,7 +81,7 @@ API 容器化後，可行的做法有三種：
 
 - **部署**：多一個主機服務（runtime host）要安裝與監控。正式主機需要 .NET 10 runtime，或改用 self-contained publish。
 - **安全邊界**：API 被攻破時，攻擊者最多能在既有使用者的 Agent container 內執行程序，這本來就是 API 的職責範圍；但無法建立任意 container、掛載主機路徑或提權。
-- **API 用不同帳號的 rootless Podman 執行時**：supplementary group 會被 user namespace 對應掉，需要 `--group-add keep-groups`（見 `deploy/api/README.md`）。建議以 Docker 或 rootful Podman 跑 API 容器。
+- **API 容器採 rootful Podman**：rootful 的 container engine 本身以 root 執行，但容器內是非 root 使用者、唯讀、drop 全部 capabilities，而且只掛兩個資料夾。若之後改成以其他帳號的 rootless Podman 執行，supplementary group 會被 user namespace 對應掉，需要 `--group-add keep-groups`，屆時要重新驗證。
 - **不得用 `ymir` 帳號跑 API 容器**：等於讓 API 直接擁有 rootless Podman。
 - **runtime id 的對應**：API 端只在記憶體中保存 runtime id → user id 的對應。API 或 runtime host 重新啟動後，下一次 execution 的 EnsureRuntime 會重建對應，與原本行為相同。
 - **WebSocket 轉送的成本**：每個 exec 多一層轉送，相較於模型呼叫的延遲可以忽略。

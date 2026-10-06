@@ -72,6 +72,11 @@ deploy/litellm/.env
 deploy/cloudflared/*.json
 cert.pem
 
+# API container 的 secret 與資料（連線字串、runtime host token、Data Protection 金鑰，ADR-0008）
+deploy/api/.env
+deploy/api/.env.windows
+deploy/api/data/
+
 # IDE
 .vs/
 .idea/

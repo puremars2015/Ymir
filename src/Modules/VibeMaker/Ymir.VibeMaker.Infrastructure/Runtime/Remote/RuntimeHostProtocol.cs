@@ -98,9 +98,20 @@ internal sealed record RuntimeHostEndpoint(string? SocketPath, Uri? HttpUri)
 {
     private const string UnixPrefix = "unix:";
 
+    /// <summary>
+    /// 容器內代表「主機」的名稱。只有 API（client 端）可以使用：Windows Docker Desktop 無法把 Unix socket 掛進 Linux 容器，
+    /// 改由 runtime host 聽主機的 <c>127.0.0.1</c>，API 容器經 <c>host.docker.internal</c> 連線（Docker Desktop 轉送後是 loopback）。
+    /// 只用於開發 / 驗證（ADR-0005、ADR-0008）。
+    /// </summary>
+    private static readonly string[] s_containerHostAliases = ["host.docker.internal", "host.containers.internal"];
+
     public bool IsUnixSocket => SocketPath is not null;
 
-    public static RuntimeHostEndpoint Parse(string? value, string settingName)
+    /// <summary>是否經由容器的主機別名連線（明文 HTTP 經過容器網路，只限開發）。</summary>
+    public bool UsesContainerHostAlias => HttpUri is { } uri && s_containerHostAliases.Contains(uri.Host, StringComparer.OrdinalIgnoreCase);
+
+    /// <param name="allowContainerHostAlias">client 端（API 容器）為 true；runtime host 監聽的位址一律只能是 loopback。</param>
+    public static RuntimeHostEndpoint Parse(string? value, string settingName, bool allowContainerHostAlias = false)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -121,7 +132,9 @@ internal sealed record RuntimeHostEndpoint(string? SocketPath, Uri? HttpUri)
         // 不提供 TLS：TCP 只允許 loopback，避免 runtime host 暴露到網路上。
         if (Uri.TryCreate(value, UriKind.Absolute, out var uri)
             && uri.Scheme == Uri.UriSchemeHttp
-            && (uri.IsLoopback || (IPAddress.TryParse(uri.Host.Trim('[', ']'), out var address) && IPAddress.IsLoopback(address)))
+            && (uri.IsLoopback
+                || (IPAddress.TryParse(uri.Host.Trim('[', ']'), out var address) && IPAddress.IsLoopback(address))
+                || (allowContainerHostAlias && s_containerHostAliases.Contains(uri.Host, StringComparer.OrdinalIgnoreCase)))
             && uri.AbsolutePath == "/")
         {
             return new RuntimeHostEndpoint(null, uri);

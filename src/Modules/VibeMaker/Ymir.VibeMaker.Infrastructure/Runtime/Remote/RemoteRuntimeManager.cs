@@ -20,10 +20,14 @@ internal sealed class RemoteRuntimeManager : IAgentRuntimeManager, IDisposable
     public RemoteRuntimeManager(IOptions<RuntimeOptions> options, ILogger<RemoteRuntimeManager> logger)
     {
         var remote = options.Value.Remote;
-        var endpoint = RuntimeHostEndpoint.Parse(remote.Endpoint, "VibeMaker:Runtime:Remote:Endpoint");
+        var endpoint = RuntimeHostEndpoint.Parse(remote.Endpoint, "VibeMaker:Runtime:Remote:Endpoint", allowContainerHostAlias: true);
         RuntimeHostProtocol.EnsureTokenIsStrong(remote.Token, "VibeMaker:Runtime:Remote:Token");
         _connection = new RuntimeHostConnection(endpoint, remote.Token!);
         _logger = logger;
+        if (endpoint.UsesContainerHostAlias)
+        {
+            logger.LogWarning("Runtime host is reached through {Host} over plain HTTP; this is for Windows Docker Desktop development only (ADR-0008)", endpoint.HttpUri!.Host);
+        }
     }
 
     public async Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, CancellationToken cancellationToken)

@@ -35,7 +35,7 @@ web/                                 Angular 22（standalone、signals、zoneles
 runtime/agent/                       Agent runtime Containerfile
 deploy/cloudflared/                  cloudflared ingress 設定範本（指南 docs/guides/cloudflare-tunnel.md）
 deploy/litellm/                      LiteLLM proxy sample（MiniMax 國際站 + Fake LLM）；金鑰只放在 .env（已被 gitignore）
-deploy/api/                          API container 的 compose（host network、唯讀、只掛 socket 目錄與 Data Protection 金鑰）
+deploy/api/                          API container：Linux 用 rootful Podman + Quadlet（ymir-api.container），Windows 用 Docker Desktop（compose.windows.yml）；唯讀、只掛 socket 目錄與 Data Protection 金鑰
 deploy/runtime-host/                 runtime host 的 systemd unit、設定範本與安裝指南
 spikes/pi-rpc-poc/                   技術驗證主控台程式
 ```
@@ -87,7 +87,7 @@ Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真
 
 Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用於開發 / 驗證，例如 Windows，ADR-0005；指南 `docs/guides/windows-docker.md`）| `Local`（Linux / macOS 開發用，無隔離）| `Remote`（API 在容器內，呼叫 runtime host：`VibeMaker:Runtime:Remote:Endpoint` / `Token`，ADR-0008）。Runtime host 自己用 Podman / Docker / Local。
 
-API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:dev .`（部署見 `deploy/api/README.md`、`deploy/runtime-host/README.md`）。
+API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:dev .`。API container 的 engine：Linux 正式主機用 **rootful Podman**（Quadlet），Windows 開發機用 **Docker Desktop**（runtime host 聽 `127.0.0.1:5090`，API 經 `host.docker.internal` 連線，只限開發）；部署見 `deploy/api/README.md`、`deploy/runtime-host/README.md`。
 
 ## 架構規則
 
