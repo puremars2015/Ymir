@@ -94,6 +94,8 @@ Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真
 
 管理介面（ADR-0010）：`/admin` 總覽、使用者、Make 主題、稽核紀錄；端點在 `src/Ymir.Api/Endpoints/Admin*.cs`，跨模組資料（使用者名稱 + Vibe Maker 統計）在 Api 層組合。稽核只讀查詢用 `IAuditLogQuery`，寫入仍只經由 `IAuditLog`。
 
+對話檔案（Agent 產生的成果）：`GET /api/conversations/{id}/files`、`/files/download?path=`、`/files/archive`（zip）。經 `IWorkspaceFileReader` 在使用者 runtime 內執行 `find` / `bash` 讀取，所以 Remote（runtime host）也適用；路徑經 stdin 傳入、runtime 內以 realpath 確認不逃出工作目錄；下載一律附件（octet-stream、nosniff、CSP sandbox），不得在 Ymir 網域上直接開啟 Agent 產生的 HTML。
+
 `/make`：對話輸入 `/make` 顯示管理員設定的主題按鈕（`vibemaker.make_topics`，Admin 在「管理 → Make 主題」維護）；給 Agent 的完整指示由後端 `MakePromptBuilder` 組合並存在 `AgentExecution.AgentPrompt`，對話紀錄只保留使用者輸入的文字。
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。

@@ -32,6 +32,8 @@ export type OidcSettings = Schemas['OidcSettingsResponse'];
 export type OidcSettingsSource = Schemas['OidcSettingsSource'];
 export type SaveOidcSettingsRequest = Schemas['SaveOidcSettingsRequest'];
 export type OidcTestResult = Schemas['OidcTestResponse'];
+export type WorkspaceFile = Schemas['WorkspaceFileResponse'];
+export type WorkspaceFiles = Schemas['WorkspaceFilesResponse'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

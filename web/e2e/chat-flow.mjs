@@ -2,13 +2,16 @@
 // 前置：SQL Server、Fake LLM、API（VibeMaker__Harness=Pi）、ng serve 都已啟動。
 // 用法：node e2e/chat-flow.mjs <screenshot-dir> [baseUrl]
 import { chromium } from 'playwright';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 
 const [outDir = '.', baseUrl = 'http://localhost:4200'] = process.argv.slice(2);
 mkdirSync(outDir, { recursive: true });
 const executablePath = process.env.CHROMIUM_PATH;
 const browser = await chromium.launch(executablePath ? { executablePath } : {});
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const page = await browser.newPage({
+  viewport: { width: 1280, height: 800 },
+  acceptDownloads: true,
+});
 const step = (name) => console.log(`✔ ${name}`);
 const composer = 'app-composer textarea';
 const sendPrompt = async (text) => {
@@ -71,6 +74,31 @@ await waitIdle();
 await page.waitForSelector('.sidebar a.item.active:has-text("幫我建立一個檔案")');
 step('started an ungrouped chat from the home composer (title from first message)');
 await page.screenshot({ path: `${outDir}/02-chat.png` });
+
+// 2b. Agent 建立的檔案可以下載：回覆下方出現檔案、檔案面板、打包下載
+const chip = page.locator('.turn-files a.chip:has-text("hello.txt")');
+await chip.waitFor();
+const [fileDownload] = await Promise.all([page.waitForEvent('download'), chip.click()]);
+if (fileDownload.suggestedFilename() !== 'hello.txt')
+  throw new Error(`unexpected file name: ${fileDownload.suggestedFilename()}`);
+const fileContent = readFileSync(await fileDownload.path(), 'utf8');
+if (fileContent !== 'Hello from Ymir') throw new Error(`unexpected content: ${fileContent}`);
+await page.click('button.files-toggle');
+await page.waitForSelector('app-files-panel a.file:has-text("hello.txt")');
+await page.screenshot({ path: `${outDir}/02b-files.png` });
+const [zipDownload] = await Promise.all([
+  page.waitForEvent('download'),
+  page.click('app-files-panel a.archive'),
+]);
+// headless Chromium 無法處理非 ASCII 檔名（會改叫 "download"），所以直接檢查 header：一般瀏覽器用 filename* 取得中文檔名
+const archiveResponse = await page.request.get(zipDownload.url());
+const disposition = archiveResponse.headers()['content-disposition'] ?? '';
+if (!disposition.startsWith('attachment') || !/filename\*=UTF-8''.+\.zip/.test(disposition))
+  throw new Error(`unexpected archive disposition: ${disposition}`);
+const zipBytes = readFileSync(await zipDownload.path());
+if (zipBytes[0] !== 0x50 || zipBytes[1] !== 0x4b) throw new Error('archive is not a zip file');
+await page.click('app-files-panel button.close');
+step('agent-created file downloadable (inline chip, files panel, zip)');
 
 // 3. 重新整理後歷史仍在
 await page.reload();

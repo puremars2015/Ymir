@@ -6,6 +6,18 @@
     <span class="sep" aria-hidden="true">/</span>
   }
   <span class="title">{{ conversation()?.title }}</span>
+  <button
+    type="button"
+    class="files-toggle"
+    [class.active]="filesOpen()"
+    [attr.aria-expanded]="filesOpen()"
+    (click)="filesOpen.set(!filesOpen())"
+  >
+    <span aria-hidden="true">📁</span> 檔案
+    @if (files().length > 0) {
+      <span class="count">{{ files().length }}</span>
+    }
+  </button>
 </header>
 
 <div class="scroller">
@@ -52,6 +64,20 @@
           }
         </div>
       </li>
+    } @else if (turnFiles().length > 0) {
+      <li class="turn assistant turn-files" aria-label="這次產生的檔案">
+        <div class="bubble">
+          <p class="status">這次產生 / 更新的檔案，點一下下載：</p>
+          <div class="chips">
+            @for (file of turnFiles(); track file.path) {
+              <a class="chip" [href]="downloadUrl(file)" download [title]="file.path">
+                {{ fileLabel(file) }} <span class="muted">{{ fileSize(file) }}</span>
+                <span class="dl" aria-hidden="true">⬇</span>
+              </a>
+            }
+          </div>
+        </div>
+      </li>
     }
   </ol>
 </div>
@@ -69,3 +95,17 @@
   <app-composer [busy]="!!live()" (submitted)="submit($event)" (stopped)="stop()" />
   <p class="hint muted">Agent 在你的專屬執行環境中工作；Enter 送出，Shift+Enter 換行。</p>
 </footer>
+
+@if (filesOpen()) {
+  <app-files-panel
+    class="files-panel"
+    [conversationId]="conversationId()"
+    [files]="files()"
+    [truncated]="filesTruncated()"
+    [loading]="filesLoading()"
+    [error]="filesError()"
+    [shared]="!!conversation()?.projectId"
+    (refresh)="refreshFiles()"
+    (closed)="filesOpen.set(false)"
+  />
+}
