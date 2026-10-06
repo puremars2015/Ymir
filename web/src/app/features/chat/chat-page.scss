@@ -150,8 +150,8 @@
       max-width: 80%;
       padding: 0.625rem 1rem;
       border-radius: 1.25rem;
-      background: linear-gradient(135deg, #004ea0, #0075b9);
-      color: #ffffff;
+      background: linear-gradient(135deg, #dceeff, #b9def8);
+      color: var(--text);
       box-shadow: 0 4px 12px rgb(0 78 160 / 12%);
       white-space: pre-wrap;
     }
