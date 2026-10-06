@@ -389,6 +389,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/settings/oidc': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetOidcSettings'];
+    put: operations['AdminSaveOidcSettings'];
+    post?: never;
+    delete: operations['AdminResetOidcSettings'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/settings/oidc/test': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['AdminTestOidcSettings'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/make-topics': {
     parameters: {
       query?: never;
@@ -587,6 +619,31 @@ export interface components {
       displayName: string;
       isDefault: boolean;
     };
+    OidcSettingsResponse: {
+      source: components['schemas']['OidcSettingsSource'];
+      enabled: boolean;
+      configured: boolean;
+      tenantId: null | string;
+      clientId: null | string;
+      hasClientSecret: boolean;
+      secretSource: components['schemas']['OidcSettingsSource'];
+      /** Format: date-time */
+      secretUpdatedAt: null | string;
+      /** Format: date */
+      secretExpiresOn: null | string;
+      adminRole: string;
+      displayName: string;
+      redirectUri: string;
+      /** Format: date-time */
+      updatedAt: null | string;
+      updatedByName: null | string;
+    };
+    /** @enum {unknown} */
+    OidcSettingsSource: 'None' | 'Deployment' | 'Database';
+    OidcTestResponse: {
+      ok: boolean;
+      message: string;
+    };
     PasswordLoginRequest: {
       account: null | string;
       password: null | string;
@@ -630,6 +687,16 @@ export interface components {
       sortOrder: number | string;
       isEnabled: boolean;
     };
+    SaveOidcSettingsRequest: {
+      enabled: boolean;
+      tenantId: null | string;
+      clientId: null | string;
+      clientSecret: null | string;
+      /** Format: date */
+      secretExpiresOn: null | string;
+      adminRole: null | string;
+      displayName: null | string;
+    };
     SendMessageRequest: {
       content: string;
       /** Format: uuid */
@@ -644,6 +711,9 @@ export interface components {
       /** Format: uuid */
       executionId: string;
       eventStreamUrl: string;
+    };
+    TestOidcSettingsRequest: {
+      tenantId: null | string;
     };
     UpdateProjectRequest: {
       name: null | string;
@@ -1344,6 +1414,94 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AuditLogPageResponse'];
+        };
+      };
+    };
+  };
+  AdminGetOidcSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OidcSettingsResponse'];
+        };
+      };
+    };
+  };
+  AdminSaveOidcSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveOidcSettingsRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OidcSettingsResponse'];
+        };
+      };
+    };
+  };
+  AdminResetOidcSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OidcSettingsResponse'];
+        };
+      };
+    };
+  };
+  AdminTestOidcSettings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['TestOidcSettingsRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OidcTestResponse'];
         };
       };
     };

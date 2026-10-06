@@ -28,6 +28,10 @@ export type AuditLogPage = Schemas['AuditLogPageResponse'];
 export type AuditLogItem = Schemas['AuditLogItemResponse'];
 export type AuditResult = Schemas['AuditResult'];
 export type RuntimeState = Schemas['RuntimeStatus'];
+export type OidcSettings = Schemas['OidcSettingsResponse'];
+export type OidcSettingsSource = Schemas['OidcSettingsSource'];
+export type SaveOidcSettingsRequest = Schemas['SaveOidcSettingsRequest'];
+export type OidcTestResult = Schemas['OidcTestResponse'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

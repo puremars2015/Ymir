@@ -30,6 +30,26 @@
 
 ## 2. 設定 Ymir
 
+有兩種方式，擇一即可。兩者都有時，**網頁設定優先**（ADR-0010）。
+
+### 2A. 在管理介面設定（建議）
+
+1. 先用本機 Admin 登入。還沒有 Admin 時，見第 3 節的 `create-local-admin`。
+2. 左下角「管理」→「系統設定」→「企業帳號登入」，填入：
+   - Tenant ID：`e333846a-0ee2-4e2d-a13b-efc97851b892`
+   - Client ID：`5e85a804-c308-4402-b621-0be6d023a2ac`
+   - Client secret：Entra「憑證及祕密」的**值**
+   - Secret 到期日：選填，到期前 30 天會在總覽提醒
+3. 按「測試設定」確認 tenant 正確，再按「儲存」。**不必重啟**，登入頁立即出現企業帳號按鈕。
+4. 頁面上顯示的重新導向 URI，必須已加在 Entra 的「驗證」頁。
+
+說明：
+
+- Client secret 以 Data Protection 加密後存進資料庫，網頁上看不到原值，只顯示「已設定」與更新時間。留空存檔表示不變更。
+- 停用或還原企業帳號登入時，系統會先確認還有啟用中的本機 Admin，避免所有人都進不來。
+
+### 2B. 在部署設定（.env）設定
+
 在 `deploy/api/.env`（Linux）或 `deploy/api/.env.windows`（Windows）填入：
 
 ```
@@ -69,7 +89,8 @@ dotnet out/api/Ymir.Api.dll create-local-admin admin "系統管理員"
 ## 4. 更換 client secret（到期前）
 
 1. Entra → 應用程式註冊 → `Ymir` → 憑證及祕密 → 新增用戶端密碼。
-2. 更新 `deploy/api/.env` 的 `Ymir__Auth__Oidc__ClientSecret`，重新啟動 API：
+2. 用網頁設定的話：到「管理 → 系統設定」貼上新的值並更新到期日，存檔後立即生效，跳過第 2 步的其他做法。
+   用 `.env` 設定的話：更新 `deploy/api/.env` 的 `Ymir__Auth__Oidc__ClientSecret`，重新啟動 API：
    - Linux：`sudo systemctl restart ymir-api`
    - Windows：`docker compose -f compose.windows.yml up -d`
 3. 確認可以登入後，刪除舊的用戶端密碼。

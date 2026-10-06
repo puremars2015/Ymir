@@ -5,6 +5,9 @@ import {
   AdminMakeTopic,
   AdminOverview,
   AuditLogPage,
+  OidcSettings,
+  OidcTestResult,
+  SaveOidcSettingsRequest,
   AdminUser,
   ApiProblem,
   CancelExecutionResponse,
@@ -84,6 +87,22 @@ export class ApiService {
 
   adminSearchAudit(params: Record<string, string>): Observable<AuditLogPage> {
     return this.http.get<AuditLogPage>('/api/admin/audit', { params });
+  }
+
+  adminGetOidcSettings(): Observable<OidcSettings> {
+    return this.http.get<OidcSettings>('/api/admin/settings/oidc');
+  }
+
+  adminSaveOidcSettings(request: SaveOidcSettingsRequest): Observable<OidcSettings> {
+    return this.http.put<OidcSettings>('/api/admin/settings/oidc', request);
+  }
+
+  adminResetOidcSettings(): Observable<OidcSettings> {
+    return this.http.delete<OidcSettings>('/api/admin/settings/oidc');
+  }
+
+  adminTestOidcSettings(tenantId: string): Observable<OidcTestResult> {
+    return this.http.post<OidcTestResult>('/api/admin/settings/oidc/test', { tenantId });
   }
 
   adminListUsers(search: string): Observable<AdminUser[]> {

@@ -75,7 +75,8 @@ dotnet run --project tests/Ymir.Testing.FakeOidc      # http://127.0.0.1:5299，
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:auth -- <截圖目錄>
 # /make 指令與 Make 主題管理（同 e2e 的前置；以 Dev 登入 Admin）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:make -- <截圖目錄>
-# 管理介面：總覽、停止執行環境、稽核紀錄（同 e2e 的前置）
+# 管理介面：總覽、停止執行環境、稽核紀錄、系統設定（同 e2e 的前置）
+# 另需 Fake OIDC，API 加上 Ymir__Auth__Oidc__AuthorityHost=http://127.0.0.1:5299（不設定 Authority）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:admin -- <截圖目錄>
 
 # 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
@@ -87,7 +88,7 @@ dotnet run --project src/Ymir.Api                    # http://localhost:5080（D
 cd web && npm start                                  # http://localhost:4200，/api 轉給 5080
 ```
 
-登入（ADR-0009）：企業帳號 `Ymir__Auth__Oidc__Authority` / `ClientId` / `ClientSecret`（Entra ID，設定值見 `docs/guides/entra-id.md`）；本機帳號 `Ymir__Auth__LocalAccounts__Enabled`（預設開啟，由 Admin 建立，第一個 Admin 可用 `dotnet Ymir.Api.dll create-local-admin <帳號>`）；Development 另有 `/api/dev/login`。
+登入（ADR-0009）：企業帳號 `Ymir__Auth__Oidc__Authority` / `ClientId` / `ClientSecret`（Entra ID，設定值見 `docs/guides/entra-id.md`），或由 Admin 在「管理 → 系統設定」設定（ADR-0010：資料庫優先、不重啟生效；authority 由 `Ymir__Auth__Oidc__AuthorityHost` + Tenant ID 組成）；本機帳號 `Ymir__Auth__LocalAccounts__Enabled`（預設開啟，由 Admin 建立，第一個 Admin 可用 `dotnet Ymir.Api.dll create-local-admin <帳號>`）；Development 另有 `/api/dev/login`。
 
 Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真正的 Pi：設定 `VibeMaker__Harness=Pi` 並啟動 Fake LLM。
 
@@ -124,7 +125,7 @@ API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:de
 - 回給瀏覽器的錯誤與 tool 事件只能是摘要：不得含 stack trace、host path、token、完整 command output（SA §10、§12）。原始細節只寫 server log。
 - `LocalRuntimeManager` 沒有隔離，只允許 Development 環境（DI 會在其他環境拒絕啟動）。
 - API container 不得掛載 container runtime socket（podman.sock / docker.sock）或使用者 workspace，只能經由 runtime host（ADR-0008）。Runtime host 的端點只接受 user id 與 runtime 內的程序規格，不得新增接受 host 路徑、image、掛載或資源設定的端點；改動協定時同步更新 `RuntimeHostProtocolTests` 與 `RuntimeHostTests`。Runtime host token 只放在部署 secret，不得進版控；不得用 rootless Podman 帳號 `ymir` 跑 API container。
-- 不得保存 IdP token（`SaveTokens=false`）；登入後導回位址只接受站內相對路徑（`SafeRedirect`）。Entra client secret 只放在 `deploy/api/.env` 或部署 secret。本機帳號密碼只存 `PasswordHasher` 雜湊，不得記錄、回傳或寫入 log；登入端點的錯誤訊息不得區分「帳號不存在」與「密碼錯誤」。
+- 不得保存 IdP token（`SaveTokens=false`）；登入後導回位址只接受站內相對路徑（`SafeRedirect`）。Entra client secret 只放在 `deploy/api/.env`、部署 secret，或經管理介面以 Data Protection 加密存進 `platform.system_settings`（ADR-0010）；任何 API 回應、稽核、log 都不得包含 secret 值，`ISystemSettingsStore.SetAsync`（明文）不得用來存機密。本機帳號密碼只存 `PasswordHasher` 雜湊，不得記錄、回傳或寫入 log；登入端點的錯誤訊息不得區分「帳號不存在」與「密碼錯誤」。
 - 模型供應商金鑰（例如 `MINIMAX_API_KEY`）與 LiteLLM master key 只放在 `deploy/*/.env` 或部署環境的 secret，不得進版控、不得進 Agent container。
 - 對外公開（`Ymir:PublicEdge`，ADR-0006）不得在 Development 環境開啟；API 只綁 127.0.0.1、只信任 cloudflared 的 `X-Forwarded-*`。Tunnel 憑證不得進版控或進 container。
 
