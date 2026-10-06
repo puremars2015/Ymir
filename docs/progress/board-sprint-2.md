@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-07 01:15 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-07 01:45 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -48,6 +48,7 @@
 | AI 產生的檔案可下載（單檔、zip，使用者回報） | ✅ | 見 [#025](#025--ai-產生的檔案可以下載使用者回報) |
 | 系統設定：Cloudflare Tunnel（token 交給 runtime host、網域可改） | ✅ | 見 [#028](#028--系統設定cloudflare-tunnel-token-與對外網域)；真實 Cloudflare / systemd **待使用者環境確認** |
 | 對話體驗（Sprint 3）：改名 / 刪除（封存）、執行中重新整理可接回串流、檔案預覽、複製回覆 | ✅ | 見 [#029](#029--對話體驗改名刪除接回執行中的串流檔案預覽) |
+| Runtime 生命週期（Sprint 4）：閒置自動停止、啟動時對帳、每人配額、執行政策可在管理介面修改、用量頁（ADR-0011） | ✅ | 見 [#030](#030--runtime-生命週期閒置停止對帳配額與用量)；正式 Podman / runtime host 上的閒置停止**待使用者環境確認** |
 | 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
@@ -56,6 +57,53 @@
 ---
 
 ## 💬 留言區
+
+### #030 · Runtime 生命週期：閒置停止、對帳、配額與用量
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 01:45 · `✅完成`
+
+- **背景**：Sprint 3 完成後，依使用者指示接著做下一階段，也就是路線圖的 Sprint 4「Runtime 完整生命週期」。
+- **先修的 bug**：runtime id 只存在記憶體。
+  - API 或 runtime host 重新啟動後，資料庫紀錄的 runtime id 就與 manager 不同。
+  - 影響：Admin「停止執行環境」與停用帳號時的停止都會失敗（找不到 runtime）。
+  - 修正：生命週期操作改為以 user id 進行（新增 `StopForUserAsync`、`GetStatusForUserAsync`）。
+  - runtime host 的 `GET /runtime` 與 `POST /stop` 改為直接以 user id 操作 container，不依賴記憶體中的對照表；端點清單不變。
+- **做法**（[ADR-0011](../adr/0011-runtime-lifecycle-policy.md)）：
+  - **啟動時對帳**：`RuntimeLifecycleWorker` 啟動時，比對每筆 runtime 紀錄與實際狀態，以實際狀態為準。
+  - **閒置停止**：
+    - 每分鐘檢查一次，停止超過閒置時間的 runtime；
+    - execution 開始與結束都會更新最後活動時間；
+    - 正在執行或有排隊工作的使用者會跳過（非阻塞取得使用者 lock）；
+    - 寫稽核 `runtime.idle_stop`；
+    - 檔案保留，下次送訊息時自動啟動。
+  - **執行政策**：閒置停止時間、單次執行上限、每人同時排隊的工作數、每人每日執行次數。
+    - 部署設定 `VibeMaker__Runtime__*` 是預設值；
+    - 管理介面的設定存在 `system_settings`，優先於部署設定、**不必重啟**。
+  - **配額**：送訊息時檢查，超過回 429 `QUOTA_EXCEEDED`，聊天頁直接顯示原因。這是軟性上限；「同一對話單一執行中」仍由資料庫唯一索引保證。
+  - **管理介面**：
+    - 系統設定新增「執行環境」卡片；
+    - 新增「用量」分頁：各使用者的執行數、成功率、失敗 / 取消數、Agent 執行時間、24 小時次數（接近或達到每日上限時標示）、執行環境狀態，期間可選 1、7、30、90 天。
+  - CLAUDE.md、ADR 索引已更新。
+- **驗證（實際跑過）**：
+  - 後端：`dotnet test --solution Ymir.slnx` **452 項全部通過**，`dotnet format` 無差異。新增：
+    - 執行政策：預設值、存檔、驗證、還原、稽核；
+    - 每日上限回 429；
+    - 閒置停止：停止、寫稽核，再送訊息會自動啟動；
+    - 執行中的使用者不會被停止；
+    - 對帳；
+    - 用量；
+    - runtime host 測試：**新的 API instance（不認得任何 runtime id）仍能以 user id 查詢與停止**；
+    - 政策驗證與解析的單元測試；
+    - 授權矩陣加入 4 個端點；OpenAPI 快照已更新。
+  - 前端：`npm run lint`、`npm test`（**100 項**）、`npm run build` 都通過。
+  - 端對端：
+    - `e2e:admin` 擴充到 **14 步全部通過**：設定執行政策（含欄位驗證）、每日上限設為 1 後一般使用者再送出被擋下並看到原因、用量頁標示已達上限、還原政策。
+    - `e2e`（19 步）、`e2e:make` 重跑通過。
+  - 沙箱只有 Local runtime；Podman / Docker 與正式 runtime host 上的閒置停止與對帳**未驗證、待使用者環境確認**。Podman 的 inspect / stop 指令沿用原本經過測試的 `ContainerCommandBuilder`。
+- **卡關 / 待決定**：
+  - 模型 token 用量與費用在 LiteLLM（ADR-0004），目前用量頁只有執行次數與時間。需要的話，下一步可以把 LiteLLM 的 spend 接進用量頁。
+  - 閒置停止與使用者 lock 都是單一 API instance 的記憶體 lock；之後要多 instance 時需要改成分散式 lock。
+  - 路線圖下一步是 Sprint 5「驗收與強化」：OTel 指標、安全檢查、Playwright 覆蓋 SA 的 12 項驗收條件。
 
 ### #029 · 對話體驗：改名、刪除、接回執行中的串流、檔案預覽
 
