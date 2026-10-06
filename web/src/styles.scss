@@ -60,8 +60,8 @@ code {
 /* 對話以白底呈現，避免系統深色模式降低藍色漸層的可讀性。 */
 .chat-surface {
   color-scheme: light;
-  --text: #20364b;
-  --text-muted: #5f7385;
+  --text: #111111;
+  --text-muted: #404040;
   --surface: #ffffff;
   --surface-muted: #f0f6fb;
   --surface-active: #e2eff9;
