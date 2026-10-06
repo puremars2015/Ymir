@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-06 09:58 ・ 狀態：**⏳ 尚未開始（等待決定）**
+> 最後更新：2026-10-06 10:50 ・ 狀態：**⏳ 尚未開始（等待決定）**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -30,7 +30,9 @@
 | Ymir 接上 LiteLLM：每位使用者的 virtual key（ADR-0004） | ✅ | 以 Fake LLM 模擬的 LiteLLM 驗證；真正的 LiteLLM + PostgreSQL 在沙箱**跳過**（image 拉不下來），見 [#011](#011--ymir-接上-litellm每位使用者的-virtual-key) |
 | 對話選模型、個人 global / 專案 system prompt | ✅ | 見 [#012](#012--對話選模型個人-global-與專案-system-prompt) |
 | API 放進容器 + 主機 runtime host（ADR-0008） | ✅ | 見 [#013](#013--api-放進容器agent-runtime-改由主機上的-runtime-host-管理)；沙箱以 Docker 驗證完整流程 |
-| 在 Linux 主機安裝 runtime host（rootless Podman、systemd、`ymir-runtime` group）並啟動 API 容器 | ⏳ | 依 [deploy/runtime-host](../../deploy/runtime-host/README.md)、[deploy/api](../../deploy/api/README.md)；**待使用者環境確認** |
+| API 容器的 engine：Linux 用 rootful Podman（Quadlet）、Windows 用 Docker Desktop | ✅ | 使用者決定；見 [#014](#014--api-容器linux-用-rootful-podmanwindows-用-docker-desktop) |
+| 在 Linux 主機安裝 runtime host（rootless Podman、systemd、`ymir-runtime` group）並以 Quadlet 啟動 API 容器 | ⏳ | 依 [deploy/runtime-host](../../deploy/runtime-host/README.md)、[deploy/api](../../deploy/api/README.md)；**待使用者環境確認** |
+| Windows：runtime host + Docker Desktop 跑 API 容器 | ⏳ | 依 [deploy/api 的 Windows 一節](../../deploy/api/README.md#windowsdocker-desktop開發--驗證)；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
 **開工前要先有的決定**：企業 IdP 類型（Entra ID / ADFS / 純 LDAP）與測試用的 App 註冊資訊（client id、redirect URI）。
@@ -38,6 +40,44 @@
 ---
 
 ## 💬 留言區
+
+### #014 · API 容器：Linux 用 rootful Podman，Windows 用 Docker Desktop
+
+> 👤 **Claude（AI）** · 🕒 2026-10-06 10:50 · `✅完成`
+
+依使用者決定（「先用 rootful podman，windows 上可以用 docker」）調整部署方式，ADR-0008 已記錄這個決定。
+
+- **Linux 正式主機**：新增 Quadlet unit [`deploy/api/ymir-api.container`](../../deploy/api/ymir-api.container)。
+  - 由 rootful Podman + systemd 管理 API 容器，設定為 host network、唯讀、drop ALL、`no-new-privileges`，只掛 socket 目錄與金鑰目錄。
+  - rootful 時 `--group-add <ymir-runtime gid>` 直接有效，不會被 rootless 的 user namespace 對應掉。
+  - Agent container 仍由 `ymir` 帳號的 rootless Podman（runtime host）執行，兩者分開。
+- **Windows 開發機**：新增 [`compose.windows.yml`](../../deploy/api/compose.windows.yml) 與 `.env.windows.example`。
+  - Docker Desktop 不能把 Windows 的 Unix socket 掛進 Linux 容器，所以改成：runtime host 聽 Windows 主機的 `127.0.0.1:5090`，API 容器經 `host.docker.internal:5090` 連線，仍然需要 token。
+  - 程式改動：`host.docker.internal` / `host.containers.internal` **只允許**用在 API（client）端的設定，使用時會記錄「只限開發」的警告；runtime host 監聽的位址仍然只能是 loopback。
+- `compose.yml` 改為備用（Linux + Docker）；`.gitignore` 加入 `deploy/api/.env`、`.env.windows`、`data/`。
+- 文件：`deploy/api/README.md` 改寫成 Linux / Windows 兩段；runtime host README、Windows 指南（新增第 7 節）、CLAUDE.md 同步更新。
+
+**驗證（實際跑過）**
+- `dotnet format` 通過；`dotnet test --solution Ymir.slnx` **253 項全部通過**（新增 5 項：主機別名只允許 client 端、必須完全符合、只能用 http）。
+- **Quadlet**：用 `quadlet -dryrun` 驗證 unit 檔，產生的 `podman run` 參數正確（`--network=host --read-only --cap-drop=all --security-opt=no-new-privileges --group-add=<gid>`，兩個 `-v`）。
+- **沙箱以 rootful Podman 實際跑 Quadlet 產生的 `podman run` 參數**（沙箱沒有 systemd，所以只去掉 `--sdnotify` / `--cgroups=split` / `--cidfile`）：
+  - 容器內 `id` 包含 socket 的 group；
+  - `npm run e2e` **12 個步驟全部通過**，Agent container 由 runtime host 建立；
+  - 重新啟動容器後沒有產生新的金鑰，原本的登入 cookie 仍然有效；
+  - runtime host 的 log 中沒有 token 或模型金鑰。
+- **未驗證、待使用者環境確認**：
+  - 真正的 systemd 啟動 Quadlet；
+  - SELinux 主機上容器連 runtime host socket 的 policy；
+  - Windows Docker Desktop 經 `host.docker.internal` 連到 `127.0.0.1:5090`（沙箱沒有 Docker Desktop）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #013 · API 放進容器，Agent runtime 改由主機上的 runtime host 管理
 
@@ -87,7 +127,7 @@
   - API 容器以 rootless Podman 執行時 `--group-add keep-groups` 的行為。
   - 沙箱建置 image 時為了通過代理，額外帶了 CA 憑證，這只用於驗證；`Containerfile` 本身沒有改。
 
-**待決定**：正式主機要用哪個 engine 跑 API 容器（建議 Docker 或 rootful Podman，`group_add` 最單純），以及 runtime host 用 framework-dependent（主機裝 .NET 10 runtime）還是 self-contained 發行。
+**待決定**：~~正式主機要用哪個 engine 跑 API 容器~~（已決定，見 #014）；runtime host 用 framework-dependent（主機裝 .NET 10 runtime）還是 self-contained 發行。
 
 <details>
 <summary>💬 回覆（0）</summary>
