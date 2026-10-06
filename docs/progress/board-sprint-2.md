@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-06 21:45 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-07 01:15 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -47,6 +47,7 @@
 | 系統設定：Entra ID（網頁設定、secret 加密存 DB、不重啟生效） | ✅ | 見 [#022](#022--系統設定entra-id-可在管理介面設定不重啟生效)；真實 Entra **待使用者環境確認** |
 | AI 產生的檔案可下載（單檔、zip，使用者回報） | ✅ | 見 [#025](#025--ai-產生的檔案可以下載使用者回報) |
 | 系統設定：Cloudflare Tunnel（token 交給 runtime host、網域可改） | ✅ | 見 [#028](#028--系統設定cloudflare-tunnel-token-與對外網域)；真實 Cloudflare / systemd **待使用者環境確認** |
+| 對話體驗（Sprint 3）：改名 / 刪除（封存）、執行中重新整理可接回串流、檔案預覽、複製回覆 | ✅ | 見 [#029](#029--對話體驗改名刪除接回執行中的串流檔案預覽) |
 | 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
@@ -55,6 +56,54 @@
 ---
 
 ## 💬 留言區
+
+### #029 · 對話體驗：改名、刪除、接回執行中的串流、檔案預覽
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 01:15 · `✅完成`
+
+- **背景**：使用者選擇接著做 Sprint 3「對話體驗」。原本對話不能改名或刪除、專案不能刪除；重新整理頁面時執行中的 Agent 看起來像卡住；檔案只能下載不能先看。
+- **做法**：
+  - **刪除＝封存**：依資料保存原則（Conversation / Workspace 永久保留，可封存）。
+    - 狀態改為 `Status = Archived`，資料與 runtime 內的檔案都保留。
+    - 封存後所有端點回 404，送訊息也會被拒絕。
+    - 執行中的對話不能封存，回 409 `EXECUTION_CONFLICT`。
+    - 封存專案時，專案內的對話一起封存。
+  - **新端點**：`PATCH /api/conversations/{id}`（改名）、`DELETE /api/conversations/{id}`、`DELETE /api/projects/{id}`。
+    - 都驗證擁有者並加上 antiforgery；
+    - 稽核動作：`conversation.update`、`conversation.archive`、`project.archive`；
+    - 已加入授權矩陣（DELETE 放在最後執行，先等 execution 結束）。
+  - **接回串流**：
+    - `ConversationResponse.ActiveExecutionId` 是執行中（Queued / Running）的 execution id。
+    - 前端載入對話時若有這個值，就訂閱該 execution 的 SSE（事件從頭重播）。最後一則使用者訊息改由 live turn 顯示，不會重複；判斷邏輯寫成純函式 `resumeTurnFrom`。停止按鈕可以使用。
+    - 接回的這一輪不知道執行前的檔案狀態，所以不顯示「這次產生的檔案」，避免把舊檔案誤判成新的（e2e 發現後修正）。
+  - **側邊欄**：每個對話與專案都有「⋯」選單。
+    - 重新命名：inline 編輯，Enter 存檔、Esc 取消；
+    - 刪除：確認後封存；刪除專案時會說明「N 個對話一起移除，檔案保留」；
+    - 刪除目前開啟的項目時，導回首頁或該專案頁；
+    - 先更新畫面再呼叫 API，失敗時還原。
+  - **對話頁**：
+    - 標題點兩下可以改名；
+    - Agent 回覆加上「複製」按鈕，複製的是 Markdown 原文。
+  - **檔案預覽**：點檔名開啟預覽，下載按鈕另外放；類型判斷寫成純函式 `previewKind`。
+    - 文字與程式碼 ≤ 512 KB：以文字綁定放在 `<pre>`，HTML 只顯示原始碼、不執行；
+    - Markdown：經既有的 sanitizer 排版；
+    - 圖片 ≤ 10 MB：fetch 成 blob 後放進 `<img>`，SVG 的腳本不會執行；關閉預覽時 revoke URL；
+    - 其他類型或檔案太大：顯示「無法預覽，請下載」。
+  - **樣式修正**：全域 `button:hover` 的權重太高，透明的圖示按鈕滑過時會變成深藍方塊。改用 `:not(a, b, c)` 降低權重。
+  - CLAUDE.md 補上封存、接回串流與預覽的規則。
+- **驗證（實際跑過）**：
+  - 後端：`dotnet test --solution Ymir.slnx` **429 項全部通過**，`dotnet format` 無差異。新增 `ConversationManagementTests`：
+    - 改名、封存後回 404；
+    - 專案連同對話一起封存；
+    - 執行中回 409、`activeExecutionId` 執行中有值、結束後為 null；
+    - 別人的資源回 404。
+  - 前端：`npm run lint`、`npm test`（**93 項**）、`npm run build` 都通過。新增 `resumeTurnFrom`、`previewKind`、側邊欄樂觀更新的純函式測試。
+  - 端對端：
+    - `e2e`（chat-flow）擴充到 **19 步全部通過**：預覽 `hello.txt`、`[slow]` 執行中重新整理後自動接回並停止（使用者訊息只出現一次）、複製整則回覆、標題改名、側邊欄改專案名稱、刪除目前開啟的對話（導回首頁）、刪除專案（重新整理後仍不見）。
+    - `e2e:make`、`e2e:admin` 重跑通過。
+- **卡關 / 待決定**：
+  - 目前沒有「已封存」清單，也不能還原；需要的話可以在管理介面或個人設定加上。
+  - 接下來進入下一階段：**執行環境生命週期**（閒置自動停止、啟動時對帳、每位使用者的配額、執行逾時設定、管理介面顯示用量）。
 
 ### #028 · 系統設定：Cloudflare Tunnel token 與對外網域
 

@@ -43,6 +43,13 @@ public sealed class Project
 
     public void Touch(DateTimeOffset now) => UpdatedAt = now;
 
+    /// <summary>「刪除」專案：封存後從清單隱藏；專案內的對話由 Application 層一併封存，檔案保留在 runtime。</summary>
+    public void Archive(DateTimeOffset now)
+    {
+        Status = ProjectStatus.Archived;
+        UpdatedAt = now;
+    }
+
     public void Rename(string name, DateTimeOffset now)
     {
         Name = DomainGuard.RequiredText(name, NameMaxLength, nameof(name));

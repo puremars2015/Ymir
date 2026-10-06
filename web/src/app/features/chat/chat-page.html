@@ -5,7 +5,23 @@
     >
     <span class="sep" aria-hidden="true">/</span>
   }
-  <span class="title">{{ conversation()?.title }}</span>
+  @if (editingTitle()) {
+    <input
+      #titleInput
+      class="title-input"
+      aria-label="對話名稱"
+      maxlength="300"
+      [value]="titleDraft()"
+      (input)="titleDraft.set(titleInput.value)"
+      (keydown.enter)="commitRename()"
+      (keydown.escape)="editingTitle.set(false)"
+      (blur)="commitRename()"
+    />
+  } @else {
+    <span class="title" title="點兩下重新命名" (dblclick)="startRename()">{{
+      conversation()?.title
+    }}</span>
+  }
   <button
     type="button"
     class="files-toggle"
@@ -35,6 +51,16 @@
           <div class="bubble">
             @if (message.role === 'ASSISTANT' && message.messageType !== 'ERROR') {
               <app-markdown [text]="content" />
+              <div class="actions">
+                <button
+                  type="button"
+                  class="copy-reply"
+                  [attr.aria-label]="'複製回覆'"
+                  (click)="copy(message, content)"
+                >
+                  {{ copiedId() === message.id ? '已複製' : '複製' }}
+                </button>
+              </div>
             } @else {
               <span class="text">{{ content }}</span>
             }
@@ -44,9 +70,11 @@
     }
     @if (live(); as turn) {
       <!-- 執行中尚未重新載入歷史，先顯示送出的訊息；結束後以後端保存的訊息取代 -->
-      <li class="turn user">
-        <div class="bubble">{{ turn.prompt }}</div>
-      </li>
+      @if (turn.prompt) {
+        <li class="turn user">
+          <div class="bubble">{{ turn.prompt }}</div>
+        </li>
+      }
       <li class="turn assistant live" [attr.data-status]="turn.view.status">
         <div class="bubble">
           @if (turn.view.statusText) {

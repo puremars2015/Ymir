@@ -102,6 +102,35 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    cursor: text;
+  }
+
+  .title-input {
+    flex: 1;
+    min-width: 0;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.copy-reply {
+  background: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 6px;
+  opacity: 0.7;
+
+  &:hover:not(:disabled) {
+    opacity: 1;
+    background: var(--surface-muted);
+    color: var(--text);
   }
 }
 

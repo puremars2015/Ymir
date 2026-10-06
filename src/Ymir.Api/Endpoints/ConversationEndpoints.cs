@@ -37,8 +37,26 @@ internal static class ConversationEndpoints
             .WithName("ListMessages")
             .Produces<IReadOnlyList<MessageResponse>>();
 
+        group.MapPatch("/{conversationId:guid}", async Task<IResult> (Guid conversationId, UpdateConversationRequest request, ConversationService service, CancellationToken ct) =>
+                await service.RenameAsync(conversationId, request, ct) is { } conversation ? TypedResults.Ok(conversation) : NotFound())
+            .WithName("UpdateConversation")
+            .Produces<ConversationResponse>();
+
+        // 「刪除」= 封存：從清單隱藏，訊息與檔案保留（資料保存原則）。
+        group.MapDelete("/{conversationId:guid}", async Task<IResult> (Guid conversationId, ConversationService service, CancellationToken ct) =>
+                ArchiveResult(await service.ArchiveAsync(conversationId, ct), NotFound))
+            .WithName("ArchiveConversation")
+            .Produces(StatusCodes.Status204NoContent);
+
         return endpoints;
     }
+
+    internal static IResult ArchiveResult(ArchiveOutcome outcome, Func<IResult> notFound) => outcome switch
+    {
+        ArchiveOutcome.Archived => TypedResults.NoContent(),
+        ArchiveOutcome.ExecutionInProgress => ApiProblem.Create(StatusCodes.Status409Conflict, ExecutionErrorCodes.ExecutionConflict, "還有執行中的工作，請等待完成或先停止。"),
+        _ => notFound(),
+    };
 
     internal static IResult NotFound() =>
         ApiProblem.Create(StatusCodes.Status404NotFound, ExecutionErrorCodes.ConversationNotFound, "找不到對話。");

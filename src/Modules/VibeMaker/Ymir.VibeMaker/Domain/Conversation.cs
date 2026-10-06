@@ -53,6 +53,21 @@ public sealed class Conversation
 
     public void Touch(DateTimeOffset now) => UpdatedAt = now;
 
+    public void Rename(string title, DateTimeOffset now)
+    {
+        Title = DomainGuard.RequiredText(title, TitleMaxLength, nameof(title));
+        UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// 「刪除」對話：封存後從清單隱藏，訊息與 runtime 內的檔案都保留（資料保存原則：永久保留、可封存）。
+    /// </summary>
+    public void Archive(DateTimeOffset now)
+    {
+        Status = ConversationStatus.Archived;
+        UpdatedAt = now;
+    }
+
     /// <summary>記住使用者選的模型，下次開啟對話時沿用（像 ChatGPT）。模型是否可用由 Application 層檢查。</summary>
     public void SelectModel(string modelId) => ModelId = DomainGuard.RequiredText(modelId, ModelIdMaxLength, nameof(modelId));
 }

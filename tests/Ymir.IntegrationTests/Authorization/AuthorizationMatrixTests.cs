@@ -29,6 +29,10 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         },
         ["GET /api/conversations/{conversationId:guid}"] = r => Get($"/api/conversations/{r.ConversationId}"),
         ["GET /api/conversations/{conversationId:guid}/messages"] = r => Get($"/api/conversations/{r.ConversationId}/messages"),
+        ["PATCH /api/conversations/{conversationId:guid}"] = r => new HttpRequestMessage(HttpMethod.Patch, $"/api/conversations/{r.ConversationId}")
+        {
+            Content = JsonContent.Create(new UpdateConversationRequest("secret chat")),
+        },
         ["GET /api/conversations/{conversationId:guid}/files/"] = r => Get($"/api/conversations/{r.ConversationId}/files"),
         ["GET /api/conversations/{conversationId:guid}/files/download"] = r => Get($"/api/conversations/{r.ConversationId}/files/download?path=hello.txt"),
         ["GET /api/conversations/{conversationId:guid}/files/archive"] = r => Get($"/api/conversations/{r.ConversationId}/files/archive"),
@@ -45,6 +49,16 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["GET /api/executions/{executionId:guid}/events"] = r => Get($"/api/executions/{r.ExecutionId}/events"),
         ["POST /api/executions/{executionId:guid}/cancel"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/executions/{r.ExecutionId}/cancel"),
     };
+
+    /// <summary>
+    /// 會封存（「刪除」）資源的端點：擁有者呼叫後資源就不見了，所以在所有 <see cref="ResourceRequests"/> 之後依序執行
+    /// （先對話、再專案）。別人呼叫一樣必須是 404。
+    /// </summary>
+    private static readonly List<(string Endpoint, Func<OwnedResources, HttpRequestMessage> Create)> ArchiveRequests =
+    [
+        ("DELETE /api/conversations/{conversationId:guid}", r => new HttpRequestMessage(HttpMethod.Delete, $"/api/conversations/{r.ConversationId}")),
+        ("DELETE /api/projects/{projectId:guid}", r => new HttpRequestMessage(HttpMethod.Delete, $"/api/projects/{r.ProjectId}")),
+    ];
 
     /// <summary>只有 Admin 能呼叫（SA §4、ADR-0009）：一般使用者必須得到 403。</summary>
     private static readonly Dictionary<string, Func<HttpRequestMessage>> AdminOnlyRequests = new()
@@ -127,7 +141,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
             .SelectMany(e => (e.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? ["ANY"]).Select(m => $"{m} {e.RoutePattern.RawText}"))
             .ToList();
 
-        var unclassified = endpoints.Where(e => !ResourceRequests.ContainsKey(e) && !AdminOnlyRequests.ContainsKey(e) && !NotResourceScoped.Contains(e)).ToList();
+        var unclassified = endpoints.Where(e => !ResourceRequests.ContainsKey(e) && !ArchiveRequests.Any(a => a.Endpoint == e) && !AdminOnlyRequests.ContainsKey(e) && !NotResourceScoped.Contains(e)).ToList();
         Assert.True(unclassified.Count == 0, "未分類的端點（請加入授權矩陣）：" + string.Join(", ", unclassified));
     }
 
@@ -150,7 +164,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         await File.WriteAllTextAsync(Path.Combine(projectDirectory, "hello.txt"), "owner file", ct);
 
         var failures = new List<string>();
-        foreach (var (endpoint, createRequest) in ResourceRequests)
+        foreach (var (endpoint, createRequest) in ResourceRequests.Select(kv => (kv.Key, kv.Value)).Concat(ArchiveRequests))
         {
             using var request = createRequest(resources);
             using var response = await intruder.SendAsync(request, ct);
@@ -160,6 +174,12 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
             }
 
             // 擁有者本人必須能存取，避免測試因為請求本身錯誤而誤判通過。
+            if (endpoint.StartsWith("DELETE ", StringComparison.Ordinal))
+            {
+                // 前面的 POST messages 讓擁有者的對話又開始執行；執行中的對話不能封存，先等它結束。
+                await WaitForIdleAsync(owner, resources.ConversationId, ct);
+            }
+
             using var ownerRequest = createRequest(resources);
             using var ownerResponse = await owner.SendAsync(ownerRequest, ct);
             if (!ownerResponse.IsSuccessStatusCode)
@@ -171,6 +191,21 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
+    private static async Task WaitForIdleAsync(HttpClient owner, Guid conversationId, CancellationToken ct)
+    {
+        for (var i = 0; i < 100; i++)
+        {
+            using var response = await owner.GetAsync($"/api/conversations/{conversationId}", ct);
+            if (!response.IsSuccessStatusCode
+                || (await response.Content.ReadFromJsonAsync<ConversationResponse>(JsonDefaults.Options, ct))?.ActiveExecutionId is null)
+            {
+                return;
+            }
+
+            await Task.Delay(200, ct);
+        }
+    }
+
     [Fact]
     public async Task ResourceEndpoints_RequireLogin()
     {
@@ -178,7 +213,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         using var anonymous = factory.CreateBrowserClient();
         var resources = new OwnedResources(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
 
-        foreach (var (endpoint, createRequest) in ResourceRequests)
+        foreach (var (endpoint, createRequest) in ResourceRequests.Select(kv => (kv.Key, kv.Value)).Concat(ArchiveRequests))
         {
             using var request = createRequest(resources);
             using var response = await anonymous.SendAsync(request, ct);
