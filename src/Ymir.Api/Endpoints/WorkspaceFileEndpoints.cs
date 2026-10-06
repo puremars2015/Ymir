@@ -103,7 +103,10 @@ internal static class WorkspaceFileEndpoints
     private static void PrepareDownload(HttpResponse response, string fileName, string contentType)
     {
         response.ContentType = contentType;
-        response.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment") { FileNameStar = fileName }.ToString();
+        // filename=（ASCII 備援，非 ASCII 以 _ 取代）+ filename*=UTF-8''（完整檔名），各瀏覽器都能取得正確檔名。
+        var disposition = new ContentDispositionHeaderValue("attachment");
+        disposition.SetHttpFileName(fileName);
+        response.Headers.ContentDisposition = disposition.ToString();
         response.Headers.XContentTypeOptions = "nosniff";
         response.Headers.ContentSecurityPolicy = "sandbox";
         response.Headers.CacheControl = "no-store";

@@ -13,13 +13,20 @@ import { ComposerSubmission } from '../../core/make/make-command';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
-import { ChatMessage, Conversation } from '../../core/api/api-types';
+import { ChatMessage, Conversation, WorkspaceFile } from '../../core/api/api-types';
 import {
   applyExecutionEvent,
   ExecutionView,
   initialExecutionView,
 } from '../../core/executions/execution-state';
 import { ExecutionStreamService } from '../../core/executions/execution-stream.service';
+import {
+  changedFiles,
+  fileDownloadUrl,
+  fileIcon,
+  fileName,
+  formatSize,
+} from '../../core/files/workspace-files';
 import { resolveModel } from '../../core/models/model-selection';
 import { ModelStore } from '../../core/models/model.store';
 import { NavigationStore } from '../../core/navigation/navigation.store';
@@ -28,6 +35,7 @@ import { Composer } from '../../shared/composer';
 import { AssistantText } from '../../shared/assistant-text';
 import { Markdown } from '../../shared/markdown';
 import { ModelPicker } from '../../shared/model-picker';
+import { FilesPanel } from './files-panel';
 
 interface LiveTurn {
   prompt: string;
@@ -42,7 +50,7 @@ interface LiveTurn {
  */
 @Component({
   selector: 'app-chat-page',
-  imports: [RouterLink, Composer, ModelPicker, AssistantText, Markdown],
+  imports: [RouterLink, Composer, ModelPicker, AssistantText, Markdown, FilesPanel],
   templateUrl: './chat-page.html',
   styleUrl: './chat-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -72,6 +80,16 @@ export class ChatPage {
         this.modelStore.preferred(),
       ),
   );
+
+  /** Agent 在工作目錄產生的檔案（專案內的對話共用，ADR-0007）。 */
+  protected readonly files = signal<WorkspaceFile[]>([]);
+  protected readonly filesTruncated = signal(false);
+  protected readonly filesLoading = signal(false);
+  protected readonly filesError = signal<string | null>(null);
+  protected readonly filesOpen = signal(false);
+  /** 剛結束的這一輪新增 / 修改的檔案，顯示在回覆下方方便直接下載。 */
+  protected readonly turnFiles = signal<WorkspaceFile[]>([]);
+  private filesBeforeTurn: WorkspaceFile[] = [];
 
   private stream: Subscription | null = null;
 
@@ -110,6 +128,8 @@ export class ChatPage {
           return; // 送出後使用者已切到別的對話；執行在背景繼續，回來時看歷史即可
         }
         this.store.touch(conversationId);
+        this.filesBeforeTurn = this.files();
+        this.turnFiles.set([]);
         this.live.set({ prompt, executionId: accepted.executionId, view: initialExecutionView() });
         this.stream = this.streams.stream(accepted.eventStreamUrl).subscribe({
           next: (event) =>
@@ -142,6 +162,9 @@ export class ChatPage {
     this.chosenModel.set(null);
     this.conversation.set(null);
     this.messages.set([]);
+    this.files.set([]);
+    this.turnFiles.set([]);
+    this.refreshFiles();
 
     this.api.getConversation(conversationId).subscribe({
       next: (conversation) => this.conversation.set(conversation),
@@ -162,6 +185,40 @@ export class ChatPage {
   private finish(conversationId: string, error: string | null): void {
     this.error.set(error);
     this.reloadMessages(conversationId, () => this.live.set(null));
+    this.refreshFiles((files) => this.turnFiles.set(changedFiles(this.filesBeforeTurn, files)));
+  }
+
+  protected refreshFiles(after?: (files: WorkspaceFile[]) => void): void {
+    const conversationId = this.conversationId();
+    this.filesLoading.set(true);
+    this.filesError.set(null);
+    this.api.listConversationFiles(conversationId).subscribe({
+      next: (result) => {
+        if (conversationId !== this.conversationId()) {
+          return;
+        }
+        this.files.set(result.files);
+        this.filesTruncated.set(result.truncated);
+        this.filesLoading.set(false);
+        after?.(result.files);
+      },
+      error: (error: unknown) => {
+        this.filesLoading.set(false);
+        this.filesError.set(describeApiError(error));
+      },
+    });
+  }
+
+  protected downloadUrl(file: WorkspaceFile): string {
+    return fileDownloadUrl(this.conversationId(), file.path);
+  }
+
+  protected fileLabel(file: WorkspaceFile): string {
+    return `${fileIcon(file.path)} ${fileName(file.path)}`;
+  }
+
+  protected fileSize(file: WorkspaceFile): string {
+    return formatSize(file.size);
   }
 
   private reloadMessages(conversationId: string, after?: () => void): void {

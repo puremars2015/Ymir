@@ -59,5 +59,15 @@ public class RemoteRuntimeApiTests(RemoteRuntimeApiFactory factory) : IClassFixt
         var directory = UserDirectories.For(factory.HostWorkspaceRoot, me!.Id).HostPathOf(RuntimePaths.ProjectDirectory(project.Id));
         Assert.Equal(FakeLlmScript.CreatedFileContent, await File.ReadAllTextAsync(Path.Combine(directory, FakeLlmScript.CreatedFileName), ct));
         Assert.False(Directory.Exists(Path.Combine(factory.WorkspaceRoot, "must-not-be-used")));
+
+        // 檔案下載也經由 runtime host（API 容器不掛載 workspace，ADR-0008）
+        var files = await client.GetFromJsonAsync<Ymir.VibeMaker.Contracts.Files.WorkspaceFilesResponse>($"/api/conversations/{conversation.Id}/files", JsonDefaults.Options, ct);
+        Assert.Equal([FakeLlmScript.CreatedFileName], files!.Files.Select(f => f.Path));
+        Assert.Equal(
+            FakeLlmScript.CreatedFileContent,
+            await client.GetStringAsync($"/api/conversations/{conversation.Id}/files/download?path={FakeLlmScript.CreatedFileName}", ct));
+        using var archive = await client.GetAsync($"/api/conversations/{conversation.Id}/files/archive", ct);
+        using var zip = new System.IO.Compression.ZipArchive(new MemoryStream(await archive.Content.ReadAsByteArrayAsync(ct)));
+        Assert.Equal([FakeLlmScript.CreatedFileName], zip.Entries.Select(e => e.FullName));
     }
 }

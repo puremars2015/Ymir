@@ -8,6 +8,7 @@ import {
   OidcSettings,
   OidcTestResult,
   SaveOidcSettingsRequest,
+  WorkspaceFiles,
   AdminUser,
   ApiProblem,
   CancelExecutionResponse,
@@ -103,6 +104,10 @@ export class ApiService {
 
   adminTestOidcSettings(tenantId: string): Observable<OidcTestResult> {
     return this.http.post<OidcTestResult>('/api/admin/settings/oidc/test', { tenantId });
+  }
+
+  listConversationFiles(conversationId: string): Observable<WorkspaceFiles> {
+    return this.http.get<WorkspaceFiles>(`/api/conversations/${conversationId}/files`);
   }
 
   adminListUsers(search: string): Observable<AdminUser[]> {
