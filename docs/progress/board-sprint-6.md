@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-08 01:30 ・ 狀態：**🚧 進行中（A2 MCP Gateway）**
+> 最後更新：2026-10-08 02:00 ・ 狀態：**🚧 進行中（插單：OneDrive connector）**
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -40,10 +40,13 @@
 | A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`）+ 每人覆寫資料表 `vibemaker.user_extension_grants`<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | ✅ | — |
 | A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• `internet` 能力加入擴充政策（全域 + 每人）<br>• 受限網路部署文件 | ✅ | — |
 | A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | — |
-| R0 | RAG ADR（ADR-0013）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite（sqlite-vec）部署、權限 | ⏳ | **❓待決定**：Embedding 模型與硬體、文件格式與容量、外部回答模型的資料政策 |
+| O0 | **插單** OneDrive connector ADR（[ADR-0013](../adr/0013-onedrive-connector.md)） | ✅ | — |
+| O1 | OneDrive 連結 / 解除連結：<br>• `onedrive` 能力<br>• 授權碼 + PKCE 連結流程、refresh token 加密保存<br>• 根資料夾、設定頁<br>• FakeGraph 測試替身 | 🚧 | O0 |
+| O2 | OneDrive 同步：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | ⏳ | O1 |
+| R0 | RAG ADR（ADR-0014）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite（sqlite-vec）部署、權限 | ⏳ | **❓待決定**：Embedding 模型與硬體、文件格式與容量、外部回答模型的資料政策 |
 | R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ⏳ | R0 經使用者確認 |
 | R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ⏳ | R1 |
-| H0 | 網站託管 ADR（ADR-0014）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ⏳ | **❓待決定**：網域與 DNS / Tunnel、公司模式的帳號範圍、配額 |
+| H0 | 網站託管 ADR（ADR-0015）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ⏳ | **❓待決定**：網域與 DNS / Tunnel、公司模式的帳號範圍、配額 |
 | H1 | 公開網站發布：網站與版本、產物檢查、Nginx 託管、原子切換、取消發布 | ⏳ | H0 經使用者確認 |
 | H2 | 身分與分享：公司模式、指定使用者、分享給我的網站 | ⏳ | H1 |
 | C1 | 對話附加檔案 / 圖片 / 影片給 Agent（使用者回報） | ✅ | 見 [#006](#006--對話可以附加檔案圖片影片給-agent)；真實視覺模型**待使用者環境確認** |
@@ -336,6 +339,34 @@
   - 沙箱是 root Podman：掛載目錄的擁有者問題改用 Docker 模式（`ContainerExecutable=podman`）跑完，與網路行為無關。
 - **未驗證、待使用者環境確認**：rootless Podman（`ymir` 帳號）下兩個 network 與 LiteLLM container 的實際行為，可用 `npm run e2e:network` 驗證。
 - **下一步**：A2 MCP Gateway（獨立服務 `Ymir.McpGateway`、每人短期 token、`deploy/mcp/servers.json`、存取清單、echo 服務）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #006 · 插單：OneDrive connector（ADR-0013）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 02:00 · `📢公告` `📐設計`
+
+- **背景**：使用者要求插單實作已規劃的 OneDrive 功能（[計畫](../planning/onedrive-workspace-plan.md) 的方法二）：使用者開啟後可以連到自己的 OneDrive。A2（MCP Gateway）暫停，等 OneDrive 完成後繼續。
+- **使用者決定**：
+  - 首版做「連結 + 自動同步」；
+  - 使用公司帳號，權限為 `Files.ReadWrite`（整個 OneDrive，使用者自選根資料夾）；
+  - 由管理員開放（擴充政策新增 `onedrive` 能力，預設關閉），使用者自己連結。
+- **設計**（[ADR-0013](../adr/0013-onedrive-connector.md)）：
+  - 沿用 Ymir 的 Entra 應用程式註冊，另走一個授權碼 + PKCE 的連結流程；
+  - refresh token 以 Data Protection 加密，只在後端使用，Agent 拿不到；
+  - 執行前下載、執行後由持久化工作上傳；以 eTag / If-Match 避免覆蓋，衝突時保留兩份；首版不同步刪除。
+  - CLAUDE.md 的「不得保存 IdP token」紅線補上這個例外。
+- **編號**：RAG、網站託管的 ADR 順延為 ADR-0014、0015。
+- **驗證**：只改文件；`git diff --check`。
+- **未驗證、待使用者環境確認**：真實 Entra 權限同意與 Microsoft Graph（沙箱連不到，改用 FakeGraph）。
+- **下一步**：O1 連結與解除連結。
 
 <details>
 <summary>💬 回覆（0）</summary>
