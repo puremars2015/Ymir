@@ -32,6 +32,13 @@ public sealed class FakeOidcServer : IAsyncDisposable
     /// <summary>給 Ymir 設定的 authority，格式同 Entra：<c>{root}/{tenant}/v2.0</c>。</summary>
     public string Authority => $"{RootUrl.ToString().TrimEnd('/')}/{Settings.TenantId}/v2.0";
 
+    /// <summary>Fake Microsoft Graph（OneDrive，ADR-0013），給 Ymir 的 <c>Ymir:Connectors:OneDrive:GraphBaseUrl</c>。</summary>
+    public string GraphBaseUrl => $"{RootUrl.ToString().TrimEnd('/')}/graph/v1.0";
+
+    public FakeGraphStore Graph => _app.Services.GetRequiredService<FakeGraphStore>();
+
+    public FakeOidcIssuer Issuer => _app.Services.GetRequiredService<FakeOidcIssuer>();
+
     public static async Task<FakeOidcServer> StartAsync(FakeOidcSettings settings, string url = "http://127.0.0.1:0", CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(settings);
@@ -40,6 +47,7 @@ public sealed class FakeOidcServer : IAsyncDisposable
         builder.WebHost.UseUrls(url);
         builder.Services.AddSingleton(settings);
         builder.Services.AddSingleton<FakeOidcIssuer>();
+        builder.Services.AddSingleton<FakeGraphStore>();
 
         var app = builder.Build();
         app.MapFakeOidc();

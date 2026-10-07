@@ -40,6 +40,12 @@ public static class VibeMakerInfrastructureExtensions
         services.AddHostedService<ExecutionWorker>();
         services.AddHostedService<RuntimeLifecycleWorker>();
         services.AddHttpClient(nameof(Health.LiteLlmHealthCheck));
+
+        // OneDrive connector（ADR-0013）：只有後端連 Graph 與 Entra；token 不保存在 HttpClient。
+        services.Configure<Connectors.OneDrive.OneDriveOptions>(configuration.GetSection(Connectors.OneDrive.OneDriveOptions.SectionName));
+        services.AddHttpClient<Application.Connectors.OneDrive.IOneDriveOAuthClient, Connectors.OneDrive.OneDriveOAuthClient>(Connectors.OneDrive.OneDriveOAuthClient.HttpClientName);
+        services.AddHttpClient<Application.Connectors.OneDrive.IOneDriveClient, Connectors.OneDrive.GraphOneDriveClient>(Connectors.OneDrive.GraphOneDriveClient.HttpClientName);
+        services.AddSingleton<Application.Connectors.OneDrive.IOneDriveTokenProtector, Connectors.OneDrive.DataProtectionOneDriveTokenProtector>();
         services.AddHealthChecks()
             .AddCheck<Health.DatabaseHealthCheck>("database", tags: [Health.VibeMakerHealthChecks.ReadyTag], timeout: Health.VibeMakerHealthChecks.Timeout)
             .AddCheck<Health.RuntimeHealthCheck>("runtime", tags: [Health.VibeMakerHealthChecks.ReadyTag], timeout: Health.VibeMakerHealthChecks.Timeout)

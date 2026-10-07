@@ -79,6 +79,7 @@ app.MapAdminEndpoints();
 app.MapAdminOverviewEndpoints();
 app.MapAdminRuntimeEndpoints();
 app.MapExtensionEndpoints();
+app.MapOneDriveEndpoints();
 app.MapAdminSettingsEndpoints();
 app.MapMakeTopicEndpoints();
 app.MapDefaultEndpoints();

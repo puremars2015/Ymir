@@ -51,6 +51,8 @@ export type UserExtensions = Schemas['UserExtensionsResponse'];
 export type SaveUserExtensionsRequest = Schemas['SaveUserExtensionsRequest'];
 export type MyExtensions = Schemas['MyExtensionsResponse'];
 export type RestrictedNetworkSupport = Schemas['RestrictedNetworkSupport'];
+export type OneDriveStatus = Schemas['OneDriveStatusResponse'];
+export type OneDriveLinkState = Schemas['OneDriveLinkState'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

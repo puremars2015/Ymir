@@ -17,7 +17,7 @@ internal static class FakeOidcProgram
             Environment.GetEnvironmentVariable("FAKE_OIDC_CLIENT_SECRET") ?? "ymir-dev-secret");
 
         await using var server = await FakeOidcServer.StartAsync(settings, url);
-        Console.WriteLine($"Fake OIDC listening; authority: {server.Authority} (client id: {settings.ClientId})");
+        Console.WriteLine($"Fake OIDC listening; authority: {server.Authority} (client id: {settings.ClientId}); Fake Graph: {server.GraphBaseUrl}");
 
         var done = new TaskCompletionSource();
         Console.CancelKeyPress += (_, e) =>

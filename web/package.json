@@ -16,7 +16,8 @@
     "e2e:artifacts": "node e2e/artifacts-flow.mjs",
     "e2e:sidebar": "node e2e/sidebar-flow.mjs",
     "e2e:attach": "node e2e/attachment-flow.mjs",
-    "e2e:network": "node e2e/network-flow.mjs"
+    "e2e:network": "node e2e/network-flow.mjs",
+    "e2e:onedrive": "node e2e/onedrive-flow.mjs"
   },
   "private": true,
   "packageManager": "npm@11.19.0",

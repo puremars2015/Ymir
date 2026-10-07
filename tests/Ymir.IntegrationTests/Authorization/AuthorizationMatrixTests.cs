@@ -154,6 +154,11 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "GET /api/me/settings/",
         "PUT /api/me/settings/",
         "GET /api/extensions",
+        "GET /api/connectors/onedrive/",
+        "GET /api/connectors/onedrive/connect",
+        "GET /api/connectors/onedrive/callback",
+        "PUT /api/connectors/onedrive/root",
+        "DELETE /api/connectors/onedrive/",
     ];
 
     private sealed record OwnedResources(Guid ProjectId, Guid ConversationId, Guid ExecutionId);

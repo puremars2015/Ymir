@@ -114,7 +114,12 @@ export class ExtensionSettingsCard implements OnInit {
 
   protected readonly capabilities = CAPABILITIES;
   protected readonly policy = signal<ExtensionPolicy | null>(null);
-  protected readonly draft = signal<ExtensionValues>({ skills: false, mcp: false, internet: true });
+  protected readonly draft = signal<ExtensionValues>({
+    skills: false,
+    mcp: false,
+    internet: true,
+    oneDrive: false,
+  });
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);

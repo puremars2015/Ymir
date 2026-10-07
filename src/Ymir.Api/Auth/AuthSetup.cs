@@ -63,6 +63,7 @@ internal static class AuthSetup
         services.AddHostedService<OidcSettingsWarmup>();
         services.AddHttpClient(OidcSettingsTester.HttpClientName, client => client.Timeout = TimeSpan.FromSeconds(10));
         services.AddSingleton<OidcSettingsTester>();
+        services.AddSingleton<Ymir.VibeMaker.Application.Connectors.OneDrive.IOneDriveOAuthSettingsSource, Endpoints.OidcOneDriveSettingsSource>();
 
         services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
             .AddCookie(options =>

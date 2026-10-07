@@ -15,6 +15,12 @@ export const CAPABILITIES = [
       '讓使用者加入自己的工具與連線目的地（例如外部 API）；憑證只能是使用者自己的，連不到平台後端。',
   },
   {
+    key: 'oneDrive',
+    label: 'OneDrive 連結',
+    description:
+      '讓使用者連結自己的 OneDrive，執行前後自動同步工作檔案；憑證只由平台保管，Agent 拿不到。',
+  },
+  {
     key: 'internet',
     label: '對外連線',
     description:

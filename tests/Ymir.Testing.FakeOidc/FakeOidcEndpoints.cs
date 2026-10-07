@@ -27,6 +27,7 @@ public static class FakeOidcEndpoints
         endpoints.MapGet("/{tenant}/oauth2/v2.0/authorize", AuthorizeGet);
         endpoints.MapPost("/{tenant}/oauth2/v2.0/authorize", AuthorizePostAsync).DisableAntiforgery();
         endpoints.MapPost("/{tenant}/oauth2/v2.0/token", TokenAsync).DisableAntiforgery();
+        endpoints.MapFakeGraph();
         return endpoints;
     }
 
@@ -38,7 +39,10 @@ public static class FakeOidcEndpoints
     private static readonly string[] s_responseModes = ["query", "form_post"];
     private static readonly string[] s_subjectTypes = ["pairwise"];
     private static readonly string[] s_algorithms = ["RS256"];
-    private static readonly string[] s_scopes = ["openid", "profile", "email"];
+    private static readonly string[] s_scopes = ["openid", "profile", "email", "offline_access", "Files.ReadWrite", "User.Read"];
+
+    /// <summary>模擬 Entra 應用程式註冊的 redirect URI：登入與 OneDrive connector（ADR-0013）。</summary>
+    private static readonly string[] s_registeredRedirectPaths = ["/signin-oidc", "/api/connectors/onedrive/callback"];
     private static readonly string[] s_authMethods = ["client_secret_post", "client_secret_basic"];
     private static readonly string[] s_pkceMethods = ["S256"];
     private static readonly string[] s_claims = ["sub", "iss", "aud", "exp", "iat", "nonce", "name", "preferred_username", "email", "oid", "tid", "roles"];
@@ -71,14 +75,16 @@ public static class FakeOidcEndpoints
     private static IResult AuthorizeGet(string tenant, HttpRequest request, FakeOidcSettings settings, FakeOidcIssuer issuer)
     {
         var query = request.Query;
-        var (authorize, error) = ParseAuthorize(tenant, settings, query["client_id"], query["redirect_uri"], query["state"], query["nonce"], query["code_challenge"], query["code_challenge_method"], query["response_type"]);
+        var (authorize, error) = ParseAuthorize(tenant, settings, query["client_id"], query["redirect_uri"], query["state"], query["nonce"], query["code_challenge"], query["code_challenge_method"], query["response_type"], query["scope"]);
         if (authorize is null)
         {
             return Results.BadRequest(error);
         }
 
-        if (query["login_hint"].ToString() is { Length: > 0 } hint)
+        // 有多個 login_hint 時以最後一個為準（測試會在 Ymir 帶的 email 之後再指定帳號）；接受 帳號@網域，與 Entra 相同。
+        if (query["login_hint"] is { Count: > 0 } hints && hints[^1] is { Length: > 0 } rawHint)
         {
+            var hint = rawHint.EndsWith("@" + settings.UserDomain, StringComparison.OrdinalIgnoreCase) ? rawHint[..^(settings.UserDomain.Length + 1)] : rawHint;
             var isAdmin = hint.EndsWith(AdminHintSuffix, StringComparison.Ordinal);
             var account = isAdmin ? hint[..^AdminHintSuffix.Length] : hint;
             return RedirectWithCode(issuer, authorize, new FakeLogin(account, account, isAdmin));
@@ -90,7 +96,7 @@ public static class FakeOidcEndpoints
     private static async Task<IResult> AuthorizePostAsync(string tenant, HttpRequest request, FakeOidcSettings settings, FakeOidcIssuer issuer)
     {
         var form = await request.ReadFormAsync();
-        var (authorize, error) = ParseAuthorize(tenant, settings, form["client_id"], form["redirect_uri"], form["state"], form["nonce"], form["code_challenge"], form["code_challenge_method"], "code");
+        var (authorize, error) = ParseAuthorize(tenant, settings, form["client_id"], form["redirect_uri"], form["state"], form["nonce"], form["code_challenge"], form["code_challenge_method"], "code", form["scope"]);
         var account = form["account"].ToString().Trim();
         if (authorize is null || account.Length == 0)
         {
@@ -119,24 +125,47 @@ public static class FakeOidcEndpoints
             clientSecret = decoded.Length > 1 ? WebUtility.UrlDecode(decoded[1]) : string.Empty;
         }
 
+        if (form["grant_type"] == "refresh_token")
+        {
+            // OneDrive connector（ADR-0013）：refresh token 每次換發都輪替；撤銷後回 invalid_grant（模擬密碼變更、權限撤回）。
+            var refreshed = issuer.Refresh(form["refresh_token"].ToString(), clientId, clientSecret);
+            return refreshed is null ? Results.BadRequest(new { error = "invalid_grant" }) : Results.Json(TokenResponse(refreshed, idToken: null));
+        }
+
         if (form["grant_type"] != "authorization_code")
         {
             return Results.BadRequest(new { error = "unsupported_grant_type" });
         }
 
-        var idToken = issuer.Redeem(form["code"].ToString(), clientId, clientSecret, form["redirect_uri"].ToString(), form["code_verifier"], IssuerOf(request, tenant));
-        if (idToken is null)
+        var redeemed = issuer.Redeem(form["code"].ToString(), clientId, clientSecret, form["redirect_uri"].ToString(), form["code_verifier"], IssuerOf(request, tenant));
+        if (redeemed is null)
         {
             return Results.BadRequest(new { error = "invalid_grant" });
         }
 
-        return Results.Json(new Dictionary<string, object>
+        return Results.Json(TokenResponse(redeemed.Tokens, redeemed.IdToken));
+    }
+
+    private static Dictionary<string, object> TokenResponse(FakeTokens tokens, string? idToken)
+    {
+        var response = new Dictionary<string, object>
         {
             ["token_type"] = "Bearer",
-            ["expires_in"] = 3600,
-            ["access_token"] = "fake-access-token",
-            ["id_token"] = idToken,
-        });
+            ["expires_in"] = (int)FakeOidcIssuer.AccessTokenLifetime.TotalSeconds,
+            ["access_token"] = tokens.AccessToken,
+            ["scope"] = tokens.Scope,
+        };
+        if (tokens.RefreshToken is not null)
+        {
+            response["refresh_token"] = tokens.RefreshToken;
+        }
+
+        if (idToken is not null)
+        {
+            response["id_token"] = idToken;
+        }
+
+        return response;
     }
 
     private static (AuthorizeRequest? Request, string? Error) ParseAuthorize(
@@ -148,7 +177,8 @@ public static class FakeOidcEndpoints
         string? nonce,
         string? codeChallenge,
         string? codeChallengeMethod,
-        string? responseType)
+        string? responseType,
+        string? scope)
     {
         if (tenant != settings.TenantId)
         {
@@ -160,8 +190,8 @@ public static class FakeOidcEndpoints
             return (null, "unknown client_id");
         }
 
-        // 模擬 Entra 的「已註冊的 redirect URI」：只接受 http(s) 且路徑為 /signin-oidc。
-        if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out var redirect) || redirect.Scheme is not ("http" or "https") || redirect.AbsolutePath != "/signin-oidc")
+        // 模擬 Entra 的「已註冊的 redirect URI」：只接受 http(s) 且路徑為已註冊的 callback。
+        if (!Uri.TryCreate(redirectUri, UriKind.Absolute, out var redirect) || redirect.Scheme is not ("http" or "https") || !s_registeredRedirectPaths.Contains(redirect.AbsolutePath))
         {
             return (null, "redirect_uri is not registered");
         }
@@ -176,7 +206,7 @@ public static class FakeOidcEndpoints
             return (null, "only S256 is supported");
         }
 
-        return (new AuthorizeRequest(clientId!, redirectUri!, state!, string.IsNullOrEmpty(nonce) ? null : nonce, string.IsNullOrEmpty(codeChallenge) ? null : codeChallenge), null);
+        return (new AuthorizeRequest(clientId!, redirectUri!, state!, string.IsNullOrEmpty(nonce) ? null : nonce, string.IsNullOrEmpty(codeChallenge) ? null : codeChallenge, string.IsNullOrEmpty(scope) ? "openid profile" : scope), null);
     }
 
     private static IResult RedirectWithCode(FakeOidcIssuer issuer, AuthorizeRequest request, FakeLogin login)
@@ -210,6 +240,7 @@ public static class FakeOidcEndpoints
               <input type="hidden" name="nonce" value="{{E(request.Nonce)}}">
               <input type="hidden" name="code_challenge" value="{{E(request.CodeChallenge)}}">
               <input type="hidden" name="code_challenge_method" value="S256">
+              <input type="hidden" name="scope" value="{{E(request.Scope)}}">
               <button type="submit">登入</button>
             </form></body></html>
             """;

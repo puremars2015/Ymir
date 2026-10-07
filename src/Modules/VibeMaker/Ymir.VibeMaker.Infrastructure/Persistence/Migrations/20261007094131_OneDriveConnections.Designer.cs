@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Ymir.VibeMaker.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using Ymir.VibeMaker.Infrastructure.Persistence;
 namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(VibeMakerDbContext))]
-    partial class VibeMakerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261007094131_OneDriveConnections")]
+    partial class OneDriveConnections
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

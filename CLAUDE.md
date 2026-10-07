@@ -31,7 +31,7 @@ tests/
   Ymir.UnitTests/                    含 Fixtures/pi-rpc/：Pi 1.0.0 的真實 RPC 錄製
   Ymir.IntegrationTests/             WebApplicationFactory + SQL Server（每個 fixture 獨立資料庫）+ 真實 Pi；含授權矩陣、OpenAPI 快照
   Ymir.Testing.FakeLlm/              OpenAI 相容假模型（[create-file] / [slow] / [fail] 腳本）
-  Ymir.Testing.FakeOidc/             模擬 Entra ID 的 OIDC 伺服器（tid / oid / pairwise sub / roles、PKCE），測試與本機開發用
+  Ymir.Testing.FakeOidc/             模擬 Entra ID 的 OIDC 伺服器（tid / oid / pairwise sub / roles、PKCE、refresh token）與 Fake Graph（`/graph/v1.0`，OneDrive），測試與本機開發用
 web/                                 Angular 22（standalone、signals、zoneless、Vitest、ESLint）；src/app/core/api/schema.ts 由 OpenAPI 產生；e2e/ Playwright 腳本
 runtime/agent/                       Agent runtime Containerfile
 deploy/cloudflared/                  cloudflared ingress 設定範本（指南 docs/guides/cloudflare-tunnel.md）
@@ -80,6 +80,8 @@ cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:make -- <截圖目
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:admin -- <截圖目錄>
 # 對外連線管制（ADR-0012 A.8；需要 Podman 與兩個 network，前置步驟見 web/e2e/network-flow.mjs 開頭）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:network -- <截圖目錄>
+# OneDrive connector（ADR-0013；需要 Fake OIDC，API 設定見 web/e2e/onedrive-flow.mjs 開頭）
+cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:onedrive -- <截圖目錄>
 
 # 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
 dotnet run --project src/Ymir.AppHost
@@ -115,6 +117,8 @@ Runtime 生命週期（ADR-0011）：`RuntimeLifecycleWorker` 啟動時對帳、
 `/make`：對話輸入 `/make` 顯示管理員設定的主題按鈕（`vibemaker.make_topics`，Admin 在「管理 → Make 主題」維護）；給 Agent 的完整指示由後端 `MakePromptBuilder` 組合並存在 `AgentExecution.AgentPrompt`，對話紀錄只保留使用者輸入的文字。
 
 Agent 擴充能力（ADR-0012）：管理員在「管理 → 系統設定」設定全域預設（`vibemaker.extension_policy`），在「使用者」頁設定每人覆寫（`vibemaker.user_extension_grants`）；`ExtensionPolicyService` 解析、`ExecutionRunner` 每次執行帶入 `AgentRunRequest.Extensions`。`PiAgentHarness` **一律** `--no-extensions`（Agent 寫的 extension 不得載入），沒有 `skills` 加 `--no-skills`，有 `mcp` 才 `-e builtin:mcp`；每次執行前重寫 agent dir 的 `settings.json` / `trust.json` / `mcp.json`（使用者自建 MCP 在 `mcp.user.json`）與平台 skill（`PiExtensionConfig`）。成員端 `GET /api/extensions` 只回名稱，不回 MCP 設定內容。對外連線（`internet` 能力，預設允許，ADR-0012 A.8）：關閉時 `ExecutionRunner` 以 `RuntimeNetworkAccess.Restricted` 呼叫 `EnsureRuntimeAsync`，container 改接 `VibeMaker:Runtime:RestrictedNetwork`（`--internal`，名稱只來自部署設定；runtime host 只接受 `network=internet|restricted`）；label `ymir.network` 不符時重建並稽核 `runtime.recreate`；沒有設定受限網路時執行失敗，**不得**退回成可以對外連線。
+
+OneDrive connector（ADR-0013）：管理員開放 `oneDrive` 能力後，使用者在個人設定連結（`/api/connectors/onedrive/connect` → Microsoft 授權碼 + PKCE → `/callback`，state 存在加密的短期 cookie、綁定使用者；企業帳號必須連到同一個 oid）。沿用登入的 Entra 註冊（`OidcOneDriveSettingsSource`），需在 Entra 加 `Files.ReadWrite`、`offline_access` 委派權限與 callback redirect URI。`OneDriveConnectionService` 保存 Data Protection 加密的 refresh token（換發時輪替、`invalid_grant` → `NeedsReauth`），access token 只在記憶體；Graph 呼叫在 `GraphOneDriveClient`（429 / 503 依 Retry-After 重試，base URL `Ymir:Connectors:OneDrive:GraphBaseUrl` 只給測試替身用）。同步（O2）在後端進行，Agent 拿不到任何 Graph 憑證。
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
 
