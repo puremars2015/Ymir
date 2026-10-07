@@ -157,12 +157,10 @@ import { formatSize } from '../core/files/workspace-files';
       align-items: flex-end;
       gap: 0.5rem;
       padding: 0.5rem 0.5rem 0.5rem 1rem;
-      border: 1px solid transparent;
+      border: 1px solid var(--border);
       border-radius: 1.5rem;
-      background:
-        linear-gradient(var(--surface), var(--surface)) padding-box,
-        linear-gradient(110deg, var(--accent), var(--focus-ring), var(--border)) border-box;
-      box-shadow: 0 4px 16px rgb(0 78 160 / 8%);
+      background: var(--input);
+      box-shadow: var(--card-shadow);
     }
     textarea {
       flex: 1;

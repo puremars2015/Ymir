@@ -151,7 +151,7 @@ import { TunnelSettings } from '../../core/api/api-types';
       color: var(--text-muted);
     }
     .state[data-state='connected'] {
-      color: #15803d;
+      color: var(--success);
     }
     .state[data-state='disconnected'] {
       color: var(--danger);

@@ -191,6 +191,8 @@
       <p class="error sidebar-error">{{ error() }}</p>
     }
 
+    <app-theme-switcher />
+
     @if (auth.user(); as user) {
       <footer class="user">
         <span class="avatar" aria-hidden="true">{{ user.displayName.charAt(0) }}</span>

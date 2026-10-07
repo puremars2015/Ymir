@@ -341,14 +341,14 @@ import { AdminTabs } from './admin-tabs';
       gap: 0.5rem;
       padding: 0.625rem 0.875rem;
       border-radius: 0.625rem;
-      border: 1px solid #f59e0b;
-      background: rgb(245 158 11 / 10%);
+      border: 1px solid var(--warning);
+      background: var(--warning-soft);
       color: var(--text);
       text-decoration: none;
     }
     .warning[data-level='danger'] {
       border-color: var(--danger);
-      background: rgb(220 38 38 / 10%);
+      background: var(--danger-soft);
     }
     .checks {
       list-style: none;
@@ -365,10 +365,10 @@ import { AdminTabs } from './admin-tabs';
       gap: 0.375rem;
     }
     .checks .dot {
-      color: #15803d;
+      color: var(--success);
     }
     .checks [data-level='warn'] .dot {
-      color: #b45309;
+      color: var(--warning);
     }
     .checks [data-level='down'] .dot {
       color: var(--danger);

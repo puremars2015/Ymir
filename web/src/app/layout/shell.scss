@@ -75,9 +75,8 @@
   }
 
   &.active {
-    background: var(--surface-active);
-    color: var(--accent);
-    box-shadow: inset 3px 0 var(--accent);
+    background: var(--accent);
+    color: var(--accent-contrast);
     font-weight: 600;
   }
 }
