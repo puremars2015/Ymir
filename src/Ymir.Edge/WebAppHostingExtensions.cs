@@ -14,6 +14,13 @@ public static class WebAppHostingExtensions
 {
     public const string RootPathKey = "Ymir:Web:RootPath";
 
+    private static readonly HashSet<string> NoCacheFiles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "index.html",
+        "sw.js",
+        "manifest.webmanifest",
+    };
+
     /// <summary>需放在 <c>UseAuthentication</c> 之前：前端靜態檔不含機敏資料，匿名即可下載。</summary>
     public static WebApplication UseYmirWebApp(this WebApplication app)
     {
@@ -30,7 +37,18 @@ public static class WebAppHostingExtensions
             throw new InvalidOperationException($"{RootPathKey} does not contain index.html; run 'npm run build' in web/ first.");
         }
 
-        var files = new StaticFileOptions { FileProvider = new PhysicalFileProvider(fullPath) };
+        var files = new StaticFileOptions
+        {
+            FileProvider = new PhysicalFileProvider(fullPath),
+            // PWA：入口檔每次都要向伺服器驗證，否則手機會卡在舊版（帶雜湊的 chunk 檔名會變，不受影響）。
+            OnPrepareResponse = context =>
+            {
+                if (NoCacheFiles.Contains(context.File.Name))
+                {
+                    context.Context.Response.Headers.CacheControl = "no-cache";
+                }
+            },
+        };
         app.UseStaticFiles(files);
 
         // Angular 的前端路由（/workspaces/...）都回 index.html；/api 底下沒有對應的端點時維持 404，不要回 HTML。

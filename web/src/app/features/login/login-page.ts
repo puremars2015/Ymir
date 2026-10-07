@@ -13,6 +13,7 @@ import { ApiService, describeApiError } from '../../core/api/api.service';
 import { LoginProviders, UserRole } from '../../core/api/api-types';
 import { isLocalPath, loginErrorMessage, oidcLoginUrl } from '../../core/auth/auth-rules';
 import { AuthService } from '../../core/auth/auth.service';
+import { PwaInstallService } from '../../core/pwa/pwa-install.service';
 
 /**
  * 登入頁（ADR-0009）：依後端設定顯示
@@ -99,6 +100,19 @@ import { AuthService } from '../../core/auth/auth.service';
       } @else {
         <p class="muted">載入中…</p>
       }
+
+      @switch (pwa.hint()) {
+        @case ('prompt') {
+          <button type="button" class="secondary install" (click)="pwa.install()">
+            安裝到手機（加入主畫面）
+          </button>
+        }
+        @case ('ios') {
+          <p class="muted install-ios">
+            安裝到 iPhone / iPad：用 Safari 開啟，點「分享」→「加入主畫面」。
+          </p>
+        }
+      }
     </section>
   `,
   styles: `
@@ -143,6 +157,11 @@ import { AuthService } from '../../core/auth/auth.service';
         border-top: 1px solid var(--border);
       }
     }
+    .install-ios {
+      margin: 0;
+      font-size: 0.8125rem;
+      text-align: center;
+    }
     .dev summary {
       cursor: pointer;
       color: var(--text-muted);
@@ -156,6 +175,7 @@ export class LoginPage implements OnInit {
   private readonly api = inject(ApiService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  protected readonly pwa = inject(PwaInstallService);
 
   readonly returnUrl = input<string>();
   /** OIDC callback 失敗時後端導回 `/login?error=...`。 */

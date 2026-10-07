@@ -32,6 +32,7 @@
 |---|---|---|---|
 | F1 | 明確交付成果與工作檔分離（ADR-0015） | ✅ | 成功執行登記成果、單檔／ZIP、成果與專案檔案分頁；見 #010 |
 | P0 | 多人、多 Agent 軟體專案協作計畫 | 📝 | 見 [#009](#009--多人多-agent-軟體專案協作計畫)；僅計畫，功能尚未實作，排程另定 |
+| W5 | PWA：手機可「加入主畫面」安裝 | ✅ | 見 #012；iOS / Android 實機安裝**待使用者環境確認** |
 | W4 | AppDashboard 側欄清單與漢堡收合 | ✅ | 圖示、列高與群組分隔線；桌面記住收合，手機抽屜；見 #011 |
 | W3 | AppDashboard 配色與淺色／深色／自動切換 | ✅ | 見 [#008](#008--appdashboard-配色與主題切換) |
 | W2 | Ubuntu 既有 Docker 部署啟動檔 `start-ymir.sh` | ✅ | 見 [#005](#005--ubuntu-既有-docker-部署啟動檔)；語法與隔離模擬通過，實機待驗證 |
@@ -69,6 +70,34 @@
 ---
 
 ## 💬 留言區
+
+### #012 · PWA：手機可安裝到主畫面
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 19:00 · `✅完成`
+
+前端本來就是 SPA，補上 PWA 安裝能力，使用者用手機開網址即可「加入主畫面」，以獨立視窗開啟。
+
+- **新增**：`manifest.webmanifest`、192／512／maskable 圖示（暫由 `apple-touch-icon.png` 放大產生，有正式 logo 再替換）、`sw.js`、`index.html` 的 manifest 與 iOS meta、`viewport-fit=cover`。
+- **service worker 只快取帶雜湊的靜態檔**（cache-first）；`/api`（含 SSE、登入、下載）與 `index.html` 一律不經快取，登入狀態仍是 HttpOnly cookie（ADR-0002），不碰任何憑證。沒有離線功能（Agent 需要連線）。
+- **登入頁安裝提示**：Android 顯示原生安裝按鈕（`beforeinstallprompt`），iOS 顯示「分享 → 加入主畫面」說明，已安裝則不顯示（`PwaInstallService` + 純函式 `pwa-rules.ts`）。
+- **伺服器**：`WebAppHostingExtensions` 對 `index.html`、`sw.js`、`manifest.webmanifest` 回 `Cache-Control: no-cache`，手機才會取得新版。
+- **CSP 不需修改**：`manifest-src` / `worker-src` 退回 `default-src` / `script-src 'self'`。沒有新增相依套件（手寫 service worker）。
+
+驗證：
+- 前端 lint 通過、131 個測試通過（含新增 `pwa-rules.spec.ts`）、production build 通過；
+- `dotnet build`、`dotnet format --verify-no-changes`、`WebAppHostingTests` 11 個通過（含新增 no-cache 與 manifest content-type）；
+- Playwright（Chromium、iPhone 尺寸）：service worker 啟用、manifest 可讀、重新整理後只快取 5 個雜湊檔（無 `/api`、無 `index.html`）、登入頁顯示 iOS 說明。
+
+**未驗證、待使用者環境確認**：真實 iPhone / Android 在 HTTPS 網域（Cloudflare Tunnel）上的安裝與登入（iOS 主畫面 App 的 cookie 與 Safari 分開，第一次需重新登入；Entra OIDC 在獨立視窗內的跳轉需實機測）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #011 · AppDashboard 側欄清單與漢堡收合
 
