@@ -25,10 +25,12 @@ public sealed class ExecutionRunner(
     UserExecutionLocks userLocks,
     RuntimePolicyService policies,
     IAuditLog auditLog,
+    VibeMakerTelemetry telemetry,
     TimeProvider timeProvider,
     ILogger<ExecutionRunner> logger)
 {
     private long _sequence;
+    private bool _started;
 
     public async Task RunAsync(Guid executionId, CancellationToken stoppingToken)
     {
@@ -40,6 +42,16 @@ public sealed class ExecutionRunner(
 
         _sequence = await db.ExecutionEvents.Where(e => e.ExecutionId == executionId)
             .MaxAsync(e => (long?)e.Sequence, stoppingToken).ConfigureAwait(false) ?? 0;
+
+        // AC-10：同一次執行的 log 都帶 execution / conversation / user id，稽核的 correlation id 是這個 activity 的 trace id。
+        using var activity = VibeMakerTelemetry.ActivitySource.StartActivity("vibemaker.execution");
+        activity?.SetTag("ymir.execution_id", executionId.ToString("D"));
+        using var logScope = logger.BeginScope(new Dictionary<string, object>
+        {
+            ["ExecutionId"] = executionId,
+            ["ConversationId"] = execution.ConversationId,
+            ["UserId"] = execution.UserId,
+        });
 
         // 一個使用者一個 container（ADR-0007）：同一使用者的 execution 依序執行。
         using var userLock = await userLocks.AcquireAsync(execution.UserId, stoppingToken).ConfigureAwait(false);
@@ -84,6 +96,8 @@ public sealed class ExecutionRunner(
 
             execution.Start(session.Id, runtime.RuntimeId, timeProvider.GetUtcNow());
             await db.SaveChangesAsync(stoppingToken).ConfigureAwait(false);
+            _started = true;
+            telemetry.ExecutionStarted();
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -108,6 +122,7 @@ public sealed class ExecutionRunner(
 #pragma warning restore CA1031
         {
             logger.LogError(ex, "Failed to prepare runtime for execution {ExecutionId}", executionId);
+            telemetry.RuntimeStartFailed();
             await auditLog.WriteAsync(
                 new AuditEntry("system", "runtime.ensure", "user", execution.UserId.ToString("D"), AuditResult.Failure, timeProvider.GetUtcNow(), null),
                 stoppingToken).ConfigureAwait(false);
@@ -205,6 +220,12 @@ public sealed class ExecutionRunner(
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await AppendAsync(execution.Id, terminalEvent, cancellationToken).ConfigureAwait(false);
+        telemetry.ExecutionFinished(
+            _started,
+            execution.Status.ToString(),
+            execution.ErrorCode,
+            execution.StartedAt is { } startedAt && execution.EndedAt is { } endedAt ? endedAt - startedAt : null);
+        _started = false;
         await auditLog.WriteAsync(new AuditEntry("system", "execution.finish", "execution", execution.Id.ToString("D"),
             execution.Status == ExecutionStatus.Completed ? AuditResult.Success : AuditResult.Failure, now, null), cancellationToken).ConfigureAwait(false);
     }

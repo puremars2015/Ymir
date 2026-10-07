@@ -26,6 +26,7 @@ public static class VibeMakerApplicationExtensions
         services.AddScoped<Application.Runtime.RuntimeLifecycleService>();
         services.AddSingleton<Application.Runtime.RuntimePolicyService>();
         services.AddSingleton<UserExecutionLocks>();
+        services.AddSingleton<VibeMakerTelemetry>();
         services.AddSingleton<RuntimeCredentialService>();
         services.AddSingleton<ModelBudgetGuard>();
         return services;
