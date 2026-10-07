@@ -196,6 +196,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/users/search': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['SearchUsers'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/make-topics': {
     parameters: {
       query?: never;
@@ -784,6 +800,54 @@ export interface paths {
     put?: never;
     post?: never;
     delete: operations['DeleteSite'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/{siteId}/access': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['SetSiteAccess'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/shared-with-me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListSitesSharedWithMe'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/{siteId}/ticket': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['IssueSiteTicket'];
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -1473,8 +1537,22 @@ export interface components {
     SetTunnelTokenRequest: {
       token: null | string;
     };
+    SharedSiteResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** Format: uri */
+      url: null | string;
+      ownerName: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
     /** @enum {unknown} */
     SiteAccessMode: 'Public' | 'AllUsers' | 'SelectedUsers';
+    SiteAccessRequest: {
+      mode: components['schemas']['SiteAccessMode'];
+      userIds: null | string[];
+    };
     SiteResponse: {
       /** Format: uuid */
       id: string;
@@ -1495,6 +1573,13 @@ export interface components {
       publishedAt: null | string;
       /** Format: date-time */
       updatedAt: string;
+      sharedWith: components['schemas']['SiteShareResponse'][];
+    };
+    SiteShareResponse: {
+      /** Format: uuid */
+      userId: string;
+      displayName: string;
+      accountName: null | string;
     };
     SitesResponse: {
       enabled: boolean;
@@ -1504,6 +1589,13 @@ export interface components {
     };
     /** @enum {unknown} */
     SiteStatus: 'Unpublished' | 'Published';
+    SiteTicketRequest: {
+      path: null | string;
+    };
+    SiteTicketResponse: {
+      /** Format: uri */
+      redirectUrl: string;
+    };
     /** Format: binary */
     Stream: string;
     TestOidcSettingsRequest: {
@@ -1551,6 +1643,12 @@ export interface components {
     };
     /** @enum {unknown} */
     UserRole: 'User' | 'Admin';
+    UserSearchResult: {
+      /** Format: uuid */
+      id: string;
+      displayName: string;
+      accountName: null | string;
+    };
     UserSettingsResponse: {
       systemPrompt: null | string;
     };
@@ -1896,6 +1994,28 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SiteResponse'];
+        };
+      };
+    };
+  };
+  SearchUsers: {
+    parameters: {
+      query?: {
+        q?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UserSearchResult'][];
         };
       };
     };
@@ -3009,6 +3129,78 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  SetSiteAccess: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        siteId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SiteAccessRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SiteResponse'];
+        };
+      };
+    };
+  };
+  ListSitesSharedWithMe: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SharedSiteResponse'][];
+        };
+      };
+    };
+  };
+  IssueSiteTicket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        siteId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SiteTicketRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SiteTicketResponse'];
+        };
       };
     };
   };

@@ -13,7 +13,42 @@ public sealed class SiteRulesTests : IDisposable
     private readonly MemoryCache _cache = new(new MemoryCacheOptions());
 
     private SiteRequestHandler Handler() =>
-        new(new SiteHostOptions { BaseUrl = new Uri("https://sites.example.com"), Root = _root }, null!, _cache);
+        new(new SiteHostOptions { BaseUrl = new Uri("https://sites.example.com"), Root = _root }, null!, null!, new Microsoft.AspNetCore.DataProtection.EphemeralDataProtectionProvider(), _cache, TimeProvider.System);
+
+    [Theory]
+    [InlineData(SiteAccessMode.Public, false, false, false, true)]
+    [InlineData(SiteAccessMode.AllUsers, false, false, false, true)]
+    [InlineData(SiteAccessMode.SelectedUsers, false, false, false, false)]
+    [InlineData(SiteAccessMode.SelectedUsers, false, false, true, true)]
+    [InlineData(SiteAccessMode.SelectedUsers, true, false, false, true)]
+    [InlineData(SiteAccessMode.SelectedUsers, false, true, false, true)]
+    public void CanView_OwnersAndAdminsAlwaysCan_OthersFollowTheMode(SiteAccessMode mode, bool isOwner, bool isAdmin, bool isShared, bool expected)
+    {
+        var owner = Guid.NewGuid();
+        var viewer = isOwner ? owner : Guid.NewGuid();
+        Assert.Equal(expected, SiteAccessRules.CanView(mode, owner, viewer, isAdmin, isShared));
+    }
+
+    [Theory]
+    [InlineData("/orders/1?x=1", "/orders/1?x=1")]
+    [InlineData("/", "/")]
+    [InlineData(null, "/")]
+    [InlineData("", "/")]
+    [InlineData("//evil.example/", "/")]
+    [InlineData("https://evil.example/", "/")]
+    [InlineData("/\\evil.example", "/")]
+    [InlineData("/a\r\nSet-Cookie: x", "/")]
+    public void SafeReturnPath_OnlyAllowsSiteRelativePaths(string? path, string expected) =>
+        Assert.Equal(expected, SiteAccessRules.SafeReturnPath(path));
+
+    [Fact]
+    public void TicketHash_IsStableAndDoesNotContainTheTicket()
+    {
+        var hash = SiteAccessRules.HashTicket("abc");
+        Assert.Equal(hash, SiteAccessRules.HashTicket("abc"));
+        Assert.Equal(64, hash.Length);
+        Assert.NotEqual(hash, SiteAccessRules.HashTicket("abd"));
+    }
 
     [Fact]
     public void Urls_UseTheSlugAsSubdomain_AndKeepScheme()

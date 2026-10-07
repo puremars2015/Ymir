@@ -87,6 +87,8 @@ cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:admin -- <截圖�
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:network -- <截圖目錄>
 # OneDrive connector（ADR-0013；需要 Fake OIDC，API 設定見 web/e2e/onedrive-flow.mjs 開頭）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:onedrive -- <截圖目錄>
+# 網站託管與分享（ADR-0016；需要 SiteHost 與 *.localhost，前置步驟見 web/e2e/sites-flow.mjs 開頭）
+cd web && WORKSPACE_ROOT=<工作目錄根> CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:sites -- <截圖目錄>
 # 平台 MCP（ADR-0012 B；需要 Fake MCP、MCP Gateway、API 的 Ymir__Mcp__*，見 deploy/mcp/README.md「本機驗證」）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:mcp -- <截圖目錄>
 # 知識庫（ADR-0014；Fake LLM + API 的 VibeMaker__Rag__EmbeddingModel 等，見 web/e2e/knowledge-flow.mjs 開頭）
@@ -133,7 +135,7 @@ OneDrive connector（ADR-0013）：管理員開放 `oneDrive` 能力後，使用
 
 RAG 知識庫（ADR-0014）：專案擁有者在專案頁上傳文件（`/api/projects/{id}/knowledge/*`），`KnowledgeIndexWorker` 背景擷取（TXT / Markdown / 文字型 PDF / DOCX）→ `TextChunker` 切段 → 經 LiteLLM `/v1/embeddings`（使用者 virtual key，模型 `VibeMaker:Rag:EmbeddingModel`，沒設定時停用）→ 寫入每專案一份 SQLite（`SqliteVectorStore`，暴力餘弦搜尋）。原始檔與 SQLite 放在 API 自己的 volume `Ymir:Knowledge:Root/<userId>/<projectId>/`（不是 Agent workspace、不掛給 Agent）；新版本索引成功才切換（filtered unique index：同檔名只一份 Ready），失敗保留舊版本，重啟時 `ReconcileAsync` 重做。問答 `POST /api/projects/{id}/knowledge/ask`（`KnowledgeQueryService`）：只在該專案、相同 embedding 模型的 Ready 版本中檢索，低於 `MinScore` 回「資料不足」且不呼叫模型；只有 `VibeMaker:Models:N:AllowKnowledgeBase=true` 的模型會收到片段（否則只回段落），片段放在 `<knowledge>` 資料區塊並要求以 `[n]` 標註。
 
-網站託管（ADR-0016，`deploy/sites/README.md`）：檔案面板「發布網站」選含 `index.html` 的目錄 → `SiteService` 經 `IWorkspaceFileReader` 複製到網站 volume `Ymir:Sites:Root/{siteId}/{versionId}/`（完整寫好才切換 `CurrentVersionId`，保留最近 3 版，失敗不影響目前版本）；`Ymir.SiteHost` 依 Host 找網站、只提供版本目錄內的檔案（路徑逐段檢查、SPA 模式無副檔名回 index.html、`nosniff`）。網站網域（`Ymir:Sites:BaseUrl`）必須與 Ymir 登入網域不同；API 不掛載 workspace，SiteHost 唯讀、不執行使用者程式。
+網站託管（ADR-0016，`deploy/sites/README.md`）：檔案面板「發布網站」選含 `index.html` 的目錄 → `SiteService` 經 `IWorkspaceFileReader` 複製到網站 volume `Ymir:Sites:Root/{siteId}/{versionId}/`（完整寫好才切換 `CurrentVersionId`，保留最近 3 版，失敗不影響目前版本）；`Ymir.SiteHost` 依 Host 找網站、只提供版本目錄內的檔案（路徑逐段檢查、SPA 模式無副檔名回 index.html、`nosniff`）。網站網域（`Ymir:Sites:BaseUrl`）必須與 Ymir 登入網域不同；API 不掛載 workspace，SiteHost 唯讀、不執行使用者程式。存取模式（`PUT /api/sites/{id}/access`）：公開 / 所有 Ymir 使用者 / 指定使用者（`vibemaker.site_shares`），擁有者與 Admin 一律可看（`SiteAccessRules.CanView`，API 與 SiteHost 共用）。私人網站：SiteHost 導向平台 `/site-access` → 前端 `POST /api/sites/{id}/ticket`（60 秒、一次性、只存雜湊）→ SiteHost `/.ymir/auth` 兌換成只限該 hostname、綁定網站的 `ymir_site` cookie；每個請求重新檢查帳號狀態與分享（快取 ≤ 30 秒）。平台 cookie 不得送到網站網域；導回路徑只接受站內相對路徑（`SafeReturnPath`）。
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
 

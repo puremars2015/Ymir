@@ -12,6 +12,7 @@ using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Contracts.Conversations;
 using Ymir.VibeMaker.Contracts.Make;
 using Ymir.VibeMaker.Contracts.Projects;
+using Ymir.VibeMaker.Domain;
 
 namespace Ymir.IntegrationTests.Authorization;
 
@@ -65,6 +66,14 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         },
         ["POST /api/sites/{siteId:guid}/unpublish"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/sites/{r.ExecutionId}/unpublish"),
         ["DELETE /api/sites/{siteId:guid}"] = r => new HttpRequestMessage(HttpMethod.Delete, $"/api/sites/{r.ExecutionId}"),
+        ["PUT /api/sites/{siteId:guid}/access"] = r => new HttpRequestMessage(HttpMethod.Put, $"/api/sites/{r.ExecutionId}/access")
+        {
+            Content = JsonContent.Create(new SiteAccessRequest(SiteAccessMode.Public, null)),
+        },
+        ["POST /api/sites/{siteId:guid}/ticket"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/sites/{r.ExecutionId}/ticket")
+        {
+            Content = JsonContent.Create(new SiteTicketRequest("/")),
+        },
         ["POST /api/conversations/{conversationId:guid}/attachments"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/attachments?fileName=intrusion.txt")
         {
             Content = new ByteArrayContent("intrusion"u8.ToArray()),
@@ -100,6 +109,8 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["POST /api/sites/{siteId:guid}/publish"] = HttpStatusCode.NotFound,
         ["POST /api/sites/{siteId:guid}/unpublish"] = HttpStatusCode.NotFound,
         ["DELETE /api/sites/{siteId:guid}"] = HttpStatusCode.NotFound,
+        ["PUT /api/sites/{siteId:guid}/access"] = HttpStatusCode.NotFound,
+        ["POST /api/sites/{siteId:guid}/ticket"] = HttpStatusCode.NotFound,
     };
 
     /// <summary>
@@ -188,6 +199,8 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     [
         "GET /api/me",
         "GET /api/sites/",
+        "GET /api/sites/shared-with-me",
+        "GET /api/users/search",
         "POST /api/me/password",
         "POST /api/auth/logout",
         "GET /api/auth/providers",

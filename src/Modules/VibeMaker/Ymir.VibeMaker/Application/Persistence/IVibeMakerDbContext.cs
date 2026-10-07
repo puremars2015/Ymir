@@ -48,6 +48,10 @@ public interface IVibeMakerDbContext
 
     DbSet<SiteVersion> SiteVersions { get; }
 
+    DbSet<SiteShare> SiteShares { get; }
+
+    DbSet<SiteTicket> SiteTickets { get; }
+
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity)
         where TEntity : class;
 

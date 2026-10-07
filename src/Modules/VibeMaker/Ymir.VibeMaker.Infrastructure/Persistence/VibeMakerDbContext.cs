@@ -48,6 +48,10 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<SiteVersion> SiteVersions => Set<SiteVersion>();
 
+    public DbSet<SiteShare> SiteShares => Set<SiteShare>();
+
+    public DbSet<SiteTicket> SiteTickets => Set<SiteTicket>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -292,6 +296,26 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             version.Property(v => v.Error).HasMaxLength(SiteVersion.ErrorMaxLength);
             version.HasIndex(v => v.SiteId);
             version.HasOne<Site>().WithMany().HasForeignKey(v => v.SiteId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SiteShare>(share =>
+        {
+            share.ToTable("site_shares");
+            share.HasKey(s => new { s.SiteId, s.UserId });
+            share.HasIndex(s => s.UserId);
+            share.HasOne<Site>().WithMany().HasForeignKey(s => s.SiteId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SiteTicket>(ticket =>
+        {
+            // ADR-0016 §4：只存雜湊；SiteHost 以條件更新兌換（只能用一次）。
+            ticket.ToTable("site_tickets");
+            ticket.HasKey(t => t.Id);
+            ticket.Property(t => t.Id).ValueGeneratedNever();
+            ticket.Property(t => t.TokenHash).HasMaxLength(64).IsRequired();
+            ticket.HasIndex(t => t.TokenHash).IsUnique();
+            ticket.HasIndex(t => t.ExpiresAt);
+            ticket.HasOne<Site>().WithMany().HasForeignKey(t => t.SiteId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.ApplySnakeCaseNames();

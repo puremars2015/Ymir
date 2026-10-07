@@ -20,6 +20,10 @@ import {
   ConversationOneDrive,
   KnowledgeAnswer,
   PublishSiteRequest,
+  SharedSite,
+  SiteAccessMode,
+  SiteTicket,
+  UserSearchResult,
   Site,
   Sites,
   KnowledgeBase,
@@ -425,6 +429,23 @@ export class ApiService {
 
   deleteSite(siteId: string): Observable<void> {
     return this.http.delete<void>(`/api/sites/${siteId}`);
+  }
+
+  setSiteAccess(siteId: string, mode: SiteAccessMode, userIds: string[]): Observable<Site> {
+    return this.http.put<Site>(`/api/sites/${siteId}/access`, { mode, userIds });
+  }
+
+  sitesSharedWithMe(): Observable<SharedSite[]> {
+    return this.http.get<SharedSite[]>('/api/sites/shared-with-me');
+  }
+
+  /** 私人網站的登入票據（ADR-0016 §4）：回傳 SiteHost 的兌換網址。 */
+  issueSiteTicket(siteId: string, path: string): Observable<SiteTicket> {
+    return this.http.post<SiteTicket>(`/api/sites/${siteId}/ticket`, { path });
+  }
+
+  searchUsers(query: string): Observable<UserSearchResult[]> {
+    return this.http.get<UserSearchResult[]>('/api/users/search', { params: { q: query } });
   }
 
   cancelExecution(executionId: string): Observable<CancelExecutionResponse> {

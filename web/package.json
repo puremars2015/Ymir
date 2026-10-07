@@ -19,7 +19,8 @@
     "e2e:network": "node e2e/network-flow.mjs",
     "e2e:onedrive": "node e2e/onedrive-flow.mjs",
     "e2e:mcp": "node e2e/mcp-flow.mjs",
-    "e2e:knowledge": "node e2e/knowledge-flow.mjs"
+    "e2e:knowledge": "node e2e/knowledge-flow.mjs",
+    "e2e:sites": "node e2e/sites-flow.mjs"
   },
   "private": true,
   "packageManager": "npm@11.19.0",

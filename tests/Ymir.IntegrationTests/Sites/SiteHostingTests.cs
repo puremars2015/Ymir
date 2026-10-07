@@ -3,10 +3,13 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Ymir.Api.Endpoints;
 using Ymir.IntegrationTests.Api;
 using Ymir.IntegrationTests.Executions;
 using Ymir.IntegrationTests.PlatformMcp;
+using Ymir.Platform.Users;
 using Ymir.SiteHost;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
@@ -21,6 +24,15 @@ public sealed class SiteApiFactory : ApiFactory
     public const string BaseHost = "sites.test";
 
     private readonly List<WebApplication> _hosts = [];
+
+    /// <summary>清掉 SiteHost 的網站與授權快取，讓測試不必等 10 / 30 秒。</summary>
+    public void ClearSiteHostCaches()
+    {
+        foreach (var host in _hosts)
+        {
+            ((MemoryCache)host.Services.GetRequiredService<IMemoryCache>()).Clear();
+        }
+    }
 
     public string SitesRoot { get; } = Path.Combine(Path.GetTempPath(), "ymir-sites-" + Guid.NewGuid().ToString("N"));
 
@@ -241,5 +253,172 @@ public class SiteHostingTests(SiteApiFactory factory) : IClassFixture<SiteApiFac
 
         using var tooMany = await alice.PostAsJsonAsync($"/api/sites/{site.Id}/publish", new RepublishSiteRequest(null, null, null), JsonDefaults.Options, Ct);
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, tooMany.StatusCode);
+    }
+
+    internal static async Task SetAccessAsync(HttpClient owner, SiteResponse site, SiteAccessMode mode, params Guid[] userIds)
+    {
+        using var response = await owner.PutAsJsonAsync($"/api/sites/{site.Id}/access", new SiteAccessRequest(mode, userIds), JsonDefaults.Options, Ct);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    private static async Task<Guid> UserIdAsync(HttpClient client) =>
+        (await client.GetFromJsonAsync<JsonElement>("/api/me", Ct)).GetProperty("id").GetGuid();
+
+    /// <summary>平台簽發票據 → SiteHost 兌換，回傳網站 cookie（<c>name=value</c>）；簽發失敗時回傳 API 的狀態碼。</summary>
+    private static async Task<(HttpStatusCode Status, string? Cookie)> SignInToSiteAsync(HttpClient siteHost, SiteResponse site, HttpClient viewer, string path = "/")
+    {
+        using var issue = await viewer.PostAsJsonAsync($"/api/sites/{site.Id}/ticket", new SiteTicketRequest(path), JsonDefaults.Options, Ct);
+        if (issue.StatusCode != HttpStatusCode.OK)
+        {
+            return (issue.StatusCode, null);
+        }
+
+        var redirect = (await issue.Content.ReadFromJsonAsync<SiteTicketResponse>(JsonDefaults.Options, Ct))!.RedirectUrl;
+        Assert.Equal(site.Url!.Host, redirect.Host);
+        using var redeem = await VisitAsync(siteHost, site, redirect.PathAndQuery);
+        Assert.Equal(HttpStatusCode.Redirect, redeem.StatusCode);
+        Assert.Equal(path, redeem.Headers.Location!.OriginalString);
+        var setCookie = Assert.Single(redeem.Headers.GetValues("Set-Cookie"));
+        Assert.Contains("httponly", setCookie, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("domain=", setCookie, StringComparison.OrdinalIgnoreCase); // 只限這個 hostname
+        return (HttpStatusCode.OK, setCookie.Split(';')[0]);
+    }
+
+    [Fact]
+    public async Task PrivateSite_RequiresTicketLogin_AndOnlySharedUsersAndAdminsCanView()
+    {
+        var siteHost = await SiteHostAsync();
+        using var owner = await factory.LoginAsync($"site-own-{Guid.NewGuid():N}");
+        using var friend = await factory.LoginAsync($"site-friend-{Guid.NewGuid():N}");
+        using var stranger = await factory.LoginAsync($"site-stranger-{Guid.NewGuid():N}");
+        using var admin = await factory.LoginAsync($"site-admin-{Guid.NewGuid():N}", UserRole.Admin);
+        var friendId = await UserIdAsync(friend);
+        var ownerId = await UserIdAsync(owner);
+        var (conversationId, directory) = await WorkspaceAsync(owner);
+        await WriteSiteAsync(directory, "dist", "private");
+        var site = await PublishAsync(owner, conversationId);
+
+        // 分享選擇器只回未停用的帳號、不含自己
+        var found = await owner.GetFromJsonAsync<List<UserSearchResult>>("/api/users/search?q=site-", JsonDefaults.Options, Ct);
+        Assert.Contains(found!, u => u.Id == friendId);
+        Assert.DoesNotContain(found!, u => u.Id == ownerId);
+
+        await SetAccessAsync(owner, site, SiteAccessMode.SelectedUsers, friendId);
+        var listed = (await owner.GetFromJsonAsync<SitesResponse>("/api/sites", JsonDefaults.Options, Ct))!.Sites.Single(s => s.Id == site.Id);
+        Assert.Equal(SiteAccessMode.SelectedUsers, listed.AccessMode);
+        Assert.Equal(friendId, Assert.Single(listed.SharedWith).UserId);
+        Assert.Contains((await friend.GetFromJsonAsync<List<SharedSiteResponse>>("/api/sites/shared-with-me", JsonDefaults.Options, Ct))!, s => s.Id == site.Id);
+        Assert.DoesNotContain((await stranger.GetFromJsonAsync<List<SharedSiteResponse>>("/api/sites/shared-with-me", JsonDefaults.Options, Ct))!, s => s.Id == site.Id);
+        factory.ClearSiteHostCaches();
+
+        // 沒有網站 cookie：導向平台的 site-access 頁
+        using (var anonymous = await VisitAsync(siteHost, site, "/orders/1?x=1"))
+        {
+            Assert.Equal(HttpStatusCode.Redirect, anonymous.StatusCode);
+            Assert.Equal($"http://ymir.test/site-access?site={site.Id:D}&path=%2Forders%2F1%3Fx%3D1", anonymous.Headers.Location!.ToString());
+        }
+
+        var (_, friendCookie) = await SignInToSiteAsync(siteHost, site, friend, "/orders/1");
+        using (var viewed = await VisitAsync(siteHost, site, "/", friendCookie))
+        {
+            Assert.Equal(HttpStatusCode.OK, viewed.StatusCode);
+            Assert.True(viewed.Headers.CacheControl is { Private: true, NoStore: true });
+        }
+
+        var (_, ownerCookie) = await SignInToSiteAsync(siteHost, site, owner);
+        var (_, adminCookie) = await SignInToSiteAsync(siteHost, site, admin);
+        using (var ownerView = await VisitAsync(siteHost, site, "/", ownerCookie))
+        using (var adminView = await VisitAsync(siteHost, site, "/", adminCookie))
+        {
+            Assert.Equal(HttpStatusCode.OK, ownerView.StatusCode);
+            Assert.Equal(HttpStatusCode.OK, adminView.StatusCode);
+        }
+
+        // 沒有分享的使用者拿不到票據；偽造的 cookie 等同未登入
+        Assert.Equal(HttpStatusCode.Forbidden, (await SignInToSiteAsync(siteHost, site, stranger)).Status);
+        using (var forged = await VisitAsync(siteHost, site, "/", $"{SiteRequestHandler.CookieName}=forged"))
+        {
+            Assert.Equal(HttpStatusCode.Redirect, forged.StatusCode);
+        }
+
+        // 所有 Ymir 使用者
+        await SetAccessAsync(owner, site, SiteAccessMode.AllUsers);
+        Assert.Equal(HttpStatusCode.OK, (await SignInToSiteAsync(siteHost, site, stranger)).Status);
+
+        // 撤銷分享：快取到期後已發的 cookie 也失效
+        await SetAccessAsync(owner, site, SiteAccessMode.SelectedUsers);
+        factory.ClearSiteHostCaches();
+        using (var revoked = await VisitAsync(siteHost, site, "/", friendCookie))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, revoked.StatusCode);
+        }
+
+        // 別人改不了存取設定
+        using var hijack = await stranger.PutAsJsonAsync($"/api/sites/{site.Id}/access", new SiteAccessRequest(SiteAccessMode.Public, null), JsonDefaults.Options, Ct);
+        Assert.Equal(HttpStatusCode.NotFound, hijack.StatusCode);
+    }
+
+    [Fact]
+    public async Task Tickets_AreSingleUse_BoundToTheSite_AndDisabledUsersLoseAccess()
+    {
+        var siteHost = await SiteHostAsync();
+        using var owner = await factory.LoginAsync($"site-tk-{Guid.NewGuid():N}");
+        using var viewer = await factory.LoginAsync($"site-tkv-{Guid.NewGuid():N}");
+        using var admin = await factory.LoginAsync($"site-tka-{Guid.NewGuid():N}", UserRole.Admin);
+        var viewerId = await UserIdAsync(viewer);
+        var (conversationId, directory) = await WorkspaceAsync(owner);
+        await WriteSiteAsync(directory, "dist", "a");
+        await WriteSiteAsync(directory, "other", "b");
+        var siteA = await PublishAsync(owner, conversationId);
+        var siteB = await PublishAsync(owner, conversationId, "other");
+        await SetAccessAsync(owner, siteA, SiteAccessMode.SelectedUsers, viewerId);
+        await SetAccessAsync(owner, siteB, SiteAccessMode.SelectedUsers);
+        factory.ClearSiteHostCaches();
+
+        // 重放、拿到別的網站兌換、開放式導向都失敗
+        using var issue = await viewer.PostAsJsonAsync($"/api/sites/{siteA.Id}/ticket", new SiteTicketRequest("//evil.example/"), JsonDefaults.Options, Ct);
+        var redirect = (await issue.Content.ReadFromJsonAsync<SiteTicketResponse>(JsonDefaults.Options, Ct))!.RedirectUrl;
+        using (var wrongSite = await VisitAsync(siteHost, siteB, redirect.PathAndQuery))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, wrongSite.StatusCode);
+        }
+
+        string cookie;
+        using (var redeem = await VisitAsync(siteHost, siteA, redirect.PathAndQuery))
+        {
+            Assert.Equal(HttpStatusCode.Redirect, redeem.StatusCode);
+            Assert.Equal("/", redeem.Headers.Location!.OriginalString);
+            cookie = redeem.Headers.GetValues("Set-Cookie").Single().Split(';')[0];
+        }
+
+        using (var replay = await VisitAsync(siteHost, siteA, redirect.PathAndQuery))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, replay.StatusCode);
+        }
+
+        // cookie 綁定網站：拿到 B 等同未登入
+        using (var otherSite = await VisitAsync(siteHost, siteB, "/", cookie))
+        {
+            Assert.Equal(HttpStatusCode.Redirect, otherSite.StatusCode);
+        }
+
+        using (var allowed = await VisitAsync(siteHost, siteA, "/", cookie))
+        {
+            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+        }
+
+        // 停用帳號立即（快取到期後）失去存取
+        using (var disable = await admin.PostAsync(new Uri($"/api/admin/users/{viewerId}/disable", UriKind.Relative), null, Ct))
+        {
+            Assert.Equal(HttpStatusCode.OK, disable.StatusCode);
+        }
+
+        factory.ClearSiteHostCaches();
+        using var disabled = await VisitAsync(siteHost, siteA, "/", cookie);
+        Assert.Equal(HttpStatusCode.Forbidden, disabled.StatusCode);
+
+        // 分享名單不接受停用的帳號
+        using var invalid = await owner.PutAsJsonAsync($"/api/sites/{siteA.Id}/access", new SiteAccessRequest(SiteAccessMode.SelectedUsers, [viewerId]), JsonDefaults.Options, Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
     }
 }

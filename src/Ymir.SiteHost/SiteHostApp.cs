@@ -1,4 +1,6 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Ymir.Platform.Infrastructure;
 using Ymir.VibeMaker.Infrastructure.Persistence;
 
 namespace Ymir.SiteHost;
@@ -44,13 +46,24 @@ public static class SiteHostApp
         builder.Services.AddSingleton(options);
         builder.Services.AddDbContext<VibeMakerDbContext>(db => db.UseSqlServer(connectionString, VibeMakerSqlServerOptions.Configure)
             .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
+        // 使用者狀態與角色（停用立即生效、Admin 可看所有網站，ADR-0016 §3）。
+        builder.Services.AddPlatformInfrastructure(connectionString);
+        // 網站 cookie 用自己的金鑰（與 API 分開）：平台的 Data Protection 金鑰不會交給 SiteHost。
+        var dataProtection = builder.Services.AddDataProtection().SetApplicationName("Ymir.SiteHost");
+        if (!string.IsNullOrWhiteSpace(options.DataProtectionKeysPath))
+        {
+            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(options.DataProtectionKeysPath));
+        }
+
         builder.Services.AddMemoryCache();
-        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddScoped<SiteRequestHandler>();
 
         var app = builder.Build();
         app.MapGet("/.ymir/health", () => Results.Ok(new { status = "ok" }));
-        app.Run(context => context.RequestServices.GetRequiredService<SiteRequestHandler>().HandleAsync(context));
+        app.MapGet("/.ymir/auth", (HttpContext context, SiteRequestHandler handler) => handler.HandleTicketAsync(context));
+        // 用 fallback 端點而不是 app.Run：terminal middleware 會在端點執行前攔下所有請求（包含上面的 /.ymir/*）。
+        // 模式不加 :nonfile，讓 app.js 等有副檔名的路徑也交給網站處理。
+        app.MapFallback("{**path}", (HttpContext context, SiteRequestHandler handler) => handler.HandleAsync(context));
         return app;
     }
 }

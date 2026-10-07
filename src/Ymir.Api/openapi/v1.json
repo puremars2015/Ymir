@@ -367,6 +367,38 @@
         }
       }
     },
+    "/api/users/search": {
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "SearchUsers",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSearchResult"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/make-topics": {
       "get": {
         "tags": [
@@ -1895,6 +1927,111 @@
         "responses": {
           "200": {
             "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sites/{siteId}/access": {
+      "put": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "SetSiteAccess",
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/shared-with-me": {
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "ListSitesSharedWithMe",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedSiteResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{siteId}/ticket": {
+      "post": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "IssueSiteTicket",
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteTicketRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteTicketResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4433,12 +4570,67 @@
           }
         }
       },
+      "SharedSiteResponse": {
+        "required": [
+          "id",
+          "name",
+          "url",
+          "ownerName",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          },
+          "ownerName": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "SiteAccessMode": {
         "enum": [
           "Public",
           "AllUsers",
           "SelectedUsers"
         ]
+      },
+      "SiteAccessRequest": {
+        "required": [
+          "mode",
+          "userIds"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/SiteAccessMode"
+          },
+          "userIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
       },
       "SiteResponse": {
         "required": [
@@ -4453,7 +4645,8 @@
           "fileCount",
           "totalBytes",
           "publishedAt",
-          "updatedAt"
+          "updatedAt",
+          "sharedWith"
         ],
         "type": "object",
         "properties": {
@@ -4513,6 +4706,35 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "sharedWith": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SiteShareResponse"
+            }
+          }
+        }
+      },
+      "SiteShareResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "accountName"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -4548,6 +4770,32 @@
           "Unpublished",
           "Published"
         ]
+      },
+      "SiteTicketRequest": {
+        "required": [
+          "path"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SiteTicketResponse": {
+        "required": [
+          "redirectUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "redirectUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
       },
       "Stream": {
         "type": "string",
@@ -4749,6 +4997,29 @@
           "User",
           "Admin"
         ]
+      },
+      "UserSearchResult": {
+        "required": [
+          "id",
+          "displayName",
+          "accountName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
       },
       "UserSettingsResponse": {
         "required": [

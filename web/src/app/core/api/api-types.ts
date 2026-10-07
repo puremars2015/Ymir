@@ -67,6 +67,10 @@ export type Site = Schemas['SiteResponse'];
 export type Sites = Schemas['SitesResponse'];
 export type SiteAccessMode = Schemas['SiteAccessMode'];
 export type PublishSiteRequest = Schemas['PublishSiteRequest'];
+export type SiteShare = Schemas['SiteShareResponse'];
+export type SharedSite = Schemas['SharedSiteResponse'];
+export type UserSearchResult = Schemas['UserSearchResult'];
+export type SiteTicket = Schemas['SiteTicketResponse'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

@@ -3,9 +3,10 @@ import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@ang
 import { RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
-import { Site, Sites } from '../../core/api/api-types';
+import { SharedSite, Site, Sites } from '../../core/api/api-types';
 import { formatSize } from '../../core/files/workspace-files';
 import { siteAccessLabel } from '../../core/sites/site-rules';
+import { SiteAccessEditor } from './site-access-editor';
 
 /**
  * 我的網站（ADR-0016）：已發布的網站、網址、重新發布、取消發布與刪除。
@@ -13,7 +14,7 @@ import { siteAccessLabel } from '../../core/sites/site-rules';
  */
 @Component({
   selector: 'app-sites-page',
-  imports: [DatePipe, RouterLink],
+  imports: [DatePipe, RouterLink, SiteAccessEditor],
   template: `
     <section class="page stack">
       <h1>我的網站</h1>
@@ -64,6 +65,14 @@ import { siteAccessLabel } from '../../core/sites/site-rules';
                 }
                 <button
                   type="button"
+                  class="secondary"
+                  [attr.aria-expanded]="editing() === site.id"
+                  (click)="toggleAccess(site)"
+                >
+                  存取設定
+                </button>
+                <button
+                  type="button"
                   class="link danger"
                   [disabled]="busy()"
                   (click)="remove(site)"
@@ -71,6 +80,9 @@ import { siteAccessLabel } from '../../core/sites/site-rules';
                   刪除
                 </button>
               </div>
+              @if (editing() === site.id) {
+                <app-site-access-editor [site]="site" (saved)="accessSaved($event)" />
+              }
             </li>
           } @empty {
             <li class="muted">還沒有網站。</li>
@@ -78,6 +90,22 @@ import { siteAccessLabel } from '../../core/sites/site-rules';
         </ul>
       } @else if (!error()) {
         <p class="muted">載入中…</p>
+      }
+      @if (shared().length > 0) {
+        <h2>分享給我的網站</h2>
+        <ul class="sites" aria-label="分享給我的網站">
+          @for (site of shared(); track site.id) {
+            <li class="card row between" [attr.data-shared-site]="site.name">
+              <span
+                ><strong>{{ site.name }}</strong>
+                <span class="muted small">· {{ site.ownerName }}</span></span
+              >
+              @if (site.url) {
+                <a [href]="site.url" target="_blank" rel="noopener noreferrer">開啟</a>
+              }
+            </li>
+          }
+        </ul>
       }
       @if (message(); as m) {
         <p class="muted" role="status">{{ m }}</p>
@@ -96,6 +124,10 @@ import { siteAccessLabel } from '../../core/sites/site-rules';
     h1 {
       margin: 0;
       font-size: 1.5rem;
+    }
+    h2 {
+      margin: 0.5rem 0 0;
+      font-size: 1.125rem;
     }
     p {
       margin: 0;
@@ -133,6 +165,8 @@ export class SitesPage implements OnInit {
   private readonly api = inject(ApiService);
 
   protected readonly data = signal<Sites | null>(null);
+  protected readonly shared = signal<SharedSite[]>([]);
+  protected readonly editing = signal<string | null>(null);
   protected readonly busy = signal(false);
   protected readonly message = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
@@ -143,6 +177,16 @@ export class SitesPage implements OnInit {
 
   protected access(site: Site): string {
     return siteAccessLabel(site.accessMode);
+  }
+
+  protected toggleAccess(site: Site): void {
+    this.editing.update((id) => (id === site.id ? null : site.id));
+  }
+
+  protected accessSaved(site: Site): void {
+    this.editing.set(null);
+    this.message.set(`已更新「${site.name}」的存取設定：${siteAccessLabel(site.accessMode)}。`);
+    this.load();
   }
 
   protected size(site: Site): string {
@@ -185,6 +229,10 @@ export class SitesPage implements OnInit {
   private load(): void {
     this.api.listSites().subscribe({
       next: (data) => this.data.set(data),
+      error: (e: unknown) => this.error.set(describeApiError(e)),
+    });
+    this.api.sitesSharedWithMe().subscribe({
+      next: (sites) => this.shared.set(sites),
       error: (e: unknown) => this.error.set(describeApiError(e)),
     });
   }

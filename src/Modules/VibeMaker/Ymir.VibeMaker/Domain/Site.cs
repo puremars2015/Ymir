@@ -160,3 +160,47 @@ public sealed class SiteVersion
 
     public void Prune() => Status = SiteVersionStatus.Pruned;
 }
+
+/// <summary>網站分享給的使用者（ADR-0016 §3，<see cref="SiteAccessMode.SelectedUsers"/>）；只授予瀏覽權。</summary>
+public sealed class SiteShare
+{
+    private SiteShare()
+    {
+    }
+
+    public Guid SiteId { get; private set; }
+
+    public Guid UserId { get; private set; }
+
+    public DateTimeOffset CreatedAt { get; private set; }
+
+    public static SiteShare Create(Guid siteId, Guid userId, DateTimeOffset now) => new() { SiteId = siteId, UserId = userId, CreatedAt = now };
+}
+
+/// <summary>
+/// 私人網站的登入票據（ADR-0016 §4）：60 秒、只能用一次、綁定網站與使用者；資料庫只存 SHA-256 雜湊。
+/// SiteHost 兌換時以條件更新原子性地標記已使用。
+/// </summary>
+public sealed class SiteTicket
+{
+    public static readonly TimeSpan Lifetime = TimeSpan.FromSeconds(60);
+
+    private SiteTicket()
+    {
+    }
+
+    public Guid Id { get; private set; }
+
+    public Guid SiteId { get; private set; }
+
+    public Guid UserId { get; private set; }
+
+    public string TokenHash { get; private set; } = string.Empty;
+
+    public DateTimeOffset ExpiresAt { get; private set; }
+
+    public DateTimeOffset? UsedAt { get; private set; }
+
+    public static SiteTicket Create(Guid siteId, Guid userId, string tokenHash, DateTimeOffset now) =>
+        new() { Id = Guid.CreateVersion7(), SiteId = siteId, UserId = userId, TokenHash = tokenHash, ExpiresAt = now + Lifetime };
+}
