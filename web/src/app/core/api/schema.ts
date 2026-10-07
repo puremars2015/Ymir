@@ -629,6 +629,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/conversations/{conversationId}/onedrive': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetConversationOneDriveStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/conversations/{conversationId}/onedrive/sync': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['SyncConversationOneDrive'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/settings/oidc': {
     parameters: {
       query?: never;
@@ -839,6 +871,17 @@ export interface components {
       currentPassword: null | string;
       newPassword: null | string;
     };
+    ConversationOneDriveResponse: {
+      availability: components['schemas']['OneDriveAvailability'];
+      rootPath: null | string;
+      folderPath: null | string;
+      state: null | components['schemas']['OneDriveSyncState'];
+      /** Format: date-time */
+      lastSyncedAt: null | string;
+      /** Format: int32 */
+      conflictCount: number | string;
+      lastError: null | string;
+    };
     ConversationResponse: {
       /** Format: uuid */
       id: string;
@@ -991,6 +1034,8 @@ export interface components {
       message: string;
     };
     /** @enum {unknown} */
+    OneDriveAvailability: 'NotAllowed' | 'NotConnected' | 'NeedsReauth' | 'NoRoot' | 'Ready';
+    /** @enum {unknown} */
     OneDriveLinkState: 'NotConnected' | 'Connected' | 'NeedsReauth';
     OneDriveStatusResponse: {
       allowed: boolean;
@@ -1002,6 +1047,8 @@ export interface components {
       connectedAt: null | string;
       lastError: null | string;
     };
+    /** @enum {unknown} */
+    OneDriveSyncState: 'Synced' | 'Pending' | 'Failed' | null;
     PasswordLoginRequest: {
       account: null | string;
       password: null | string;
@@ -2410,6 +2457,55 @@ export interface operations {
         'application/json': components['schemas']['SetOneDriveRootRequest'];
       };
     };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  GetConversationOneDriveStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConversationOneDriveResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SyncConversationOneDrive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description OK */
       200: {

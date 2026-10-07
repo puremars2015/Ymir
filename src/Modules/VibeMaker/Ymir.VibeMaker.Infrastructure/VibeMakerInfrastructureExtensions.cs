@@ -46,6 +46,8 @@ public static class VibeMakerInfrastructureExtensions
         services.AddHttpClient<Application.Connectors.OneDrive.IOneDriveOAuthClient, Connectors.OneDrive.OneDriveOAuthClient>(Connectors.OneDrive.OneDriveOAuthClient.HttpClientName);
         services.AddHttpClient<Application.Connectors.OneDrive.IOneDriveClient, Connectors.OneDrive.GraphOneDriveClient>(Connectors.OneDrive.GraphOneDriveClient.HttpClientName);
         services.AddSingleton<Application.Connectors.OneDrive.IOneDriveTokenProtector, Connectors.OneDrive.DataProtectionOneDriveTokenProtector>();
+        services.Configure<Application.Connectors.OneDrive.OneDriveSyncOptions>(configuration.GetSection(Connectors.OneDrive.OneDriveOptions.SectionName));
+        services.AddHostedService<Connectors.OneDrive.OneDriveSyncWorker>();
         services.AddHealthChecks()
             .AddCheck<Health.DatabaseHealthCheck>("database", tags: [Health.VibeMakerHealthChecks.ReadyTag], timeout: Health.VibeMakerHealthChecks.Timeout)
             .AddCheck<Health.RuntimeHealthCheck>("runtime", tags: [Health.VibeMakerHealthChecks.ReadyTag], timeout: Health.VibeMakerHealthChecks.Timeout)

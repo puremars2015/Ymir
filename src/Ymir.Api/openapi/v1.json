@@ -1551,6 +1551,64 @@
         }
       }
     },
+    "/api/conversations/{conversationId}/onedrive": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "GetConversationOneDriveStatus",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOneDriveResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversationId}/onedrive/sync": {
+      "post": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "SyncConversationOneDrive",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/admin/settings/oidc": {
       "get": {
         "tags": [
@@ -2219,6 +2277,66 @@
           }
         }
       },
+      "ConversationOneDriveResponse": {
+        "required": [
+          "availability",
+          "rootPath",
+          "folderPath",
+          "state",
+          "lastSyncedAt",
+          "conflictCount",
+          "lastError"
+        ],
+        "type": "object",
+        "properties": {
+          "availability": {
+            "$ref": "#/components/schemas/OneDriveAvailability"
+          },
+          "rootPath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "folderPath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "state": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OneDriveSyncState"
+              }
+            ]
+          },
+          "lastSyncedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "conflictCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lastError": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ConversationResponse": {
         "required": [
           "id",
@@ -2862,6 +2980,15 @@
           }
         }
       },
+      "OneDriveAvailability": {
+        "enum": [
+          "NotAllowed",
+          "NotConnected",
+          "NeedsReauth",
+          "NoRoot",
+          "Ready"
+        ]
+      },
       "OneDriveLinkState": {
         "enum": [
           "NotConnected",
@@ -2916,6 +3043,14 @@
             ]
           }
         }
+      },
+      "OneDriveSyncState": {
+        "enum": [
+          "Synced",
+          "Pending",
+          "Failed",
+          null
+        ]
       },
       "PasswordLoginRequest": {
         "required": [

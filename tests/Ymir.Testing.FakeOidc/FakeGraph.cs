@@ -19,6 +19,7 @@ public sealed class FakeGraphStore
     private readonly ConcurrentDictionary<string, FakeDrive> _drives = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, UploadSession> _sessions = new();
     private int _throttle;
+    private int _sessionsCreated;
 
     /// <summary>測試用：接下來的 <paramref name="count"/> 個 Graph 請求回 429（Retry-After: 1）。</summary>
     public void ThrottleNext(int count) => Interlocked.Exchange(ref _throttle, count);
@@ -42,18 +43,23 @@ public sealed class FakeGraphStore
 
     public FakeDrive DriveOf(string account) => _drives.GetOrAdd(account.ToLowerInvariant(), a => new FakeDrive(a));
 
-    internal string CreateSession(FakeDrive drive, string parentId, string name, string? ifMatch)
+    internal string CreateSession(FakeDrive drive, string parentId, string name, string? ifMatch, string conflictBehavior)
     {
         var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
-        _sessions[id] = new UploadSession(drive, parentId, name, ifMatch, new MemoryStream());
+        _sessions[id] = new UploadSession(drive, parentId, name, ifMatch, conflictBehavior, new MemoryStream());
         return id;
     }
+
+    /// <summary>測試用：目前進行中的 upload session 數（大檔案是否走 upload session）。</summary>
+    public int UploadSessionsCreated => Volatile.Read(ref _sessionsCreated);
+
+    internal void CountSession() => Interlocked.Increment(ref _sessionsCreated);
 
     internal UploadSession? Session(string id) => _sessions.TryGetValue(id, out var session) ? session : null;
 
     internal void EndSession(string id) => _sessions.TryRemove(id, out _);
 
-    internal sealed record UploadSession(FakeDrive Drive, string ParentId, string Name, string? IfMatch, MemoryStream Buffer);
+    internal sealed record UploadSession(FakeDrive Drive, string ParentId, string Name, string? IfMatch, string ConflictBehavior, MemoryStream Buffer);
 }
 
 /// <summary>一個帳號的 drive；測試可直接讀寫檔案（模擬使用者在 OneDrive 網頁上的操作）。</summary>
@@ -192,23 +198,47 @@ public sealed class FakeDrive
         }
     }
 
-    /// <summary>上傳檔案；<paramref name="ifMatch"/> 與目前 eTag 不符時回傳 conflict（Graph 回 412）。</summary>
-    internal (FakeItem? Item, bool PreconditionFailed) Upload(string parentId, string name, byte[] content, string? ifMatch)
+    /// <summary>
+    /// 上傳檔案（比照 Graph）：<paramref name="ifMatch"/> 與目前 eTag 不符時 412；
+    /// conflictBehavior=fail 且同名已存在時 409；rename 時另取 <c>名稱 1.ext</c>；replace（預設）覆蓋。
+    /// </summary>
+    internal (FakeItem? Item, int Status) Upload(string parentId, string name, byte[] content, string? ifMatch, string conflictBehavior)
     {
         lock (_lock)
         {
             if (!_items.TryGetValue(parentId, out var parent) || !parent.IsFolder)
             {
-                return (null, false);
+                return (null, StatusCodes.Status404NotFound);
             }
 
             var existing = ChildLocked(parentId, name);
             if (ifMatch is not null && ifMatch != "*" && (existing is null || existing.ETag != ifMatch))
             {
-                return (null, true);
+                return (null, StatusCodes.Status412PreconditionFailed);
             }
 
-            return (UpsertFileLocked(parentId, name, content), false);
+            if (existing is not null && ifMatch is null)
+            {
+                if (conflictBehavior == "fail" || existing.IsFolder)
+                {
+                    return (null, StatusCodes.Status409Conflict);
+                }
+
+                if (conflictBehavior == "rename")
+                {
+                    var dot = name.LastIndexOf('.');
+                    var (stem, extension) = dot > 0 ? (name[..dot], name[dot..]) : (name, string.Empty);
+                    var n = 1;
+                    while (ChildLocked(parentId, $"{stem} {n}{extension}") is not null)
+                    {
+                        n++;
+                    }
+
+                    name = $"{stem} {n}{extension}";
+                }
+            }
+
+            return (UpsertFileLocked(parentId, name, content), StatusCodes.Status201Created);
         }
     }
 
@@ -277,6 +307,9 @@ internal sealed record FakeItem(string Id, string Name, string? ParentId, bool I
 internal static class FakeGraphEndpoints
 {
     private const string Prefix = "/graph/v1.0";
+
+    /// <summary>刻意比 Graph 的 200 小，讓測試走到分頁。</summary>
+    private const int ChildrenPageSize = 50;
 
     public static void MapFakeGraph(this IEndpointRouteBuilder endpoints)
     {
@@ -358,10 +391,8 @@ internal static class FakeGraphEndpoints
             {
                 using var buffer = new MemoryStream();
                 await context.Request.Body.CopyToAsync(buffer, context.RequestAborted);
-                var (uploaded, failed) = drive.Upload(parentId, name, buffer.ToArray(), ifMatch);
-                return failed ? Error(StatusCodes.Status412PreconditionFailed, "preconditionFailed", "ETag does not match.")
-                    : uploaded is null ? NotFound()
-                    : ItemResult(drive, uploaded, StatusCodes.Status201Created);
+                var behavior = context.Request.Query["@microsoft.graph.conflictBehavior"].ToString() is { Length: > 0 } b ? b : "replace";
+                return UploadResult(drive, drive.Upload(parentId, name, buffer.ToArray(), ifMatch, behavior));
             }
 
             if (action == "createUploadSession" && method == "POST")
@@ -371,8 +402,23 @@ internal static class FakeGraphEndpoints
                     return NotFound();
                 }
 
+                var request = await context.Request.ReadFromJsonAsync<Dictionary<string, System.Text.Json.JsonElement>>(context.RequestAborted) ?? [];
+                var behavior = request.TryGetValue("item", out var item) && item.TryGetProperty("@microsoft.graph.conflictBehavior", out var cb) ? cb.GetString() ?? "replace" : "replace";
+                var existing = drive.Child(parentId, name);
+                // Graph 在建立 session 時就檢查 If-Match 與 conflictBehavior=fail。
+                if (ifMatch is not null && ifMatch != "*" && existing?.ETag != ifMatch)
+                {
+                    return Error(StatusCodes.Status412PreconditionFailed, "preconditionFailed", "ETag does not match.");
+                }
+
+                if (existing is not null && ifMatch is null && behavior == "fail")
+                {
+                    return Error(StatusCodes.Status409Conflict, "nameAlreadyExists", "Name already exists.");
+                }
+
                 var store = context.RequestServices.GetRequiredService<FakeGraphStore>();
-                var sessionId = store.CreateSession(drive, parentId, name, ifMatch);
+                store.CountSession();
+                var sessionId = store.CreateSession(drive, parentId, name, ifMatch, behavior);
                 var root = $"{context.Request.Scheme}://{context.Request.Host}";
                 return Results.Json(new { uploadUrl = $"{root}/graph/upload/{sessionId}", expirationDateTime = DateTimeOffset.UtcNow.AddHours(1) });
             }
@@ -392,12 +438,25 @@ internal static class FakeGraphEndpoints
             case "" when method == "GET":
                 return ItemResult(drive, target);
             case "children" when method == "GET":
-                return Results.Json(new { value = drive.Children(target.Id).Select(i => ItemJson(drive, i)).ToList() });
+                {
+                    // 分頁比照 Graph：$top 決定每頁筆數，下一頁以 @odata.nextLink（含 $skiptoken）提供。
+                    var children = drive.Children(target.Id);
+                    var top = int.TryParse(context.Request.Query["$top"], CultureInfo.InvariantCulture, out var t) && t > 0 ? Math.Min(t, ChildrenPageSize) : ChildrenPageSize;
+                    var skip = int.TryParse(context.Request.Query["$skiptoken"], CultureInfo.InvariantCulture, out var k) && k > 0 ? k : 0;
+                    var page = children.Skip(skip).Take(top).Select(i => ItemJson(drive, i)).ToList();
+                    var body = new Dictionary<string, object?> { ["value"] = page };
+                    if (skip + top < children.Count)
+                    {
+                        body["@odata.nextLink"] = $"{context.Request.Scheme}://{context.Request.Host}{Prefix}/me/drive/items/{target.Id}/children?$top={top}&$skiptoken={skip + top}";
+                    }
+
+                    return Results.Json(body);
+                }
             case "children" when method == "POST":
-                var body = await context.Request.ReadFromJsonAsync<Dictionary<string, System.Text.Json.JsonElement>>(context.RequestAborted) ?? [];
-                var folderName = body.TryGetValue("name", out var n) ? n.GetString() ?? string.Empty : string.Empty;
-                var behavior = body.TryGetValue("@microsoft.graph.conflictBehavior", out var b) ? b.GetString() ?? "fail" : "fail";
-                if (folderName.Length == 0 || !body.ContainsKey("folder"))
+                var folderRequest = await context.Request.ReadFromJsonAsync<Dictionary<string, System.Text.Json.JsonElement>>(context.RequestAborted) ?? [];
+                var folderName = folderRequest.TryGetValue("name", out var n) ? n.GetString() ?? string.Empty : string.Empty;
+                var behavior = folderRequest.TryGetValue("@microsoft.graph.conflictBehavior", out var b) ? b.GetString() ?? "fail" : "fail";
+                if (folderName.Length == 0 || !folderRequest.ContainsKey("folder"))
                 {
                     return Error(StatusCodes.Status400BadRequest, "invalidRequest", "Only folder creation is supported.");
                 }
@@ -436,11 +495,16 @@ internal static class FakeGraphEndpoints
         }
 
         store.EndSession(sessionId);
-        var (item, failed) = session.Drive.Upload(session.ParentId, session.Name, session.Buffer.ToArray(), session.IfMatch);
-        return failed ? Error(StatusCodes.Status412PreconditionFailed, "preconditionFailed", "ETag does not match.")
-            : item is null ? NotFound()
-            : ItemResult(session.Drive, item, StatusCodes.Status201Created);
+        return UploadResult(session.Drive, session.Drive.Upload(session.ParentId, session.Name, session.Buffer.ToArray(), session.IfMatch, session.ConflictBehavior));
     }
+
+    private static IResult UploadResult(FakeDrive drive, (FakeItem? Item, int Status) result) => result switch
+    {
+        ({ } item, _) => ItemResult(drive, item, StatusCodes.Status201Created),
+        (_, StatusCodes.Status412PreconditionFailed) => Error(StatusCodes.Status412PreconditionFailed, "preconditionFailed", "ETag does not match."),
+        (_, StatusCodes.Status409Conflict) => Error(StatusCodes.Status409Conflict, "nameAlreadyExists", "Name already exists."),
+        _ => NotFound(),
+    };
 
     private static IResult ItemResult(FakeDrive drive, FakeItem item, int status = StatusCodes.Status200OK) =>
         Results.Json(ItemJson(drive, item), statusCode: status);

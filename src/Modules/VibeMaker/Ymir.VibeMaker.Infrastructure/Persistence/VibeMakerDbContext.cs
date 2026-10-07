@@ -36,6 +36,10 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<OneDriveConnection> OneDriveConnections => Set<OneDriveConnection>();
 
+    public DbSet<OneDriveSyncScope> OneDriveSyncScopes => Set<OneDriveSyncScope>();
+
+    public DbSet<OneDriveSyncItem> OneDriveSyncItems => Set<OneDriveSyncItem>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -197,6 +201,34 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             connection.Property(c => c.ProtectedRefreshToken).IsRequired();
             connection.Property(c => c.Status).HasConversion<UpperSnakeCaseEnumConverter<OneDriveConnectionStatus>>().HasMaxLength(30);
             connection.Property(c => c.LastError).HasMaxLength(OneDriveConnection.ErrorMaxLength);
+        });
+
+        modelBuilder.Entity<OneDriveSyncScope>(scope =>
+        {
+            // ADR-0013 §4：一個工作目錄（專案或未分組對話）一筆；upload_pending 是持久化的同步工作佇列。
+            scope.ToTable("onedrive_sync_scopes");
+            scope.HasKey(s => s.ScopeId);
+            scope.Property(s => s.ScopeId).ValueGeneratedNever();
+            scope.Property(s => s.DriveId).HasMaxLength(OneDriveConnection.DriveIdMaxLength).IsRequired();
+            scope.Property(s => s.RootItemId).HasMaxLength(OneDriveConnection.ItemIdMaxLength).IsRequired();
+            scope.Property(s => s.FolderItemId).HasMaxLength(OneDriveConnection.ItemIdMaxLength).IsRequired();
+            scope.Property(s => s.FolderPath).HasMaxLength(OneDriveSyncScope.FolderNameMaxLength).IsRequired();
+            scope.Property(s => s.State).HasConversion<UpperSnakeCaseEnumConverter<OneDriveSyncState>>().HasMaxLength(30);
+            scope.Property(s => s.LastError).HasMaxLength(OneDriveConnection.ErrorMaxLength);
+            scope.HasIndex(s => s.UserId);
+            scope.HasIndex(s => new { s.UploadPending, s.NextAttemptAt });
+        });
+
+        modelBuilder.Entity<OneDriveSyncItem>(item =>
+        {
+            item.ToTable("onedrive_sync_items");
+            item.HasKey(i => i.Id);
+            item.Property(i => i.Id).ValueGeneratedNever();
+            item.Property(i => i.Path).HasMaxLength(OneDriveSyncItem.PathMaxLength).IsRequired();
+            item.Property(i => i.ItemId).HasMaxLength(OneDriveConnection.ItemIdMaxLength).IsRequired();
+            item.Property(i => i.ETag).HasMaxLength(OneDriveConnection.ItemIdMaxLength);
+            item.HasIndex(i => i.ScopeId);
+            item.HasOne<OneDriveSyncScope>().WithMany().HasForeignKey(i => i.ScopeId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.ApplySnakeCaseNames();

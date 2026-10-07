@@ -30,6 +30,8 @@ public sealed class OneDriveApiFactory : ApiFactory
         builder.UseSetting("Ymir:Auth:Oidc:ClientId", OidcApiFactory.ClientId);
         builder.UseSetting("Ymir:Auth:Oidc:ClientSecret", OidcApiFactory.ClientSecret);
         builder.UseSetting("Ymir:Connectors:OneDrive:GraphBaseUrl", Oidc.GraphBaseUrl);
+        // 排入工作時會立即喚醒 worker；縮短輪詢只是讓「使用者執行中先略過」的工作更快被處理。
+        builder.UseSetting("Ymir:Connectors:OneDrive:PollInterval", "00:00:00.500");
     }
 
     /// <summary>以 Fake OIDC 登入企業帳號（同 <see cref="OidcApiFactory.LoginWithOidcAsync"/>）。</summary>

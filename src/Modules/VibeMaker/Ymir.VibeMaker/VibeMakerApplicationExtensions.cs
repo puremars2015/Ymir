@@ -33,6 +33,8 @@ public static class VibeMakerApplicationExtensions
         services.AddSingleton<UserExecutionLocks>();
         services.AddScoped<Application.Connectors.OneDrive.OneDriveConnectionService>();
         services.AddSingleton<Application.Connectors.OneDrive.OneDriveAccessTokenCache>();
+        services.AddScoped<Application.Connectors.OneDrive.OneDriveSyncService>();
+        services.AddSingleton<Application.Connectors.OneDrive.OneDriveSyncSignal>();
         services.AddSingleton<VibeMakerTelemetry>();
         services.AddSingleton<RuntimeCredentialService>();
         services.AddSingleton<ModelBudgetGuard>();

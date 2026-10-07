@@ -1,7 +1,7 @@
 # OneDrive Workspace 後續計畫
 
 - 記錄日期：2026-10-06
-- 狀態：**實作中**（2026-10-07 使用者要求插單；決策見 [ADR-0013](../adr/0013-onedrive-connector.md)，進度見 Sprint 6 看板 O0～O2）
+- 狀態：**首版完成**（2026-10-07 使用者要求插單；決策見 [ADR-0013](../adr/0013-onedrive-connector.md)，進度見 Sprint 6 看板 O0～O2；操作指南 [docs/guides/onedrive.md](../guides/onedrive.md)）
 - 使用者指示：日後透過 Microsoft Graph 串接每位使用者自己的 OneDrive；目前先不要修改程式。
 
 ## 目標與架構方向

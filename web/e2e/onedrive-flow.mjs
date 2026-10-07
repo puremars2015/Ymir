@@ -1,4 +1,5 @@
-// OneDrive connector 的端對端驗證（ADR-0013）：管理員開放 → 使用者在個人設定連結（經 Fake OIDC 授權）→ 設定同步資料夾 → 解除連結。
+// OneDrive connector 的端對端驗證（ADR-0013）：管理員開放 → 使用者在個人設定連結（經 Fake OIDC 授權）→ 設定同步資料夾
+// → 送訊息後檔案面板顯示「已同步到 OneDrive」、Fake Graph 建立對話資料夾 → 解除連結。
 // 前置：SQL Server、Fake OIDC（dotnet run --project tests/Ymir.Testing.FakeOidc，含 Fake Graph）；
 //       API 設定 Ymir__Auth__Oidc__Authority=http://127.0.0.1:5299/00000000-0000-0000-0000-00000000f00d/v2.0、
 //       Ymir__Auth__Oidc__ClientId=ymir-dev、Ymir__Auth__Oidc__ClientSecret=ymir-dev-secret、
@@ -61,7 +62,23 @@ await onedrive.locator('text=已連結，同步到 /Ymir/E2E').waitFor();
 await user.screenshot({ path: `${outDir}/03-connected.png`, fullPage: true });
 step("sync folder created in the user's OneDrive");
 
-// 4. 解除連結
+// 4. 對話執行後自動同步：檔案面板顯示雲端保存狀態，與任務結果分開
+await user.goto(`${baseUrl}/`);
+await user.waitForSelector('app-new-chat-page h1');
+await user.fill('app-composer textarea', '幫我整理會議紀錄');
+await user.press('app-composer textarea', 'Enter');
+await user.locator('.turn.assistant').waitFor({ timeout: 30000 });
+await user.click('button.files-toggle');
+const cloud = user.locator('app-onedrive-sync .cloud');
+await cloud.locator('text=已同步到 OneDrive').waitFor({ timeout: 30000 });
+await cloud.locator('text=OneDrive：/Ymir/E2E/chats/').waitFor();
+await user.screenshot({ path: `${outDir}/04-synced.png`, fullPage: true });
+await cloud.locator('button:has-text("立即同步")').click();
+await cloud.locator('text=已同步到 OneDrive').waitFor({ timeout: 30000 });
+step('conversation synced to OneDrive after the run; manual sync works');
+
+// 5. 解除連結
+await user.goto(`${baseUrl}/settings`);
 user.once('dialog', (d) => d.accept());
 await onedrive.locator('button:has-text("解除連結")').click();
 await onedrive.locator('text=尚未連結').waitFor();

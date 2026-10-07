@@ -42,6 +42,8 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["GET /api/conversations/{conversationId:guid}/files/"] = r => Get($"/api/conversations/{r.ConversationId}/files"),
         ["GET /api/conversations/{conversationId:guid}/files/download"] = r => Get($"/api/conversations/{r.ConversationId}/files/download?path=hello.txt"),
         ["GET /api/conversations/{conversationId:guid}/files/archive"] = r => Get($"/api/conversations/{r.ConversationId}/files/archive"),
+        ["GET /api/conversations/{conversationId:guid}/onedrive/"] = r => Get($"/api/conversations/{r.ConversationId}/onedrive"),
+        ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/onedrive/sync"),
         ["POST /api/conversations/{conversationId:guid}/attachments"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/attachments?fileName=intrusion.txt")
         {
             Content = new ByteArrayContent("intrusion"u8.ToArray()),
@@ -58,6 +60,15 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         },
         ["GET /api/executions/{executionId:guid}/events"] = r => Get($"/api/executions/{r.ExecutionId}/events"),
         ["POST /api/executions/{executionId:guid}/cancel"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/executions/{r.ExecutionId}/cancel"),
+    };
+
+    /// <summary>
+    /// 擁有者呼叫時預期的非成功狀態：通過擁有者檢查之後才會得到的業務錯誤（例如沒有連結 OneDrive 時同步回 409），
+    /// 與別人呼叫時的 404 不同，仍能證明請求本身正確。
+    /// </summary>
+    private static readonly Dictionary<string, HttpStatusCode> OwnerStatusOverrides = new()
+    {
+        ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = HttpStatusCode.Conflict,
     };
 
     /// <summary>
@@ -227,7 +238,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
 
             using var ownerRequest = createRequest(resources);
             using var ownerResponse = await owner.SendAsync(ownerRequest, ct);
-            if (!ownerResponse.IsSuccessStatusCode)
+            if (!ownerResponse.IsSuccessStatusCode && OwnerStatusOverrides.GetValueOrDefault(endpoint) != ownerResponse.StatusCode)
             {
                 failures.Add($"{endpoint} (owner) → {(int)ownerResponse.StatusCode}");
             }

@@ -53,6 +53,7 @@ export type MyExtensions = Schemas['MyExtensionsResponse'];
 export type RestrictedNetworkSupport = Schemas['RestrictedNetworkSupport'];
 export type OneDriveStatus = Schemas['OneDriveStatusResponse'];
 export type OneDriveLinkState = Schemas['OneDriveLinkState'];
+export type ConversationOneDrive = Schemas['ConversationOneDriveResponse'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

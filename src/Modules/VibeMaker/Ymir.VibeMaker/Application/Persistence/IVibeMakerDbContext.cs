@@ -36,6 +36,10 @@ public interface IVibeMakerDbContext
 
     DbSet<OneDriveConnection> OneDriveConnections { get; }
 
+    DbSet<OneDriveSyncScope> OneDriveSyncScopes { get; }
+
+    DbSet<OneDriveSyncItem> OneDriveSyncItems { get; }
+
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity)
         where TEntity : class;
 
