@@ -39,6 +39,7 @@ if (command is not null)
 
 // 經由 Cloudflare Tunnel 對外時必須最先執行，後面才會看到正確的 scheme 與用戶端 IP（ADR-0006）。
 app.UsePublicEdge();
+app.UseSecurityHeaders();
 
 if (app.Environment.IsDevelopment())
 {
