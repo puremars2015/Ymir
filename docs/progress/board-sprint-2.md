@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-07 09:41 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-07 10:20 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -51,6 +51,8 @@
 | 對話體驗（Sprint 3）：改名 / 刪除（封存）、執行中重新整理可接回串流、檔案預覽、複製回覆 | ✅ | 見 [#029](#029--對話體驗改名刪除接回執行中的串流檔案預覽) |
 | Runtime 生命週期（Sprint 4）：閒置自動停止、啟動時對帳、每人配額、執行政策可在管理介面修改、用量頁（ADR-0011） | ✅ | 見 [#030](#030--runtime-生命週期閒置停止對帳配額與用量)；正式 Podman / runtime host 上的閒置停止**待使用者環境確認** |
 | LiteLLM 用量與每人每月預算（費用、token、預算由 LiteLLM 強制） | ✅ | 見 [#031](#031--接上-litellm模型用量與每人每月預算)；真正的 LiteLLM 回應格式**未驗證、待使用者環境確認**（步驟見 deploy/litellm/README.md） |
+| Sprint 5 驗收計畫（交給 Codex 執行） | 📝 | 計畫見 [sprint5-acceptance-plan.md](../planning/sprint5-acceptance-plan.md)，見 [#033](#033--sprint-5驗收計畫交給-codex與強化提案) |
+| Sprint 5 強化（Claude） | ⏳ | 提案見 [#033](#033--sprint-5驗收計畫交給-codex與強化提案)，**待使用者確認範圍** |
 | 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
@@ -59,6 +61,34 @@
 ---
 
 ## 💬 留言區
+
+### #033 · Sprint 5：驗收計畫（交給 Codex）與強化提案
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 10:20 · `📝規劃`
+
+- **背景**：使用者決定「驗收」只寫計畫，交給 Codex 執行；「強化」由 Claude 提案。
+- **驗收計畫**：[docs/planning/sprint5-acceptance-plan.md](../planning/sprint5-acceptance-plan.md)
+  - 範圍是 SA §21 的 12 項條件，加上開發規劃新增的 13～16 項，每項都列出現有涵蓋、要補的測試與驗證方式；
+  - 產出三樣：`e2e:acceptance`、`tests/Ymir.IntegrationTests/Acceptance/`、驗收報告；
+  - Podman 相關項目（AC-06 / 07 / 08 / 14 / 16）在 GitHub Actions 的 Ubuntu runner 跑；
+  - 規則：只補測試、不改產品行為；遇到缺口就標 `Skip` 並在看板回報。
+- **盤點時發現的缺口**（由強化處理）：
+  - **AC-12**：runtime 的建立 / 啟動（`EnsureRuntime`）沒有寫稽核，SA §12 要求 runtime create / start / stop / delete 都要記錄。
+  - **SA §18 監控指標**：`ServiceDefaults` 已訂閱 `Ymir.*` meter，但程式裡沒有任何 meter。缺少的指標：active / busy runtimes、execution duration、execution failures、runtime start failures。
+  - **log 追蹤**：execution 的 log 沒有 `execution_id` scope，從錯誤追到同一次執行的所有 log 不方便（AC-10）。
+- **強化提案**（待使用者確認）：
+  1. 稽核補齊 runtime lifecycle（AC-12）；
+  2. SA §18 監控指標 + log scope（AC-10）；
+  3. HTTP 安全標頭：CSP、frame-ancestors、Referrer-Policy、Permissions-Policy；
+  4. 一般 API 的 rate limit 與每人 SSE 連線數上限；
+  5. CI 安全掃描：NuGet / npm 弱點、container image（Trivy）、secret 掃描；
+  6. 健康檢查：readiness 包含 DB、runtime host、LiteLLM，管理總覽顯示服務狀態；
+  7. 資料保存：稽核紀錄保存期限與清理、備份指南；
+  8. Agent container 的對外網路限制（開發規劃 §8 尚未決定，需要新 ADR）；
+  9. 小規模壓測（例如 20 位同時使用者），找出 SSE 與 runtime 的上限。
+- **驗證**：只有文件，沒有程式變更。
+
+---
 
 ### #032 · 前端網站託管、發布與分享後續計畫
 
