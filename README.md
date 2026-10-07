@@ -91,6 +91,8 @@ API 採 BFF + HttpOnly Cookie，可支援 Entra ID OIDC 與本機帳號。前端
 5. 執行事件先寫入 SQL Server，再發布；瀏覽器透過 SSE 接收輸出、工具事件及最終狀態。
 6. 成功執行後，後端只登記本次 `deliverables/{executionId}/` 中的交付成果，保存於 `vibemaker.execution_artifacts`；回覆下載卡片使用此紀錄，不以工作目錄的檔案變化推測成果。
 
+對話區執行工具或終端機時只顯示一行「正在工作中......」，不呈現工具名稱、指令、摘要或個別工具結果。一般回覆照常串流；工作提示在工具結束或執行終止後清除。後端事件保存與稽核流程維持原樣。
+
 同一位使用者的對話共用一個 Agent 容器，專案與獨立對話各有工作目錄。Agent 容器不持有模型供應商金鑰、LiteLLM master key 或 Ymir 資料庫連線字串。
 
 ### 資料與檔案存放

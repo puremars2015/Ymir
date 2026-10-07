@@ -223,26 +223,6 @@
   }
 }
 
-.tool {
-  font-size: 0.8125rem;
-  padding: 0.375rem 0.625rem;
-  border-radius: 8px;
-  background: var(--surface-muted);
-  align-self: flex-start;
-
-  .tool-name {
-    font-weight: 600;
-  }
-
-  &[data-state='running'] .tool-name::after {
-    content: ' …';
-  }
-
-  &[data-state='failed'] .tool-name {
-    color: var(--danger);
-  }
-}
-
 .composer-area {
   flex-shrink: 0;
   width: 100%;
