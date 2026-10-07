@@ -102,18 +102,19 @@ import { ModelOption } from '../core/api/api-types';
           </div>
           <fieldset class="thinking" [disabled]="!model.supportsThinking">
             <legend>思考深度</legend>
-            <div class="depth-options">
-              @for (level of levels; track level.value) {
-                <label [class.selected]="effectiveDepth() === level.value">
-                  <input
-                    type="radio"
-                    [name]="listId + '-depth'"
-                    [value]="level.value ?? ''"
-                    [checked]="effectiveDepth() === level.value"
-                    (change)="depthChanged.emit(level.value)"
-                  />
-                  <span>{{ level.label }}</span>
-                </label>
+            <div class="depth-options" role="radiogroup" aria-label="思考深度">
+              @for (level of levels; track level.value; let index = $index) {
+                <button
+                  type="button"
+                  role="radio"
+                  [attr.aria-checked]="effectiveDepth() === level.value"
+                  [attr.tabindex]="effectiveDepth() === level.value ? 0 : -1"
+                  [class.selected]="effectiveDepth() === level.value"
+                  (click)="depthChanged.emit(level.value)"
+                  (keydown)="onDepthKey($event, index)"
+                >
+                  {{ level.label }}
+                </button>
               }
             </div>
           </fieldset>
@@ -235,6 +236,33 @@ export class ModelPicker {
   protected close(restoreFocus = false): void {
     this.open.set(false);
     if (restoreFocus) this.host.nativeElement.querySelector<HTMLButtonElement>('.picker')?.focus();
+  }
+
+  protected onDepthKey(event: KeyboardEvent, index: number): void {
+    let next: number;
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        next = (index + 1) % this.levels.length;
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        next = (index + this.levels.length - 1) % this.levels.length;
+        break;
+      case 'Home':
+        next = 0;
+        break;
+      case 'End':
+        next = this.levels.length - 1;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    this.depthChanged.emit(this.levels[next].value);
+    const buttons =
+      this.host.nativeElement.querySelectorAll<HTMLButtonElement>('.depth-options button');
+    buttons[next]?.focus();
   }
 
   protected onOutside(event: Event): void {

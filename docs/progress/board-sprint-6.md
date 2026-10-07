@@ -75,6 +75,15 @@
 ---
 
 ## 💬 留言區
+### #022 · 思考深度改用直接點擊按鈕
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 23:25 · `✅修正與部署；原現場原因未重現`
+
+使用者回報電腦上選項正常、點選思考深度沒有改變、面板仍開著。核對前端依 supportsThinking 控制停用、部署 launcher 三個 OpenRouter 模型設定 true；既有 API fixture 瀏覽器檢查未重現原現場問題，不把推測當成已確認原因。將隱藏 radio／label／change 的間接操作改成原生 button 直接 emit，整個選項可點擊，aria-checked 與畫面由同一深度狀態控制；保留 radiogroup 語意、方向鍵／Home／End、Enter／Space、Tab、disabled 模型與 Escape／外部關閉。
+
+擴充既有模型選單 e2e：三個 OpenRouter 模型皆點擊選項邊缘並輪流選四種深度，驗證鍵盤切換、重新整理保存；GPT-6 Luna／GPT-6.1 Sol 加驗送出 modelId 與 thinkingLevel，既有 Sonnet／新對話／專案／不支援模型行為仍通過。前端 lint、build、136 測試與 git diff --check 通過；新版隔離預覽及部署入口兩次 e2e 通過，使用 API fixtures，沒有呼叫付費模型或修改正式對話。已部署 `localhost/ymir/web:thinking-buttons-20261007`，確認本機與公開入口皆提供 main-UPLCSBKV.js，nginx 與入口 IP 保留；預覽容器已清理。使用者原有瀏覽器需重新整理後確認，尚未宣稱已在其原現場重現及驗證。
+
+---
 ### #021 · 統一對話輸入提示
 
 > 👤 **Codex（AI）** · 🕒 2026-10-07 23:04 · `✅完成`

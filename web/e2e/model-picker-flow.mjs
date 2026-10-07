@@ -142,10 +142,26 @@ try {
   assert.equal(await sonnet.getByRole('img').count(), 2);
   await sonnet.click();
   await selected('Claude Sonnet 5.5');
-  await page.getByRole('radio', { name: '深入', exact: true }).locator('..').click();
+  await page.getByRole('radio', { name: '深入', exact: true }).click();
   await page.waitForFunction(() =>
     document.querySelector('app-model-picker .depth-summary')?.textContent.includes('深入'),
   );
+  for (const modelName of ['GPT-6 Luna', 'GPT-6.1 Sol', 'Claude Sonnet 5.5']) {
+    await page.getByRole('option', { name: modelName, exact: true }).click();
+    await selected(modelName);
+    for (const depthName of ['輕量', '標準', '深入', '自動']) {
+      await page
+        .getByRole('radio', { name: depthName, exact: true })
+        .click({ position: { x: 8, y: 8 } });
+      await page.waitForFunction(
+        (label) =>
+          document.querySelector('app-model-picker .depth-summary')?.textContent.includes(label),
+        depthName,
+        { timeout: 3000 },
+      );
+    }
+  }
+  await page.getByRole('radio', { name: '深入', exact: true }).click();
   await page.screenshot({ path: `${outDir}/desktop-model-settings.png` });
   await page.keyboard.press('Escape');
   await panel.waitFor({ state: 'detached' });
@@ -164,7 +180,15 @@ try {
   await selected('GPT-6 Luna');
   assert.equal(await panel.count(), 1);
   await page.keyboard.press('Tab');
-  await page.waitForFunction(() => document.activeElement?.getAttribute('type') === 'radio');
+  await page.waitForFunction(() => document.activeElement?.getAttribute('role') === 'radio');
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForFunction(() =>
+    document.querySelector('app-model-picker .depth-summary')?.textContent.includes('標準'),
+  );
+  assert.equal(
+    await page.getByRole('radio', { name: '標準', exact: true }).getAttribute('aria-checked'),
+    'true',
+  );
   await page.keyboard.press('Escape');
   await picker.click();
   await page.getByRole('textbox', { name: '訊息', exact: true }).click();
@@ -177,7 +201,7 @@ try {
   await picker.click();
   await sonnet.click();
   await selected('Claude Sonnet 5.5');
-  await page.getByRole('radio', { name: '標準', exact: true }).locator('..').click();
+  await page.getByRole('radio', { name: '標準', exact: true }).click();
   await page.keyboard.press('Escape');
   const chatResponse = page.waitForResponse(
     (r) => r.url().endsWith('/messages') && r.request().method() === 'POST',
@@ -188,11 +212,31 @@ try {
   assert.equal(submissions.at(-1).thinkingLevel, 'medium');
   assert.equal(submissions.at(-1).modelId, 'openrouter-sonnet-5.5');
 
+  for (const [modelName, modelId] of [
+    ['GPT-6 Luna', 'openrouter-gpt-6-luna'],
+    ['GPT-6.1 Sol', 'openrouter-gpt-6.1-sol'],
+  ]) {
+    await picker.click();
+    await page.getByRole('option', { name: modelName, exact: true }).click();
+    await page
+      .getByRole('radio', { name: '深入', exact: true })
+      .click({ position: { x: 8, y: 8 } });
+    await page.keyboard.press('Escape');
+    const response = page.waitForResponse(
+      (r) => r.url().endsWith('/messages') && r.request().method() === 'POST',
+    );
+    await page.getByRole('textbox', { name: '訊息', exact: true }).fill('驗證模型思考深度');
+    await page.getByRole('textbox', { name: '訊息', exact: true }).press('Enter');
+    await response;
+    assert.equal(submissions.at(-1).thinkingLevel, 'high');
+    assert.equal(submissions.at(-1).modelId, modelId);
+  }
+
   for (const target of ['', `/projects/${projectId}`]) {
     await page.goto(baseUrl + target);
     await picker.click();
     await sonnet.click();
-    await page.getByRole('radio', { name: '輕量', exact: true }).locator('..').click();
+    await page.getByRole('radio', { name: '輕量', exact: true }).click();
     await page.keyboard.press('Escape');
     const response = page.waitForResponse(
       (r) => r.url().endsWith('/messages') && r.request().method() === 'POST',
@@ -223,7 +267,7 @@ try {
   await picker.click();
   await sonnet.click();
   await selected('Claude Sonnet 5.5');
-  await page.getByRole('radio', { name: '深入', exact: true }).locator('..').click();
+  await page.getByRole('radio', { name: '深入', exact: true }).click();
   let box = await panel.boundingBox();
   let anchor = await picker.boundingBox();
   assert.ok(box.x >= 0 && box.x + box.width <= 390);
