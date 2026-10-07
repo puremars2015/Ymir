@@ -34,6 +34,7 @@ public static class VibeMakerInfrastructureExtensions
         services.AddSingleton<IExecutionEventBus, InMemoryExecutionEventBus>();
         services.AddSingleton<IExecutionCancellationRegistry, ExecutionCancellationRegistry>();
         services.AddSingleton<Application.Files.IWorkspaceFileReader, Files.RuntimeWorkspaceFileReader>();
+        services.AddSingleton<Application.Extensions.IExtensionInventory, PiAgent.PiExtensionInventory>();
         services.AddHostedService<ExecutionWorker>();
         services.AddHostedService<RuntimeLifecycleWorker>();
         services.AddHttpClient(nameof(Health.LiteLlmHealthCheck));

@@ -7,6 +7,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Ymir.VibeMaker.Application.Agents;
+using Ymir.VibeMaker.Application.Extensions;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
@@ -57,6 +58,8 @@ internal sealed class PiAgentHarness(
                 "--session-dir", PiRuntimeLayout.SessionDirectory,
                 "--session-id", request.SessionId.ToString("D"),
                 .. request.SystemPrompts.SelectMany((_, i) => new[] { "--append-system-prompt", SystemPromptPath(request.ExecutionId, i) }),
+                // 擴充能力由政策決定（ADR-0012 A.3），Agent 無法改變參數。
+                .. PiExtensionConfig.BuildArguments(request.Extensions ?? EffectiveExtensions.None),
             ],
             new Dictionary<string, string>
             {
@@ -79,6 +82,7 @@ internal sealed class PiAgentHarness(
         try
         {
             await EnsureConfigProvisionedAsync(request.RuntimeId, cancellationToken).ConfigureAwait(false);
+            await WriteExtensionConfigAsync(request, cancellationToken).ConfigureAwait(false);
             await WriteSystemPromptsAsync(request, cancellationToken).ConfigureAwait(false);
 
             // 使用者的 LiteLLM virtual key（ADR-0004），由 ExecutionRunner 經 IModelGateway 取得；只以環境變數名稱傳入 runtime。
@@ -191,6 +195,91 @@ internal sealed class PiAgentHarness(
                     throw new InvalidOperationException($"Writing system prompt failed with exit code {exitCode}: {writerProcess.GetStandardErrorTail()}");
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// 每次執行前重寫 Pi 的 <c>settings.json</c>、<c>trust.json</c>、<c>mcp.json</c> 與平台 skill（ADR-0012 A.3、B.3）。
+    /// Agent 在上一次執行改寫這些檔也不會延續；Pi 只在 session 啟動時讀取，執行中被改寫不影響這一次。
+    /// </summary>
+    private async Task WriteExtensionConfigAsync(AgentRunRequest request, CancellationToken cancellationToken)
+    {
+        var extensions = request.Extensions ?? EffectiveExtensions.None;
+        var userMcp = await ReadUserMcpConfigAsync(request.RuntimeId, cancellationToken).ConfigureAwait(false);
+        var mcpJson = PiExtensionConfig.BuildMcpConfig(userMcp, extensions.Mcp, out var invalid);
+        if (invalid)
+        {
+            logger.LogWarning("Ignoring invalid {File} for execution {ExecutionId}", PiRuntimeLayout.UserMcpFileName, request.ExecutionId);
+        }
+
+        List<(string Path, string Content)> files =
+        [
+            (PiRuntimeLayout.SettingsPath, PiExtensionConfig.SettingsJson),
+            (PiRuntimeLayout.TrustPath, PiExtensionConfig.TrustJson),
+            (PiRuntimeLayout.McpConfigPath, mcpJson),
+        ];
+        if (extensions.Skills || extensions.Mcp)
+        {
+            files.Add(($"{PiRuntimeLayout.ExtensionBuilderSkillDirectory}/SKILL.md", PiExtensionConfig.BuildExtensionBuilderSkill(extensions)));
+        }
+
+        // 以 runtime 內的 node（Pi 本身需要）一次寫入多個檔案。路徑只來自上面的常數、以參數傳入（Local runtime 會換成 host 路徑）；
+        // 內容經 stdin，不經程序參數（使用者的 MCP 設定可能含有憑證）。先寫暫存檔再 rename，Agent 預先放的 symlink 會被取代而不是被跟隨。
+        var spec = new RuntimeProcessSpec("node", ["-e", WriteFilesScript, .. files.Select(f => f.Path)]);
+        var writer = await runtimeManager.StartProcessAsync(request.RuntimeId, spec, cancellationToken).ConfigureAwait(false);
+        await using (writer.ConfigureAwait(false))
+        {
+            await writer.StandardInput.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(files.Select(f => f.Content).ToList(), s_jsonOptions), cancellationToken)
+                .ConfigureAwait(false);
+            writer.CloseStandardInput();
+            var exitCode = await writer.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            if (exitCode != 0)
+            {
+                throw new InvalidOperationException($"Writing Pi extension config failed with exit code {exitCode}: {writer.GetStandardErrorTail()}");
+            }
+        }
+    }
+
+    private const string WriteFilesScript =
+        "const fs=require('fs'),path=require('path');let d='';process.stdin.setEncoding('utf8');" +
+        "process.stdin.on('data',c=>d+=c).on('end',()=>{const c=JSON.parse(d),p=process.argv.slice(1);" +
+        "if(c.length!==p.length)process.exit(2);p.forEach((f,i)=>{fs.mkdirSync(path.dirname(f),{recursive:true});" +
+        "const t=f+'.ymir-tmp';fs.writeFileSync(t,c[i]);fs.renameSync(t,f);});});";
+
+    /// <summary>
+    /// 讀取使用者自建的 MCP 設定。第一次執行時，把 Ymir 管理之前 Agent 寫的 <c>mcp.json</c> 複製成 <c>mcp.user.json</c>，
+    /// 之後 <c>mcp.json</c> 由 Ymir 產生（標記檔避免把產生的檔案又複製回去）。
+    /// </summary>
+    private async Task<string?> ReadUserMcpConfigAsync(Guid runtimeId, CancellationToken cancellationToken)
+    {
+        const string script =
+            "cd \"$1\" 2>/dev/null || exit 0\n" +
+            "if [ ! -e \"$2\" ] && [ -f mcp.json ] && [ ! -e .ymir-mcp-migrated ]; then cp mcp.json \"$2\"; fi\n" +
+            ": > .ymir-mcp-migrated\n" +
+            "if [ -f \"$2\" ]; then head -c \"$3\" \"$2\"; fi\n" +
+            "exit 0\n";
+        var spec = new RuntimeProcessSpec(
+            "sh",
+            ["-c", script, "ymir-read-mcp", PiRuntimeLayout.AgentDirectory, PiRuntimeLayout.UserMcpFileName, (PiExtensionConfig.MaxUserMcpBytes + 1).ToString(System.Globalization.CultureInfo.InvariantCulture)]);
+        var reader = await runtimeManager.StartProcessAsync(runtimeId, spec, cancellationToken).ConfigureAwait(false);
+        await using (reader.ConfigureAwait(false))
+        {
+            reader.CloseStandardInput();
+            using var buffer = new MemoryStream();
+            await reader.StandardOutput.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+            var exitCode = await reader.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            if (exitCode != 0)
+            {
+                throw new InvalidOperationException($"Reading user MCP config failed with exit code {exitCode}: {reader.GetStandardErrorTail()}");
+            }
+
+            if (buffer.Length == 0)
+            {
+                return null;
+            }
+
+            // 超過上限時不解析，回傳無效內容讓呼叫端記錄並忽略。
+            return buffer.Length > PiExtensionConfig.MaxUserMcpBytes ? "<too large>" : Encoding.UTF8.GetString(buffer.ToArray());
         }
     }
 

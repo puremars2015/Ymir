@@ -110,6 +110,16 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         },
         ["DELETE /api/admin/settings/runtime"] = () => new HttpRequestMessage(HttpMethod.Delete, "/api/admin/settings/runtime"),
         ["GET /api/admin/usage"] = () => Get("/api/admin/usage?days=7"),
+        ["GET /api/admin/settings/extensions"] = () => Get("/api/admin/settings/extensions"),
+        ["PUT /api/admin/settings/extensions"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/extensions")
+        {
+            Content = JsonContent.Create(new SaveExtensionPolicyRequest(true, true)),
+        },
+        ["GET /api/admin/users/{userId:guid}/extensions"] = () => Get($"/api/admin/users/{Guid.NewGuid()}/extensions"),
+        ["PUT /api/admin/users/{userId:guid}/extensions"] = () => new HttpRequestMessage(HttpMethod.Put, $"/api/admin/users/{Guid.NewGuid()}/extensions")
+        {
+            Content = JsonContent.Create(new SaveUserExtensionsRequest(ExtensionGrantSetting.Allow, ExtensionGrantSetting.Allow)),
+        },
         ["POST /api/admin/settings/oidc/test"] = () => new HttpRequestMessage(HttpMethod.Post, "/api/admin/settings/oidc/test")
         {
             Content = JsonContent.Create(new TestOidcSettingsRequest(Guid.NewGuid().ToString())),
@@ -133,6 +143,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "GET /api/make-topics",
         "GET /api/me/settings/",
         "PUT /api/me/settings/",
+        "GET /api/extensions",
     ];
 
     private sealed record OwnedResources(Guid ProjectId, Guid ConversationId, Guid ExecutionId);

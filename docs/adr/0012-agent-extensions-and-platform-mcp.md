@@ -47,7 +47,7 @@
 2. **政策儲存與生效方式比照 ADR-0010 / ADR-0011**：
    - 全域預設存在 `platform.system_settings` 的 `vibemaker.extension_policy`（明文 JSON，不含機密），資料庫優先、不必重啟，快取 30 秒。
    - **每位成員可覆寫**：`vibemaker.user_extension_grants`（`user_id`、`capability`、`effect = Allow | Deny`），沒有紀錄就繼承全域預設。跨模組只存 user id，不建 FK（ADR-0001）。
-   - 管理員的任何變更都寫稽核（`extension_policy.update`、`extension_grant.set`），actor 為管理員。
+   - 管理員的任何變更都寫稽核（`admin.settings.extensions.update`、`admin.user.extensions.update`，與既有的管理稽核命名一致），actor 為管理員。
 3. **管制必須在伺服器端、啟動 Agent 的當下強制執行，不靠 Agent 自律或前端隱藏。**
    - `PiAgentHarness` 每次執行前由 `IExtensionPolicy.ResolveAsync(userId)` 取得有效能力，據此組合 Pi 參數（A0 spike 實測，見文末「Spike 結果」）：
      - **一律**加 `--no-extensions`（`-ne`），只以 `-e` 明列 Ymir 允許的內建擴充；否則 Agent 寫進 `/agent-state/pi-agent/extensions/` 的 TypeScript 會被 Pi 載入執行（實測現況就是如此）。
@@ -58,7 +58,7 @@
 4. **放在哪裡**：
    - 使用者自建的 skill 與 MCP 設定放在使用者既有的 `/agent-state/pi-agent`（使用者層），不新增 host 路徑、不新增 mount；仍然只有該使用者的 container 看得到（ADR-0007）。
    - 「專案層」擴充（`.pi/skills`、`.pi/mcp.json`、`.pi/extensions`）第一階段**不啟用**：Pi 只在專案受信任時載入，預設不信任；但信任紀錄存在 Agent 可寫的 `trust.json`，因此由 Ymir 每次執行前重寫 `trust.json` / `settings.json` 確保不信任（見 A.3）。之後要開再另議。
-5. **讓 Agent 知道怎麼做**：能力啟用時，Ymir 在執行時以 `--skill` 載入一個由平台維護、唯讀的 skill（`ymir-extension-builder`），說明正確的目錄位置、命名規則與限制（例如不得要求使用者貼憑證）。能力關閉時不載入，Agent 就會回答「目前沒有這個權限，請洽管理員」。
+5. **讓 Agent 知道怎麼做**：能力啟用時，Ymir 在執行時以 `--skill` 載入一個由平台維護的 skill（`ymir-extension-builder`，內容依開放的能力產生，每次執行前重寫到 `/agent-state/ymir/skills/`，不在 Pi 的掃描路徑內，Agent 改寫也不會延續），說明正確的目錄位置、命名規則與限制（例如不得要求使用者貼憑證）。能力關閉時不載入，Agent 就會回答「目前沒有這個權限，請洽管理員」。
 6. **可見與可控**：
    - 新增唯讀端點讓使用者看到自己有哪些擴充與目前是否允許（經 `IWorkspaceFileReader` 同樣的 runtime 內掃描，不接受任何路徑參數）。
    - 管理員在使用者頁可看到每人的有效能力。第一階段不提供管理員檢視使用者擴充內容（隱私與範圍另議）。
@@ -106,8 +106,8 @@
 ### C. API 與管理介面（概要，細節在實作時定稿並更新 OpenAPI）
 
 - 管理員（`AdminPolicy`，加入授權矩陣 `AdminOnlyRequests`）：
-  - `GET / PUT /api/admin/extension-policy`
-  - `GET / PUT /api/admin/users/{id}/extension-grants`
+  - `GET / PUT /api/admin/settings/extensions`（全域預設）
+  - `GET / PUT /api/admin/users/{id}/extensions`（每人覆寫：`Inherit` / `Allow` / `Deny`）
   - `GET /api/admin/mcp-servers`、`PUT /api/admin/mcp-servers/{name}/access`（只能改啟用與對象）
 - 成員（登入即可，只回自己的資料，不接受任何 user id 或路徑）：
   - `GET /api/extensions`：我的有效能力、我的自建擴充清單、我可用的平台 MCP 摘要
@@ -125,10 +125,10 @@
 
 ## 影響
 
-- 新增 `IExtensionPolicy`（Application 層）與 `PiAgentHarness` 的參數組合邏輯；`PiAgentHarnessTests` 與 `PiProcessSpecTests` 需覆蓋各種能力組合。
+- 新增 `IExtensionPolicy`（Application 層）與 `PiAgentHarness` 的參數組合邏輯；`PiExtensionConfigTests`、`PiProcessSpecTests` 與整合測試 `ExtensionPolicyTests`（真實 Pi）覆蓋各種能力組合。
 - 新增 `vibemaker.user_extension_grants` 資料表與 migration；`vibemaker.extension_policy` 沿用 `system_settings`。
 - 新增 gateway 元件與部署文件（`deploy/mcp/`）；它與 runtime host、API 一樣屬於平台，**不得**掛載 container runtime socket 或使用者 workspace。
-- 平台 skill（`ymir-extension-builder`）放在 Agent runtime image 內的唯讀路徑（image 本身 `--read-only`），不需要新增 mount；平台 MCP 設定以每次執行重新產生的方式注入，也不需要新增 mount。若之後仍需新增 mount，必須同步更新 `ContainerCommandBuilderTests`（Podman 與 Docker 兩種 engine），且不得掛載 host 敏感路徑。
+- 平台 skill（`ymir-extension-builder`）由 Ymir 每次執行前寫入 `/agent-state/ymir/skills/`（Local / Podman / Docker / Remote 都適用，不必改 image），不需要新增 mount；平台 MCP 設定以每次執行重新產生的方式注入，也不需要新增 mount。若之後仍需新增 mount，必須同步更新 `ContainerCommandBuilderTests`（Podman 與 Docker 兩種 engine），且不得掛載 host 敏感路徑。
 - 管理員啟用 `mcp` 能力等於允許該使用者的 Agent 連到使用者指定的外部位址；這與目前 Agent 已可在 bash 執行 `curl` 的實際能力相近，但稽核上更明顯，文件需清楚告知管理員。
 - Agent 可寫的使用者層目錄今天就可能放 skill 或 `mcp.json`；本 ADR 落地後這件事才有政策與稽核，在此之前行為未定義。
 

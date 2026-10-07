@@ -8,9 +8,22 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Observable } from 'rxjs';
+import { forkJoin, Observable } from 'rxjs';
+import {
+  CAPABILITIES,
+  CapabilityKey,
+  effectiveValue,
+  GRANT_SETTINGS,
+  grantLabel,
+} from '../../core/admin/extension-rules';
 import { ApiService, describeApiError } from '../../core/api/api.service';
-import { AdminUser, UserRole } from '../../core/api/api-types';
+import {
+  AdminUser,
+  ExtensionGrantSetting,
+  ExtensionValues,
+  SaveUserExtensionsRequest,
+  UserRole,
+} from '../../core/api/api-types';
 import {
   canToggleUser,
   describeAuthMethod,
@@ -21,7 +34,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { AdminTabs } from './admin-tabs';
 
 /**
- * 使用者管理（Admin，SA §4、ADR-0009）：停用 / 啟用帳號、建立本機帳號、重設本機帳號密碼。
+ * 使用者管理（Admin，SA §4、ADR-0009）：停用 / 啟用帳號、建立本機帳號、重設本機帳號密碼、
+ * 個人的 Agent 擴充能力覆寫（ADR-0012）。
  * 企業帳號的角色以 Entra 的 app role 為準，不在這裡修改。
  */
 @Component({
@@ -167,6 +181,14 @@ import { AdminTabs } from './admin-tabs';
                         {{ user.status === 'Disabled' ? '啟用' : '停用' }}
                       </button>
                     }
+                    <button
+                      type="button"
+                      class="link"
+                      [disabled]="busy()"
+                      (click)="startExtensions(user)"
+                    >
+                      擴充能力
+                    </button>
                     @if (user.authMethod === 'Local') {
                       <button
                         type="button"
@@ -202,6 +224,45 @@ import { AdminTabs } from './admin-tabs';
                         取消
                       </button>
                     </form>
+                  </td>
+                </tr>
+              }
+              @if (extensions()?.user?.id === user.id) {
+                <tr class="reset-row">
+                  <td colspan="7">
+                    @if (extensions(); as e) {
+                      <form class="stack extension-form" (ngSubmit)="saveExtensions()">
+                        <div class="grid">
+                          @for (c of capabilities; track c.key) {
+                            <label
+                              >{{ c.label }}
+                              <select
+                                [name]="c.key"
+                                [attr.name]="c.key"
+                                [ngModel]="e.draft[c.key]"
+                                (ngModelChange)="patchExtension(c.key, $event)"
+                              >
+                                @for (g of grantSettings; track g) {
+                                  <option [value]="g">{{ grantText(g, e.defaults[c.key]) }}</option>
+                                }
+                              </select>
+                              <span class="muted small"
+                                >結果：{{
+                                  effective(e.draft[c.key], e.defaults[c.key]) ? '允許' : '不允許'
+                                }}</span
+                              >
+                            </label>
+                          }
+                        </div>
+                        <p class="muted small">從這位成員的下一則訊息開始生效。</p>
+                        <div class="row">
+                          <button type="submit" [disabled]="busy()">儲存</button>
+                          <button type="button" class="secondary" (click)="extensions.set(null)">
+                            取消
+                          </button>
+                        </div>
+                      </form>
+                    }
                   </td>
                 </tr>
               }
@@ -317,6 +378,14 @@ export class UsersPage implements OnInit {
   protected readonly newPassword = signal('');
 
   protected readonly resetting = signal<AdminUser | null>(null);
+  protected readonly capabilities = CAPABILITIES;
+  protected readonly grantSettings = GRANT_SETTINGS;
+  /** 正在編輯擴充能力的成員：覆寫草稿與全域預設（用來顯示「依全域預設」的結果）。 */
+  protected readonly extensions = signal<{
+    user: AdminUser;
+    draft: SaveUserExtensionsRequest;
+    defaults: ExtensionValues;
+  } | null>(null);
   protected readonly resetPassword = signal('');
   private readonly me = computed(() => this.auth.user());
 
@@ -400,6 +469,42 @@ export class UsersPage implements OnInit {
     this.run(this.api.adminResetPassword(user.id, this.resetPassword()), () => {
       this.resetting.set(null);
       this.message.set(`已重設 ${user.accountName} 的密碼；對方下次登入時必須變更。`);
+    });
+  }
+
+  protected grantText(setting: ExtensionGrantSetting, defaultAllowed: boolean): string {
+    return grantLabel(setting, defaultAllowed);
+  }
+
+  protected effective(setting: ExtensionGrantSetting, defaultAllowed: boolean): boolean {
+    return effectiveValue(setting, defaultAllowed);
+  }
+
+  protected startExtensions(user: AdminUser): void {
+    this.run(
+      forkJoin({
+        state: this.api.adminGetUserExtensions(user.id),
+        policy: this.api.adminGetExtensionPolicy(),
+      }),
+      ({ state, policy }) =>
+        this.extensions.set({
+          user,
+          draft: { skills: state.skills, mcp: state.mcp },
+          defaults: policy.defaults,
+        }),
+    );
+  }
+
+  protected patchExtension(key: CapabilityKey, value: ExtensionGrantSetting): void {
+    this.extensions.update((e) => (e ? { ...e, draft: { ...e.draft, [key]: value } } : e));
+  }
+
+  protected saveExtensions(): void {
+    const editing = this.extensions();
+    if (!editing) return;
+    this.run(this.api.adminSaveUserExtensions(editing.user.id, editing.draft), () => {
+      this.extensions.set(null);
+      this.message.set(`已更新 ${editing.user.displayName} 的擴充能力，從下一則訊息開始生效。`);
     });
   }
 

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Ymir.Platform.Auditing;
 using Ymir.VibeMaker.Application.Agents;
+using Ymir.VibeMaker.Application.Extensions;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Application.Runtime;
@@ -24,6 +25,7 @@ public sealed class ExecutionRunner(
     IExecutionCancellationRegistry cancellations,
     UserExecutionLocks userLocks,
     RuntimePolicyService policies,
+    IExtensionPolicy extensionPolicy,
     IAuditLog auditLog,
     VibeMakerTelemetry telemetry,
     TimeProvider timeProvider,
@@ -140,7 +142,9 @@ public sealed class ExecutionRunner(
                 await GetWorkingDirectoryAsync(execution, stoppingToken).ConfigureAwait(false),
                 credential.ApiKey,
                 models.Resolve(execution.ModelId),
-                await GetSystemPromptsAsync(execution, stoppingToken).ConfigureAwait(false));
+                await GetSystemPromptsAsync(execution, stoppingToken).ConfigureAwait(false),
+                // 擴充能力由伺服器在每次執行時決定（ADR-0012 A.3）；查詢失敗會落到下方的 catch 而結束，不會放寬權限。
+                await extensionPolicy.ResolveAsync(execution.UserId, stoppingToken).ConfigureAwait(false));
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
             {
                 if (agentEvent is AgentCompleted or AgentFailed or AgentCancelled)
