@@ -320,7 +320,7 @@ export class Composer {
   protected readonly topics = inject(MakeTopicStore);
   private readonly inputRef = viewChild<ElementRef<HTMLTextAreaElement>>('input');
 
-  readonly placeholder = input('輸入訊息，或輸入 /make 建置小工具、網站');
+  readonly placeholder = input('問問Ymir');
   readonly busy = input(false);
   readonly disabled = input(false);
   readonly allowAttachments = input(true);

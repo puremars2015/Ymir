@@ -37,7 +37,6 @@ import { ModelPicker } from '../../shared/model-picker';
         />
         <app-composer
           class="composer"
-          placeholder="有什麼可以幫忙的？例如：幫我建立一個 Todo List 網站"
           [disabled]="busy()"
           (submitted)="start($event)"
         />
