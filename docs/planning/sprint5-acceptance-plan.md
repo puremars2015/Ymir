@@ -9,6 +9,7 @@
 - **只補測試與驗收文件，不改產品行為。** 發現產品缺口時：
   - 在看板留言，標明哪一項驗收條件、缺什麼；
   - 測試寫好但先標成 `Skip`，並附上原因與看板連結，等缺口修好再打開；
+  - 監控指標、log 的 ExecutionId scope、健康檢查、安全標頭、保存期限已在 2026-10-07 的強化完成（看板 #034），AC-10 可以直接驗證 log scope；
   - **不得刪除或停用既有測試**。
 - 測試規範：
   - xUnit v3，用 `TestContext.Current.CancellationToken`；
@@ -49,7 +50,7 @@
 | AC-09 | 可取消 RUNNING execution，狀態變 CANCELLED | `ExecutionFlowTests`、`e2e`（停止） | 斷言資料庫的 `AgentExecution.Status == Cancelled`、SSE 最後一個事件是 `execution.cancelled`、有 `execution.cancel` 稽核 | 整合 |
 | AC-10 | 錯誤時前端收到可理解的訊息，server log 可用 correlation id / execution id 追蹤 | `UnreachableLiteLlmTests`、`ExecutionTimeoutTests` | ① Fake LLM `[fail]`、runtime 啟動失敗、逾時：UI 顯示中文摘要，不含 host path、stack trace、token；② 用 `TestOutputLogger` 收 log，斷言 log 含該 execution id 與 trace id；③ 稽核的 `CorrelationId` 與 log 的 trace id 一致 | 整合 + E2E |
 | AC-11 | 同一對話並行送出不會產生兩個互相覆蓋的 execution | `PersistenceConstraintTests`（filtered unique index） | 用 `Task.WhenAll` 同時送 10 次（不同 `clientRequestId`）：只有 1 個 202、其他 409；同一個 `clientRequestId` 重送回同一個 executionId | 整合 |
-| AC-12 | 所有 runtime lifecycle 與 agent execution 都有稽核 | execution 的建立 / 開始 / 結束 / 取消、Admin 停止、閒置停止都有 | **已知缺口**：runtime 的 create / start（`EnsureRuntime` 建立或啟動 container）**沒有寫稽核**。測試先寫好並標 `Skip`，在看板回報，由強化項目補上 | 整合（先 Skip） |
+| AC-12 | 所有 runtime lifecycle 與 agent execution 都有稽核 | execution 的建立 / 開始 / 結束 / 取消；runtime 的 `runtime.create` / `runtime.start` / `runtime.stop` / `runtime.reconcile` / `runtime.idle_stop`、Admin 停止（2026-10-07 強化已補上） | 一個測試走完：第一次送訊息（create）→ Admin 停止 → 再送訊息（Local 為 create、Podman 為 start）→ 閒置停止 → 對帳，逐一斷言稽核動作與 `TargetId` | 整合 |
 | AC-13 | SSE 斷線後以 `Last-Event-ID` 重連，不遺失、不重複 | `ExecutionFlowTests`（續傳） | 執行中斷線，再用 `Last-Event-ID` 重連：事件序號連續、沒有重複；頁面重新整理後接回（`resumeTurnFrom`） | 整合 + E2E |
 | AC-14 | Container 重建後，同一對話仍保有上下文 | `PiExecutionTests`（session 續接） | 與 AC-07 合併：`rm -f` container 後第二輪回覆仍提到第一輪 | 整合（Podman） |
 | AC-15 | 檔案 API 無法透過 `..` 或 symlink 讀到 workspace 以外 | `WorkspaceFileTests` | 補 symlink 指向 `/etc/passwd`、指向其他對話目錄、URL 編碼的 `..%2f` | 整合 |

@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-07 10:20 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-07 11:30 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -52,7 +52,7 @@
 | Runtime 生命週期（Sprint 4）：閒置自動停止、啟動時對帳、每人配額、執行政策可在管理介面修改、用量頁（ADR-0011） | ✅ | 見 [#030](#030--runtime-生命週期閒置停止對帳配額與用量)；正式 Podman / runtime host 上的閒置停止**待使用者環境確認** |
 | LiteLLM 用量與每人每月預算（費用、token、預算由 LiteLLM 強制） | ✅ | 見 [#031](#031--接上-litellm模型用量與每人每月預算)；真正的 LiteLLM 回應格式**未驗證、待使用者環境確認**（步驟見 deploy/litellm/README.md） |
 | Sprint 5 驗收計畫（交給 Codex 執行） | 📝 | 計畫見 [sprint5-acceptance-plan.md](../planning/sprint5-acceptance-plan.md)，見 [#033](#033--sprint-5驗收計畫交給-codex與強化提案) |
-| Sprint 5 強化（Claude） | ⏳ | 提案見 [#033](#033--sprint-5驗收計畫交給-codex與強化提案)，**待使用者確認範圍** |
+| Sprint 5 強化（Claude）：稽核補齊、監控指標、安全標頭、健康檢查、保存期限與備份 | ✅ | 使用者選 1、2、3、6、7，見 [#034](#034--sprint-5-強化稽核監控安全標頭健康檢查保存期限)；其餘（rate limit、CI 掃描、對外網路、壓測）待定 |
 | 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
@@ -61,6 +61,49 @@
 ---
 
 ## 💬 留言區
+
+### #034 · Sprint 5 強化：稽核、監控、安全標頭、健康檢查、保存期限
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 11:30 · `✅完成`
+
+- **背景**：使用者從 #033 的提案選了 1、2、3、6、7。
+- **做法**：
+  1. **runtime lifecycle 稽核**（SA §12、AC-12）：
+     - EnsureRuntime 回報這次是新建立還是從停止啟動（`RuntimeInfo.Transition`；Podman / Docker / Local / runtime host 協定都帶上，舊版 runtime host 視為 None）；
+     - 稽核新增 `runtime.create`、`runtime.start`、`runtime.ensure`（失敗）、`runtime.stop`（帳號停用）、`runtime.reconcile`；
+     - runtime 原本就在執行時不寫，避免每次 execution 都產生一筆。
+  2. **監控指標與追查**（SA §18、AC-10）：
+     - meter `Ymir.VibeMaker`：`ymir.runtimes.active` / `busy`、`ymir.executions.started` / `finished`（status、error_code）、`ymir.execution.duration`、`ymir.runtime.start_failures`，經 OpenTelemetry 匯出（設定 `OTEL_EXPORTER_OTLP_ENDPOINT`）；
+     - 每個 execution 有自己的 trace，log scope 帶 ExecutionId / ConversationId / UserId，稽核的 correlation id 就是這個 trace id；
+     - console log 現在會印出 scope。原本的 appsettings 設定沒有生效，改在 ServiceDefaults 用程式設定。
+  3. **安全標頭**：所有回應都加上下列標頭；下載檔案的 `CSP: sandbox` 不受影響。
+     - CSP：script 只允許同源，所以 Angular build 關閉 `inlineCritical`，避免產生 inline script；style 允許 inline；`frame-ancestors 'none'`；
+     - `X-Frame-Options: DENY`（覆蓋 antiforgery 的 SAMEORIGIN）、`Referrer-Policy`、`Permissions-Policy`、COOP。
+  6. **健康檢查**：
+     - `/health` 包含資料庫、執行環境（runtime host `/health` 或 container CLI）、LiteLLM（`/health/liveliness`）；
+     - `GET /api/admin/health` 回傳各項狀態與摘要；
+     - 管理總覽新增「服務狀態」卡片，服務異常時最上方顯示警告。
+  7. **保存期限與備份**：
+     - `DataRetentionWorker` 每天刪除過期的稽核紀錄（預設 365 天）與已結束 execution 的事件（預設 90 天），並寫入稽核 `system.retention.purge`；
+     - 對話、訊息、檔案永久保留；
+     - 新增 [backup-restore.md](../guides/backup-restore.md)：資料庫與 Data Protection 金鑰必須一起備份，另有 workspace、LiteLLM、排程、還原步驟與驗證清單。
+  - 文件：deploy/api README 新增「維運」、`.env` 範本、CLAUDE.md；驗收計畫的 AC-12 改為「已補上」。
+- **驗證（實際跑過）**：
+  - 後端：`dotnet test --solution Ymir.slnx` **476 項全部通過**，`dotnet format` 無差異。新增：
+    - runtime 稽核（create / reconcile）、runtime host 回報 Transition；
+    - 指標（MeterListener 收到 started / finished / duration / busy）；
+    - 健康檢查（全部正常；LiteLLM 無法連線時 `/health` 回 503，摘要不含內部位址）；
+    - 安全標頭（3 個端點）；
+    - 保存期限（過期的被刪除，訊息與期限內的稽核保留）；
+    - 授權矩陣、OpenAPI 已更新。
+  - 前端：`npm run lint`、`npm test`（**104 項**）、`npm run build` 都通過。
+  - **CSP 實測**：由 API 直接提供正式 build，用 Chromium 登入並收到 Markdown 回覆，沒有 CSP 違規。唯一的 console 錯誤是未登入時 `/api/me` 回 401，屬於預期。
+  - 端對端：`e2e:admin` 15 步、`e2e` 19 步、`e2e:make` 10 步全部通過；總覽截圖顯示三項服務正常。
+  - API log 確認每個 execution 都帶自己的 TraceId 與 ExecutionId。
+- **卡關 / 待決定**：
+  - OTLP collector（例如 Grafana / Prometheus）要在使用者環境架設，**指標匯出待使用者環境確認**。
+  - 稽核保存天數請依公司政策調整（`Ymir__Retention__AuditLogDays`）。
+  - 尚未做的強化項目：一般 API rate limit 與 SSE 連線上限、CI 安全掃描、Agent 對外網路限制（需要 ADR）、壓測。
 
 ### #033 · Sprint 5：驗收計畫（交給 Codex）與強化提案
 
