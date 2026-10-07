@@ -51,4 +51,13 @@ internal sealed class CountingGateway(TimeProvider time) : IModelGateway
         Revoked.Add(keyId);
         return FailRevoke ? Task.FromException(new ModelCredentialException("boom")) : Task.CompletedTask;
     }
+
+    public bool SupportsUsage => false;
+
+    public Task ApplyUserBudgetAsync(Guid userId, decimal? monthlyBudget, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task<ModelBudgetStatus?> GetBudgetStatusAsync(Guid userId, CancellationToken cancellationToken) => Task.FromResult<ModelBudgetStatus?>(null);
+
+    public Task<IReadOnlyDictionary<Guid, ModelUserUsage>> GetUsageAsync(IReadOnlyCollection<Guid> userIds, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, ModelUserUsage>>(new Dictionary<Guid, ModelUserUsage>());
 }

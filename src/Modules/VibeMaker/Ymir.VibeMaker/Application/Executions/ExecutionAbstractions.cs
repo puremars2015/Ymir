@@ -64,6 +64,9 @@ public sealed class ExecutionOptions
     /// <summary>每位使用者過去 24 小時可建立的 execution 數（<c>DailyExecutionLimit</c>）；0 表示不限制。</summary>
     public int DailyExecutionLimit { get; set; }
 
+    /// <summary>每人每月模型預算（美元，<c>VibeMaker:LiteLlm:MonthlyBudgetUsd</c>）；0 表示不限制。由 LiteLLM 強制。</summary>
+    public decimal MonthlyBudgetUsd { get; set; }
+
     /// <summary>閒置檢查的間隔（<c>IdleCheckIntervalSeconds</c>，測試可調短）。</summary>
     public TimeSpan IdleCheckInterval { get; set; } = TimeSpan.FromMinutes(1);
 }

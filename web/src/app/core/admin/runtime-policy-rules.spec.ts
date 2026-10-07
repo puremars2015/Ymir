@@ -1,5 +1,7 @@
 import {
+  formatBudget,
   formatLimit,
+  formatUsd,
   formatMinutes,
   policyDraftFrom,
   policyDraftProblem,
@@ -13,6 +15,7 @@ describe('runtime policy rules', () => {
     executionTimeoutMinutes: 30,
     maxPendingExecutionsPerUser: 5,
     dailyExecutionLimit: 0,
+    monthlyBudgetUsd: 0,
   };
 
   it('表單由目前的值產生，小數四捨五入且不低於下限', () => {
@@ -21,6 +24,7 @@ describe('runtime policy rules', () => {
       executionTimeoutMinutes: '30',
       maxPendingExecutionsPerUser: '5',
       dailyExecutionLimit: '0',
+      monthlyBudgetUsd: '0',
     });
     expect(
       policyDraftFrom({ ...values, executionTimeoutMinutes: 0.005 }).executionTimeoutMinutes,
@@ -36,6 +40,9 @@ describe('runtime policy rules', () => {
     );
     expect(policyDraftProblem({ ...draft, maxPendingExecutionsPerUser: '2.5' })).toContain('排隊');
     expect(policyDraftProblem({ ...draft, dailyExecutionLimit: '' })).toContain('每日');
+    expect(policyDraftProblem({ ...draft, monthlyBudgetUsd: '12.50' })).toBeNull();
+    expect(policyDraftProblem({ ...draft, monthlyBudgetUsd: '1.234' })).toContain('預算');
+    expect(policyDraftProblem({ ...draft, monthlyBudgetUsd: '-1' })).toContain('預算');
   });
 
   it('轉成 API 請求', () => {
@@ -59,6 +66,9 @@ describe('runtime policy rules', () => {
         updatedAt: null,
         updatedByName: null,
       }),
-    ).toBe('閒置 30 分鐘後停止 · 單次最長 30 分鐘 · 每人排隊 5 個 · 每日 不限制');
+    ).toBe('閒置 30 分鐘後停止 · 單次最長 30 分鐘 · 每人排隊 5 個 · 每日 不限制 · 每月預算 不限制');
+    expect(formatUsd(12.5)).toBe('US$12.50');
+    expect(formatUsd(0.004)).toBe('< US$0.01');
+    expect(formatBudget(0)).toBe('不限制');
   });
 });

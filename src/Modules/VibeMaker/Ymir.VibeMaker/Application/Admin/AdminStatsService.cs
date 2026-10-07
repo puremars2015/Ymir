@@ -102,6 +102,10 @@ public sealed class AdminStatsService(
             .ThenByDescending(u => u.LastExecutionAt)];
     }
 
+    /// <summary>用過 runtime 的使用者（模型用量要查的對象）。</summary>
+    public async Task<IReadOnlyList<Guid>> ListRuntimeUserIdsAsync(CancellationToken cancellationToken) =>
+        await db.AgentRuntimes.AsNoTracking().Select(r => r.UserId).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
+
     /// <summary>停止指定使用者的 runtime（不刪除檔案）；沒有 runtime 時回傳 false。</summary>
     public async Task<bool> StopRuntimeAsync(Guid userId, string actor, CancellationToken cancellationToken)
     {

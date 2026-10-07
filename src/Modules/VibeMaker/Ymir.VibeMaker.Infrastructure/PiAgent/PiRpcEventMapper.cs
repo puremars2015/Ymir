@@ -154,6 +154,9 @@ internal sealed class PiRpcEventMapper
         return _lastStopReason switch
         {
             "aborted" => [new AgentCancelled(AccumulatedText)],
+            // LiteLLM 超過使用者預算時回 budget exceeded（ADR-0011）；只回摘要，不含原始錯誤（SA §12）。
+            "error" when LastErrorDetail?.Contains("budget", StringComparison.OrdinalIgnoreCase) == true =>
+                [new AgentFailed(ExecutionErrorCodes.ModelProviderError, "本月模型預算已用完，請聯絡管理員。")],
             "error" => [new AgentFailed(ExecutionErrorCodes.ModelProviderError, "模型服務發生錯誤，請稍後再試。")],
             _ => [new AgentCompleted(AccumulatedText)],
         };

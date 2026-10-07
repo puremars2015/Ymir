@@ -12,6 +12,7 @@ public sealed class FakeLlmState
     private readonly ConcurrentQueue<string?> _usedApiKeys = new();
     private readonly ConcurrentQueue<JsonObject> _generateRequests = new();
     private readonly ConcurrentDictionary<string, string> _activeKeysByToken = new();
+    private readonly ConcurrentDictionary<string, string> _userByKey = new();
 
     /// <param name="masterKey">
     /// 設定時模擬 LiteLLM 的 key management（<c>/key/generate</c>、<c>/key/delete</c>），
@@ -32,6 +33,13 @@ public sealed class FakeLlmState
 
     public IReadOnlyCollection<string> ActiveKeys => _activeKeysByToken.Values.ToList();
 
+    /// <summary>LiteLLM 的使用者、預算與花費（只在設定 master key 時使用）。</summary>
+    public FakeLiteLlmUsers LiteLlmUsers { get; } = new();
+
+    /// <summary>key 所屬的 LiteLLM 使用者（發 key 時的 <c>user_id</c>）。</summary>
+    public FakeLiteLlmUser? UserOfKey(string? apiKey) =>
+        apiKey is not null && _userByKey.TryGetValue(apiKey, out var userId) ? LiteLlmUsers.Find(userId) : null;
+
     internal void Record(JsonObject request, string? apiKey)
     {
         _requests.Enqueue(request);
@@ -44,6 +52,11 @@ public sealed class FakeLlmState
         var key = $"sk-fake-{Guid.NewGuid():N}";
         var token = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(key)));
         _activeKeysByToken[token] = key;
+        if (request["user_id"]?.GetValue<string>() is { Length: > 0 } userId)
+        {
+            _userByKey[key] = userId;
+        }
+
         return (key, token);
     }
 

@@ -58,7 +58,7 @@ public sealed class ExecutionRunner(
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(userCancellation.Token, timeout.Token, stoppingToken);
         try
         {
-            await RunRegisteredAsync(execution, timeout, linked.Token, stoppingToken).ConfigureAwait(false);
+            await RunRegisteredAsync(execution, policy, timeout, linked.Token, stoppingToken).ConfigureAwait(false);
         }
         finally
         {
@@ -66,7 +66,7 @@ public sealed class ExecutionRunner(
         }
     }
 
-    private async Task RunRegisteredAsync(AgentExecution execution, CancellationTokenSource timeout, CancellationToken runToken, CancellationToken stoppingToken)
+    private async Task RunRegisteredAsync(AgentExecution execution, RuntimePolicy policy, CancellationTokenSource timeout, CancellationToken runToken, CancellationToken stoppingToken)
     {
         var executionId = execution.Id;
         RuntimeInfo runtime;
@@ -79,7 +79,7 @@ public sealed class ExecutionRunner(
             await RecordRuntimeAsync(runtime, stoppingToken).ConfigureAwait(false);
             session = await GetOrCreateSessionAsync(execution, runtime, stoppingToken).ConfigureAwait(false);
             // 使用者的 LiteLLM virtual key（ADR-0004）：只放進 Agent 程序的環境變數，container 內不會有 master key。
-            credential = await credentials.GetAsync(execution.UserId, runtime.RuntimeId, runToken).ConfigureAwait(false);
+            credential = await credentials.GetAsync(execution.UserId, runtime.RuntimeId, runToken, policy.MonthlyBudget).ConfigureAwait(false);
 
             execution.Start(session.Id, runtime.RuntimeId, timeProvider.GetUtcNow());
             await db.SaveChangesAsync(stoppingToken).ConfigureAwait(false);

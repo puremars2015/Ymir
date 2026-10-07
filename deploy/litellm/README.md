@@ -47,7 +47,9 @@ Agent container 只拿得到這把 virtual key，**master key 與 MiniMax key �
 | `VibeMaker__LiteLlm__BaseUrl` | API 連 LiteLLM 的位址，例如 `http://127.0.0.1:4000` |
 | `VibeMaker__LiteLlm__MasterKey` | 與 `.env` 的 `LITELLM_MASTER_KEY` 相同；只放在 API 的 secret / 環境變數 |
 | `VibeMaker__LiteLlm__AllowedModels__0` | key 可用的模型；未設定時只允許 `VibeMaker__Pi__ModelId` |
-| `VibeMaker__LiteLlm__KeyLifetime` / `RenewBefore` / `MaxBudget` | 有效期（預設 `1.00:00:00`）、提前換發時間（預設 `01:00:00`）、每把 key 的預算上限（美元，可不設） |
+| `VibeMaker__LiteLlm__KeyLifetime` / `RenewBefore` | 有效期（預設 `1.00:00:00`）、提前換發時間（預設 `01:00:00`） |
+| `VibeMaker__LiteLlm__MonthlyBudgetUsd` | 每人每月模型預算（美元，30 天一期；0 或不設表示不限制）。管理介面「系統設定 → 執行環境」的值優先 |
+| `VibeMaker__LiteLlm__MaxBudget` | 舊設定：每把 key 的預算。key 每 24 小時換發，等於每天重置，建議改用 `MonthlyBudgetUsd` |
 | `VibeMaker__Pi__ModelBaseUrl` | **Agent container 內**連 LiteLLM 的位址：`http://host.containers.internal:4000/v1`（Podman）或 `http://host.docker.internal:4000/v1`（Docker） |
 | `VibeMaker__Pi__ModelId` | 預設模型，例如 `minimax`（對應 `config.yaml` 的 `model_name`） |
 | `VibeMaker__Models__0__Id` / `VibeMaker__Models__0__DisplayName` | 對話中可選的模型清單（`__1__`、`__2__` 依序增加）；Id 必須與 `config.yaml` 的 `model_name` 相同。未設定時只有預設模型 |
@@ -57,4 +59,22 @@ Agent container 只拿得到這把 virtual key，**master key 與 MiniMax key �
   - 選了清單外的模型，API 回 `400 MODEL_NOT_AVAILABLE`。
 - 非 Development 環境沒有設定 `VibeMaker__LiteLlm__MasterKey` 時，API 會拒絕啟動。
 - Development 沒設定時，會退回固定的 `VibeMaker__Pi__DevelopmentApiKey`（給 Fake LLM 用）。
-- 想在本機不跑 LiteLLM 也驗證整個發 key 流程：用 `FAKE_LLM_MASTER_KEY=sk-dev dotnet run --project tests/Ymir.Testing.FakeLlm` 啟動 Fake LLM，它會模擬 `/key/generate`，並拒絕 master key 與未發放的 key。
+- 想在本機不跑 LiteLLM 也驗證整個發 key 流程：用 `FAKE_LLM_MASTER_KEY=sk-dev dotnet run --project tests/Ymir.Testing.FakeLlm` 啟動 Fake LLM。
+  - 它會模擬 `/key/generate`，並拒絕 master key 與未發放的 key；
+  - 也會模擬使用者、預算與用量（`/user/*`、`/user/daily/activity`）：每次呼叫算 10 + 5 個 token、US$0.01。
+
+## 用量與每人預算（ADR-0011）
+
+- **key 掛在使用者底下**：Ymir 發 key 時帶 `user_id`（= Ymir 使用者 id）。發 key 前先以 `/user/update`（不存在時 `/user/new`）建立或更新 LiteLLM 使用者，並設定 `max_budget` 與 `budget_duration: 30d`。
+  - LiteLLM 因此依使用者彙總花費，並強制每人每月預算：用完後該使用者的 key 都無法呼叫模型。
+  - Ymir 送訊息前也會先檢查，預算用完時直接告訴使用者。
+  - 這個功能上線前發出的 key 沒有 `user_id`，它們的花費不會算到使用者身上；這些 key 最晚 24 小時後換發。
+- **管理介面「用量」**：每位使用者的費用、輸入 / 輸出 token、請求數、本期已用 / 預算。
+  - 資料來自 `GET /user/daily/activity?user_id=&start_date=&end_date=` 與 `GET /user/info?user_id=`。
+- **單價**：費用依 `config.yaml` 每個模型的 `input_cost_per_token` / `output_cost_per_token` 計算。
+  - LiteLLM 沒有 MiniMax 的內建單價：沒填時**費用為 0、預算永遠不會用完**，但 token 數仍然正確。
+  - 請依 MiniMax 方案填入（單位：美元 / token，例如每百萬 token US$0.30 → `0.0000003`）。
+- **手動驗證**（使用者環境，沙箱沒有真正的 LiteLLM）：
+  1. 在管理介面設定每月預算後，以一般使用者送一則訊息；
+  2. 執行 `./smoke-test.sh usage <Ymir 使用者 id>`，應看到該使用者的 `max_budget` 與當天的 token / 花費；
+  3. 把預算設得很低（例如 0.01），送幾則訊息後應被擋下，並顯示「本月模型預算已用完」。
