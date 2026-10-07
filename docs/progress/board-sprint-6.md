@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-08 06:00 ・ 狀態：**🚧 進行中（A2、R0～R2、H0、H1 完成；接著 H2，使用者要求先不合併回 main）**
+> 最後更新：2026-10-08 11:30 ・ 狀態：**✅ 本輪計畫完成（A2、R0～R2、H0～H2 都在開發分支，使用者要求先不合併回 main；P0 維持僅計畫）**
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -47,8 +47,8 @@
 | R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ✅ | 見 #015 |
 | R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ✅ | 見 #016 |
 | H0 | 網站託管 ADR（[ADR-0016](../adr/0016-site-hosting.md)；0015 已用於明確交付成果）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ✅ | 使用者 2026-10-08 決定：網域為設定值 `<代碼>.<BaseDomain>`（真實 DNS / Tunnel 待使用者環境）；可見範圍由網站擁有者選擇，Ymir 管理員一律可看 |
-| H1 | 公開網站發布：網站與版本、產物檢查、Nginx 託管、原子切換、取消發布 | ✅ | 見 #018 |
-| H2 | 身分與分享：公司模式、指定使用者、分享給我的網站 | ⏳ | H1 |
+| H1 | 公開網站發布：網站與版本、產物檢查、SiteHost 託管（ADR-0016 不用 Nginx）、原子切換、取消發布 | ✅ | 見 #018 |
+| H2 | 身分與分享：公司模式、指定使用者、分享給我的網站 | ✅ | 見 #019 |
 | C1 | 對話附加檔案 / 圖片 / 影片給 Agent（使用者回報） | ✅ | 見 [#006](#006--對話可以附加檔案圖片影片給-agent)；真實視覺模型**待使用者環境確認** |
 
 **從 Sprint 2 移交、待使用者環境確認**（見 [Sprint 2 看板 #037](board-sprint-2.md)）：
@@ -70,6 +70,51 @@
 
 ## 💬 留言區
 
+### #019 · H2 完成：私人網站的票據登入、分享與管理員可見（本輪計畫收尾）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 11:30 · `✅完成`
+
+- **做了什麼**（ADR-0016 §3、§4）：
+  - **存取模式**：公開 / 所有 Ymir 使用者 / 指定使用者（`vibemaker.site_shares`）。
+    - 擁有者與 Ymir 管理員一律可以看。
+    - API 與 SiteHost 共用 `SiteAccessRules.CanView`。
+  - **私人網站登入**：
+    1. SiteHost 導向平台的 `/site-access`（未登入時先走 Ymir 登入）；
+    2. 前端 `POST /api/sites/{id}/ticket` 取得票據：60 秒、一次性、資料庫只存 SHA-256；
+    3. SiteHost 的 `/.ymir/auth` 以條件更新兌換，設定 `ymir_site` cookie：只限該 hostname、綁定網站、HttpOnly、8 小時。
+    - 導回路徑只接受站內相對路徑。
+    - 平台 cookie 不會送到網站網域。
+  - **每個請求的授權**：重新檢查帳號狀態、管理員角色與分享名單（快取 ≤ 30 秒）。網站查詢快取 10 秒。
+  - **API**（加入授權矩陣與 OpenAPI；存取變更寫稽核 `site.access.update`）：
+    - `PUT /api/sites/{id}/access`；
+    - `GET /api/sites/shared-with-me`；
+    - `GET /api/users/search`：只回未停用帳號的 id / 名稱 / 帳號，不含自己；
+    - 票據端點。
+  - **前端**：
+    - 「我的網站」的存取設定與分享選擇器；
+    - 「分享給我的網站」；
+    - `/site-access` 轉接頁：沒有權限時顯示摘要。
+  - **修正**：SiteHost 原本用 `app.Run`，會在端點之前攔下 `/.ymir/*`。改成 `MapFallback("{**path}")`。
+- **驗證**：
+  - `dotnet build`（0 警告）、`dotnet format --verify-no-changes`。
+  - `dotnet test --solution`：722 / 722 通過，新增：
+    - `SiteHostingTests` 2 個：私人網站導向登入、票據 / cookie、分享、AllUsers、撤權、管理員、別人改不了設定；票據重放、跨站兌換、cookie 綁定網站、停用帳號、分享名單拒絕停用帳號。
+    - `SiteRulesTests` 15 個：CanView、SafeReturnPath、票據雜湊。
+  - 前端 lint、141 個測試、build 通過。
+  - **e2e:sites**（`*.localhost`，SiteHost 在 5300）全部通過，截圖 5 張：
+    - 發布 → 匿名看公開網站；
+    - 改成指定使用者 → 匿名被導向登入；
+    - 被分享者經票據進站，「分享給我的網站」看得到；
+    - 其他使用者被拒；
+    - 管理員可看；
+    - 撤權後 cookie 失效。
+- **發現**：公開網站回應帶 `Cache-Control: public, max-age=60`，所以公開改私人後，**已經看過**的瀏覽器最多 60 秒內還會顯示快取內容。私人網站一律 `private, no-store`。
+- **未驗證、待使用者環境確認**：
+  - 真實網域、萬用字元 DNS / TLS、Tunnel 路由；
+  - 正式主機 SiteHost 的 Data Protection 金鑰目錄權限。
+- **本輪總結**：A2 → R0 → R1 → R2 → H0 → H1 → H2 都已完成，都在 `claude/inspiring-einstein-2pwxx6`。依使用者指示**未合併回 main**；PR #47 保持開啟。P0 維持「僅計畫」。
+
+---
 ### #018 · H1 完成：公開網站發布（SiteHost）
 
 > 👤 **Claude（AI）** · 🕒 2026-10-08 10:30 · `✅完成`
