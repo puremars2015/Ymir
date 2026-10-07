@@ -1,6 +1,6 @@
 # ADR-0012：Agent 擴充能力——管理員管制的使用者自建擴充，與開發人員維護的平台 MCP
 
-- 狀態：已採納（2026-10-07 使用者確認決定事項；A0 spike 結果已寫入，egress 第一階段不強制、正式主機方案待使用者確認；補充 ADR-0003、ADR-0004、ADR-0007、ADR-0010）
+- 狀態：已採納（2026-10-07 使用者確認決定事項；A0 spike 結果已寫入，egress 由管理員以 `internet` 能力控制、預設允許；補充 ADR-0003、ADR-0004、ADR-0007、ADR-0010）
 - 日期：2026-10-07
 
 ## 背景
@@ -39,8 +39,10 @@
    |---|---|---|
    | `skills` | `SKILL.md` 指示、附帶的腳本與參考檔 | 只影響該使用者自己的 Agent 行為；腳本仍在其 container 內執行 |
    | `mcp` | 使用者自建的 MCP server（stdio 在自己的 container 內，或 HTTP 連外部位址） | 能新增工具與連線目的地；憑證只能是使用者自己的 |
+   | `internet` | Agent container 能否連到 LiteLLM 與 gateway 以外的位址（網際網路、內網） | 關閉時 Agent 無法下載套件或呼叫外部 API；**預設允許**（使用者 2026-10-07 決定），見 A.8 |
    | `extensions` | Pi extension / package（可執行程式碼，可 `npm install`） | 最強；需要 egress（開發計畫 §8 尚未決定）。**第一階段不開放**，列入後續 |
 
+   - `skills`、`mcp` 預設關閉；`internet` 例外，預設允許以維持既有行為。
    - 第一階段實作 `skills` 與 `mcp`；`extensions` 的欄位先保留，值固定為 false。
 2. **政策儲存與生效方式比照 ADR-0010 / ADR-0011**：
    - 全域預設存在 `platform.system_settings` 的 `vibemaker.extension_policy`（明文 JSON，不含機密），資料庫優先、不必重啟，快取 30 秒。
@@ -62,6 +64,19 @@
    - 管理員在使用者頁可看到每人的有效能力。第一階段不提供管理員檢視使用者擴充內容（隱私與範圍另議）。
 7. **不共用**：使用者自建的擴充只屬於該使用者。要分享給別人，必須由開發人員審查後升級成平台項目（見 B），第一階段不提供使用者之間分享。
 
+8. **對外連線（`internet` 能力）**：
+   - 能力值決定 Agent container 的網路模式（`RuntimeNetworkAccess`）：
+     - `Internet`：沿用 `VibeMaker:Runtime:Network`（預設 Podman `slirp4netns`、Docker `bridge`）；
+     - `Restricted`：使用 `VibeMaker:Runtime:RestrictedNetwork`，即主機預先建立的 `--internal` network；LiteLLM 與 gateway 以 container 接上同一個 network，Agent 只連得到它們（Spike 結果 4）。
+   - 沒有設定 `RestrictedNetwork` 時無法使用 `Restricted`：執行以摘要錯誤失敗（「受限網路尚未設定，請洽管理員」），管理介面同時顯示警告；不會退回成可以對外連線。
+   - Network 只能在建立 container 時決定。Container 加上 label `ymir.network=internet|restricted`，`EnsureRuntime` 發現與政策不符時：
+     - container 沒在執行，或呼叫端確認該使用者沒有其他執行中的 execution：移除後以新 network 重建（檔案都在掛載目錄，SA §15），寫稽核 `runtime.recreate`；
+     - 否則沿用舊的 container，等下一次執行再套用，避免中斷另一個對話正在跑的 Agent。
+   - 管理員變更政策不會主動停止 container，下一次執行時生效；管理介面需說明。
+   - **Runtime host（ADR-0008）**：建立 runtime 的端點只多接受 enum（`network=internet|restricted`）與是否允許重建；network 名稱只來自 runtime host 自己的設定，不接受任何 network 名稱、host 路徑或資源設定，符合 ADR-0008 的紅線。協定變更同步更新 `RuntimeHostProtocolTests` 與 `RuntimeHostTests`。
+   - **Local runtime** 沒有隔離（只限 Development），無法強制網路模式：只記 warning，管理介面標示「開發模式不強制」。
+   - 部署文件（`deploy/runtime-host/README.md`）提供受限網路的建立方式；rootless Podman 下的行為「未驗證、待使用者環境確認」。
+
 ### B. 平台 MCP / 常駐服務（需求 2）
 
 1. **服務目錄只能由開發人員定義，部署在版控與部署設定裡**，不在管理介面與資料庫新增：
@@ -69,7 +84,7 @@
    - 憑證（EIP / MES 的服務帳號、資料庫連線）只放在 gateway 或服務自己的 `deploy/*/.env` 與部署 secret，不進版控、**不進 Agent container**（ADR-0004、CLAUDE.md 安全紅線）。
 2. **Agent 只透過 Ymir MCP Gateway 連到平台服務**（SA §22 的 MCP Gateway）：
    - Gateway 是獨立於 Agent container 的服務，對 Agent 暴露 streamable HTTP MCP 端點；對後端的 EIP / MES / embedding 則以服務帳號連線。
-   - **網路隔離**：Agent container 只能連到 gateway 與 LiteLLM，不能直接連 EIP / MES / embedding 後端。實際做法見文末「Spike 結果 4」與「Egress 建議」。
+   - **網路隔離**：Agent container 只能連到 gateway 與 LiteLLM，不能直接連 EIP / MES / embedding 後端。對外連線由管理員以 `internet` 能力控制（見 A.8）；關閉時 Agent 只連得到受限網路上的 LiteLLM 與 gateway。
    - 對 embedding：[RAG 知識庫計畫](../planning/rag-knowledge-base-plan.md) 已規劃平台共用的獨立 Embedding 容器，由後端而非 Agent 呼叫；若之後要讓 Agent 直接查知識庫，應包成平台 MCP 經 gateway 提供，不讓 Agent 直連。LiteLLM 本來就能提供 `/v1/embeddings`，可直接沿用使用者的 virtual key（ADR-0004），不一定要再包一層；是否要包成 MCP 工具由開發人員依需求決定。
 3. **每人專屬的短期 token，不使用共用憑證**：
    - 沿用 ADR-0004 的模式：API 為使用者簽發 gateway token（含 user id、有效期限，建議 ≤ 1 小時，每次執行重新簽發），以 `exec --env NAME` 傳入，值不出現在程序參數。
@@ -122,9 +137,10 @@
 1. **權限粒度**：全域預設 + 每位成員覆寫。角色、部門、Entra 群組留待之後再說。
 2. **第一階段開放 `skills` 與 `mcp`**，兩者都預設關閉、由管理員開啟。`extensions` 維持後續項目。
 3. **Gateway 做成獨立服務**（新的 `Ymir.McpGateway` 專案與部署單元），不與 API 同程序。
-4. **Egress 先做 spike 再決定**：
-   - 在 Sprint 6 的 A0 實測 rootless Podman 能否把 Agent container 的對外連線限制在 LiteLLM 與 gateway，結果寫進下方「Spike 結果」：第一階段不強制，正式主機的 `--internal` network 方案待使用者實測 rootless 後決定（見「Egress 建議」）；
-   - 在那之前，平台服務的授權仍然由 gateway 的 token 與存取清單強制。
+4. **Egress 由管理員控制，預設允許**（2026-10-07 依 A0 spike 結果決定）：
+   - 新增能力 `internet`，粒度同 `skills` / `mcp`（全域預設 + 每人覆寫），全域預設 **允許**，維持既有行為；
+   - 不論允許與否，Agent 都必須連得到 LiteLLM 與 MCP Gateway；
+   - 平台服務的授權仍然由 gateway 的 token 與存取清單強制，不依賴網路隔離。做法見 A.8。
 
 ## Spike 結果（A0，2026-10-07）
 
@@ -170,11 +186,7 @@
    - `RuntimeOptions.Network`（`VibeMaker__Runtime__Network`）已經可以設定，不必改 `ContainerCommandBuilder`。
    - **未驗證、待使用者環境確認**：rootless Podman 下 `--internal` network 與 LiteLLM / gateway container 共用 network 的實際行為（rootless 的 bridge 在 `ymir` 帳號的 network namespace 內，host 服務不一定連得到）。
 
-### Egress 建議（待使用者確認）
+### Egress 決定（使用者 2026-10-07）
 
-- **第一階段不強制**，維持現行 `slirp4netns`：平台服務的授權由 gateway 的 token 與存取清單強制，Agent 能做的事與現在可以用 `curl` 的能力相同。
-- **正式主機建議**（A2 的部署文件提供範本，由管理員選擇啟用）：
-  - 在 `ymir` 帳號建立 `--internal` network，Agent container 設 `VibeMaker__Runtime__Network=<該 network>`；
-  - MCP Gateway 與一個 LiteLLM 轉送（或 LiteLLM 本身）以 container 加入同一 network，Agent 只連得到這兩者；
-  - 需要對外的 `mcp` 使用者項目在這個模式下會連不到，管理員啟用 `mcp` 能力時要知道這個取捨。
-- 實際採用與否，等使用者在正式主機實測 rootless 行為後決定；在那之前本 ADR 的 egress 項目維持「建議」狀態。
+- 對外連線改由管理員控制（`internet` 能力，全域預設 + 每人覆寫），**預設允許**。設計見 A.8。
+- 正式主機要關閉對外連線前，需先依部署文件建立受限網路並把 LiteLLM 與 gateway 接上；rootless 的實際行為待使用者在正式主機確認。
