@@ -35,6 +35,7 @@ Sprint 4 的範圍是 runtime 的完整生命週期：閒置停止、啟動時�
    | 單次執行上限 | `ExecutionTimeoutMinutes`（預設 30） | 1～240 分鐘 |
    | 每人排隊 + 執行中上限 | `MaxPendingExecutionsPerUser`（預設 5） | 1～50 |
    | 每人過去 24 小時執行次數 | `DailyExecutionLimit`（預設 0） | 0 = 不限，最多 10000 |
+   | 每人每月模型預算（2026-10-07 新增） | `VibeMaker__LiteLlm__MonthlyBudgetUsd`（預設 0） | 0 = 不限，最多 US$100000；由 LiteLLM 強制（30 天一期） |
 
    - 管理介面的值存在 `platform.system_settings` 的 `vibemaker.runtime_policy`，比照 ADR-0010：資料庫優先、不必重啟。
    - 讀取快取 30 秒。
@@ -49,7 +50,8 @@ Sprint 4 的範圍是 runtime 的完整生命週期：閒置停止、啟動時�
    - 過去 24 小時的次數，前端與每日上限比較並標示；
    - runtime 狀態。
 
-   模型 token 用量在 LiteLLM（ADR-0004），之後再整合。
+   模型費用、token 與本期預算來自 LiteLLM（ADR-0004 補充）；沒有連接 LiteLLM 時用量頁只顯示執行資料。
+7. **每月模型預算**：送訊息前檢查本期花費（每人快取 60 秒；LiteLLM 無法連線時不擋，由 LiteLLM 自己強制），用完回 429；執行中才超過時，Agent 以「本月模型預算已用完」的摘要結束。
 
 ## 影響
 

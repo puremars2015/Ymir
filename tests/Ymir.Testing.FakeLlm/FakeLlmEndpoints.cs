@@ -22,6 +22,10 @@ public static class FakeLlmEndpoints
         endpoints.MapPost("/v1/chat/completions", HandleChatCompletionsAsync);
         endpoints.MapPost("/key/generate", HandleGenerateKeyAsync);
         endpoints.MapPost("/key/delete", HandleDeleteKeyAsync);
+        endpoints.MapPost("/user/new", HandleNewUserAsync);
+        endpoints.MapPost("/user/update", HandleUpdateUserAsync);
+        endpoints.MapGet("/user/info", HandleUserInfoAsync);
+        endpoints.MapGet("/user/daily/activity", HandleDailyActivityAsync);
         return endpoints;
     }
 
@@ -57,6 +61,127 @@ public static class FakeLlmEndpoints
         });
     }
 
+    private static bool IsMaster(HttpContext context, FakeLlmState state)
+    {
+        if (state.MasterKey is not null && BearerToken(context) == state.MasterKey)
+        {
+            return true;
+        }
+
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return false;
+    }
+
+    private static decimal? ReadBudget(JsonObject request) =>
+        request["max_budget"] is JsonValue value ? value.GetValue<decimal>() : null;
+
+    private static async Task HandleNewUserAsync(HttpContext context)
+    {
+        var state = context.RequestServices.GetRequiredService<FakeLlmState>();
+        if (!IsMaster(context, state))
+        {
+            return;
+        }
+
+        var request = await ReadObjectAsync(context);
+        var userId = request["user_id"]?.GetValue<string>() ?? Guid.NewGuid().ToString();
+        if (!state.LiteLlmUsers.TryCreate(userId, ReadBudget(request), request["budget_duration"]?.GetValue<string>()))
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new { error = new { message = "User already exists" } });
+            return;
+        }
+
+        await context.Response.WriteAsJsonAsync(new { user_id = userId });
+    }
+
+    private static async Task HandleUpdateUserAsync(HttpContext context)
+    {
+        var state = context.RequestServices.GetRequiredService<FakeLlmState>();
+        if (!IsMaster(context, state))
+        {
+            return;
+        }
+
+        var request = await ReadObjectAsync(context);
+        if (state.LiteLlmUsers.Find(request["user_id"]?.GetValue<string>()) is not { } user)
+        {
+            // LiteLLM 對不存在的使用者回 4xx
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new { error = new { message = "User not found" } });
+            return;
+        }
+
+        user.MaxBudget = ReadBudget(request);
+        user.BudgetDuration = request["budget_duration"]?.GetValue<string>();
+        await context.Response.WriteAsJsonAsync(new { user_id = user.UserId });
+    }
+
+    private static async Task HandleUserInfoAsync(HttpContext context)
+    {
+        var state = context.RequestServices.GetRequiredService<FakeLlmState>();
+        if (!IsMaster(context, state))
+        {
+            return;
+        }
+
+        if (state.LiteLlmUsers.Find(context.Request.Query["user_id"]) is not { } user)
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+
+        await context.Response.WriteAsJsonAsync(new
+        {
+            user_id = user.UserId,
+            user_info = new { user_id = user.UserId, spend = user.Spend, max_budget = user.MaxBudget, budget_duration = user.BudgetDuration, budget_reset_at = user.BudgetResetAt.ToString("O") },
+            keys = Array.Empty<object>(),
+        });
+    }
+
+    /// <summary>格式同 LiteLLM 的 <c>/user/daily/activity</c>：results[].metrics 與 metadata 合計。</summary>
+    private static async Task HandleDailyActivityAsync(HttpContext context)
+    {
+        var state = context.RequestServices.GetRequiredService<FakeLlmState>();
+        if (!IsMaster(context, state))
+        {
+            return;
+        }
+
+        var from = DateOnly.Parse(context.Request.Query["start_date"].ToString(), System.Globalization.CultureInfo.InvariantCulture);
+        var to = DateOnly.Parse(context.Request.Query["end_date"].ToString(), System.Globalization.CultureInfo.InvariantCulture);
+        var days = state.LiteLlmUsers.Find(context.Request.Query["user_id"])?.Daily
+            .Where(d => d.Key >= from && d.Key <= to)
+            .OrderBy(d => d.Key)
+            .Select(d => new
+            {
+                date = d.Key.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                metrics = new
+                {
+                    spend = d.Value.Spend,
+                    prompt_tokens = d.Value.Requests * FakeLiteLlmUsers.PromptTokensPerRequest,
+                    completion_tokens = d.Value.Requests * FakeLiteLlmUsers.CompletionTokensPerRequest,
+                    total_tokens = d.Value.Requests * (FakeLiteLlmUsers.PromptTokensPerRequest + FakeLiteLlmUsers.CompletionTokensPerRequest),
+                    api_requests = d.Value.Requests,
+                },
+            })
+            .ToList() ?? [];
+        await context.Response.WriteAsJsonAsync(new
+        {
+            results = days,
+            metadata = new
+            {
+                total_spend = days.Sum(d => d.metrics.spend),
+                total_prompt_tokens = days.Sum(d => d.metrics.prompt_tokens),
+                total_completion_tokens = days.Sum(d => d.metrics.completion_tokens),
+                total_api_requests = days.Sum(d => d.metrics.api_requests),
+                page = 1,
+                total_pages = 1,
+                has_more = false,
+            },
+        });
+    }
+
     private static async Task HandleDeleteKeyAsync(HttpContext context)
     {
         var state = context.RequestServices.GetRequiredService<FakeLlmState>();
@@ -85,6 +210,19 @@ public static class FakeLlmEndpoints
             return;
         }
 
+        // LiteLLM 的使用者預算：本期花費達到上限時拒絕（ADR-0011）
+        var liteLlmUser = state.MasterKey is null ? null : state.UserOfKey(apiKey);
+        if (liteLlmUser is { IsOverBudget: true })
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new
+            {
+                error = new { message = $"Budget has been exceeded! Current cost: {liteLlmUser.Spend}, Max budget: {liteLlmUser.MaxBudget}", type = "budget_exceeded" },
+            });
+            return;
+        }
+
+        liteLlmUser?.RecordRequest();
         var reply = FakeLlmScript.Decide(request);
         if (reply.ErrorStatusCode is { } status)
         {

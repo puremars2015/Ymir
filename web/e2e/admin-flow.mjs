@@ -1,5 +1,6 @@
 // 管理介面的端對端驗證（ADR-0010、ADR-0011）：總覽、停止執行環境、稽核紀錄、系統設定（Entra ID、Tunnel、執行政策）、用量。
-// 前置：SQL Server、Fake LLM、Fake OIDC（dotnet run --project tests/Ymir.Testing.FakeOidc）都已啟動；
+// 前置：SQL Server、Fake LLM（FAKE_LLM_MASTER_KEY=sk-dev，模擬 LiteLLM）、Fake OIDC（dotnet run --project tests/Ymir.Testing.FakeOidc）都已啟動；
+//       API 另設 VibeMaker__LiteLlm__BaseUrl=http://127.0.0.1:5199/、VibeMaker__LiteLlm__MasterKey=sk-dev（第 13 步：用量與每月預算）；
 //       API 以 VibeMaker__Harness=Pi、Ymir__Auth__Oidc__AuthorityHost=http://127.0.0.1:5299 啟動（不設定 Ymir__Auth__Oidc__Authority，
 //       Entra 由管理介面設定）；ng serve。
 // 用法：node e2e/admin-flow.mjs <screenshot-dir> [baseUrl]
@@ -207,5 +208,34 @@ await admin.click('app-admin-tabs a:has-text("系統設定")');
 await admin.locator('app-runtime-settings-card button:has-text("還原為部署設定")').click();
 await admin.locator('app-runtime-settings-card [role=status]:has-text("已還原")').waitFor();
 step('usage page shows the worker at the daily limit; policy reset to deployment');
+
+// 13. 每月模型預算（LiteLLM，Fake LLM 每次呼叫 US$0.01）：設為 US$0.02 → 已用過的使用者被擋下；用量頁顯示費用與預算
+await runtimeCard.locator('input[name=monthlyBudgetUsd]').fill('1.234');
+await runtimeCard.locator('text=最多兩位小數').waitFor();
+await runtimeCard.locator('input[name=monthlyBudgetUsd]').fill('0.02');
+await runtimeCard.locator('button:has-text("儲存")').click();
+await runtimeCard.locator('.summary:has-text("每月預算 US$0.02")').waitFor();
+const budgetMessage = worker.locator(
+  '.composer-area .error:has-text("預算"), .turn.error-message:has-text("預算")',
+);
+for (let i = 0; i < 4 && !(await budgetMessage.count()); i++) {
+  await worker.fill('app-composer textarea', `預算測試 ${i}`);
+  await worker.press('app-composer textarea', 'Enter');
+  await Promise.race([
+    budgetMessage.first().waitFor({ timeout: 60000 }),
+    worker.waitForSelector('.turn.live', { state: 'detached', timeout: 60000 }),
+  ]);
+  await worker.waitForTimeout(500);
+}
+await budgetMessage.first().waitFor();
+await worker.screenshot({ path: `${outDir}/09-budget-exceeded.png` });
+await admin.click('app-admin-tabs a:has-text("用量")');
+await admin.locator('app-usage-page th:has-text("費用")').waitFor();
+await workerRow.locator('.quota[data-level="reached"]:has-text("US$0.02")').waitFor();
+await admin.screenshot({ path: `${outDir}/10-usage-model.png`, fullPage: true });
+await admin.click('app-admin-tabs a:has-text("系統設定")');
+await admin.locator('app-runtime-settings-card button:has-text("還原為部署設定")').click();
+await admin.locator('app-runtime-settings-card [role=status]:has-text("已還原")').waitFor();
+step('monthly model budget enforced; usage page shows LiteLLM spend, tokens and budget');
 
 await browser.close();

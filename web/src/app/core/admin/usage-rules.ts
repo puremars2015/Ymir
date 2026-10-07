@@ -34,6 +34,28 @@ export interface UsageTotals {
   executions: number;
   failed: number;
   runMinutes: number;
+  spendUsd: number;
+  tokens: number;
+}
+
+/** 本期預算的使用程度：80% 以上提醒，用完標紅；沒有預算或沒有資料時不標示。 */
+export function budgetLevel(
+  spend: number | string | null | undefined,
+  budget: number | string | null | undefined,
+): QuotaLevel {
+  const limit = Number(budget ?? 0);
+  if (!limit || spend === null || spend === undefined) return 'none';
+  const used = Number(spend);
+  if (used >= limit) return 'reached';
+  return used >= limit * 0.8 ? 'near' : 'ok';
+}
+
+/** 950 → 「950」；12,345 → 「12.3K」；2,500,000 → 「2.5M」。 */
+export function formatTokens(value: number | string | null | undefined): string {
+  const tokens = Number(value ?? 0);
+  if (tokens < 1000) return String(tokens);
+  if (tokens < 1_000_000) return `${(tokens / 1000).toFixed(tokens < 10_000 ? 1 : 0)}K`;
+  return `${(tokens / 1_000_000).toFixed(1)}M`;
 }
 
 export function usageTotals(users: UserUsage[]): UsageTotals {
@@ -43,7 +65,9 @@ export function usageTotals(users: UserUsage[]): UsageTotals {
       executions: sum.executions + Number(u.executions),
       failed: sum.failed + Number(u.failed),
       runMinutes: sum.runMinutes + Number(u.runMinutes),
+      spendUsd: sum.spendUsd + Number(u.spendUsd ?? 0),
+      tokens: sum.tokens + Number(u.promptTokens ?? 0) + Number(u.completionTokens ?? 0),
     }),
-    { users: 0, executions: 0, failed: 0, runMinutes: 0 },
+    { users: 0, executions: 0, failed: 0, runMinutes: 0, spendUsd: 0, tokens: 0 },
   );
 }

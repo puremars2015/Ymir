@@ -11,6 +11,7 @@ import { FormsModule } from '@angular/forms';
 import { Observable } from 'rxjs';
 import { oidcSourceLabel } from '../../core/admin/oidc-settings-rules';
 import {
+  formatBudget,
   formatLimit,
   formatMinutes,
   POLICY_LIMITS,
@@ -117,6 +118,23 @@ import { RuntimePolicy } from '../../core/api/api-types';
                 }}</span
               >
             </label>
+            <label
+              >每人每月模型預算（US$）
+              <input
+                name="monthlyBudgetUsd"
+                type="number"
+                inputmode="decimal"
+                step="0.01"
+                [min]="limits.monthlyBudgetUsd.min"
+                [max]="limits.monthlyBudgetUsd.max"
+                [ngModel]="draft().monthlyBudgetUsd"
+                (ngModelChange)="patch({ monthlyBudgetUsd: $event + '' })"
+              />
+              <span class="muted small"
+                >每 30 天一期，由 LiteLLM 依設定的模型單價計費並強制，用完就無法呼叫模型。0
+                表示不限制。部署設定：{{ budget(p.deployment.monthlyBudgetUsd) }}</span
+              >
+            </label>
           </div>
           <div class="row">
             <button type="submit" [disabled]="busy() || !!problem()">儲存</button>
@@ -185,6 +203,7 @@ export class RuntimeSettingsCard implements OnInit {
     executionTimeoutMinutes: '',
     maxPendingExecutionsPerUser: '',
     dailyExecutionLimit: '',
+    monthlyBudgetUsd: '',
   });
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
@@ -219,6 +238,10 @@ export class RuntimeSettingsCard implements OnInit {
 
   protected minutes(value: number | string, zeroLabel?: string): string {
     return formatMinutes(value, zeroLabel);
+  }
+
+  protected budget(value: number | string): string {
+    return formatBudget(value);
   }
 
   protected limit(value: number | string): string {

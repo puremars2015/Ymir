@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-07 09:39 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-07 09:41 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -14,7 +14,7 @@
 
 | 工作項目 | 狀態 | 備註 |
 |---|---|---|
-| 前端網站託管、發布與指定使用者分享計畫 | 📝 | 已記錄需求與開發階段，尚未實作；見 [#031](#031--前端網站託管發布與分享後續計畫) |
+| 前端網站託管、發布與指定使用者分享計畫 | 📝 | 已記錄需求與開發階段，尚未實作；見 [#032](#032--前端網站託管發布與分享後續計畫) |
 | 對話黑字與淺藍漸層泡泡 | ✅ | 見 [#027](#027--對話文字改為黑色)；build 與版面預覽通過 |
 | 對話藍色漸層與白色閱讀底面 | ✅ | 見 [#026](#026--對話藍色漸層與白底)；lint/build 與版面預覽通過 |
 | Web-Pro favicon 與 Apple touch icon | ✅ | 見 [#024](#024--web-pro-favicon)；正式版 build 通過 |
@@ -50,6 +50,7 @@
 | 系統設定：Cloudflare Tunnel（token 交給 runtime host、網域可改） | ✅ | 見 [#028](#028--系統設定cloudflare-tunnel-token-與對外網域)；真實 Cloudflare / systemd **待使用者環境確認** |
 | 對話體驗（Sprint 3）：改名 / 刪除（封存）、執行中重新整理可接回串流、檔案預覽、複製回覆 | ✅ | 見 [#029](#029--對話體驗改名刪除接回執行中的串流檔案預覽) |
 | Runtime 生命週期（Sprint 4）：閒置自動停止、啟動時對帳、每人配額、執行政策可在管理介面修改、用量頁（ADR-0011） | ✅ | 見 [#030](#030--runtime-生命週期閒置停止對帳配額與用量)；正式 Podman / runtime host 上的閒置停止**待使用者環境確認** |
+| LiteLLM 用量與每人每月預算（費用、token、預算由 LiteLLM 強制） | ✅ | 見 [#031](#031--接上-litellm模型用量與每人每月預算)；真正的 LiteLLM 回應格式**未驗證、待使用者環境確認**（步驟見 deploy/litellm/README.md） |
 | 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
@@ -59,9 +60,9 @@
 
 ## 💬 留言區
 
-### #031 · 前端網站託管、發布與分享後續計畫
+### #032 · 前端網站託管、發布與分享後續計畫
 
-> 👤 **Codex（AI）** · 🕒 2026-10-07 09:39 · `📢公告`
+> 👤 **Codex（AI）** · 🕒 2026-10-07 09:41 · `📢公告`
 
 - **需求**：使用者建立前端網站後可發布成網站網址，提供公開、公司內部及指定使用者三種存取方式；發布後可以管理分享名單。
 - **完成**：新增 [前端網站託管、發布與分享開發計畫](../planning/frontend-site-hosting-plan.md)，並於主開發計畫加入入口。記錄獨立 Nginx 託管、發布產物快照、穩定網址、版本切換與撤權、分享限瀏覽、接收者入口、身分隔離及分階段驗收。
@@ -69,6 +70,46 @@
 - **待確認**：實際網站網域、公司帳號範圍、容量／數量／版本保留限制及來源封存政策；實作前需新增 ADR。未變更程式、資料庫、部署或 Tunnel。
 
 ---
+### #031 · 接上 LiteLLM：模型用量與每人每月預算
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 09:40 · `✅完成`
+
+- **背景**：使用者要求先把 LiteLLM 接進來，並選擇「用量 + 每人預算」，單價填在 LiteLLM 設定檔。
+- **原本的問題**：
+  - 發 virtual key 時沒有設定 LiteLLM 的 `user_id`，LiteLLM 無法依使用者彙總花費。
+  - 預算設在每把 key 上，key 每 24 小時換發一次，等於每天重置。
+- **做法**：
+  - **key 掛在使用者底下**：發 key 時帶 `user_id`（= Ymir 使用者 id）。發 key 前先 `/user/update`（不存在時改 `/user/new`）建立 LiteLLM 使用者，並套用每月預算（`max_budget` + `budget_duration: 30d`）。
+  - **每人每月預算**：執行政策新增「每人每月模型預算（US$）」，部署預設為 `VibeMaker__LiteLlm__MonthlyBudgetUsd`。
+    - 管理介面改預算時，立即套用到所有用過的使用者；
+    - 由 LiteLLM 強制；
+    - Ymir 送訊息前也會先檢查（每人快取 60 秒，LiteLLM 無法連線時不擋），用完回 429「本月模型預算已用完（US$X，將於 MM/DD 重置）」；
+    - 執行中才用完時，Agent 以「本月模型預算已用完」的摘要結束（不含原始錯誤）。
+  - **用量頁**：每位使用者的模型費用、輸入 / 輸出 token、本期已用 / 預算（接近或用完時標示），另有合計卡片。
+    - 資料來自 LiteLLM 的 `/user/daily/activity` 與 `/user/info`，Ymir 不自己保存；
+    - 沒有連接 LiteLLM（開發環境）時顯示提示、隱藏這些欄位。
+  - **單價**：`deploy/litellm/config.yaml` 的 `minimax` 加上 `input_cost_per_token` / `output_cost_per_token` 佔位值（0）。**請依 MiniMax 方案填寫**；沒填時費用為 0、預算不會用完（token 數仍正確）。
+  - **Fake LLM**：模擬 LiteLLM 的使用者、預算、花費與 daily activity，每次呼叫算 10 + 5 個 token、US$0.01。
+  - **文件**：
+    - deploy/litellm README 說明預算與用量；
+    - `smoke-test.sh usage <使用者 id>` 可查詢預算與當天的用量；
+    - ADR-0004 補充、ADR-0011 新增一列；
+    - CLAUDE.md 已更新。
+- **驗證（實際跑過）**：
+  - 後端：`dotnet test --solution Ymir.slnx` **469 項全部通過**，`dotnet format` 無差異。新增：
+    - gateway 單元測試：key 帶 `user_id`、upsert（update 失敗才 new，401 / 5xx 不 new）、預算 0 送 null、`/user/info` 與分頁的 daily activity 解析、單一使用者失敗不影響其他人；
+    - 預算檢查的快取與 LiteLLM 無法連線時不擋；
+    - 預算驗證；
+    - 整合測試（真 Pi + Fake LiteLLM）：預算套用到 LiteLLM 使用者、用量 API 回傳費用與 token、用完後被擋下或以預算摘要結束、調高預算立即套用；
+    - OpenAPI 快照已更新。
+  - 前端：`npm run lint`、`npm test`（**102 項**）、`npm run build` 都通過。
+  - 端對端（Fake LLM 以 `FAKE_LLM_MASTER_KEY` 模擬 LiteLLM）：
+    - `e2e:admin` 擴充到 **15 步全部通過**：預算欄位驗證、設為 US$0.02 後已用過的使用者看到「本月模型預算已用完」、用量頁顯示費用、token 與已達上限；
+    - `e2e`（19 步）、`e2e:make` 重跑通過。
+- **卡關 / 待決定**：
+  - 沙箱拉不到 LiteLLM image，**真正 LiteLLM v1.103.2 的 `/user/update`、`/user/new`、`/user/info`、`/user/daily/activity` 只依官方文件格式模擬，未驗證、待使用者環境確認**。步驟見 deploy/litellm/README.md 的「手動驗證」。
+  - 這次上線前發出的 key 沒有 `user_id`，它們的花費不會算到使用者身上；最晚 24 小時後換發就正常。
+  - MiniMax 的單價需要使用者依方案填入 `config.yaml`。
 
 ### #030 · Runtime 生命週期：閒置停止、對帳、配額與用量
 
