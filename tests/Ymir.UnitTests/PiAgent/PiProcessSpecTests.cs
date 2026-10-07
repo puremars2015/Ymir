@@ -18,7 +18,7 @@ public class PiProcessSpecTests
     public void VirtualKey_IsPassedOnlyAsEnvironmentVariable()
     {
         var options = Options.Create(new PiAgentOptions { DevelopmentApiKey = "sk-should-not-be-used" });
-        var harness = new PiAgentHarness(null!, options, Catalog, NullLogger<PiAgentHarness>.Instance);
+        var harness = new PiAgentHarness(null!, options, Catalog, null!, NullLogger<PiAgentHarness>.Instance);
 
         var spec = harness.BuildProcessSpec(Request);
 
@@ -30,7 +30,7 @@ public class PiProcessSpecTests
     [Fact]
     public void ModelAndSystemPrompts_ArePassedAsModelArgAndPromptFilePaths()
     {
-        var harness = new PiAgentHarness(null!, Options.Create(new PiAgentOptions()), Catalog, NullLogger<PiAgentHarness>.Instance);
+        var harness = new PiAgentHarness(null!, Options.Create(new PiAgentOptions()), Catalog, null!, NullLogger<PiAgentHarness>.Instance);
 
         var spec = harness.BuildProcessSpec(Request);
 

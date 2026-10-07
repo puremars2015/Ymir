@@ -19,6 +19,7 @@ public sealed class MultiModelApiFactory : ApiFactory
         builder.UseSetting("VibeMaker:Models:0:DisplayName", "MiniMax M2");
         builder.UseSetting("VibeMaker:Models:1:Id", "gpt-x");
         builder.UseSetting("VibeMaker:Models:1:DisplayName", "GPT X");
+        builder.UseSetting("VibeMaker:Models:1:SupportsImages", "true");
     }
 }
 
@@ -31,7 +32,7 @@ public class ModelsAndSettingsTests(MultiModelApiFactory factory) : IClassFixtur
 
         var models = await client.GetFromJsonAsync<List<ModelResponse>>("/api/models", JsonDefaults.Options, TestContext.Current.CancellationToken);
 
-        Assert.Equal([new ModelResponse("minimax", "MiniMax M2", true), new ModelResponse("gpt-x", "GPT X", false)], models);
+        Assert.Equal([new ModelResponse("minimax", "MiniMax M2", true, false), new ModelResponse("gpt-x", "GPT X", false, true)], models);
     }
 
     [Fact]

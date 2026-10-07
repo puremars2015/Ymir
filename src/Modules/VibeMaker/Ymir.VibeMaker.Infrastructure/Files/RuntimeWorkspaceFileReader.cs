@@ -68,8 +68,26 @@ internal sealed partial class RuntimeWorkspaceFileReader(IAgentRuntimeManager ru
         }
 
         var runtime = await runtimes.EnsureRuntimeAsync(userId, cancellationToken).ConfigureAwait(false);
+        await ReadInRuntimeAsync(runtime.RuntimeId, workingDirectory, relativePaths, onFile, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>在已啟動的 runtime 內讀取（Agent harness 執行中使用，不必再經過 EnsureRuntime）。</summary>
+    internal async Task ReadInRuntimeAsync(
+        Guid runtimeId,
+        string workingDirectory,
+        IReadOnlyList<string> relativePaths,
+        Func<WorkspaceFileContent, CancellationToken, Task> onFile,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(relativePaths);
+        ArgumentNullException.ThrowIfNull(onFile);
+        if (relativePaths.Count == 0)
+        {
+            return;
+        }
+
         var process = await runtimes.StartProcessAsync(
-            runtime.RuntimeId,
+            runtimeId,
             new RuntimeProcessSpec("bash", ["-c", ReadScript, "ymir-read"], WorkingDirectory: workingDirectory),
             cancellationToken).ConfigureAwait(false);
         await using (process.ConfigureAwait(false))

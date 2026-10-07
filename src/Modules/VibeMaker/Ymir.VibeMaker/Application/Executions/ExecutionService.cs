@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Users;
+using Ymir.VibeMaker.Application.Attachments;
 using Ymir.VibeMaker.Application.Make;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
@@ -94,6 +95,18 @@ public sealed class ExecutionService(
             return quota;
         }
 
+        // 附件：必須是這個使用者在這個對話上傳、尚未送出的（不接受別人的或其他對話的 id，SA §12）。
+        var attachments = await FindPendingAttachmentsAsync(userId, conversationId, request.AttachmentIds, cancellationToken).ConfigureAwait(false);
+        if (attachments is null)
+        {
+            return SubmitMessageResult.AttachmentNotAvailable;
+        }
+
+        if (attachments.Count > 0)
+        {
+            agentPrompt = AttachmentRules.AppendToPrompt(agentPrompt ?? request.Content.Trim(), attachments);
+        }
+
         var nextSequence = await db.Messages.Where(m => m.ConversationId == conversationId)
             .MaxAsync(m => (long?)m.SequenceNo, cancellationToken).ConfigureAwait(false) ?? 0;
         var message = Message.CreateUser(conversationId, request.Content, nextSequence + 1, now);
@@ -104,6 +117,11 @@ public sealed class ExecutionService(
 
         // 執行時的模型：這次選的 → 對話上次選的 → 預設；已不在清單的模型退回預設。
         var execution = AgentExecution.Queue(conversation, message, request.ClientRequestId, now, models.Resolve(request.ModelId ?? conversation.ModelId), agentPrompt);
+        foreach (var attachment in attachments)
+        {
+            attachment.AttachTo(message.Id);
+        }
+
         conversation.Touch(now);
         db.Messages.Add(message);
         db.AgentExecutions.Add(execution);
@@ -255,6 +273,28 @@ public sealed class ExecutionService(
         return null;
     }
 
+    /// <returns>沒有指定附件時為空清單；任何一個不可用（或超過數量上限）時為 null。</returns>
+    private async Task<List<MessageAttachment>?> FindPendingAttachmentsAsync(Guid userId, Guid conversationId, IReadOnlyList<Guid>? attachmentIds, CancellationToken cancellationToken)
+    {
+        var ids = attachmentIds?.Distinct().ToList() ?? [];
+        if (ids.Count == 0)
+        {
+            return [];
+        }
+
+        if (ids.Count > AttachmentRules.MaxAttachmentsPerMessage)
+        {
+            return null;
+        }
+
+        var attachments = await db.MessageAttachments
+            .Where(a => ids.Contains(a.Id) && a.UserId == userId && a.ConversationId == conversationId && a.MessageId == null)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        // 依使用者選擇的順序
+        return attachments.Count == ids.Count ? [.. attachments.OrderBy(a => ids.IndexOf(a.Id))] : null;
+    }
+
     private void DetachAll()
     {
         if (db is DbContext context)
@@ -273,6 +313,7 @@ public sealed record SubmitMessageResult(SubmitMessageOutcome Outcome, SendMessa
     public static readonly SubmitMessageResult ModelNotAvailable = new(SubmitMessageOutcome.ModelNotAvailable, null);
     public static readonly SubmitMessageResult MakeTopicNotAvailable = new(SubmitMessageOutcome.MakeTopicNotAvailable, null);
     public static readonly SubmitMessageResult MakeDescriptionRequired = new(SubmitMessageOutcome.MakeDescriptionRequired, null);
+    public static readonly SubmitMessageResult AttachmentNotAvailable = new(SubmitMessageOutcome.AttachmentNotAvailable, null);
 
     public static SubmitMessageResult QuotaExceeded(string message) => new(SubmitMessageOutcome.QuotaExceeded, null, message);
 
@@ -289,4 +330,5 @@ public enum SubmitMessageOutcome
     MakeTopicNotAvailable = 5,
     MakeDescriptionRequired = 6,
     QuotaExceeded = 7,
+    AttachmentNotAvailable = 8,
 }

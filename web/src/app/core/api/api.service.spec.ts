@@ -36,6 +36,22 @@ describe('ApiService', () => {
     second.flush({});
   });
 
+  it('uploads an attachment as the raw request body with its file name', () => {
+    const file = new File(['png-bytes'], '截圖 1.png', { type: 'image/png' });
+    api.uploadAttachment('c1', file).subscribe();
+    api.sendMessage('c1', 'look', null, null, ['a1']).subscribe();
+
+    const upload = http.expectOne((r) => r.url === '/api/conversations/c1/attachments');
+    expect(upload.request.method).toBe('POST');
+    expect(upload.request.body).toBe(file);
+    expect(upload.request.params.get('fileName')).toBe('截圖 1.png');
+    expect(upload.request.headers.get('Content-Type')).toBe('application/octet-stream');
+    const send = http.expectOne('/api/conversations/c1/messages');
+    expect(send.request.body.attachmentIds).toEqual(['a1']);
+    upload.flush({});
+    send.flush({});
+  });
+
   it('filters conversations by project, or lists all without one', () => {
     api.listConversations('p1').subscribe();
     api.listConversations().subscribe();

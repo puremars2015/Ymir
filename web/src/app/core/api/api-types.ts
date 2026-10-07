@@ -35,6 +35,7 @@ export type OidcTestResult = Schemas['OidcTestResponse'];
 export type WorkspaceFile = Schemas['WorkspaceFileResponse'];
 export type TunnelSettings = Schemas['TunnelSettingsResponse'];
 export type WorkspaceFiles = Schemas['WorkspaceFilesResponse'];
+export type Attachment = Schemas['AttachmentResponse'];
 export type RuntimePolicy = Schemas['RuntimePolicyResponse'];
 export type RuntimePolicyValues = Schemas['RuntimePolicyValues'];
 export type SaveRuntimePolicyRequest = Schemas['SaveRuntimePolicyRequest'];

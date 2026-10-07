@@ -14,9 +14,9 @@ import {
 } from '@angular/core';
 import { ComposerSubmission } from '../../core/make/make-command';
 import { RouterLink } from '@angular/router';
-import { forkJoin, Subscription } from 'rxjs';
+import { concatMap, forkJoin, from, Observable, of, Subscription, switchMap, toArray } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
-import { ChatMessage, Conversation, WorkspaceFile } from '../../core/api/api-types';
+import { Attachment, ChatMessage, Conversation, WorkspaceFile } from '../../core/api/api-types';
 import {
   applyExecutionEvent,
   ExecutionView,
@@ -40,10 +40,12 @@ import { Composer } from '../../shared/composer';
 import { AssistantText } from '../../shared/assistant-text';
 import { Markdown } from '../../shared/markdown';
 import { ModelPicker } from '../../shared/model-picker';
+import { AttachmentList } from '../../shared/attachment-list';
 import { FilesPanel } from './files-panel';
 
 interface LiveTurn {
   prompt: string;
+  attachments: Attachment[];
   executionId: string;
   view: ExecutionView;
 }
@@ -56,7 +58,7 @@ interface LiveTurn {
 @Component({
   selector: 'app-chat-page',
   host: { class: 'chat-surface' },
-  imports: [RouterLink, Composer, ModelPicker, AssistantText, Markdown, FilesPanel],
+  imports: [RouterLink, Composer, ModelPicker, AssistantText, Markdown, FilesPanel, AttachmentList],
   templateUrl: './chat-page.html',
   styleUrl: './chat-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -75,6 +77,8 @@ export class ChatPage {
   protected readonly messages = signal<ChatMessage[]>([]);
   protected readonly live = signal<LiveTurn | null>(null);
   protected readonly error = signal<string | null>(null);
+  /** 送出前正在上傳附件（顯示進度、輸入框暫停）。 */
+  protected readonly uploading = signal<string | null>(null);
   protected readonly project = computed(() => this.store.project(this.conversation()?.projectId));
 
   /** 這個對話本次選的模型；未選時沿用對話上次的模型 → 個人偏好 → 預設。 */
@@ -121,30 +125,77 @@ export class ChatPage {
   }
 
   protected submit(submission: ComposerSubmission): void {
-    this.send(submission.content, this.selectedModel(), submission.makeTopicId);
+    this.send(submission.content, this.selectedModel(), submission.makeTopicId, submission.files);
   }
 
   protected send(
     prompt: string,
     modelId: string | null = this.selectedModel(),
     makeTopicId: string | null = null,
+    files: File[] = [],
   ): void {
-    if (this.live()) {
+    if (this.live() || this.uploading()) {
       return;
     }
 
     const conversationId = this.conversationId();
     this.error.set(null);
-    this.api.sendMessage(conversationId, prompt, modelId, makeTopicId).subscribe({
-      next: (accepted) => {
-        if (conversationId !== this.conversationId()) {
-          return; // 送出後使用者已切到別的對話；執行在背景繼續，回來時看歷史即可
-        }
-        this.store.touch(conversationId);
-        this.attach(conversationId, prompt, accepted.executionId, accepted.eventStreamUrl);
-      },
-      error: (error: unknown) => this.error.set(describeApiError(error)),
-    });
+    let attachments: Attachment[] = [];
+    this.upload(conversationId, files)
+      .pipe(
+        switchMap((uploaded) => {
+          attachments = uploaded;
+          this.uploading.set(null);
+          return this.api.sendMessage(
+            conversationId,
+            prompt,
+            modelId,
+            makeTopicId,
+            uploaded.map((a) => a.id),
+          );
+        }),
+      )
+      .subscribe({
+        next: (accepted) => {
+          if (conversationId !== this.conversationId()) {
+            return; // 送出後使用者已切到別的對話；執行在背景繼續，回來時看歷史即可
+          }
+          this.store.touch(conversationId);
+          this.attach(
+            conversationId,
+            prompt,
+            accepted.executionId,
+            accepted.eventStreamUrl,
+            false,
+            attachments,
+          );
+        },
+        error: (error: unknown) => {
+          this.uploading.set(null);
+          this.error.set(describeApiError(error));
+        },
+      });
+  }
+
+  /** 依序上傳附件（一次一個，避免大檔同時佔用頻寬）；沒有附件時直接完成。 */
+  private upload(conversationId: string, files: File[]): Observable<Attachment[]> {
+    if (files.length === 0) {
+      return of([]);
+    }
+    let done = 0;
+    this.uploading.set(`正在上傳檔案（0 / ${files.length}）…`);
+    return from(files).pipe(
+      concatMap((file) =>
+        this.api.uploadAttachment(conversationId, file).pipe(
+          switchMap((attachment) => {
+            done++;
+            this.uploading.set(`正在上傳檔案（${done} / ${files.length}）…`);
+            return of(attachment);
+          }),
+        ),
+      ),
+      toArray(),
+    );
   }
 
   /** 訂閱 execution 的 SSE，以 live turn 顯示；送出新訊息與重新接回執行中的工作共用。 */
@@ -154,10 +205,11 @@ export class ChatPage {
     executionId: string,
     url: string,
     resumed = false,
+    attachments: Attachment[] = [],
   ): void {
     this.filesBeforeTurn = resumed ? null : this.files();
     this.turnFiles.set([]);
-    this.live.set({ prompt, executionId, view: initialExecutionView() });
+    this.live.set({ prompt, attachments, executionId, view: initialExecutionView() });
     this.stream = this.streams.stream(url).subscribe({
       next: (event) =>
         this.live.update((turn) =>
@@ -231,6 +283,7 @@ export class ChatPage {
     this.stream = null;
     this.live.set(null);
     this.error.set(null);
+    this.uploading.set(null);
     this.chosenModel.set(null);
     this.conversation.set(null);
     this.editingTitle.set(false);
@@ -258,6 +311,7 @@ export class ChatPage {
             resumed.executionId,
             `/api/executions/${resumed.executionId}/events`,
             true,
+            resumed.attachments,
           );
           return;
         }
@@ -268,7 +322,7 @@ export class ChatPage {
           if (pending.modelId) {
             this.chosenModel.set(pending.modelId);
           }
-          this.send(pending.prompt, pending.modelId, pending.makeTopicId);
+          this.send(pending.prompt, pending.modelId, pending.makeTopicId, pending.files);
         }
       },
       error: (error: unknown) => this.error.set(describeApiError(error)),
@@ -279,7 +333,13 @@ export class ChatPage {
     this.error.set(error);
     this.reloadMessages(conversationId, () => this.live.set(null));
     const before = this.filesBeforeTurn;
-    this.refreshFiles((files) => this.turnFiles.set(before ? changedFiles(before, files) : []));
+    // 使用者這一輪上傳的附件不算 Agent 產生的檔案
+    const uploaded = new Set(this.live()?.attachments.map((a) => a.path));
+    this.refreshFiles((files) =>
+      this.turnFiles.set(
+        before ? changedFiles(before, files).filter((f) => !uploaded.has(f.path)) : [],
+      ),
+    );
   }
 
   protected refreshFiles(after?: (files: WorkspaceFile[]) => void): void {

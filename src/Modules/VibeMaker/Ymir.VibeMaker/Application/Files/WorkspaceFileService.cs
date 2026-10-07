@@ -130,9 +130,12 @@ public sealed class WorkspaceFileService(IVibeMakerDbContext db, ICurrentUser cu
         }
 
         // 專案的對話共用同一個目錄：專案內任何一個對話執行過就可能有檔案。
+        // 上傳過附件也會有檔案（附件放在工作目錄的 uploads/）。
         var hasRun = conversation.ProjectId is { } projectId
             ? await db.AgentExecutions.AnyAsync(e => e.UserId == userId && db.Conversations.Any(c => c.Id == e.ConversationId && c.ProjectId == projectId), cancellationToken).ConfigureAwait(false)
-            : await db.AgentExecutions.AnyAsync(e => e.ConversationId == conversation.Id, cancellationToken).ConfigureAwait(false);
+                || await db.MessageAttachments.AnyAsync(a => a.UserId == userId && db.Conversations.Any(c => c.Id == a.ConversationId && c.ProjectId == projectId), cancellationToken).ConfigureAwait(false)
+            : await db.AgentExecutions.AnyAsync(e => e.ConversationId == conversation.Id, cancellationToken).ConfigureAwait(false)
+                || await db.MessageAttachments.AnyAsync(a => a.ConversationId == conversation.Id, cancellationToken).ConfigureAwait(false);
         return (RuntimePaths.WorkingDirectoryFor(conversation.Id, conversation.ProjectId), hasRun, conversation.Title);
     }
 }

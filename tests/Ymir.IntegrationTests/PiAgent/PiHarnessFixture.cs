@@ -17,16 +17,17 @@ public sealed class PiHarnessFixture : IAsyncLifetime
     /// <summary>直接呼叫 harness 時使用的模型金鑰（Fake LLM 不驗證）。</summary>
     public const string ModelApiKey = "integration-test-key";
 
-    /// <summary>第二個可選用的模型（Fake LLM 不檢查模型名稱，用來驗證 --model 確實帶入）。</summary>
+    /// <summary>第二個可選用的模型（Fake LLM 不檢查模型名稱，用來驗證 --model 確實帶入）；宣告支援圖片，用來驗證附加的圖片會送給模型。</summary>
     public const string SecondModelId = "fake-model-2";
 
     public static ModelCatalog Catalog { get; } = new(
-        [new ModelDescriptor(FakeLlmEndpoints.ModelId, "Fake"), new ModelDescriptor(SecondModelId, "Fake 2")],
+        [new ModelDescriptor(FakeLlmEndpoints.ModelId, "Fake"), new ModelDescriptor(SecondModelId, "Fake 2", SupportsImages: true)],
         FakeLlmEndpoints.ModelId);
 
     /// <summary>直接呼叫 harness 的 request（預設模型、沒有附加 system prompt）。</summary>
-    public static AgentRunRequest Request(Guid runtimeId, Guid sessionId, string prompt, string? workingDirectory = null, string? modelId = null, IReadOnlyList<string>? systemPrompts = null) =>
-        new(Guid.NewGuid(), runtimeId, sessionId, prompt, workingDirectory ?? RuntimePaths.Workspace, ModelApiKey, modelId ?? FakeLlmEndpoints.ModelId, systemPrompts ?? []);
+    public static AgentRunRequest Request(
+        Guid runtimeId, Guid sessionId, string prompt, string? workingDirectory = null, string? modelId = null, IReadOnlyList<string>? systemPrompts = null, IReadOnlyList<AgentAttachment>? attachments = null) =>
+        new(Guid.NewGuid(), runtimeId, sessionId, prompt, workingDirectory ?? RuntimePaths.Workspace, ModelApiKey, modelId ?? FakeLlmEndpoints.ModelId, systemPrompts ?? [], attachments);
 
     public string WorkspaceRoot { get; } = Path.Combine(Path.GetTempPath(), "ymir-pi-it-" + Guid.NewGuid().ToString("N"));
 
@@ -56,6 +57,7 @@ public sealed class PiHarnessFixture : IAsyncLifetime
                 AbortGracePeriod = TimeSpan.FromSeconds(5),
             }),
             Catalog,
+            new Ymir.VibeMaker.Infrastructure.Files.RuntimeWorkspaceFileReader(RuntimeManager, new TestOutputLogger<Ymir.VibeMaker.Infrastructure.Files.RuntimeWorkspaceFileReader>()),
             new TestOutputLogger<PiAgentHarness>());
 
     public async ValueTask DisposeAsync()

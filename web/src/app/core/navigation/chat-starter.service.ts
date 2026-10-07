@@ -18,10 +18,11 @@ export class ChatStarter {
     firstMessage: string,
     modelId: string | null,
     makeTopicId: string | null = null,
+    files: File[] = [],
   ): Observable<Conversation> {
     return this.store.createConversation(projectId, deriveTitle(firstMessage)).pipe(
       tap((conversation) => {
-        this.pending.set(conversation.id, { prompt: firstMessage, modelId, makeTopicId });
+        this.pending.set(conversation.id, { prompt: firstMessage, modelId, makeTopicId, files });
         void this.router.navigate(['/c', conversation.id]);
       }),
     );

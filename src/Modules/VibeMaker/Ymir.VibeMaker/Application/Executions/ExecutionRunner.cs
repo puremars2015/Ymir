@@ -140,7 +140,8 @@ public sealed class ExecutionRunner(
                 await GetWorkingDirectoryAsync(execution, stoppingToken).ConfigureAwait(false),
                 credential.ApiKey,
                 models.Resolve(execution.ModelId),
-                await GetSystemPromptsAsync(execution, stoppingToken).ConfigureAwait(false));
+                await GetSystemPromptsAsync(execution, stoppingToken).ConfigureAwait(false),
+                await GetAttachmentsAsync(execution, stoppingToken).ConfigureAwait(false));
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
             {
                 if (agentEvent is AgentCompleted or AgentFailed or AgentCancelled)
@@ -243,6 +244,14 @@ public sealed class ExecutionRunner(
     private async Task<string> GetPromptAsync(AgentExecution execution, CancellationToken cancellationToken) =>
         execution.AgentPrompt
         ?? await db.Messages.Where(m => m.Id == execution.UserMessageId).Select(m => m.Content).SingleAsync(cancellationToken).ConfigureAwait(false);
+
+    private async Task<IReadOnlyList<AgentAttachment>> GetAttachmentsAsync(AgentExecution execution, CancellationToken cancellationToken) =>
+        await db.MessageAttachments.AsNoTracking()
+            .Where(a => a.MessageId == execution.UserMessageId)
+            .OrderBy(a => a.CreatedAt)
+            .Select(a => new AgentAttachment(a.Path, a.ContentType, a.Size))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
 
     /// <summary>有專案的對話在專案目錄工作（共用檔案），未分組的對話在自己的目錄工作（ADR-0007）。</summary>
     private async Task<string> GetWorkingDirectoryAsync(AgentExecution execution, CancellationToken cancellationToken)

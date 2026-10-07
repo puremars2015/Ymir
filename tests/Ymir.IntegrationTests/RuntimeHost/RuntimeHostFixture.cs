@@ -77,6 +77,7 @@ public sealed class RuntimeHostFixture : IAsyncLifetime
                 AbortGracePeriod = TimeSpan.FromSeconds(5),
             }),
             PiHarnessFixture.Catalog,
+            new Ymir.VibeMaker.Infrastructure.Files.RuntimeWorkspaceFileReader(RuntimeManager, new TestOutputLogger<Ymir.VibeMaker.Infrastructure.Files.RuntimeWorkspaceFileReader>()),
             new TestOutputLogger<PiAgentHarness>());
 
     public async ValueTask DisposeAsync()

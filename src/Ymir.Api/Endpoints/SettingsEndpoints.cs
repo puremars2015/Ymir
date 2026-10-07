@@ -12,7 +12,7 @@ internal static class SettingsEndpoints
     public static IEndpointRouteBuilder MapSettingsEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("/api/models", (ModelCatalog catalog) =>
-                catalog.Models.Select(m => new ModelResponse(m.Id, m.DisplayName, m.Id == catalog.DefaultModelId)).ToList())
+                catalog.Models.Select(m => new ModelResponse(m.Id, m.DisplayName, m.Id == catalog.DefaultModelId, m.SupportsImages)).ToList())
             .WithName("ListModels")
             .WithTags("Models");
 

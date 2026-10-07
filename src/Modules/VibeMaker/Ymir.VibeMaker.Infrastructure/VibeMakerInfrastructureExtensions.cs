@@ -33,7 +33,9 @@ public static class VibeMakerInfrastructureExtensions
         services.AddSingleton<IExecutionDispatcher, ChannelExecutionDispatcher>();
         services.AddSingleton<IExecutionEventBus, InMemoryExecutionEventBus>();
         services.AddSingleton<IExecutionCancellationRegistry, ExecutionCancellationRegistry>();
-        services.AddSingleton<Application.Files.IWorkspaceFileReader, Files.RuntimeWorkspaceFileReader>();
+        services.AddSingleton<Files.RuntimeWorkspaceFileReader>();
+        services.AddSingleton<Application.Files.IWorkspaceFileReader>(sp => sp.GetRequiredService<Files.RuntimeWorkspaceFileReader>());
+        services.AddSingleton<Application.Files.IWorkspaceFileWriter, Files.RuntimeWorkspaceFileWriter>();
         services.AddHostedService<ExecutionWorker>();
         services.AddHostedService<RuntimeLifecycleWorker>();
         services.AddHttpClient(nameof(Health.LiteLlmHealthCheck));
@@ -154,16 +156,16 @@ public static class VibeMakerInfrastructureExtensions
     /// 沒設定時只有 Development 可以退回固定的開發用 key，其他環境拒絕啟動（避免把 master key 當成共用 key 塞進 container）。
     /// </summary>
     /// <summary>
-    /// 可選用的模型：<c>VibeMaker:Models</c>（每項 Id、DisplayName）；預設模型為 <c>VibeMaker:Pi:ModelId</c>，
+    /// 可選用的模型：<c>VibeMaker:Models</c>（每項 Id、DisplayName、SupportsImages）；預設模型為 <c>VibeMaker:Pi:ModelId</c>，
     /// 不在清單內時自動加入，清單未設定時只有預設模型。
     /// </summary>
     internal static ModelCatalog BuildModelCatalog(IConfiguration configuration)
     {
         var defaultModel = configuration.GetSection(PiAgentOptions.SectionName).GetValue(nameof(PiAgentOptions.ModelId), new PiAgentOptions().ModelId)!;
         var models = configuration.GetSection("VibeMaker:Models").GetChildren()
-            .Select(section => (Id: section["Id"]?.Trim(), DisplayName: section["DisplayName"]?.Trim()))
+            .Select(section => (Id: section["Id"]?.Trim(), DisplayName: section["DisplayName"]?.Trim(), SupportsImages: section.GetValue<bool>("SupportsImages")))
             .Where(m => !string.IsNullOrEmpty(m.Id))
-            .Select(m => new ModelDescriptor(m.Id!, string.IsNullOrEmpty(m.DisplayName) ? m.Id! : m.DisplayName!))
+            .Select(m => new ModelDescriptor(m.Id!, string.IsNullOrEmpty(m.DisplayName) ? m.Id! : m.DisplayName!, m.SupportsImages))
             .DistinctBy(m => m.Id)
             .ToList();
         if (!models.Any(m => m.Id == defaultModel))

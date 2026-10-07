@@ -12,7 +12,8 @@
     "e2e": "node e2e/chat-flow.mjs",
     "e2e:auth": "node e2e/auth-flow.mjs",
     "e2e:make": "node e2e/make-flow.mjs",
-    "e2e:admin": "node e2e/admin-flow.mjs"
+    "e2e:admin": "node e2e/admin-flow.mjs",
+    "e2e:attach": "node e2e/attachment-flow.mjs"
   },
   "private": true,
   "packageManager": "npm@11.19.0",

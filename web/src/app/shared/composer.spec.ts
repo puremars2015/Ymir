@@ -91,7 +91,7 @@ describe('Composer', () => {
     await press({});
     host.querySelector<HTMLButtonElement>('.topic')!.click();
     await fixture.whenStable();
-    expect(submissions).toEqual([{ content: '/make 小工具架設', makeTopicId: 't1' }]);
+    expect(submissions).toEqual([{ content: '/make 小工具架設', makeTopicId: 't1', files: [] }]);
     expect(host.querySelector('.make-picker')).toBeNull();
   });
 
@@ -99,7 +99,7 @@ describe('Composer', () => {
     const { submissions, type, press } = await setup();
     await type('/make 一個計算機');
     await press({});
-    expect(submissions).toEqual([{ content: '/make 一個計算機', makeTopicId: null }]);
+    expect(submissions).toEqual([{ content: '/make 一個計算機', makeTopicId: null, files: [] }]);
   });
 
   it('hints /make while typing a slash command and fills it on click', async () => {
@@ -110,5 +110,41 @@ describe('Composer', () => {
     hint!.click();
     await fixture.whenStable();
     expect(textarea.value).toBe('/make ');
+  });
+
+  it('attaches chosen files, can remove them, and sends files without text', async () => {
+    const { submissions, host, fixture } = await setup();
+    const input = host.querySelector<HTMLInputElement>('input[type=file]')!;
+    const a = new File(['a'], 'a.png', { type: 'image/png' });
+    const b = new File(['bb'], 'b.mp4', { type: 'video/mp4' });
+    Object.defineProperty(input, 'files', { value: [a, b], configurable: true });
+    input.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(
+      Array.from(host.querySelectorAll('.attachment .name')).map((e) => e.textContent),
+    ).toEqual(['a.png', 'b.mp4']);
+
+    host.querySelector<HTMLButtonElement>('.attachment .remove')!.click();
+    await fixture.whenStable();
+    host.querySelector<HTMLButtonElement>('button[type=submit]')!.click();
+    await fixture.whenStable();
+
+    expect(submissions).toEqual([
+      { content: '請看看我附加的檔案。', makeTopicId: null, files: [b] },
+    ]);
+    expect(host.querySelector('.attachment')).toBeNull();
+  });
+
+  it('reports files that cannot be attached', async () => {
+    const { host, fixture } = await setup();
+    const input = host.querySelector<HTMLInputElement>('input[type=file]')!;
+    Object.defineProperty(input, 'files', {
+      value: [new File([], 'empty.txt')],
+      configurable: true,
+    });
+    input.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(host.querySelector('.notice')?.textContent).toContain('empty.txt：空檔案');
+    expect(host.querySelector<HTMLButtonElement>('button[type=submit]')!.disabled).toBe(true);
   });
 });

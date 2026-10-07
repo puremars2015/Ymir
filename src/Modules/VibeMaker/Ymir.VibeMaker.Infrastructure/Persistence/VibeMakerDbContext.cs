@@ -28,6 +28,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<MakeTopic> MakeTopics => Set<MakeTopic>();
 
+    public DbSet<MessageAttachment> MessageAttachments => Set<MessageAttachment>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -140,6 +142,20 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             topic.Property(t => t.Description).HasMaxLength(MakeTopic.DescriptionMaxLength);
             topic.Property(t => t.Instructions).HasMaxLength(MakeTopic.InstructionsMaxLength).IsRequired();
             topic.HasIndex(t => new { t.IsEnabled, t.SortOrder });
+        });
+
+        modelBuilder.Entity<MessageAttachment>(attachment =>
+        {
+            attachment.ToTable("message_attachments");
+            attachment.HasKey(a => a.Id);
+            attachment.Property(a => a.Id).ValueGeneratedNever();
+            attachment.Property(a => a.FileName).HasMaxLength(MessageAttachment.FileNameMaxLength).IsRequired();
+            attachment.Property(a => a.Path).HasMaxLength(MessageAttachment.PathMaxLength).IsRequired();
+            attachment.Property(a => a.ContentType).HasMaxLength(MessageAttachment.ContentTypeMaxLength).IsRequired();
+            attachment.HasOne<Conversation>().WithMany().HasForeignKey(a => a.ConversationId).OnDelete(DeleteBehavior.Restrict);
+            attachment.HasOne<Message>().WithMany().HasForeignKey(a => a.MessageId).OnDelete(DeleteBehavior.Restrict);
+            attachment.HasIndex(a => new { a.ConversationId, a.MessageId });
+            attachment.HasIndex(a => a.MessageId);
         });
 
         modelBuilder.ApplySnakeCaseNames();

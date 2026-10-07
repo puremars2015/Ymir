@@ -50,6 +50,43 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
         Assert.Equal(FakeLlmScript.CreatedFileContent, await File.ReadAllTextAsync(file, ct));
     }
 
+    [Theory]
+    [InlineData(PiHarnessFixture.SecondModelId, true)]
+    [InlineData(FakeLlmEndpoints.ModelId, false)]
+    public async Task AttachedImages_AreSentToModel_OnlyWhenItSupportsImages(string modelId, bool expectImage)
+    {
+        SkipUnlessPiInstalled();
+        var ct = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var projectId = Guid.NewGuid();
+        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, ct);
+        var directory = UserDirectories.For(fixture.WorkspaceRoot, userId).HostPathOf(RuntimePaths.ProjectDirectory(projectId));
+        Directory.CreateDirectory(Path.Combine(directory, "uploads"));
+        await File.WriteAllBytesAsync(Path.Combine(directory, "uploads", "dot.png"), Ymir.IntegrationTests.Attachments.AttachmentTests.Png, ct);
+        await File.WriteAllTextAsync(Path.Combine(directory, "uploads", "notes.txt"), "not an image", ct);
+
+        var events = await RunAsync(
+            fixture.CreateHarness(),
+            PiHarnessFixture.Request(
+                runtime.RuntimeId,
+                Guid.NewGuid(),
+                "看圖",
+                RuntimePaths.ProjectDirectory(projectId),
+                modelId,
+                attachments: [new AgentAttachment("uploads/dot.png", "image/png", 70), new AgentAttachment("uploads/notes.txt", "text/plain", 12)]),
+            ct);
+
+        var completed = Assert.IsType<AgentCompleted>(events[^1]);
+        if (expectImage)
+        {
+            Assert.EndsWith($"{FakeLlmScript.ImageCountPrefix}1", completed.FinalText, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.DoesNotContain(FakeLlmScript.ImageCountPrefix, completed.FinalText, StringComparison.Ordinal);
+        }
+    }
+
     [Fact]
     public async Task SameSessionId_ResumesConversationHistory()
     {
@@ -114,6 +151,7 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
             fixture.RuntimeManager,
             Options.Create(new PiAgentOptions { Executable = "definitely-not-a-real-pi-binary", ModelBaseUrl = fixture.FakeLlm.BaseUrl }),
             PiHarnessFixture.Catalog,
+            new Ymir.VibeMaker.Infrastructure.Files.RuntimeWorkspaceFileReader(fixture.RuntimeManager, new TestOutputLogger<Ymir.VibeMaker.Infrastructure.Files.RuntimeWorkspaceFileReader>()),
             new TestOutputLogger<PiAgentHarness>());
 
         var events = await RunAsync(harness, PiHarnessFixture.Request(runtime.RuntimeId, Guid.NewGuid(), "hi", RuntimePaths.Workspace), ct);

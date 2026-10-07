@@ -132,6 +132,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/conversations/{conversationId}/attachments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['UploadAttachment'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/conversations/{conversationId}/messages': {
     parameters: {
       query?: never;
@@ -642,6 +658,15 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
     };
+    AttachmentResponse: {
+      /** Format: uuid */
+      id: string;
+      fileName: string;
+      path: string;
+      contentType: string;
+      /** Format: int64 */
+      size: number | string;
+    };
     AuditLogItemResponse: {
       /** Format: int64 */
       id: number | string;
@@ -769,11 +794,13 @@ export interface components {
       executionId: null | string;
       /** Format: date-time */
       createdAt: string;
+      attachments: components['schemas']['AttachmentResponse'][];
     };
     ModelResponse: {
       id: string;
       displayName: string;
       isDefault: boolean;
+      supportsImages: boolean;
     };
     OidcSettingsResponse: {
       source: components['schemas']['OidcSettingsSource'];
@@ -895,6 +922,7 @@ export interface components {
       modelId?: null | string;
       /** Format: uuid */
       makeTopicId?: null | string;
+      attachmentIds?: null | string[];
     };
     SendMessageResponse: {
       /** Format: uuid */
@@ -920,6 +948,8 @@ export interface components {
     SetTunnelTokenRequest: {
       token: null | string;
     };
+    /** Format: binary */
+    Stream: string;
     TestOidcSettingsRequest: {
       tenantId: null | string;
     };
@@ -1181,6 +1211,34 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ModelResponse'][];
+        };
+      };
+    };
+  };
+  UploadAttachment: {
+    parameters: {
+      query?: {
+        fileName?: string;
+      };
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/octet-stream': components['schemas']['Stream'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AttachmentResponse'];
         };
       };
     };

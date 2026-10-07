@@ -7,9 +7,11 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Ymir.VibeMaker.Application.Agents;
+using Ymir.VibeMaker.Application.Attachments;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
+using Ymir.VibeMaker.Infrastructure.Files;
 
 namespace Ymir.VibeMaker.Infrastructure.PiAgent;
 
@@ -21,6 +23,7 @@ internal sealed class PiAgentHarness(
     IAgentRuntimeManager runtimeManager,
     IOptions<PiAgentOptions> options,
     ModelCatalog models,
+    RuntimeWorkspaceFileReader files,
     ILogger<PiAgentHarness> logger) : IAgentHarness
 {
     private static readonly JsonSerializerOptions s_jsonOptions = new(JsonSerializerDefaults.Web);
@@ -93,8 +96,11 @@ internal sealed class PiAgentHarness(
             }
 
             var promptId = $"prompt-{request.ExecutionId:N}";
-            await SendCommandAsync(stdin, stdinLock, new { id = promptId, type = "prompt", message = request.Prompt }, cancellationToken)
-                .ConfigureAwait(false);
+            var images = await ReadInlineImagesAsync(request, cancellationToken).ConfigureAwait(false);
+            object prompt = images.Count == 0
+                ? new { id = promptId, type = "prompt", message = request.Prompt }
+                : new { id = promptId, type = "prompt", message = request.Prompt, images };
+            await SendCommandAsync(stdin, stdinLock, prompt, cancellationToken).ConfigureAwait(false);
 
             using var abortRegistration = cancellationToken.Register(() => _ = AbortAsync(stdin, stdinLock, readCts, request.ExecutionId));
 
@@ -172,6 +178,45 @@ internal sealed class PiAgentHarness(
         }
     }
 
+    /// <summary>
+    /// 支援視覺的模型：把使用者附加的圖片（以檔頭判斷為 PNG / JPEG / GIF / WebP、在大小與張數上限內）以 Pi 的 ImageContent 一併送出。
+    /// 其他附件（影片、文件、太大的圖片）只在 prompt 中列出路徑，由 Agent 用工具處理。
+    /// </summary>
+    private async Task<IReadOnlyList<PiImageContent>> ReadInlineImagesAsync(AgentRunRequest request, CancellationToken cancellationToken)
+    {
+        if (!models.SupportsImages(request.ModelId))
+        {
+            return [];
+        }
+
+        var candidates = request.Attachments
+            .Where(a => AttachmentRules.IsInlineImage(a.ContentType) && a.Size <= AttachmentRules.MaxInlineImageBytes)
+            .Take(AttachmentRules.MaxInlineImages)
+            .ToList();
+        if (candidates.Count == 0)
+        {
+            return [];
+        }
+
+        var images = new List<PiImageContent>(candidates.Count);
+        await files.ReadInRuntimeAsync(request.RuntimeId, request.WorkingDirectory, [.. candidates.Select(c => c.Path)], async (file, ct) =>
+        {
+            if (file.Size > AttachmentRules.MaxInlineImageBytes)
+            {
+                return; // 上傳後被 Agent 換成更大的檔案
+            }
+
+            using var buffer = new MemoryStream((int)file.Size);
+            await file.Content.CopyToAsync(buffer, ct).ConfigureAwait(false);
+            var contentType = candidates.First(c => c.Path == file.Path).ContentType;
+            images.Add(new PiImageContent("image", Convert.ToBase64String(buffer.GetBuffer(), 0, (int)buffer.Length), contentType));
+        }, cancellationToken).ConfigureAwait(false);
+        return images;
+    }
+
+    /// <summary>Pi RPC 的 ImageContent（<c>{"type":"image","data":base64,"mimeType":...}</c>）。</summary>
+    internal sealed record PiImageContent(string Type, string Data, string MimeType);
+
     /// <summary>把這次的 system prompt 寫成 runtime 內的檔案（與 models.json 相同，經 stdin 寫入，不經程序參數）。</summary>
     private async Task WriteSystemPromptsAsync(AgentRunRequest request, CancellationToken cancellationToken)
     {
@@ -247,7 +292,7 @@ internal sealed class PiAgentHarness(
 
     private async Task EnsureConfigProvisionedAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
-        var modelsJson = PiModelsConfig.Build(_options, models.Models.Select(m => m.Id));
+        var modelsJson = PiModelsConfig.Build(_options, models.Models);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(modelsJson)));
         if (_provisionedConfigHashes.TryGetValue(runtimeId, out var existing) && existing == hash)
         {
