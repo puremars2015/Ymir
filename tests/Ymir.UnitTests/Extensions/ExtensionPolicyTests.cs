@@ -27,6 +27,23 @@ public class ExtensionPolicyTests
         Assert.Equal(new EffectiveExtensions(false, true), ExtensionPolicyService.Combine(new ExtensionPolicySettings(true, false), grants));
     }
 
+    [Fact]
+    public void Internet_DefaultsToAllowed_AndCanBeDeniedPerUser()
+    {
+        var grants = new Dictionary<ExtensionCapability, ExtensionGrantEffect> { [ExtensionCapability.Internet] = ExtensionGrantEffect.Deny };
+
+        Assert.True(ExtensionPolicyService.Combine(new ExtensionPolicySettings(false, false), NoGrants).Internet);
+        var denied = ExtensionPolicyService.Combine(new ExtensionPolicySettings(false, false), grants);
+        Assert.False(denied.Internet);
+        Assert.Equal(Ymir.VibeMaker.Application.Runtime.RuntimeNetworkAccess.Restricted, denied.NetworkAccess);
+    }
+
+    [Fact]
+    public void SettingSavedBeforeInternetExisted_KeepsInternetAllowed()
+    {
+        Assert.Equal(new ExtensionPolicySettings(true, false, true), ExtensionPolicyService.Parse("{\"skills\":true,\"mcp\":false}"));
+    }
+
     [Theory]
     [InlineData("not json")]
     [InlineData("[]")]

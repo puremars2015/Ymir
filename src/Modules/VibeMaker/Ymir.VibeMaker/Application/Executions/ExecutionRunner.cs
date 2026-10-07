@@ -82,10 +82,14 @@ public sealed class ExecutionRunner(
         RuntimeInfo runtime;
         AgentSession session;
         RuntimeModelCredential credential;
+        EffectiveExtensions extensions;
         try
         {
             await AppendAsync(executionId, new StatusEvent("正在準備 Runtime"), stoppingToken).ConfigureAwait(false);
-            runtime = await runtimeManager.EnsureRuntimeAsync(execution.UserId, runToken).ConfigureAwait(false);
+            // 擴充能力由伺服器在每次執行時決定（ADR-0012 A.3）；對外連線決定 container 的 network（A.8）。
+            // 這裡持有使用者的執行鎖，沒有其他 Agent 在這個 runtime 執行，network 不符時可以安全地重建。
+            extensions = await extensionPolicy.ResolveAsync(execution.UserId, stoppingToken).ConfigureAwait(false);
+            runtime = await runtimeManager.EnsureRuntimeAsync(execution.UserId, extensions.NetworkAccess, runToken).ConfigureAwait(false);
             await RecordRuntimeAsync(runtime, stoppingToken).ConfigureAwait(false);
             await AuditRuntimeTransitionAsync(runtime, stoppingToken).ConfigureAwait(false);
             session = await GetOrCreateSessionAsync(execution, runtime, stoppingToken).ConfigureAwait(false);
@@ -107,6 +111,17 @@ public sealed class ExecutionRunner(
             await FinishAsync(execution, timeout.IsCancellationRequested
                 ? new AgentFailed(ExecutionErrorCodes.AgentTimeout, "執行超過時間限制。")
                 : new AgentCancelled(string.Empty), stoppingToken).ConfigureAwait(false);
+            return;
+        }
+        catch (RuntimeNetworkUnavailableException ex) when (!stoppingToken.IsCancellationRequested)
+        {
+            // 政策要求受限網路，但部署沒有設定：不退回成可以對外連線（ADR-0012 A.8）。
+            logger.LogError(ex, "Restricted network is required for execution {ExecutionId} but not configured", executionId);
+            await auditLog.WriteAsync(
+                new AuditEntry("system", "runtime.ensure", "user", execution.UserId.ToString("D"), AuditResult.Failure, timeProvider.GetUtcNow(), null),
+                stoppingToken).ConfigureAwait(false);
+            await FinishAsync(execution, new AgentFailed(ExecutionErrorCodes.RuntimeStartFailed, "管理員已關閉對外連線，但受限網路尚未設定，請洽管理員。"), stoppingToken)
+                .ConfigureAwait(false);
             return;
         }
         catch (ModelCredentialException ex) when (!stoppingToken.IsCancellationRequested)
@@ -143,8 +158,7 @@ public sealed class ExecutionRunner(
                 credential.ApiKey,
                 models.Resolve(execution.ModelId),
                 await GetSystemPromptsAsync(execution, stoppingToken).ConfigureAwait(false),
-                // 擴充能力由伺服器在每次執行時決定（ADR-0012 A.3）；查詢失敗會落到下方的 catch 而結束，不會放寬權限。
-                await extensionPolicy.ResolveAsync(execution.UserId, stoppingToken).ConfigureAwait(false));
+                extensions);
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
             {
                 if (agentEvent is AgentCompleted or AgentFailed or AgentCancelled)
@@ -283,6 +297,7 @@ public sealed class ExecutionRunner(
         {
             RuntimeTransition.Created => "runtime.create",
             RuntimeTransition.Started => "runtime.start",
+            RuntimeTransition.Recreated => "runtime.recreate",
             _ => null,
         };
         if (action is not null)

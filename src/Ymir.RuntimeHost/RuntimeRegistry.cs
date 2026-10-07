@@ -13,9 +13,9 @@ internal sealed class RuntimeRegistry(IAgentRuntimeManager runtimeManager)
 
     public IAgentRuntimeManager Manager => runtimeManager;
 
-    public async Task<RuntimeInfo> EnsureAsync(Guid userId, CancellationToken cancellationToken)
+    public async Task<RuntimeInfo> EnsureAsync(Guid userId, RuntimeNetworkAccess? network, CancellationToken cancellationToken)
     {
-        var runtime = await runtimeManager.EnsureRuntimeAsync(userId, cancellationToken);
+        var runtime = await runtimeManager.EnsureRuntimeAsync(userId, network, cancellationToken);
         _runtimeByUser[userId] = runtime.RuntimeId;
         return runtime;
     }
@@ -24,7 +24,7 @@ internal sealed class RuntimeRegistry(IAgentRuntimeManager runtimeManager)
 
     /// <summary>執行程序前使用：沒有對應（例如 runtime host 剛重新啟動）時先確保 runtime。</summary>
     public async Task<Guid> ResolveForProcessAsync(Guid userId, CancellationToken cancellationToken) =>
-        Find(userId) ?? (await EnsureAsync(userId, cancellationToken)).RuntimeId;
+        Find(userId) ?? (await EnsureAsync(userId, network: null, cancellationToken)).RuntimeId;
 
     public void Forget(Guid userId) => _runtimeByUser.TryRemove(userId, out _);
 }

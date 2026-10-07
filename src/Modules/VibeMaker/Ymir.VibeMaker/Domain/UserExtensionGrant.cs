@@ -8,6 +8,9 @@ public enum ExtensionCapability
 
     /// <summary>使用者自建的 MCP server。</summary>
     Mcp,
+
+    /// <summary>Agent container 能否連到 LiteLLM 與 gateway 以外的位址（ADR-0012 A.8）；全域預設允許。</summary>
+    Internet,
 }
 
 /// <summary>每人覆寫的效果；沒有資料列表示繼承全域預設。</summary>

@@ -15,7 +15,18 @@ public interface IAgentRuntimeManager
     /// 確保使用者有可用的 runtime（一個使用者一個，ADR-0007）：不存在則建立、已停止則啟動、遺失則重建並掛載同一份使用者目錄（SA §15）。
     /// 必須具備 concurrency protection，同一使用者不得同時建立兩個 container（SA §14）。
     /// </summary>
-    Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, CancellationToken cancellationToken);
+    /// <param name="network">
+    /// 政策要求的對外連線模式（ADR-0012 A.8）。非 null 時，既有 runtime 的 network 不符就移除並重建（檔案保留）；
+    /// 呼叫端必須確定該使用者沒有正在執行的 Agent（<c>ExecutionRunner</c> 持有使用者的執行鎖）。
+    /// null 表示沿用既有 runtime；需要建立時使用 <see cref="RuntimeNetworkAccess.Internet"/>，下一次執行會依政策重建。
+    /// </param>
+    Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, RuntimeNetworkAccess? network, CancellationToken cancellationToken);
+
+    /// <summary>不指定 network（例如讀取檔案）：沿用既有 runtime。</summary>
+    Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, CancellationToken cancellationToken) => EnsureRuntimeAsync(userId, null, cancellationToken);
+
+    /// <summary>這個 runtime provider 能否強制受限網路（ADR-0012 A.8）；供管理介面顯示警告。</summary>
+    RestrictedNetworkSupport RestrictedNetwork => RestrictedNetworkSupport.Unknown;
 
     Task StartAsync(Guid runtimeId, CancellationToken cancellationToken);
 

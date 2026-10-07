@@ -783,6 +783,7 @@ export interface components {
     ExtensionGrantSetting: 'Inherit' | 'Allow' | 'Deny';
     ExtensionPolicyResponse: {
       defaults: components['schemas']['ExtensionValues'];
+      restrictedNetwork: components['schemas']['RestrictedNetworkSupport'];
       /** Format: date-time */
       updatedAt: null | string;
       updatedByName: null | string;
@@ -790,6 +791,7 @@ export interface components {
     ExtensionValues: {
       skills: boolean;
       mcp: boolean;
+      internet: boolean;
     };
     LoginProvidersResponse: {
       oidc: boolean;
@@ -838,6 +840,7 @@ export interface components {
     MyExtensionsResponse: {
       skillsAllowed: boolean;
       mcpAllowed: boolean;
+      internetAllowed: boolean;
       inventoryAvailable: boolean;
       skills: string[];
       mcpServers: string[];
@@ -885,6 +888,8 @@ export interface components {
     ResetPasswordRequest: {
       newPassword: null | string;
     };
+    /** @enum {unknown} */
+    RestrictedNetworkSupport: 'Configured' | 'NotConfigured' | 'Unknown' | 'NotEnforced';
     RuntimePolicyResponse: {
       effective: components['schemas']['RuntimePolicyValues'];
       deployment: components['schemas']['RuntimePolicyValues'];
@@ -925,6 +930,8 @@ export interface components {
     SaveExtensionPolicyRequest: {
       skills: boolean;
       mcp: boolean;
+      /** @default true */
+      internet: boolean;
     };
     SaveMakeTopicRequest: {
       name: string;
@@ -962,6 +969,7 @@ export interface components {
     SaveUserExtensionsRequest: {
       skills: components['schemas']['ExtensionGrantSetting'];
       mcp: components['schemas']['ExtensionGrantSetting'];
+      internet?: components['schemas']['ExtensionGrantSetting'];
     };
     SendMessageRequest: {
       content: string;
@@ -1034,6 +1042,7 @@ export interface components {
     UserExtensionsResponse: {
       skills: components['schemas']['ExtensionGrantSetting'];
       mcp: components['schemas']['ExtensionGrantSetting'];
+      internet: components['schemas']['ExtensionGrantSetting'];
       effective: components['schemas']['ExtensionValues'];
     };
     /** @enum {unknown} */

@@ -383,7 +383,7 @@ export class UsersPage implements OnInit {
   /** 正在編輯擴充能力的成員：覆寫草稿與全域預設（用來顯示「依全域預設」的結果）。 */
   protected readonly extensions = signal<{
     user: AdminUser;
-    draft: SaveUserExtensionsRequest;
+    draft: Required<SaveUserExtensionsRequest>;
     defaults: ExtensionValues;
   } | null>(null);
   protected readonly resetPassword = signal('');
@@ -489,7 +489,7 @@ export class UsersPage implements OnInit {
       ({ state, policy }) =>
         this.extensions.set({
           user,
-          draft: { skills: state.skills, mcp: state.mcp },
+          draft: { skills: state.skills, mcp: state.mcp, internet: state.internet },
           defaults: policy.defaults,
         }),
     );

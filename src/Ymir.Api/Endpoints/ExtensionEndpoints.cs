@@ -4,6 +4,7 @@ using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Users;
 using Ymir.VibeMaker.Application.Extensions;
+using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Extensions;
 using Ymir.VibeMaker.Domain;
 
@@ -36,26 +37,31 @@ internal static class ExtensionEndpoints
     {
         var effective = await policy.ResolveAsync(currentUser.UserId, cancellationToken);
         var items = await inventory.ListAsync(currentUser.UserId, cancellationToken);
-        return new MyExtensionsResponse(effective.Skills, effective.Mcp, items is not null, items?.Skills ?? [], items?.McpServers ?? []);
+        return new MyExtensionsResponse(effective.Skills, effective.Mcp, effective.Internet, items is not null, items?.Skills ?? [], items?.McpServers ?? []);
     }
 
-    private static async Task<ExtensionPolicyResponse> GetPolicyAsync(ExtensionPolicyService policy, IUserDirectory users, CancellationToken cancellationToken) =>
-        await ToResponseAsync(await policy.RefreshAsync(cancellationToken), users, cancellationToken);
+    private static async Task<ExtensionPolicyResponse> GetPolicyAsync(
+        ExtensionPolicyService policy,
+        IAgentRuntimeManager runtimes,
+        IUserDirectory users,
+        CancellationToken cancellationToken) =>
+        await ToResponseAsync(await policy.RefreshAsync(cancellationToken), runtimes, users, cancellationToken);
 
     private static async Task<ExtensionPolicyResponse> SavePolicyAsync(
         SaveExtensionPolicyRequest request,
         ExtensionPolicyService policy,
+        IAgentRuntimeManager runtimes,
         IUserDirectory users,
         ICurrentUser currentUser,
         IAuditLog auditLog,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var state = await policy.SaveAsync(new ExtensionPolicySettings(request.Skills, request.Mcp), currentUser.ActorName, cancellationToken);
+        var state = await policy.SaveAsync(new ExtensionPolicySettings(request.Skills, request.Mcp, request.Internet), currentUser.ActorName, cancellationToken);
         await auditLog.WriteAsync(
             new AuditEntry(currentUser.ActorName, "admin.settings.extensions.update", "setting", ExtensionPolicyService.Key, AuditResult.Success, timeProvider.GetUtcNow(), null),
             cancellationToken);
-        return await ToResponseAsync(state, users, cancellationToken);
+        return await ToResponseAsync(state, runtimes, users, cancellationToken);
     }
 
     private static async Task<IResult> GetUserAsync(Guid userId, ExtensionPolicyService policy, IUserDirectory users, CancellationToken cancellationToken)
@@ -89,6 +95,7 @@ internal static class ExtensionEndpoints
             {
                 [ExtensionCapability.Skills] = ToEffect(request.Skills),
                 [ExtensionCapability.Mcp] = ToEffect(request.Mcp),
+                [ExtensionCapability.Internet] = ToEffect(request.Internet),
             },
             currentUser.ActorName,
             cancellationToken);
@@ -113,14 +120,23 @@ internal static class ExtensionEndpoints
     private static UserExtensionsResponse ToResponse(UserExtensionState state) => new(
         ToSetting(state, ExtensionCapability.Skills),
         ToSetting(state, ExtensionCapability.Mcp),
-        new ExtensionValues(state.Effective.Skills, state.Effective.Mcp));
+        ToSetting(state, ExtensionCapability.Internet),
+        new ExtensionValues(state.Effective.Skills, state.Effective.Mcp, state.Effective.Internet));
 
-    private static async Task<ExtensionPolicyResponse> ToResponseAsync(ExtensionPolicyState state, IUserDirectory users, CancellationToken cancellationToken)
+    private static async Task<ExtensionPolicyResponse> ToResponseAsync(
+        ExtensionPolicyState state,
+        IAgentRuntimeManager runtimes,
+        IUserDirectory users,
+        CancellationToken cancellationToken)
     {
         var updatedByName = state.Stored?.UpdatedBy is { } actor && AuditActor.TryGetUserId(actor) is { } userId
             ? (await users.FindAsync(userId, cancellationToken))?.DisplayName
             : null;
-        return new ExtensionPolicyResponse(new ExtensionValues(state.Effective.Skills, state.Effective.Mcp), state.Stored?.UpdatedAt, updatedByName);
+        return new ExtensionPolicyResponse(
+            new ExtensionValues(state.Effective.Skills, state.Effective.Mcp, state.Effective.Internet),
+            runtimes.RestrictedNetwork,
+            state.Stored?.UpdatedAt,
+            updatedByName);
     }
 
     private static IResult UserNotFound() => ApiProblem.Create(StatusCodes.Status404NotFound, "USER_NOT_FOUND", "找不到使用者。");
@@ -134,14 +150,18 @@ public enum ExtensionGrantSetting
     Deny,
 }
 
-public sealed record ExtensionValues(bool Skills, bool Mcp);
+/// <param name="Internet">能否對外連線（ADR-0012 A.8）。</param>
+public sealed record ExtensionValues(bool Skills, bool Mcp, bool Internet);
 
-public sealed record SaveExtensionPolicyRequest(bool Skills, bool Mcp);
+/// <param name="Internet">省略時為允許（與預設相同）。</param>
+public sealed record SaveExtensionPolicyRequest(bool Skills, bool Mcp, bool Internet = true);
 
-/// <param name="Defaults">全域預設（沒有個人覆寫的成員套用這個值）。沒有設定過時全部關閉。</param>
-public sealed record ExtensionPolicyResponse(ExtensionValues Defaults, DateTimeOffset? UpdatedAt, string? UpdatedByName);
+/// <param name="Defaults">全域預設（沒有個人覆寫的成員套用這個值）。沒有設定過時 skill / MCP 關閉、對外連線允許。</param>
+/// <param name="RestrictedNetwork">關閉對外連線能否生效：沒有設定受限網路時，被關閉的成員無法執行 Agent。</param>
+public sealed record ExtensionPolicyResponse(ExtensionValues Defaults, RestrictedNetworkSupport RestrictedNetwork, DateTimeOffset? UpdatedAt, string? UpdatedByName);
 
-public sealed record SaveUserExtensionsRequest(ExtensionGrantSetting Skills, ExtensionGrantSetting Mcp);
+/// <param name="Internet">省略時為依全域預設。</param>
+public sealed record SaveUserExtensionsRequest(ExtensionGrantSetting Skills, ExtensionGrantSetting Mcp, ExtensionGrantSetting Internet = ExtensionGrantSetting.Inherit);
 
 /// <param name="Effective">套用全域預設與覆寫後的結果。</param>
-public sealed record UserExtensionsResponse(ExtensionGrantSetting Skills, ExtensionGrantSetting Mcp, ExtensionValues Effective);
+public sealed record UserExtensionsResponse(ExtensionGrantSetting Skills, ExtensionGrantSetting Mcp, ExtensionGrantSetting Internet, ExtensionValues Effective);

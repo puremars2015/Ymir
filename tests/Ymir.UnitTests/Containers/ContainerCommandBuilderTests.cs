@@ -181,4 +181,72 @@ public class ContainerCommandBuilderTests
         Assert.Equal(expected, new RuntimeOptions { Provider = provider }.ResolvedExecutable);
         Assert.Equal("/usr/local/bin/podman", new RuntimeOptions { Provider = provider, ContainerExecutable = "/usr/local/bin/podman" }.ResolvedExecutable);
     }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public void Run_InternetAccess_UsesTheDeploymentNetwork_AndLabelsIt(RuntimeProvider provider)
+    {
+        var args = RunArguments(provider);
+
+        Assert.Equal(provider == RuntimeProvider.Docker ? "bridge" : "slirp4netns", ValueAfter(args, "--network"));
+        Assert.Contains("ymir.network=internet", ValuesAfter(args, "--label"));
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public void Run_RestrictedAccess_UsesTheConfiguredInternalNetwork(RuntimeProvider provider)
+    {
+        // ADR-0012 A.8：network 名稱只來自部署設定，Agent / API 請求無法指定。
+        var options = new RuntimeOptions { Provider = provider, WorkspaceRoot = "/srv/ymir/workspaces", RestrictedNetwork = "ymir-agents" };
+        var args = ContainerCommandBuilder.BuildRunArguments(options, UserId, Guid.NewGuid(), UserDirectories.For(options.WorkspaceRoot, UserId), RuntimeNetworkAccess.Restricted);
+
+        Assert.Equal("ymir-agents", ValueAfter(args, "--network"));
+        Assert.Single(ValuesAfter(args, "--network"));
+        Assert.Contains("ymir.network=restricted", ValuesAfter(args, "--label"));
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public void Run_RestrictedAccess_WithoutConfiguredNetwork_NeverFallsBackToInternet(RuntimeProvider provider)
+    {
+        var options = new RuntimeOptions { Provider = provider, WorkspaceRoot = "/srv/ymir/workspaces" };
+
+        Assert.Throws<RuntimeNetworkUnavailableException>(() =>
+            ContainerCommandBuilder.BuildRunArguments(options, UserId, Guid.NewGuid(), UserDirectories.For(options.WorkspaceRoot, UserId), RuntimeNetworkAccess.Restricted));
+    }
+
+    [Theory]
+    [InlineData("host")]
+    [InlineData("bridge")]
+    [InlineData("slirp4netns")]
+    [InlineData("none")]
+    [InlineData("container:other")]
+    [InlineData("ns:/proc/1/ns/net")]
+    [InlineData("-x")]
+    [InlineData("")]
+    public void RestrictedNetwork_RejectsSharedOrSpecialNetworks(string name)
+    {
+        var options = new RuntimeOptions { RestrictedNetwork = name };
+
+        Assert.False(RuntimeOptions.IsValidRestrictedNetworkName(name));
+        Assert.Throws<InvalidOperationException>(options.ValidateRestrictedNetwork);
+    }
+
+    [Theory]
+    [InlineData("running|restricted", "running", "restricted")]
+    [InlineData("exited|", "exited", null)]
+    [InlineData("running|<no value>", "running", null)]
+    [InlineData("created\n", "created", null)]
+    public void Inspect_ParsesStateAndNetworkLabel(string output, string state, string? label)
+    {
+        Assert.Equal((state, label), ContainerRuntimeManager.ParseInspect(output.Replace("\\n", "\n", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void NetworkLabel_MissingMeansInternet()
+    {
+        // A1b 之前建立的 container 沒有 label，可以對外連線；政策要求受限時會被重建。
+        Assert.Equal(RuntimeNetworkAccess.Internet, ContainerCommandBuilder.NetworkOfLabel(null));
+        Assert.Equal(RuntimeNetworkAccess.Restricted, ContainerCommandBuilder.NetworkOfLabel("restricted"));
+    }
 }

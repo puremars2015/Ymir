@@ -1,7 +1,12 @@
 import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { CAPABILITIES, CapabilityKey, capabilitySummary } from '../../core/admin/extension-rules';
+import {
+  CAPABILITIES,
+  CapabilityKey,
+  capabilitySummary,
+  restrictedNetworkWarning,
+} from '../../core/admin/extension-rules';
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { ExtensionPolicy, ExtensionValues } from '../../core/api/api-types';
 
@@ -41,12 +46,16 @@ import { ExtensionPolicy, ExtensionValues } from '../../core/api/api-types';
               <span>
                 允許{{ c.label }}
                 <span class="muted small block">{{ c.description }}</span>
+                @if (c.key === 'internet' && networkWarning(); as warning) {
+                  <span class="warning small block" role="note">{{ warning }}</span>
+                }
               </span>
             </label>
           }
           <p class="muted small">
-            沒有個人設定的成員套用這裡的預設；要針對個人開放或禁止，到「使用者」頁設定。變更從成員的下一則訊息開始生效；
-            關閉時，成員已建立的 skill 與 MCP 設定會保留，只是不會被載入。
+            沒有個人設定的成員套用這裡的預設；要針對個人開放或禁止，到「使用者」頁設定。變更從成員的下一則訊息開始生效
+            （對外連線改變時，成員的執行環境會在下一次執行前重建，檔案保留）；關閉時，成員已建立的
+            skill 與 MCP 設定會保留，只是不會被載入。
           </p>
           <div class="row">
             <button type="submit" [disabled]="busy()">儲存</button>
@@ -78,6 +87,9 @@ import { ExtensionPolicy, ExtensionValues } from '../../core/api/api-types';
     .block {
       display: block;
     }
+    .warning {
+      color: var(--danger);
+    }
     .summary {
       margin-top: 0.25rem;
     }
@@ -102,7 +114,7 @@ export class ExtensionSettingsCard implements OnInit {
 
   protected readonly capabilities = CAPABILITIES;
   protected readonly policy = signal<ExtensionPolicy | null>(null);
-  protected readonly draft = signal<ExtensionValues>({ skills: false, mcp: false });
+  protected readonly draft = signal<ExtensionValues>({ skills: false, mcp: false, internet: true });
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -119,6 +131,11 @@ export class ExtensionSettingsCard implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  protected networkWarning(): string | null {
+    const policy = this.policy();
+    return policy ? restrictedNetworkWarning(policy.restrictedNetwork) : null;
   }
 
   protected summary(values: ExtensionValues): string {
