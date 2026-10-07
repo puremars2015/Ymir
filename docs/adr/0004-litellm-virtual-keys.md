@@ -41,6 +41,12 @@ SA §12 要求「LiteLLM key 不應落地到使用者可讀 Workspace，以 runt
   - 使用者被停用時撤銷 key：已有 `RuntimeCredentialService.RevokeAsync`，等帳號停用流程（Sprint 2 Admin）呼叫；
   - runtime idle stop 時撤銷：等 idle stop 實作。
 
+## 補充（2026-10-07，ADR-0011）
+
+- key 帶 LiteLLM 的 `user_id`（= Ymir 使用者 id），發 key 前先建立或更新 LiteLLM 使用者。
+- 預算改為**每人每月**（使用者層級的 `max_budget` + `budget_duration: 30d`），由管理介面的執行政策設定。原本每把 key 的 `max_budget` 會隨 key 每 24 小時換發而重置，保留為相容設定。
+- 管理介面的用量讀 LiteLLM 的 `/user/daily/activity` 與 `/user/info`，Ymir 不自己保存 token 或費用。
+
 ## 影響
 
 - 即使 key 外洩，影響範圍限於單一使用者、有限模型、有限預算與時間。

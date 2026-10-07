@@ -1,5 +1,12 @@
 import { UserUsage } from '../api/api-types';
-import { formatRunTime, quotaLevel, successRate, usageTotals } from './usage-rules';
+import {
+  budgetLevel,
+  formatRunTime,
+  formatTokens,
+  quotaLevel,
+  successRate,
+  usageTotals,
+} from './usage-rules';
 
 const usage = (
   executions: number,
@@ -17,6 +24,13 @@ const usage = (
   last24Hours: executions,
   lastExecutionAt: null,
   runtimeStatus: null,
+  spendUsd: executions * 0.5,
+  promptTokens: executions * 100,
+  completionTokens: executions * 10,
+  modelRequests: executions,
+  budgetSpendUsd: null,
+  budgetUsd: null,
+  budgetResetAt: null,
 });
 
 describe('usage rules', () => {
@@ -43,6 +57,26 @@ describe('usage rules', () => {
       executions: 6,
       failed: 1,
       runMinutes: 3.5,
+      spendUsd: 3,
+      tokens: 660,
     });
+  });
+});
+
+describe('model usage rules', () => {
+  it('依本期預算標示', () => {
+    expect(budgetLevel(5, null)).toBe('none');
+    expect(budgetLevel(null, 10)).toBe('none');
+    expect(budgetLevel(2, 10)).toBe('ok');
+    expect(budgetLevel(8.5, 10)).toBe('near');
+    expect(budgetLevel(10, 10)).toBe('reached');
+  });
+
+  it('token 數的顯示', () => {
+    expect(formatTokens(null)).toBe('0');
+    expect(formatTokens(950)).toBe('950');
+    expect(formatTokens(1234)).toBe('1.2K');
+    expect(formatTokens(12345)).toBe('12K');
+    expect(formatTokens(2_500_000)).toBe('2.5M');
   });
 });

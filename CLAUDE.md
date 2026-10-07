@@ -104,7 +104,7 @@ Runtime 生命週期（ADR-0011）：`RuntimeLifecycleWorker` 啟動時對帳、
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
 
-模型金鑰（ADR-0004）：設定 `VibeMaker__LiteLlm__BaseUrl` 與 `VibeMaker__LiteLlm__MasterKey` 後，API 為每位使用者向 LiteLLM 發 virtual key；非 Development 未設定會拒絕啟動。本機可用 `FAKE_LLM_MASTER_KEY=<任意值>` 讓 Fake LLM 模擬 LiteLLM 的 key 管理（說明見 `deploy/litellm/README.md`）。
+模型金鑰（ADR-0004）：設定 `VibeMaker__LiteLlm__BaseUrl` 與 `VibeMaker__LiteLlm__MasterKey` 後，API 為每位使用者向 LiteLLM 發 virtual key（帶 `user_id`，發 key 前 upsert LiteLLM 使用者並套用每月預算）；用量頁的費用 / token 與預算檢查都經 `IModelGateway` 讀 LiteLLM，Ymir 不自己保存；非 Development 未設定會拒絕啟動。本機可用 `FAKE_LLM_MASTER_KEY=<任意值>` 讓 Fake LLM 模擬 LiteLLM 的 key 管理（說明見 `deploy/litellm/README.md`）。
 
 Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用於開發 / 驗證，例如 Windows，ADR-0005；指南 `docs/guides/windows-docker.md`）| `Local`（Linux / macOS 開發用，無隔離）| `Remote`（API 在容器內，呼叫 runtime host：`VibeMaker:Runtime:Remote:Endpoint` / `Token`，ADR-0008）。Runtime host 自己用 Podman / Docker / Local。
 

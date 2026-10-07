@@ -10,7 +10,15 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { runtimeStatusLabel } from '../../core/admin/admin-rules';
-import { formatRunTime, quotaLevel, successRate, usageTotals } from '../../core/admin/usage-rules';
+import { formatBudget, formatUsd } from '../../core/admin/runtime-policy-rules';
+import {
+  budgetLevel,
+  formatRunTime,
+  formatTokens,
+  quotaLevel,
+  successRate,
+  usageTotals,
+} from '../../core/admin/usage-rules';
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { AdminUsage, UserUsage } from '../../core/api/api-types';
 import { AdminTabs } from './admin-tabs';
@@ -53,14 +61,28 @@ import { AdminTabs } from './admin-tabs';
             <span class="label">Agent 執行時間</span>
             <strong class="value small-value">{{ runTime(totals().runMinutes) }}</strong>
           </article>
+          @if (u.modelUsageAvailable) {
+            <article class="card stat">
+              <span class="label">模型費用</span>
+              <strong class="value small-value">{{ usd(totals().spendUsd) }}</strong>
+              <span class="muted small">Token {{ tokens(totals().tokens) }}</span>
+            </article>
+          }
           <article class="card stat">
             <span class="label">每日上限</span>
             <strong class="value small-value">{{
               +u.dailyExecutionLimit ? u.dailyExecutionLimit + ' 次' : '不限制'
             }}</strong>
+            <span class="muted small">每月預算 {{ budget(u.monthlyBudgetUsd) }}</span>
             <a class="muted small" routerLink="/admin/settings">調整執行政策</a>
           </article>
         </div>
+        @if (!u.modelUsageAvailable) {
+          <p class="muted small">
+            未連接 LiteLLM（開發環境），沒有模型費用與 token 資料。設定 VibeMaker__LiteLlm__BaseUrl
+            / MasterKey 後顯示。
+          </p>
+        }
 
         <article class="card">
           <div class="table-wrap">
@@ -73,6 +95,11 @@ import { AdminTabs } from './admin-tabs';
                   <th class="num">失敗 / 取消</th>
                   <th class="num">執行時間</th>
                   <th class="num">24 小時</th>
+                  @if (u.modelUsageAvailable) {
+                    <th class="num">費用</th>
+                    <th class="num">Token（輸入 / 輸出）</th>
+                    <th class="num">本期預算</th>
+                  }
                   <th>最後執行</th>
                   <th>執行環境</th>
                 </tr>
@@ -100,6 +127,32 @@ import { AdminTabs } from './admin-tabs';
                         row.last24Hours
                       }}</span>
                     </td>
+                    @if (u.modelUsageAvailable) {
+                      <td class="num">{{ row.spendUsd === null ? '—' : usd(row.spendUsd) }}</td>
+                      <td class="num small">
+                        @if (row.promptTokens === null) {
+                          —
+                        } @else {
+                          {{ tokens(row.promptTokens) }} / {{ tokens(row.completionTokens) }}
+                        }
+                      </td>
+                      <td class="num small">
+                        @if (row.budgetUsd) {
+                          <span
+                            class="quota"
+                            [attr.data-level]="budgetLevel(row)"
+                            [title]="
+                              row.budgetResetAt
+                                ? '於 ' + (row.budgetResetAt | date: 'MM-dd') + ' 重置'
+                                : ''
+                            "
+                            >{{ usd(row.budgetSpendUsd ?? 0) }} / {{ usd(row.budgetUsd) }}</span
+                          >
+                        } @else {
+                          —
+                        }
+                      </td>
+                    }
                     <td class="small">
                       {{ row.lastExecutionAt ? (row.lastExecutionAt | date: 'MM-dd HH:mm') : '—' }}
                     </td>
@@ -109,14 +162,18 @@ import { AdminTabs } from './admin-tabs';
                   </tr>
                 } @empty {
                   <tr>
-                    <td colspan="8" class="muted">這段期間沒有任何執行</td>
+                    <td [attr.colspan]="u.modelUsageAvailable ? 11 : 8" class="muted">
+                      這段期間沒有任何執行
+                    </td>
                   </tr>
                 }
               </tbody>
             </table>
           </div>
           <p class="muted small legend">
-            「24 小時」與每日上限比較：<span class="quota" data-level="near">接近上限</span>
+            「24 小時」與每日上限、「本期預算」與每月預算比較：<span class="quota" data-level="near"
+              >接近上限</span
+            >
             <span class="quota" data-level="reached">已達上限</span>
           </p>
         </article>
@@ -132,7 +189,8 @@ import { AdminTabs } from './admin-tabs';
       padding: 2rem 1rem;
     }
     .admin {
-      max-width: 64rem;
+      /* 連接 LiteLLM 時表格多三欄，比其他管理頁寬一些 */
+      max-width: 78rem;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
@@ -253,6 +311,22 @@ export class UsagePage implements OnInit {
 
   protected level(row: UserUsage, usage: AdminUsage): string {
     return quotaLevel(row.last24Hours, usage.dailyExecutionLimit);
+  }
+
+  protected usd(value: number | string): string {
+    return formatUsd(value);
+  }
+
+  protected budget(value: number | string): string {
+    return formatBudget(value);
+  }
+
+  protected tokens(value: number | string | null): string {
+    return formatTokens(value);
+  }
+
+  protected budgetLevel(row: UserUsage): string {
+    return budgetLevel(row.budgetSpendUsd, row.budgetUsd);
   }
 
   protected statusLabel(row: UserUsage): string {

@@ -7,6 +7,11 @@ model_list:
       model: openai/MiniMax-M2
       api_base: https://api.minimax.io/v1
       api_key: os.environ/MINIMAX_API_KEY
+    # 單價（美元 / token）：用量頁的費用與每人每月預算都依此計算（ADR-0011）。
+    # LiteLLM 沒有 MiniMax 的內建單價，請依你的 MiniMax 方案填寫；保持 0 時費用為 0、預算不會用完（token 數仍正確）。
+    model_info:
+      input_cost_per_token: 0
+      output_cost_per_token: 0
 
   # 開發 / 離線驗證用：轉給 Ymir 的 Fake LLM（dotnet run --project tests/Ymir.Testing.FakeLlm），不需要任何金鑰。
   - model_name: fake-model
