@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-08 04:00 ・ 狀態：**🚧 進行中（OneDrive 首版完成，接著恢復 A2 MCP Gateway）**
+> 最後更新：2026-10-08 06:00 ・ 狀態：**🚧 進行中（A2 完成；依序進行 R0→R1→R2→H0→H1→H2，使用者要求先不合併回 main）**
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -39,14 +39,14 @@
 | A0 | ADR-0012 spike：實測 Pi 1.0.0 在 RPC 模式的 `--no-skills` / `--skill`、能否不讀使用者層 `mcp.json`、平台 MCP 設定能否放在 Agent 不可寫的位置，以及 rootless Podman 能否限制 egress；結果寫回 ADR-0012 | ✅ | — |
 | A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`）+ 每人覆寫資料表 `vibemaker.user_extension_grants`<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | ✅ | — |
 | A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• `internet` 能力加入擴充政策（全域 + 每人）<br>• 受限網路部署文件 | ✅ | — |
-| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | **暫停**：插單 OneDrive 完成後繼續 |
+| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ✅ | 見 #013 |
 | O0 | **插單** OneDrive connector ADR（[ADR-0013](../adr/0013-onedrive-connector.md)） | ✅ | — |
 | O1 | OneDrive 連結 / 解除連結：<br>• `onedrive` 能力<br>• 授權碼 + PKCE 連結流程、refresh token 加密保存<br>• 根資料夾、設定頁<br>• FakeGraph 測試替身 | ✅ | — |
 | O2 | OneDrive 同步：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | ✅ | — |
-| R0 | RAG ADR（ADR-0014）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite（sqlite-vec）部署、權限 | ⏳ | **❓待決定**：Embedding 模型與硬體、文件格式與容量、外部回答模型的資料政策 |
+| R0 | RAG ADR（ADR-0014）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite 部署、權限 | ⏳ | 使用者 2026-10-08 決定：Embedding 經 LiteLLM；回答模型由管理員標記可用於知識庫 |
 | R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ⏳ | R0 經使用者確認 |
 | R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ⏳ | R1 |
-| H0 | 網站託管 ADR（ADR-0015）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ⏳ | **❓待決定**：網域與 DNS / Tunnel、公司模式的帳號範圍、配額 |
+| H0 | 網站託管 ADR（ADR-0016；0015 已用於明確交付成果）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ⏳ | 使用者 2026-10-08 決定：網域為設定值 `<代碼>.<BaseDomain>`（真實 DNS / Tunnel 待使用者環境）；可見範圍由網站擁有者選擇，Ymir 管理員一律可看 |
 | H1 | 公開網站發布：網站與版本、產物檢查、Nginx 託管、原子切換、取消發布 | ⏳ | H0 經使用者確認 |
 | H2 | 身分與分享：公司模式、指定使用者、分享給我的網站 | ⏳ | H1 |
 | C1 | 對話附加檔案 / 圖片 / 影片給 Agent（使用者回報） | ✅ | 見 [#006](#006--對話可以附加檔案圖片影片給-agent)；真實視覺模型**待使用者環境確認** |
@@ -70,6 +70,50 @@
 
 ## 💬 留言區
 
+### #013 · A2 完成：平台 MCP Gateway；接下來依序完成 RAG 與網站託管
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 06:00 · `✅完成`
+
+- **使用者指示（2026-10-08）**：
+  - 依序完成剩下的計畫：A2 → R0 → R1 → R2 → H0 → H1 → H2；P0 維持「僅計畫」。
+  - **做完先不要 merge 回 main**，留在 `claude/inspiring-einstein-2pwxx6`；PR #47 保持開啟、不合併。
+- **使用者決定**：
+
+  | 項目 | 決定 |
+  |---|---|
+  | RAG Embedding | 經 LiteLLM `/v1/embeddings` |
+  | RAG 回答模型 | 由管理員標記哪些模型可用於知識庫 |
+  | 網站網域 | 設定值 `<代碼>.<BaseDomain>` |
+  | 網站可見範圍 | 由擁有者選擇，Ymir 管理員一律可看 |
+
+- **ADR 編號**：ADR-0015 已用於明確交付成果，所以網站託管改為 ADR-0016。
+- **A2 做了什麼**（ADR-0012 階段 2，附註已寫入 ADR）：
+  - **`src/Ymir.McpGateway`**：獨立服務。
+    - 驗證 API 簽發的每人短期 token（HMAC；內容是使用者、允許的服務、期限，最長 1 小時）。
+    - `/mcp/{服務}` 轉送到 `deploy/mcp/servers.json` 中的後端，並換成 gateway 自己保管的後端憑證。
+    - 每人 rate limit、逾時。
+    - 稽核：`mcp.tool.call` 只記工具名稱；另有 `mcp.access.denied`。
+  - **存取清單** `vibemaker.mcp_server_access`：
+    - 管理端點 `GET /api/admin/mcp-servers`、`PUT .../{name}/access`；
+    - 「系統設定 → 平台 MCP 服務」卡；
+    - 個人設定顯示可用的平台服務。
+  - **執行時**：
+    - `mcp.json` 寫入 gateway 位址與 `Authorization: Bearer ${YMIR_MCP_TOKEN}`，檔案裡沒有 token 值，平台項目優先；
+    - token 經 `exec --env` 傳入；
+    - 使用者沒有 `mcp` 能力時也載入 `builtin:mcp`，但只合併平台項目。
+  - **部署**：`deploy/mcp/`（目錄、範例、env 範本、systemd unit、README）；CLAUDE.md 已更新。
+- **驗證**：
+  - `dotnet build`（0 警告）、`dotnet format --verify-no-changes`。
+  - `dotnet test --solution`：664 / 664 通過，新增：
+    - `McpGatewayTests` 6 個：真實 Pi 經 gateway 呼叫 echo；偽造 / 過期 token；未授權服務；rate limit；存取清單；後端只收到 gateway 憑證；`mcp.json` 不含 token。
+    - `PlatformMcpTests` 13 個。
+  - 前端 lint、133 個測試、build 都通過。
+  - `e2e:mcp`（Fake MCP + gateway + Pi + Fake LLM）：管理員開放 → 成員看到 → Agent 回覆「echo: ping from agent」，全部通過。
+- **未驗證、待使用者環境確認**：真實後端服務（EIP / MES）；正式主機上受限網路（`--internal`）連到 gateway 的路由。
+- **其他**：PR #47 上「Agent runtime image」是 Docker Hub 回 500 造成的失敗，已重跑一次。
+- **下一步**：R0（ADR-0014 RAG）。
+
+---
 ### #012 · O2 完成：OneDrive 同步
 
 > 👤 **Claude（AI）** · 🕒 2026-10-08 04:00 · `✅完成`
