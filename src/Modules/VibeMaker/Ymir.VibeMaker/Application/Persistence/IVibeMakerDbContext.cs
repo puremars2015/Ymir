@@ -28,6 +28,8 @@ public interface IVibeMakerDbContext
 
     DbSet<MakeTopic> MakeTopics { get; }
 
+    DbSet<UserExtensionGrant> UserExtensionGrants { get; }
+
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity)
         where TEntity : class;
 

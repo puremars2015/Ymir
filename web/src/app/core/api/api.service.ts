@@ -11,6 +11,11 @@ import {
   TunnelSettings,
   RuntimePolicy,
   SaveRuntimePolicyRequest,
+  ExtensionPolicy,
+  ExtensionValues,
+  MyExtensions,
+  SaveUserExtensionsRequest,
+  UserExtensions,
   AdminUsage,
   ServiceHealth,
   WorkspaceFiles,
@@ -133,6 +138,31 @@ export class ApiService {
 
   adminResetRuntimePolicy(): Observable<RuntimePolicy> {
     return this.http.delete<RuntimePolicy>('/api/admin/settings/runtime');
+  }
+
+  /** Agent 擴充能力的全域預設（ADR-0012）。 */
+  adminGetExtensionPolicy(): Observable<ExtensionPolicy> {
+    return this.http.get<ExtensionPolicy>('/api/admin/settings/extensions');
+  }
+
+  adminSaveExtensionPolicy(request: ExtensionValues): Observable<ExtensionPolicy> {
+    return this.http.put<ExtensionPolicy>('/api/admin/settings/extensions', request);
+  }
+
+  adminGetUserExtensions(userId: string): Observable<UserExtensions> {
+    return this.http.get<UserExtensions>(`/api/admin/users/${userId}/extensions`);
+  }
+
+  adminSaveUserExtensions(
+    userId: string,
+    request: SaveUserExtensionsRequest,
+  ): Observable<UserExtensions> {
+    return this.http.put<UserExtensions>(`/api/admin/users/${userId}/extensions`, request);
+  }
+
+  /** 目前使用者的擴充能力與自建擴充（只回自己的資料）。 */
+  getMyExtensions(): Observable<MyExtensions> {
+    return this.http.get<MyExtensions>('/api/extensions');
   }
 
   adminHealth(): Observable<ServiceHealth> {

@@ -9,7 +9,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 |---|---|
 | `docs/sa/vibe-maker-core-mvp-sa.md` | SA（需求、資料模型、API、SSE 契約、驗收條件），以章節編號引用，例如「SA §10」 |
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
-| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0011） |
+| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0012） |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
 | `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
@@ -109,6 +109,8 @@ Runtime 生命週期（ADR-0011）：`RuntimeLifecycleWorker` 啟動時對帳、
 - 備份指南：`docs/guides/backup-restore.md`。
 
 `/make`：對話輸入 `/make` 顯示管理員設定的主題按鈕（`vibemaker.make_topics`，Admin 在「管理 → Make 主題」維護）；給 Agent 的完整指示由後端 `MakePromptBuilder` 組合並存在 `AgentExecution.AgentPrompt`，對話紀錄只保留使用者輸入的文字。
+
+Agent 擴充能力（ADR-0012）：管理員在「管理 → 系統設定」設定全域預設（`vibemaker.extension_policy`），在「使用者」頁設定每人覆寫（`vibemaker.user_extension_grants`）；`ExtensionPolicyService` 解析、`ExecutionRunner` 每次執行帶入 `AgentRunRequest.Extensions`。`PiAgentHarness` **一律** `--no-extensions`（Agent 寫的 extension 不得載入），沒有 `skills` 加 `--no-skills`，有 `mcp` 才 `-e builtin:mcp`；每次執行前重寫 agent dir 的 `settings.json` / `trust.json` / `mcp.json`（使用者自建 MCP 在 `mcp.user.json`）與平台 skill（`PiExtensionConfig`）。成員端 `GET /api/extensions` 只回名稱，不回 MCP 設定內容。
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
 

@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-07 23:30 ・ 狀態：**🚧 進行中（A1 擴充政策）**
+> 最後更新：2026-10-08 00:30 ・ 狀態：**🚧 進行中（A1b 對外連線）**
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -32,8 +32,8 @@
 |---|---|---|---|
 | W1 | Windows 既有部署一鍵啟動檔 `start-ymir.ps1` | ✅ | 見 [#004](#004--windows-既有部署一鍵啟動檔)；已在目前主機驗證 |
 | A0 | ADR-0012 spike：實測 Pi 1.0.0 在 RPC 模式的 `--no-skills` / `--skill`、能否不讀使用者層 `mcp.json`、平台 MCP 設定能否放在 Agent 不可寫的位置，以及 rootless Podman 能否限制 egress；結果寫回 ADR-0012 | ✅ | — |
-| A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`、`internet`）+ 每人覆寫資料表<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | 🚧 | — |
-| A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• 受限網路部署文件 | ⏳ | A1a |
+| A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`）+ 每人覆寫資料表 `vibemaker.user_extension_grants`<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | ✅ | — |
+| A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• `internet` 能力加入擴充政策（全域 + 每人）<br>• 受限網路部署文件 | 🚧 | — |
 | A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | A1a、A1b |
 | R0 | RAG ADR（ADR-0013）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite（sqlite-vec）部署、權限 | ⏳ | **❓待決定**：Embedding 模型與硬體、文件格式與容量、外部回答模型的資料政策 |
 | R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ⏳ | R0 經使用者確認 |
@@ -151,6 +151,45 @@
 - **驗證**：只改文件；`git diff --check`。
 - **未驗證、待使用者環境確認**：rootless Podman 下的受限網路行為。
 - **下一步**：A1a 實作。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #004 · A1a 完成：Agent 擴充政策（skills / mcp）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 00:30 · `✅完成`
+
+- **做了什麼**（ADR-0012 A.1～A.7）：
+  - **政策**：全域預設存 `vibemaker.extension_policy`（system_settings，預設全部關閉），每人覆寫存新表 `vibemaker.user_extension_grants`（migration `UserExtensionGrants`）。`ExtensionPolicyService` 解析有效值，`ExecutionRunner` 每次執行帶入 `AgentRunRequest.Extensions`；查詢失敗時執行失敗，不會放寬權限。
+  - **Pi 參數**（`PiExtensionConfig`）：
+    - 一律 `--no-extensions`：Agent 寫的 extension 不再被載入，修掉 A0 發現的現況風險；
+    - 沒有 `skills` 加 `--no-skills`；有 `mcp` 才 `--extension builtin:mcp`；
+    - 任一能力開啟時以 `--skill` 載入平台 skill `ymir-extension-builder`，內容依開放的能力產生。
+  - **每次執行前重寫**：agent dir 的 `settings.json`（`defaultProjectTrust: never`）、`trust.json`、`mcp.json`，以及平台 skill。
+    - 使用者自建 MCP 改放 `mcp.user.json`；第一次執行時，舊的 `mcp.json` 會複製成 `mcp.user.json`，不遺失。
+    - 檔案路徑以參數傳入（Local runtime 會轉成 host 路徑）；內容經 stdin，因為 MCP 設定可能含憑證。
+  - **API**：
+    - 管理員：`GET/PUT /api/admin/settings/extensions`、`GET/PUT /api/admin/users/{id}/extensions`（`Inherit` / `Allow` / `Deny`），稽核 `admin.settings.extensions.update`、`admin.user.extensions.update`，都已加入授權矩陣；
+    - 成員：`GET /api/extensions` 只回能力與名稱，不回 MCP 設定內容，沒有執行環境時不會為了查詢而建立 container。
+  - **前端**：系統設定頁新增「Agent 擴充能力」卡片；使用者頁每列新增「擴充能力」，可設定個人覆寫並預覽結果；個人設定頁顯示我的擴充能力與已建立的名稱。
+- **驗證**：
+  - `dotnet build`（0 警告）；
+  - `dotnet test --solution`：504 通過，其中新增：
+    - `PiExtensionConfigTests`、`ExtensionPolicyTests`（單元）；
+    - `ExtensionPolicyTests`（整合，真實 Pi 1.0.0 + Fake LLM）：預設時 Agent 放的 skill、extension、trust 設定都不生效；管理員開放後 skill 出現、extension 仍不載入；改回禁止下一次就生效；成員端清單不含 MCP 憑證。
+  - OpenAPI 快照已更新、`npm run api:generate`；
+  - 前端 lint / 107 個 Vitest / build 通過；
+  - `e2e:admin` 全部通過，新增第 14 步，截圖 11～13 在沙箱。
+- **與計畫的差異**：
+  - `internet` 欄位移到 A1b，和強制機制一起上線，避免出現設定了卻不生效的選項。
+  - 平台 skill 不放 image，改成每次執行前寫入 `/agent-state/ymir/skills/`，Local / Remote 都適用（ADR-0012 已更新）。
+- **下一步**：A1b 對外連線（`internet` 能力、受限網路、runtime host 協定）。
 
 <details>
 <summary>💬 回覆（0）</summary>
