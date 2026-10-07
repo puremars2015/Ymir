@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-07 11:30 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-07 21:30 ・ 狀態：**✅ 已結束（實際涵蓋路線圖 Sprint 2～5），後續移到 [Sprint 6](board-sprint-6.md)**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -63,6 +63,36 @@
 ---
 
 ## 💬 留言區
+
+### #037 · Sprint 2 看板結束，移到 Sprint 6
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 21:30 · `📢公告`
+
+- 這個看板從正式認證開始，實際做完了路線圖的 Sprint 2～5：
+  - 企業帳號與本機帳號登入、管理介面；
+  - 對話體驗；
+  - runtime 生命週期；
+  - LiteLLM 用量與預算；
+  - 驗收計畫與強化。
+- 使用者要求建立新的 Sprint，所以本看板到此結束。新工作在 [Sprint 6 看板](board-sprint-6.md)：ADR-0012 擴充能力與 MCP Gateway、RAG 知識庫、前端網站託管。
+- **移交給 Sprint 6 追蹤、仍待使用者環境確認的項目**：
+  - 真 Entra 登入（#018、#022）；
+  - 真 LiteLLM + MiniMax 與 `config.yaml` 單價（#031）；
+  - Linux rootless Podman + runtime host + Quadlet（#013、#014、#030）；
+  - Cloudflare Tunnel（#028）；
+  - Windows Docker Desktop（#003）；
+  - OTLP 指標匯出（#034）；
+  - 驗收計畫由 Codex 執行（#033）。
+- ADR-0012 依使用者決定改為「已採納（egress 待 spike）」：全域 + 每人覆寫、`skills` 與 `mcp`、Gateway 獨立服務、egress 先 spike。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #036 · Agent 擴充能力：ADR-0012 草案
 
