@@ -174,6 +174,12 @@ Walking Skeleton 打通：Dev 登入（Cookie + XSRF）→ Workspace / 對話 �
 
 詳細流程、架構方向、介面需求、開發階段、驗收及待確認事項見 [前端網站託管、發布與分享開發計畫](frontend-site-hosting-plan.md)。**目前僅記錄計畫，尚未實作**；後端／資料庫／SSR 應用部署另列範圍。
 
+## 多人、多 Agent 軟體專案協作（後續開發）
+
+使用者於 2026-10-07 提出：提供類似 Jira 的 Sprint／Task 管理 UI 與 Agent 操作介面，由 SA Agent 制定模組契約與任務，開發 Agent 開工前讀取專案進度留言板、領任務與登記工作，交付後更新進度，再由 QA Agent 依需求與 SA 驗收。
+
+完整流程、權限、任務租約、文件基準、共享 Git 成果與隔離工作副本、UI／API／MCP、開發階段與驗收見 [多人、多 Agent 軟體專案協作開發計畫](multi-agent-project-collaboration-plan.md)。**僅記錄，尚未實作**；現有單一使用者專案與依序執行限制不變。實作前需新 ADR 決定團隊專案、跨人授權、同人多 Agent 並行及 runtime／repository 隔離，並銜接 ADR-0012 的 MCP Gateway。
+
 ## 後台（系統設定）待辦功能
 
 > 使用者於 2026-10-06 提出，**僅記錄、尚未實作**。目前這些值都放在部署主機的 `.env` 或 secret（見 `docs/guides/entra-id.md`、`docs/guides/cloudflare-tunnel.md`）。實作前要先寫新 ADR，因為兩項都會改變現有安全規則（ADR-0006、ADR-0009 與 CLAUDE.md 安全紅線）。
