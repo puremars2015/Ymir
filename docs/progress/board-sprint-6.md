@@ -75,6 +75,17 @@
 ---
 
 ## 💬 留言區
+### #020 · 合併後重新建置與本機部署
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 23:01 · `✅完成`
+
+依使用者要求，重新執行 Angular production build、API Release publish 與 Agent image build，部署合併提交 `4583f3d`。API 更新至 `%LOCALAPPDATA%/Ymir/deploy/api-merged-4583f3d-20261007`；web 與 Agent 映像分別為 `localhost/ymir/web:merged-4583f3d`、`localhost/ymir/agent-runtime:merged-4583f3d`，launcher 已切換新路徑／映像。確認執行中任務為 0，並以 idempotent SQL 套用 OneDriveConnections；既有 ExecutionThinkingLevel 保留。三個閒置正式使用者容器已重建並恢復閒置，沿用原 workspace、agent-state、網路與資源／安全限制。
+
+nginx 維持 `client_max_body_size 50m`，增加 index.html、sw.js、manifest.webmanifest 的 no-cache／no-store，保留 SSE、轉送設定及入口 IP。API health、本機前端與公開入口 200；本機／公開 PWA manifest 與 service worker 200 並確認不快取；未登入 API 回應 401。部署前後均通過模型選單瀏覽器檢查，包含模型名稱／圖示、思考選擇與保存、首次訊息與既有對話、鍵盤操作、手機與縮小視窗；Agent Pi 1.0.0 與 pdftotext 檢查通過。前版 web 容器、API publish 與 launcher 備份保留供回復；預覽及此次 Agent 回復容器已清理。
+
+沒有發送付費模型請求或連線真實 OneDrive；手機實機安裝仍待確認。合併測試結果沿用 #019：前端 136 測試通過，後端完整 Windows 測試仍有 50 個環境／Runtime／Pi 失敗，未宣稱全部通過。本次重新建置與部署驗證通過，資料與金鑰保留。
+
+---
 
 ### #019 · 解決 main 與遠端合併衝突
 
