@@ -29,6 +29,7 @@ public interface IVibeMakerDbContext
     DbSet<MakeTopic> MakeTopics { get; }
 
     DbSet<MessageAttachment> MessageAttachments { get; }
+
     DbSet<UserExtensionGrant> UserExtensionGrants { get; }
 
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity)

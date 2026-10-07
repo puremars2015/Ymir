@@ -12,7 +12,7 @@ using Ymir.VibeMaker.Infrastructure.Persistence;
 namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(VibeMakerDbContext))]
-    [Migration("20261007043653_MessageAttachments")]
+    [Migration("20261007054235_MessageAttachments")]
     partial class MessageAttachments
     {
         /// <inheritdoc />
@@ -506,6 +506,39 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_projects_user_id");
 
                     b.ToTable("projects", "vibemaker");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.UserExtensionGrant", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Capability")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("capability");
+
+                    b.Property<string>("Effect")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("effect");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("UserId", "Capability")
+                        .HasName("pk_user_extension_grants");
+
+                    b.ToTable("user_extension_grants", "vibemaker");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.UserSettings", b =>

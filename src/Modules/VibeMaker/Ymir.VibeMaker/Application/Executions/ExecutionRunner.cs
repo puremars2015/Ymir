@@ -158,8 +158,8 @@ public sealed class ExecutionRunner(
                 credential.ApiKey,
                 models.Resolve(execution.ModelId),
                 await GetSystemPromptsAsync(execution, stoppingToken).ConfigureAwait(false),
-                Attachments: await GetAttachmentsAsync(execution, stoppingToken).ConfigureAwait(false),
-                Extensions: extensions);
+                extensions,
+                await GetAttachmentsAsync(execution, stoppingToken).ConfigureAwait(false));
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
             {
                 if (agentEvent is AgentCompleted or AgentFailed or AgentCancelled)

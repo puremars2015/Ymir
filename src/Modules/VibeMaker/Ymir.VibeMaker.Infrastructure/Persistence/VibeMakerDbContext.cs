@@ -29,6 +29,7 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
     public DbSet<MakeTopic> MakeTopics => Set<MakeTopic>();
 
     public DbSet<MessageAttachment> MessageAttachments => Set<MessageAttachment>();
+
     public DbSet<UserExtensionGrant> UserExtensionGrants => Set<UserExtensionGrant>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
