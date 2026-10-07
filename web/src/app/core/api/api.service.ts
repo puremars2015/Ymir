@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AdminMakeTopic,
+  Attachment,
   AdminOverview,
   AuditLogPage,
   OidcSettings,
@@ -285,6 +286,7 @@ export class ApiService {
     content: string,
     modelId: string | null = null,
     makeTopicId: string | null = null,
+    attachmentIds: string[] = [],
     clientRequestId: string = crypto.randomUUID(),
   ): Observable<SendMessageResponse> {
     return this.http.post<SendMessageResponse>(`/api/conversations/${conversationId}/messages`, {
@@ -292,6 +294,15 @@ export class ApiService {
       clientRequestId,
       modelId,
       makeTopicId,
+      attachmentIds,
+    });
+  }
+
+  /** 上傳附件：body 直接是檔案內容（不是 multipart），檔名放在 query string；送出訊息時帶回傳的 id。 */
+  uploadAttachment(conversationId: string, file: File): Observable<Attachment> {
+    return this.http.post<Attachment>(`/api/conversations/${conversationId}/attachments`, file, {
+      params: { fileName: file.name },
+      headers: { 'Content-Type': 'application/octet-stream' },
     });
   }
 

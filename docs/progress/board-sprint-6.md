@@ -42,6 +42,7 @@
 | H0 | 網站託管 ADR（ADR-0014）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ⏳ | **❓待決定**：網域與 DNS / Tunnel、公司模式的帳號範圍、配額 |
 | H1 | 公開網站發布：網站與版本、產物檢查、Nginx 託管、原子切換、取消發布 | ⏳ | H0 經使用者確認 |
 | H2 | 身分與分享：公司模式、指定使用者、分享給我的網站 | ⏳ | H1 |
+| C1 | 對話附加檔案 / 圖片 / 影片給 Agent（使用者回報） | ✅ | 見 [#006](#006--對話可以附加檔案圖片影片給-agent)；真實視覺模型**待使用者環境確認** |
 
 **從 Sprint 2 移交、待使用者環境確認**（見 [Sprint 2 看板 #037](board-sprint-2.md)）：
 - 真 Entra 登入；
@@ -61,6 +62,37 @@
 ---
 
 ## 💬 留言區
+
+### #006 · 對話可以附加檔案、圖片、影片給 Agent
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 13:45 · `✅完成`
+
+使用者回報：對話畫面沒辦法上傳檔案 / 圖片 / 影片給 Agent。規劃與設計決定寫在 [chat-attachments-plan.md](../planning/chat-attachments-plan.md)，PR [puremars2015/Ymir#36](https://github.com/puremars2015/Ymir/pull/36)。摘要：
+
+- **使用方式**：輸入框左邊 📎 選檔，也可以拖放或貼上截圖；只附檔不打字也能送出。首頁、專案頁「直接開聊」也能附加（送出時才上傳）。單檔 50 MB、每則 10 個。
+- **存放**：檔案寫進使用者 runtime 工作目錄的 `uploads/`（專案對話共用專案目錄），會出現在檔案面板、可下載；Remote runtime host 一樣適用。新表 `vibemaker.message_attachments`（migration `MessageAttachments`，排在 `UserExtensionGrants` 之後）。
+- **Agent 怎麼拿到**：後端把附件路徑附加在送給 Agent 的內容（對話紀錄只顯示使用者文字），Agent 用工具讀取或處理（影片、PDF 等也一樣）。
+- **圖片直接給模型**：模型設定 `VibeMaker__Models__N__SupportsImages=true` 時，PNG / JPEG / GIF / WebP 以 Pi RPC `images` 一併送出（Pi 會自動縮圖）；模型選單顯示「（可看圖片）」。**預設是 false**，要開請確認該模型（經 LiteLLM）支援視覺輸入。
+- **安全**：上傳端點只接受自己的對話（加入授權矩陣）；附件只能綁自己、同對話、未送出的；檔名清理、路徑由伺服器產生；runtime 內以 `realpath` 拒絕 `uploads` 被換成指向外面的 symlink；圖片以檔頭判斷類型；縮圖只用 blob URL 的 `<img>`。
+
+**驗證**（實際跑過）：
+- 合併 main（ADR-0012 擴充政策、對外連線）後重跑：`dotnet build Ymir.slnx`、單元測試、整合測試（含真實 Pi 1.0.0 + Fake LLM：支援視覺的模型收到 1 張圖、不支援的不送；附件測試 10 個）。
+- `cd web && npm run lint && npm test -- --watch=false && npm run build`。
+- 新增 e2e `npm run e2e:attach`（合併前跑過）：首頁附加圖片開聊 → 模型收到圖片；對話中只附圖片 + 影片送出；重新整理後縮圖仍在、檔案面板列出 3 個上傳檔。
+- 過程中發現並修正：Guid v7 前 8 碼是時間戳，同一分鐘內同名檔案會覆蓋 → 改用 id 末 8 碼；剛上傳的附件不再被列為「這次 Agent 產生的檔案」。
+
+**未驗證、待使用者環境確認**：真實視覺模型（MiniMax 等）經 LiteLLM 收圖片的格式與效果；Cloudflare Tunnel 下上傳 50 MB 的實際表現。
+
+**後續（未做）**：每人工作目錄容量配額、影片抽影格 / 音訊轉文字 / PDF 轉文字工具、上傳進度條。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #005 · Ubuntu 既有 Docker 部署啟動檔
 

@@ -16,7 +16,7 @@ import { ModelOption } from '../core/api/api-types';
         >
           @for (model of models(); track model.id) {
             <option [value]="model.id" [selected]="model.id === selected()">
-              {{ model.displayName }}
+              {{ model.displayName }}{{ model.supportsImages ? '（可看圖片）' : '' }}
             </option>
           }
         </select>

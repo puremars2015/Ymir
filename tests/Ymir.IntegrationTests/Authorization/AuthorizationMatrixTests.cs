@@ -36,6 +36,10 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["GET /api/conversations/{conversationId:guid}/files/"] = r => Get($"/api/conversations/{r.ConversationId}/files"),
         ["GET /api/conversations/{conversationId:guid}/files/download"] = r => Get($"/api/conversations/{r.ConversationId}/files/download?path=hello.txt"),
         ["GET /api/conversations/{conversationId:guid}/files/archive"] = r => Get($"/api/conversations/{r.ConversationId}/files/archive"),
+        ["POST /api/conversations/{conversationId:guid}/attachments"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/attachments?fileName=intrusion.txt")
+        {
+            Content = new ByteArrayContent("intrusion"u8.ToArray()),
+        },
         // 列表 / 建立端點以 query / body 指定別人的資源
         ["GET /api/conversations/"] = r => Get($"/api/conversations?projectId={r.ProjectId}"),
         ["POST /api/conversations/"] = r => new HttpRequestMessage(HttpMethod.Post, "/api/conversations")

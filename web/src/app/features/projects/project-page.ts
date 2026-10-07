@@ -89,7 +89,13 @@ export class ProjectPage implements OnInit {
     this.busy.set(true);
     this.error.set(null);
     this.starter
-      .start(project.id, submission.content, this.selectedModel(), submission.makeTopicId)
+      .start(
+        project.id,
+        submission.content,
+        this.selectedModel(),
+        submission.makeTopicId,
+        submission.files,
+      )
       .subscribe({
         error: (e: unknown) => {
           this.error.set(describeApiError(e));

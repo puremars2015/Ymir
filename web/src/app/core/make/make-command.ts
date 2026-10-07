@@ -45,4 +45,6 @@ export function stripMakeCommand(text: string): string {
 export interface ComposerSubmission {
   content: string;
   makeTopicId: string | null;
+  /** 使用者附加的檔案；送出時才上傳（見 core/attachments）。 */
+  files: File[];
 }

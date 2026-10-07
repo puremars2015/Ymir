@@ -98,6 +98,8 @@ Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真
 
 對話檔案（Agent 產生的成果）：`GET /api/conversations/{id}/files`、`/files/download?path=`、`/files/archive`（zip）。經 `IWorkspaceFileReader` 在使用者 runtime 內執行 `find` / `bash` 讀取，所以 Remote（runtime host）也適用；路徑經 stdin 傳入、runtime 內以 realpath 確認不逃出工作目錄；下載一律附件（octet-stream、nosniff、CSP sandbox），不得在 Ymir 網域上直接開啟 Agent 產生的 HTML。
 
+對話附件（使用者上傳，[規劃](docs/planning/chat-attachments-plan.md)）：`POST /api/conversations/{id}/attachments?fileName=`（body 即檔案，單檔 50 MB）經 `IWorkspaceFileWriter` 寫進工作目錄 `uploads/{id 末 8 碼}-{檔名}`，`vibemaker.message_attachments` 記錄中繼資料；送出訊息帶 `attachmentIds` 才綁定（只能綁自己、同對話、未送出的）。附件路徑由 `AttachmentRules.AppendToPrompt` 附加到 `AgentPrompt`；模型設定 `VibeMaker__Models__N__SupportsImages=true` 時圖片另以 Pi RPC `images` 送出。
+
 對話與專案的「刪除」一律是封存（`Status = Archived`，資料與 runtime 內的檔案保留；封存後所有端點回 404，執行中的對話不能封存）。`ConversationResponse.ActiveExecutionId` 讓前端重新整理後接回執行中的 SSE（`resumeTurnFrom`）；檔案面板的預覽只用文字綁定或 blob URL 的 `<img>`，不得以 innerHTML 或 iframe 顯示 Agent 產生的內容。
 
 Runtime 生命週期（ADR-0011）：`RuntimeLifecycleWorker` 啟動時對帳、定期停止閒置的 runtime（跳過執行中的使用者）；執行政策（閒置時間、單次執行上限、每人排隊上限、每日次數）由 `RuntimePolicyService` 提供，管理介面的值（`vibemaker.runtime_policy`）優先於 `VibeMaker__Runtime__*`；超過配額回 429 `QUOTA_EXCEEDED`。生命週期操作（停止、查詢、對帳）一律以 user id 呼叫 `StopForUserAsync` / `GetStatusForUserAsync`，不要用 runtime id（服務重啟後會變）。

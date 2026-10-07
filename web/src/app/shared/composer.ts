@@ -19,6 +19,8 @@ import {
   showsMakeHint,
 } from '../core/make/make-command';
 import { MakeTopicStore } from '../core/make/make-topic.store';
+import { addAttachments, submissionContent } from '../core/attachments/attachment-rules';
+import { formatSize } from '../core/files/workspace-files';
 
 /**
  * ChatGPT 式輸入框：Enter 送出、Shift+Enter 換行；中文輸入法選字中（isComposing）按 Enter 不送出。
@@ -26,6 +28,8 @@ import { MakeTopicStore } from '../core/make/make-topic.store';
  *
  * `/make` 指令：輸入 `/` 時提示 `/make`；只送出 `/make` 時不送給 Agent，改為顯示主題按鈕，
  * 點按鈕直接送出（Agent 會先問需求）；`/make <描述>` 照常送出，由後端請 Agent 判斷主題。
+ *
+ * 附件：📎 按鈕選檔、拖放到輸入框、或直接貼上（截圖）；送出時連同檔案一起交給頁面上傳。
  */
 @Component({
   selector: 'app-composer',
@@ -69,7 +73,57 @@ import { MakeTopicStore } from '../core/make/make-topic.store';
         <span>建置小工具或網站（直接送出可選主題，或在後面描述要做什麼）</span>
       </button>
     }
-    <form class="composer" (ngSubmit)="submit()">
+    @if (notice()) {
+      <p class="notice" role="status">{{ notice() }}</p>
+    }
+    @if (files().length > 0) {
+      <ul class="attachments" aria-label="附加的檔案">
+        @for (file of files(); track $index) {
+          <li class="attachment">
+            <span class="name" [title]="file.name">{{ file.name }}</span>
+            <span class="size">{{ size(file) }}</span>
+            <button
+              type="button"
+              class="link remove"
+              [attr.aria-label]="'移除 ' + file.name"
+              [disabled]="busy() || disabled()"
+              (click)="removeFile($index)"
+            >
+              ×
+            </button>
+          </li>
+        }
+      </ul>
+    }
+    <form
+      class="composer"
+      [class.dragging]="dragging()"
+      (ngSubmit)="submit()"
+      (dragover)="onDragOver($event)"
+      (dragleave)="dragging.set(false)"
+      (drop)="onDrop($event)"
+    >
+      @if (allowAttachments()) {
+        <input
+          #fileInput
+          type="file"
+          multiple
+          hidden
+          aria-hidden="true"
+          tabindex="-1"
+          (change)="onFilesChosen(fileInput)"
+        />
+        <button
+          type="button"
+          class="round attach"
+          aria-label="附加檔案"
+          title="附加檔案（圖片、影片、文件…，也可以拖放或貼上）"
+          [disabled]="busy() || disabled()"
+          (click)="fileInput.click()"
+        >
+          📎
+        </button>
+      }
       <textarea
         #input
         name="prompt"
@@ -77,6 +131,7 @@ import { MakeTopicStore } from '../core/make/make-topic.store';
         [ngModel]="text()"
         (ngModelChange)="text.set($event)"
         (keydown)="onKeydown($event)"
+        (paste)="onPaste($event)"
         [placeholder]="placeholder()"
         [disabled]="disabled()"
         aria-label="訊息"
@@ -129,6 +184,56 @@ import { MakeTopicStore } from '../core/make/make-topic.store';
       flex-shrink: 0;
       font-size: 1rem;
       line-height: 1;
+    }
+    .composer.dragging {
+      box-shadow: 0 0 0 3px var(--focus-ring);
+    }
+    .attach {
+      background: transparent;
+      color: var(--text-muted);
+      margin-left: -0.5rem;
+    }
+    .attach:hover:not(:disabled) {
+      background: var(--surface-muted);
+    }
+    .attachments {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.375rem;
+    }
+    .attachment {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      max-width: 16rem;
+      padding: 0.25rem 0.25rem 0.25rem 0.625rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      font-size: 0.8125rem;
+      .name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .size {
+        color: var(--text-muted);
+        flex-shrink: 0;
+      }
+    }
+    .remove {
+      font-size: 1rem;
+      line-height: 1;
+      padding: 0 0.375rem;
+      color: var(--text-muted);
+    }
+    .notice {
+      margin: 0;
+      font-size: 0.8125rem;
+      color: var(--danger, #b42318);
     }
     .stop {
       background: var(--text);
@@ -213,6 +318,7 @@ export class Composer {
   readonly placeholder = input('輸入訊息，或輸入 /make 建置小工具、網站');
   readonly busy = input(false);
   readonly disabled = input(false);
+  readonly allowAttachments = input(true);
   readonly submitted = output<ComposerSubmission>();
   readonly stopped = output<void>();
 
@@ -220,9 +326,68 @@ export class Composer {
   protected readonly text = signal('');
   protected readonly pickerOpen = signal(false);
   protected readonly hint = computed(() => showsMakeHint(this.text()));
+  protected readonly files = signal<File[]>([]);
+  protected readonly notice = signal<string | null>(null);
+  protected readonly dragging = signal(false);
 
   protected canSubmit(): boolean {
-    return !this.disabled() && this.text().trim().length > 0;
+    return !this.disabled() && submissionContent(this.text(), this.files()).length > 0;
+  }
+
+  protected size(file: File): string {
+    return formatSize(file.size);
+  }
+
+  protected removeFile(index: number): void {
+    this.files.update((files) => files.filter((_, i) => i !== index));
+  }
+
+  protected onFilesChosen(input: HTMLInputElement): void {
+    this.addFiles(Array.from(input.files ?? []));
+    input.value = ''; // 同一個檔案移除後可以再選一次
+  }
+
+  protected onDragOver(event: DragEvent): void {
+    if (this.allowAttachments() && event.dataTransfer?.types.includes('Files')) {
+      event.preventDefault();
+      this.dragging.set(true);
+    }
+  }
+
+  protected onDrop(event: DragEvent): void {
+    this.dragging.set(false);
+    if (!this.allowAttachments() || !event.dataTransfer?.files.length) {
+      return;
+    }
+    event.preventDefault();
+    this.addFiles(Array.from(event.dataTransfer.files));
+  }
+
+  /** 貼上截圖等檔案；貼上純文字照常輸入。 */
+  protected onPaste(event: ClipboardEvent): void {
+    const pasted = Array.from(event.clipboardData?.files ?? []);
+    if (!this.allowAttachments() || pasted.length === 0) {
+      return;
+    }
+    event.preventDefault();
+    this.addFiles(pasted);
+  }
+
+  private addFiles(incoming: File[]): void {
+    if (this.busy() || this.disabled()) {
+      return;
+    }
+    const result = addAttachments(this.files(), incoming);
+    this.files.set(result.files);
+    this.notice.set(result.rejected.length ? `未加入：${result.rejected.join('、')}` : null);
+  }
+
+  /** 送出後清空附件（檔案交給頁面上傳）。 */
+  private takeFiles(): File[] {
+    const files = this.files();
+    this.files.set([]);
+    this.notice.set(null);
+    return files;
   }
 
   protected onKeydown(event: KeyboardEvent): void {
@@ -235,7 +400,7 @@ export class Composer {
   }
 
   protected submit(): void {
-    const text = this.text().trim();
+    const text = submissionContent(this.text(), this.files());
     if (!text || this.busy() || this.disabled()) {
       return;
     }
@@ -246,7 +411,7 @@ export class Composer {
       return;
     }
     this.pickerOpen.set(false);
-    this.submitted.emit({ content: text, makeTopicId: null });
+    this.submitted.emit({ content: text, makeTopicId: null, files: this.takeFiles() });
     this.text.set('');
   }
 
@@ -255,7 +420,11 @@ export class Composer {
       return;
     }
     this.pickerOpen.set(false);
-    this.submitted.emit({ content: makeTopicContent(topic.name), makeTopicId: topic.id });
+    this.submitted.emit({
+      content: makeTopicContent(topic.name),
+      makeTopicId: topic.id,
+      files: this.takeFiles(),
+    });
   }
 
   protected closePicker(): void {

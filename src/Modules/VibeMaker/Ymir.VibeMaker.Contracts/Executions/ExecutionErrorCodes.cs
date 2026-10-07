@@ -22,4 +22,13 @@ public static class ExecutionErrorCodes
 
     /// <summary>超過每人配額（排隊上限或每日次數，ADR-0011）；HTTP 429。</summary>
     public const string QuotaExceeded = "QUOTA_EXCEEDED";
+
+    /// <summary>附件不存在、不是這個對話的、已經送出過，或超過每則訊息的數量上限。</summary>
+    public const string AttachmentNotAvailable = "ATTACHMENT_NOT_AVAILABLE";
+
+    /// <summary>上傳的檔案超過大小上限；HTTP 413。</summary>
+    public const string AttachmentTooLarge = "ATTACHMENT_TOO_LARGE";
+
+    /// <summary>上傳的檔案沒有檔名、檔名不合法或是空檔案。</summary>
+    public const string AttachmentInvalid = "ATTACHMENT_INVALID";
 }

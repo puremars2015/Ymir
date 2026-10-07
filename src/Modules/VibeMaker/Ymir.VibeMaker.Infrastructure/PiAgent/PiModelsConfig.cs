@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Ymir.VibeMaker.Application.Models;
 
 namespace Ymir.VibeMaker.Infrastructure.PiAgent;
 
@@ -8,7 +9,11 @@ internal static class PiModelsConfig
 {
     private static readonly JsonSerializerOptions s_indented = new() { WriteIndented = true };
 
-    public static string Build(PiAgentOptions options, IEnumerable<string> modelIds)
+    public static string Build(PiAgentOptions options, IEnumerable<string> modelIds) =>
+        Build(options, modelIds.Select(id => new ModelDescriptor(id, id)));
+
+    /// <summary>支援視覺的模型宣告 <c>input: ["text", "image"]</c>：Pi 才會把附加的圖片（與 read 工具讀到的圖片）送給模型，並自動縮圖。</summary>
+    public static string Build(PiAgentOptions options, IEnumerable<ModelDescriptor> models)
     {
         var config = new JsonObject
         {
@@ -19,10 +24,21 @@ internal static class PiModelsConfig
                     ["baseUrl"] = options.ModelBaseUrl.ToString().TrimEnd('/'),
                     ["api"] = "openai-completions",
                     ["apiKey"] = "${" + PiRuntimeLayout.ApiKeyEnvironmentVariable + "}",
-                    ["models"] = new JsonArray(modelIds.Select(id => (JsonNode)new JsonObject { ["id"] = id }).ToArray()),
+                    ["models"] = new JsonArray(models.Select(ToModelNode).ToArray()),
                 },
             },
         };
         return config.ToJsonString(s_indented);
+    }
+
+    private static JsonNode ToModelNode(ModelDescriptor model)
+    {
+        var node = new JsonObject { ["id"] = model.Id };
+        if (model.SupportsImages)
+        {
+            node["input"] = new JsonArray("text", "image");
+        }
+
+        return node;
     }
 }

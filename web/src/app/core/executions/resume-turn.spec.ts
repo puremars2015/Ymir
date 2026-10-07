@@ -9,6 +9,7 @@ const message = (id: string, role: string, content: string): ChatMessage => ({
   sequenceNo: Number(id),
   executionId: null,
   createdAt: '2026-10-06T00:00:00Z',
+  attachments: [],
 });
 
 describe('resumeTurnFrom', () => {
@@ -24,11 +25,17 @@ describe('resumeTurnFrom', () => {
     expect(resumeTurnFrom(messages, 'e1')).toEqual({
       history,
       prompt: '做一個網頁',
+      attachments: [],
       executionId: 'e1',
     });
   });
 
   it('最後一則不是使用者訊息時保留全部歷史', () => {
-    expect(resumeTurnFrom(history, 'e1')).toEqual({ history, prompt: '', executionId: 'e1' });
+    expect(resumeTurnFrom(history, 'e1')).toEqual({
+      history,
+      prompt: '',
+      attachments: [],
+      executionId: 'e1',
+    });
   });
 });

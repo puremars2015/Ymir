@@ -47,6 +47,7 @@ internal static class ExecutionEndpoints
             SubmitMessageOutcome.ModelNotAvailable => ApiProblem.Create(StatusCodes.Status400BadRequest, ExecutionErrorCodes.ModelNotAvailable, "選擇的模型無法使用，請重新選擇。"),
             SubmitMessageOutcome.MakeTopicNotAvailable => ApiProblem.Create(StatusCodes.Status400BadRequest, ExecutionErrorCodes.MakeTopicNotAvailable, "這個主題已無法使用，請重新選擇。"),
             SubmitMessageOutcome.QuotaExceeded => ApiProblem.Create(StatusCodes.Status429TooManyRequests, ExecutionErrorCodes.QuotaExceeded, result.Message!),
+            SubmitMessageOutcome.AttachmentNotAvailable => ApiProblem.Create(StatusCodes.Status400BadRequest, ExecutionErrorCodes.AttachmentNotAvailable, "附加的檔案無法使用，請重新選擇檔案。"),
             SubmitMessageOutcome.MakeDescriptionRequired => ApiProblem.Create(StatusCodes.Status400BadRequest, ExecutionErrorCodes.MakeDescriptionRequired, "請在 /make 後面描述要做什麼，或選擇一個主題。"),
             _ => ConversationEndpoints.NotFound(),
         };

@@ -10,6 +10,7 @@ namespace Ymir.Testing.FakeLlm;
 /// <item>使用者訊息含 <c>[slow]</c> → 緩慢串流很多段文字（用來測 abort）。</item>
 /// <item>使用者訊息含 <c>[markdown]</c> → 分段串流一段 Markdown（標題、程式碼區塊、清單、表格），測前端排版。</item>
 /// <item>使用者訊息含 <c>[fail]</c> → 回傳 HTTP 500（測模型端錯誤）。</item>
+/// <item>其他：回覆收到的文字；最後一則使用者訊息附有圖片時，加上 <see cref="ImageCountPrefix"/> 與張數。</item>
 /// <item>其他 → 回覆「收到第 N 則使用者訊息：...」，N 可用來驗證 session 續接。</item>
 /// </list>
 /// </summary>
@@ -67,8 +68,18 @@ public static class FakeLlmScript
                 delayPerChunk: TimeSpan.FromMilliseconds(150));
         }
 
-        return FakeLlmReply.Text([$"收到第 {userMessages.Count} 則使用者訊息：", lastUserText]);
+        // 附加的圖片以 OpenAI 的 image_url content part 送來；回報張數讓測試確認圖片有送到模型。
+        var images = userMessages.Count > 0 ? CountImages(userMessages[^1]) : 0;
+        return images > 0
+            ? FakeLlmReply.Text([$"收到第 {userMessages.Count} 則使用者訊息：", lastUserText, $"{ImageCountPrefix}{images}"])
+            : FakeLlmReply.Text([$"收到第 {userMessages.Count} 則使用者訊息：", lastUserText]);
     }
+
+    /// <summary>回覆中「收到圖片：N」的前綴。</summary>
+    public const string ImageCountPrefix = "（收到圖片）";
+
+    private static int CountImages(JsonNode? message) =>
+        message?["content"] is JsonArray parts ? parts.Count(p => p?["type"]?.GetValue<string>() == "image_url") : 0;
 
     private static string ExtractText(JsonNode? message)
     {

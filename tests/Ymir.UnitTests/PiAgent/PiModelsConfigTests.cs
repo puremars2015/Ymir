@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Infrastructure.PiAgent;
 
 namespace Ymir.UnitTests.PiAgent;
@@ -25,5 +26,16 @@ public class PiModelsConfigTests
         Assert.Equal("openai-completions", provider.GetProperty("api").GetString());
         Assert.Equal("${LITELLM_API_KEY}", provider.GetProperty("apiKey").GetString());
         Assert.Equal(["gpt-x", "gpt-y"], provider.GetProperty("models").EnumerateArray().Select(m => m.GetProperty("id").GetString()));
+    }
+
+    [Fact]
+    public void Build_DeclaresImageInput_OnlyForVisionModels()
+    {
+        var json = PiModelsConfig.Build(new PiAgentOptions(), [new ModelDescriptor("text-only", "T"), new ModelDescriptor("vision", "V", SupportsImages: true)]);
+
+        using var document = JsonDocument.Parse(json);
+        var models = document.RootElement.GetProperty("providers").GetProperty("ymir").GetProperty("models").EnumerateArray().ToList();
+        Assert.False(models[0].TryGetProperty("input", out _));
+        Assert.Equal(["text", "image"], models[1].GetProperty("input").EnumerateArray().Select(i => i.GetString()));
     }
 }

@@ -1,10 +1,12 @@
-import { ChatMessage } from '../api/api-types';
+import { Attachment, ChatMessage } from '../api/api-types';
 
 export interface ResumedTurn {
   /** 已完成的歷史訊息（不含執行中這一輪的使用者訊息）。 */
   history: ChatMessage[];
   /** 執行中這一輪的使用者訊息；改由 live turn 顯示，避免重複。 */
   prompt: string;
+  /** 這一輪使用者訊息的附件。 */
+  attachments: Attachment[];
   executionId: string;
 }
 
@@ -21,7 +23,12 @@ export function resumeTurnFrom(
   }
   const last = messages.at(-1);
   if (last?.role === 'USER') {
-    return { history: messages.slice(0, -1), prompt: last.content, executionId: activeExecutionId };
+    return {
+      history: messages.slice(0, -1),
+      prompt: last.content,
+      attachments: last.attachments,
+      executionId: activeExecutionId,
+    };
   }
-  return { history: messages, prompt: '', executionId: activeExecutionId };
+  return { history: messages, prompt: '', attachments: [], executionId: activeExecutionId };
 }

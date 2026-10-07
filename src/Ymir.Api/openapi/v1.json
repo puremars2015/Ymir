@@ -185,6 +185,54 @@
         }
       }
     },
+    "/api/conversations/{conversationId}/attachments": {
+      "post": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "UploadAttachment",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fileName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "$ref": "#/components/schemas/Stream"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/{conversationId}/messages": {
       "post": {
         "tags": [
@@ -1795,6 +1843,39 @@
           }
         }
       },
+      "AttachmentResponse": {
+        "required": [
+          "id",
+          "fileName",
+          "path",
+          "contentType",
+          "size"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "contentType": {
+            "type": "string"
+          },
+          "size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "AuditLogItemResponse": {
         "required": [
           "id",
@@ -2357,7 +2438,8 @@
           "content",
           "sequenceNo",
           "executionId",
-          "createdAt"
+          "createdAt",
+          "attachments"
         ],
         "type": "object",
         "properties": {
@@ -2392,6 +2474,12 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttachmentResponse"
+            }
           }
         }
       },
@@ -2399,7 +2487,8 @@
         "required": [
           "id",
           "displayName",
-          "isDefault"
+          "isDefault",
+          "supportsImages"
         ],
         "type": "object",
         "properties": {
@@ -2410,6 +2499,9 @@
             "type": "string"
           },
           "isDefault": {
+            "type": "boolean"
+          },
+          "supportsImages": {
             "type": "boolean"
           }
         }
@@ -2999,6 +3091,16 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "attachmentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -3099,6 +3201,10 @@
             ]
           }
         }
+      },
+      "Stream": {
+        "type": "string",
+        "format": "binary"
       },
       "TestOidcSettingsRequest": {
         "required": [

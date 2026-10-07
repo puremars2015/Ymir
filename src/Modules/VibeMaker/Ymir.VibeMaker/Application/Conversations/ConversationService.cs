@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
+using Ymir.VibeMaker.Application.Attachments;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Contracts.Conversations;
 using Ymir.VibeMaker.Domain;
@@ -137,7 +138,21 @@ public sealed class ConversationService(IVibeMakerDbContext db, ICurrentUser cur
             .OrderBy(m => m.SequenceNo)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-        return messages.Select(m => new MessageResponse(m.Id, SaValues.Of(m.Role), SaValues.Of(m.MessageType), m.Content, m.SequenceNo, m.ExecutionId, m.CreatedAt)).ToList();
+        var attachments = (await db.MessageAttachments.AsNoTracking()
+                .Where(a => a.ConversationId == conversationId && a.MessageId != null)
+                .OrderBy(a => a.CreatedAt)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false))
+            .ToLookup(a => a.MessageId!.Value);
+        return messages.Select(m => new MessageResponse(
+            m.Id,
+            SaValues.Of(m.Role),
+            SaValues.Of(m.MessageType),
+            m.Content,
+            m.SequenceNo,
+            m.ExecutionId,
+            m.CreatedAt,
+            [.. attachments[m.Id].Select(AttachmentService.ToResponse)])).ToList();
     }
 
     private Task<Conversation?> FindOwnedAsync(Guid conversationId, CancellationToken cancellationToken)

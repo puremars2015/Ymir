@@ -48,6 +48,12 @@
           [class.assistant]="message.role !== 'USER'"
           [class.error-message]="message.messageType === 'ERROR'"
         >
+          @if (message.attachments.length > 0) {
+            <app-attachment-list
+              [conversationId]="conversationId()"
+              [attachments]="message.attachments"
+            />
+          }
           <div class="bubble">
             @if (message.role === 'ASSISTANT' && message.messageType !== 'ERROR') {
               <app-markdown [text]="content" />
@@ -72,6 +78,12 @@
       <!-- 執行中尚未重新載入歷史，先顯示送出的訊息；結束後以後端保存的訊息取代 -->
       @if (turn.prompt) {
         <li class="turn user">
+          @if (turn.attachments.length > 0) {
+            <app-attachment-list
+              [conversationId]="conversationId()"
+              [attachments]="turn.attachments"
+            />
+          }
           <div class="bubble">{{ turn.prompt }}</div>
         </li>
       }
@@ -114,14 +126,25 @@
   @if (error()) {
     <p class="error">{{ error() }}</p>
   }
+  @if (uploading()) {
+    <p class="hint muted" role="status">{{ uploading() }}</p>
+  }
   <app-model-picker
     class="picker"
     [models]="modelStore.models()"
     [selected]="selectedModel()"
     (changed)="selectModel($event)"
   />
-  <app-composer [busy]="!!live()" (submitted)="submit($event)" (stopped)="stop()" />
-  <p class="hint muted">Agent 在你的專屬執行環境中工作；Enter 送出，Shift+Enter 換行。</p>
+  <app-composer
+    [busy]="!!live()"
+    [disabled]="!!uploading()"
+    (submitted)="submit($event)"
+    (stopped)="stop()"
+  />
+  <p class="hint muted">
+    Agent 在你的專屬執行環境中工作；Enter 送出，Shift+Enter 換行；📎
+    可附加圖片、影片或文件（也可拖放、貼上）。
+  </p>
 </footer>
 
 @if (filesOpen()) {
