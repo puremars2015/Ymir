@@ -30,6 +30,7 @@
 
 | # | 工作項目 | 狀態 | 前置 / 待決定 |
 |---|---|---|---|
+| W2 | Ubuntu 既有 Docker 部署啟動檔 `start-ymir.sh` | ✅ | 見 [#005](#005--ubuntu-既有-docker-部署啟動檔)；語法與隔離模擬通過，實機待驗證 |
 | W1 | Windows 既有部署一鍵啟動檔 `start-ymir.ps1` | ✅ | 見 [#004](#004--windows-既有部署一鍵啟動檔)；已在目前主機驗證 |
 | A0 | ADR-0012 spike：實測 Pi 1.0.0 在 RPC 模式的 `--no-skills` / `--skill`、能否不讀使用者層 `mcp.json`、平台 MCP 設定能否放在 Agent 不可寫的位置，以及 rootless Podman 能否限制 egress；結果寫回 ADR-0012 | ✅ | — |
 | A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`）+ 每人覆寫資料表 `vibemaker.user_extension_grants`<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | ✅ | — |
@@ -60,6 +61,18 @@
 ---
 
 ## 💬 留言區
+
+### #005 · Ubuntu 既有 Docker 部署啟動檔
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 13:26 · `✅完成`
+
+- **需求**：使用者要求另提供 Ubuntu 啟動檔。已詢問 Docker／Podman 選擇，尚未收到回覆，先依目前 Docker 使用方式提供 Docker 版，不更改既有 Podman Quadlet 文件與部署。
+- **完成**：新增 [start-ymir.sh](../../start-ymir.sh)，支援既有 Linux Docker API＋主機 runtime host 部署；檢查 systemd／Docker、辨識既有 SQL／LiteLLM PostgreSQL／LiteLLM／API／Tunnel 容器，依序啟動並等待 runtime host、API readiness 及登入頁。已運行的服務保留，名稱歧義要求明確指定；腳本不拉碼、建置、建立容器或啟動 Agent。
+- **說明**：[API README](../../deploy/api/README.md) 記錄 `sudo bash ./start-ymir.sh`、首次部署前置條件及容器名稱／埠／逾時覆寫。`.gitattributes` 固定 LF，Git 保留 executable bit；Linux 的 API 容器含前端，與 Windows 主機 API 啟動檔分開。
+- **驗證**：`git diff --check` 與 LF 檢查通過；Ubuntu 24.04 容器中的 `bash -n` 通過。離線且不掛 Docker socket的模擬 Docker／systemd／curl 測試七項通過：已運行服務不重啟、停止服務的啟動順序、缺少容器、Compose 名稱歧義、健康檢查逾時、非法埠及 help。
+- **限制**：沒有可供操作的 Ubuntu 部署主機，**實際 systemd、runtime host、Docker 服務與 Tunnel 尚未驗證**；需要先完成各部署文件的 image／憑證／socket／Linux Tunnel network 設定。沒有變更 Windows 的服務。
+
+---
 
 ### #004 · Windows 既有部署一鍵啟動檔
 
