@@ -19,6 +19,7 @@ public static class PlatformInfrastructureExtensions
         services.AddDbContext<PlatformDbContext>(options => options.UseSqlServer(connectionString, SqlServerOptions.Configure));
         services.AddSingleton<IAuditLog, DbAuditLog>();
         services.AddScoped<IAuditLogQuery, DbAuditLogQuery>();
+        services.AddScoped<IAuditLogMaintenance, DbAuditLogMaintenance>();
         services.AddScoped<ISystemSettingsStore, SystemSettingsStore>();
         services.AddScoped<IUserDirectory, UserDirectory>();
         services.AddScoped<ILocalAccountService, LocalAccountService>();

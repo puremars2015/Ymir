@@ -100,6 +100,14 @@ Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真
 
 Runtime 生命週期（ADR-0011）：`RuntimeLifecycleWorker` 啟動時對帳、定期停止閒置的 runtime（跳過執行中的使用者）；執行政策（閒置時間、單次執行上限、每人排隊上限、每日次數）由 `RuntimePolicyService` 提供，管理介面的值（`vibemaker.runtime_policy`）優先於 `VibeMaker__Runtime__*`；超過配額回 429 `QUOTA_EXCEEDED`。生命週期操作（停止、查詢、對帳）一律以 user id 呼叫 `StopForUserAsync` / `GetStatusForUserAsync`，不要用 runtime id（服務重啟後會變）。
 
+維運（Sprint 5 強化）：
+- runtime 的 create / start / stop / reconcile 都寫稽核：`RuntimeInfo.Transition` 由 EnsureRuntime 回報。
+- 監控指標在 `VibeMakerTelemetry`（meter / ActivitySource `Ymir.VibeMaker`）；每個 execution 有自己的 activity 與 log scope（ExecutionId）。
+- `/health` 包含 database / runtime / litellm 檢查（`VibeMakerHealthChecks`），細節在 `/api/admin/health`；描述只寫摘要，不含路徑或例外訊息。
+- `SecurityHeaders` 為所有回應加 CSP 等標頭：Angular build 不可產生 inline script（`angular.json` 的 `inlineCritical: false`），新的第三方腳本或 iframe 會被 CSP 擋下，需要時更新 CSP 並說明原因。
+- `DataRetentionWorker` 依 `Ymir:Retention:*` 清理過期的稽核與 execution 事件；對話、訊息、檔案永久保留。
+- 備份指南：`docs/guides/backup-restore.md`。
+
 `/make`：對話輸入 `/make` 顯示管理員設定的主題按鈕（`vibemaker.make_topics`，Admin 在「管理 → Make 主題」維護）；給 Agent 的完整指示由後端 `MakePromptBuilder` 組合並存在 `AgentExecution.AgentPrompt`，對話紀錄只保留使用者輸入的文字。
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。

@@ -29,6 +29,9 @@ builder.Services.AddPublicEdge(builder.Configuration, builder.Environment);
 builder.Services.AddPlatformInfrastructure(connectionString);
 builder.Services.AddVibeMakerApplication();
 builder.Services.AddVibeMakerInfrastructure(builder.Configuration, connectionString, builder.Environment.IsDevelopment());
+builder.Services.Configure<RetentionOptions>(builder.Configuration.GetSection(RetentionOptions.SectionName));
+builder.Services.AddSingleton<DataRetentionWorker>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<DataRetentionWorker>());
 
 var app = builder.Build();
 

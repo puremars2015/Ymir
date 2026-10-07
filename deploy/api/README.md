@@ -93,6 +93,24 @@ docker compose -f compose.windows.yml logs -f api
 - 範本使用 Development（有免密碼的 dev 登入），**不可對外公開**。在 Windows 驗證 tunnel 時，請改用指南第 4 節的主機上 API。
 - 這一段在雲端沙箱無法驗證（沒有 Docker Desktop），**待使用者環境確認**。
 
+## 維運
+
+- **健康檢查**：
+  - `curl http://127.0.0.1:5080/health` 包含資料庫、執行環境（runtime host）、LiteLLM，只回 `Healthy` / `Unhealthy`；
+  - 各項細節在「管理 → 總覽 → 服務狀態」；
+  - `/alive` 只檢查程序本身。
+  - 經由公開網域連進來的 `/health`、`/alive` 一律 404（ADR-0006）。
+- **監控指標**（SA §18）：設定 `OTEL_EXPORTER_OTLP_ENDPOINT` 後，以 OpenTelemetry 匯出以下指標，以及每個 execution 的 trace：
+  - `ymir.runtimes.active` / `ymir.runtimes.busy`；
+  - `ymir.executions.started` / `ymir.executions.finished`；
+  - `ymir.execution.duration`；
+  - `ymir.runtime.start_failures`。
+- **追查一次執行**：
+  - log 都帶 `ExecutionId`、`ConversationId`、`UserId`；
+  - 稽核紀錄的 correlation id 是該次執行的 trace id。
+- **安全標頭**：所有回應都帶 CSP（script 只允許同源）、`X-Frame-Options: DENY`、`Referrer-Policy`、`Permissions-Policy`。
+- **備份與保存期限**：見 [docs/guides/backup-restore.md](../../docs/guides/backup-restore.md)。
+
 ## 疑難排解
 
 | 症狀 | 原因 / 處理 |

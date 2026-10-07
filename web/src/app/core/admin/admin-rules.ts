@@ -27,6 +27,7 @@ const ACTION_LABELS: Record<string, string> = {
   'runtime.stop': '停止執行環境',
   'runtime.reconcile': '同步執行環境狀態',
   'runtime.ensure': '執行環境啟動失敗',
+  'system.retention.purge': '清理過期資料',
   'admin.settings.runtime.update': '修改執行政策',
   'admin.settings.runtime.reset': '還原執行政策',
   'auth.login': '開發登入',

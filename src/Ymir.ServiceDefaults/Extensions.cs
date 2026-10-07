@@ -35,6 +35,8 @@ public static class Extensions
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder)
         where TBuilder : IHostApplicationBuilder
     {
+        // log scope（例如每個 execution 的 ExecutionId）也印在 console log，方便從錯誤追到同一次執行（SA §18、AC-10）。
+        builder.Logging.AddSimpleConsole(options => options.IncludeScopes = true);
         builder.Logging.AddOpenTelemetry(logging =>
         {
             logging.IncludeFormattedMessage = true;

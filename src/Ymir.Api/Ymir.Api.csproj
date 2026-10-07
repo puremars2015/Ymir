@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Ymir.UnitTests" />
+    <InternalsVisibleTo Include="Ymir.IntegrationTests" />
   </ItemGroup>
 </Project>

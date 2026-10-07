@@ -46,12 +46,8 @@ public sealed class ExecutionRunner(
         // AC-10：同一次執行的 log 都帶 execution / conversation / user id，稽核的 correlation id 是這個 activity 的 trace id。
         using var activity = VibeMakerTelemetry.ActivitySource.StartActivity("vibemaker.execution");
         activity?.SetTag("ymir.execution_id", executionId.ToString("D"));
-        using var logScope = logger.BeginScope(new Dictionary<string, object>
-        {
-            ["ExecutionId"] = executionId,
-            ["ConversationId"] = execution.ConversationId,
-            ["UserId"] = execution.UserId,
-        });
+        using var logScope = logger.BeginScope(
+            "ExecutionId:{ExecutionId} ConversationId:{ConversationId} UserId:{UserId}", executionId, execution.ConversationId, execution.UserId);
 
         // 一個使用者一個 container（ADR-0007）：同一使用者的 execution 依序執行。
         using var userLock = await userLocks.AcquireAsync(execution.UserId, stoppingToken).ConfigureAwait(false);
