@@ -163,6 +163,17 @@ Pi 1.0.0 透過 `--thinking` 與每次執行的 models.json 明確對應傳輸�
 
 ## 成果、專案檔案與工具暫存
 
+### `/make` 文件引導與公告模板
+
+輸入 `/make` 可選擇小工具、網站、**建立簡報**與**建立公告 Word**。主題從 `vibemaker.make_topics` 載入，管理員可在「Make 主題」編輯建置指示、排序或停用。`DocumentMakeTopics` migration 只新增兩個文件主題，不覆寫既有自訂主題。
+
+- 簡報：先確認目的、聽眾、頁數、素材及風格，確認逐頁大綱後產生可編輯 `.pptx`；Agent 映像預裝 `python-pptx` 與中文字型。
+- 公告：先確認主旨、發布單位、日期、正文與聯絡資訊，確認草稿後依公司模板產生 `.docx`。模板保留使用者範例的 Logo、橫幅、背景與頁尾，移除原始活動、姓名及信箱；段落與條列可增減。
+- 平台素材：`runtime/agent/templates/` 隨 Agent 映像部署至唯讀 `/opt/ymir/templates/`；公告建置器只替換 DOCX 正文，保留其他 package parts。來源範例不進版本庫或使用者工作目錄。
+- 暫存 JSON／腳本放在 `.ymir/tmp/`，只有最終 PPTX／DOCX 放入本次成果目錄。部署時需套用 migration 並建置新 Agent 映像；既有容器須於沒有執行中的工作時重建，保留 workspace 與 agent-state。
+
+詳見 [公告模板及欄位](runtime/agent/templates/announcement/README.md)與[簡報建置指引](runtime/agent/templates/presentation/README.md)。
+
 - **成果**：每次執行使用獨立的 `deliverables/{executionId}/`。單一成果直接下載；多個檔案以後端 ZIP 交付並保留目錄結構，包含網站必要的 `package.json`、lockfile。純閱讀或摘要不建立下載卡片，除非使用者要求可下載的文件。
 - **專案檔案**：工作目錄中的原始碼、設定與上傳附件，可在檔案面板切換查看或下載；不包含成果目錄及內部工具檔。
 - **工具與暫存**：工具安裝使用 `.ymir/tools/`，處理過程使用 `.ymir/tmp/`，不提供列表、單檔下載或 ZIP 下載。Agent 映像預裝 `pdftotext`，避免單純解析 PDF 時在工作目錄根建立 npm 專案。

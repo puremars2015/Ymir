@@ -62,6 +62,8 @@ dist/
 .angular/
 coverage/
 *.tsbuildinfo
+__pycache__/
+*.pyc
 
 # Cloudflare Tunnel 憑證（ADR-0006）
 deploy/cloudflared/config.yml
