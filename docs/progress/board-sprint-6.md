@@ -30,6 +30,7 @@
 
 | # | 工作項目 | 狀態 | 前置 / 待決定 |
 |---|---|---|---|
+| P0 | 多人、多 Agent 軟體專案協作計畫 | 📝 | 見 [#009](#009--多人多-agent-軟體專案協作計畫)；僅計畫，功能尚未實作，排程另定 |
 | W3 | AppDashboard 配色與淺色／深色／自動切換 | ✅ | 見 [#008](#008--appdashboard-配色與主題切換) |
 | W2 | Ubuntu 既有 Docker 部署啟動檔 `start-ymir.sh` | ✅ | 見 [#005](#005--ubuntu-既有-docker-部署啟動檔)；語法與隔離模擬通過，實機待驗證 |
 | W1 | Windows 既有部署一鍵啟動檔 `start-ymir.ps1` | ✅ | 見 [#004](#004--windows-既有部署一鍵啟動檔)；已在目前主機驗證 |
@@ -63,6 +64,18 @@
 ---
 
 ## 💬 留言區
+
+### #009 · 多人、多 Agent 軟體專案協作計畫
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 14:34 · `✅完成（計畫）`
+
+- **需求**：使用者規劃多人多 Agent 協作：類似 Jira 的 Sprint／Task 清單、SA Agent 制定模組通訊與任務、開發 Agent 每輪讀取／更新專案留言板、QA Agent 依需求／SA 驗收，以及人用 UI 和 Agent 控制介面。
+- **完成**：新增 [協作開發計畫](../planning/multi-agent-project-collaboration-plan.md)，並加入 [總開發規劃](../planning/development-plan.md)。涵蓋任務狀態／依賴、原子領取與租約／舊輪次拒寫、文件批准基準、專案留言／交接、版本化成果／QA／整合、成員與 Agent 權限、UI／API／MCP、持久化派工、隔離 Git 副本、M0～M5 階段與驗收。
+- **架構差距**：目前專案屬單人，runtime 一人一個且 execution 依序執行；本計畫不宣稱已有多人並行。團隊授權、專用 sandbox／工作副本、同人多 Agent 並行需 M0 的新 ADR，MCP 工具需銜接 ADR-0012 A2。RAG SQLite 只作文件檢索，不作共享任務鎖與狀態來源。
+- **驗證**：文件相對連結、git diff --check 與需求覆蓋檢查通過；只有 Markdown 修改，沒有新增程式／migration，不部署或啟動 Agent。完整 CI 通過後依專案流程合併 main。
+- **後續**：尚未實作；先進行 M0 SA／ADR／隔離 spike。待確認 Git 平台、團隊規模、並行資源、模型／預算及是否自動合併，建議第一版人工批准與調度。
+
+---
 
 ### #008 · AppDashboard 配色與主題切換
 
