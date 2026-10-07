@@ -54,7 +54,7 @@ public sealed class WorkspaceFileService(IVibeMakerDbContext db, ICurrentUser cu
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(onFile);
-        if (!WorkspacePathRules.IsSafeRelativePath(path))
+        if (!WorkspacePathRules.IsSafeRelativePath(path) || path!.Split('/')[0] == "deliverables")
         {
             return WorkspaceFileOutcome.NotFound;
         }

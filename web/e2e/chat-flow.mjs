@@ -77,7 +77,7 @@ step('started an ungrouped chat from the home composer (title from first message
 await page.screenshot({ path: `${outDir}/02-chat.png` });
 
 // 2b. Agent 建立的檔案可以下載：回覆下方出現檔案、檔案面板、打包下載
-const chip = page.locator('.turn-files a.chip:has-text("hello.txt")');
+const chip = page.locator('.turn.assistant app-artifact-download a:has-text("hello.txt")');
 await chip.waitFor();
 const [fileDownload] = await Promise.all([page.waitForEvent('download'), chip.click()]);
 if (fileDownload.suggestedFilename() !== 'hello.txt')
@@ -92,17 +92,12 @@ await page.click('app-files-panel button.open:has-text("hello.txt")');
 await page.waitForSelector('app-files-panel pre.code:has-text("Hello from Ymir")');
 await page.screenshot({ path: `${outDir}/02c-file-preview.png` });
 await page.click('app-files-panel .preview-head button:has-text("返回")');
-const [zipDownload] = await Promise.all([
-  page.waitForEvent('download'),
-  page.click('app-files-panel a.archive'),
-]);
-// headless Chromium 無法處理非 ASCII 檔名（會改叫 "download"），所以直接檢查 header：一般瀏覽器用 filename* 取得中文檔名
-const archiveResponse = await page.request.get(zipDownload.url());
-const disposition = archiveResponse.headers()['content-disposition'] ?? '';
-if (!disposition.startsWith('attachment') || !/filename\*=UTF-8''.+\.zip/.test(disposition))
-  throw new Error(`unexpected archive disposition: ${disposition}`);
-const zipBytes = readFileSync(await zipDownload.path());
-if (zipBytes[0] !== 0x50 || zipBytes[1] !== 0x4b) throw new Error('archive is not a zip file');
+// 單一成果直接下載；多檔 ZIP 在 artifacts-flow.mjs 驗證。
+if (await page.locator('app-files-panel a[href$="/archive"]').count())
+  throw new Error('single deliverable should not recommend a ZIP');
+await page.reload();
+await page.waitForSelector('.turn.assistant app-artifact-download a:has-text("hello.txt")');
+await page.click('button.files-toggle');
 await page.click('app-files-panel button.close');
 step('agent-created file previewable and downloadable (inline chip, files panel, zip)');
 
@@ -251,7 +246,7 @@ step('deleted (archived) the project and its chats');
 
 // 8. 窄螢幕：側欄變抽屜
 await page.setViewportSize({ width: 390, height: 780 });
-await page.waitForSelector('.mobile-bar');
+await page.waitForSelector('.shell-bar');
 await page.screenshot({ path: `${outDir}/05-mobile.png` });
 await page.click('button[aria-label="開啟側邊欄"]');
 await page.waitForSelector('.drawer-open');

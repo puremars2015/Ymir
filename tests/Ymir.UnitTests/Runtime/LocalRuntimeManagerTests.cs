@@ -21,24 +21,32 @@ public class LocalRuntimeManagerTests
     [InlineData("echo /workspace", "echo /workspace")]
     public void MapRuntimePath_RewritesOnlyRuntimePathPrefixes(string value, string expected)
     {
-        Assert.Equal(expected, LocalRuntimeManager.MapRuntimePath(value, Directories));
+        var actual = LocalRuntimeManager.MapRuntimePath(value, Directories);
+        if (expected.StartsWith(UserRoot, StringComparison.Ordinal))
+        {
+            Assert.Equal(Path.GetFullPath(expected), Path.GetFullPath(actual));
+        }
+        else
+        {
+            Assert.Equal(expected, actual);
+        }
     }
 
     [Fact]
     public void UserDirectories_AreDerivedOnlyFromUserId()
     {
         var directories = UserDirectories.For("/srv/ymir/../ymir/workspaces", UserId);
-        Assert.Equal("/srv/ymir/workspaces/users/6f9619ff8b86d011b42d00c04fc964ff/workspace", directories.Workspace);
-        Assert.Equal("/srv/ymir/workspaces/users/6f9619ff8b86d011b42d00c04fc964ff/agent-state", directories.AgentState);
+        Assert.Equal(Path.GetFullPath("/srv/ymir/workspaces/users/6f9619ff8b86d011b42d00c04fc964ff/workspace"), directories.Workspace);
+        Assert.Equal(Path.GetFullPath("/srv/ymir/workspaces/users/6f9619ff8b86d011b42d00c04fc964ff/agent-state"), directories.AgentState);
     }
 
     [Fact]
     public void HostPathOf_MapsProjectAndConversationDirectories()
     {
         var projectId = Guid.Parse("11111111-2222-3333-4444-555555555555");
-        Assert.Equal(UserRoot + "/workspace", Directories.HostPathOf(RuntimePaths.Workspace));
-        Assert.Equal(UserRoot + "/workspace/projects/11111111222233334444555555555555", Directories.HostPathOf(RuntimePaths.ProjectDirectory(projectId)));
-        Assert.Equal(UserRoot + "/workspace/chats/11111111222233334444555555555555", Directories.HostPathOf(RuntimePaths.ConversationDirectory(projectId)));
+        Assert.Equal(Path.GetFullPath(UserRoot + "/workspace"), Directories.HostPathOf(RuntimePaths.Workspace));
+        Assert.Equal(Path.GetFullPath(UserRoot + "/workspace/projects/11111111222233334444555555555555"), Directories.HostPathOf(RuntimePaths.ProjectDirectory(projectId)));
+        Assert.Equal(Path.GetFullPath(UserRoot + "/workspace/chats/11111111222233334444555555555555"), Directories.HostPathOf(RuntimePaths.ConversationDirectory(projectId)));
     }
 
     [Theory]

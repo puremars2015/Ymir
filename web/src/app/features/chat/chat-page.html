@@ -30,8 +30,8 @@
     (click)="filesOpen.set(!filesOpen())"
   >
     <span aria-hidden="true">📁</span> 檔案
-    @if (files().length > 0) {
-      <span class="count">{{ files().length }}</span>
+    @if (artifactCount() > 0) {
+      <span class="count">{{ artifactCount() }}</span>
     }
   </button>
 </header>
@@ -41,7 +41,7 @@
     @for (message of messages(); track message.id) {
       @let content =
         message.role === 'ASSISTANT' ? (message.content | assistantText) : message.content;
-      @if (content) {
+      @if (content || artifactByMessage().has(message.id)) {
         <li
           class="turn"
           [class.user]="message.role === 'USER'"
@@ -70,6 +70,18 @@
             } @else {
               <span class="text">{{ content }}</span>
             }
+            @if (message.role === 'ASSISTANT' && artifactByMessage().get(message.id); as group) {
+              <app-artifact-download [group]="group" [conversationId]="conversationId()" />
+            }
+          </div>
+        </li>
+      }
+    }
+    @for (group of artifacts(); track group.executionId) {
+      @if (group.conversationId === conversationId() && !group.messageId) {
+        <li class="turn assistant">
+          <div class="bubble">
+            <app-artifact-download [group]="group" [conversationId]="conversationId()" />
           </div>
         </li>
       }
@@ -102,20 +114,6 @@
           } @else if (!turn.view.statusText && !turn.view.tools.length) {
             <p class="status typing" aria-label="Agent 思考中">●●●</p>
           }
-        </div>
-      </li>
-    } @else if (turnFiles().length > 0) {
-      <li class="turn assistant turn-files" aria-label="這次產生的檔案">
-        <div class="bubble">
-          <p class="status">這次產生 / 更新的檔案，點一下下載：</p>
-          <div class="chips">
-            @for (file of turnFiles(); track file.path) {
-              <a class="chip" [href]="downloadUrl(file)" download [title]="file.path">
-                {{ fileLabel(file) }} <span class="muted">{{ fileSize(file) }}</span>
-                <span class="dl" aria-hidden="true">⬇</span>
-              </a>
-            }
-          </div>
         </div>
       </li>
     }
@@ -152,6 +150,7 @@
     class="files-panel"
     [conversationId]="conversationId()"
     [files]="files()"
+    [artifacts]="artifacts()"
     [truncated]="filesTruncated()"
     [loading]="filesLoading()"
     [error]="filesError()"

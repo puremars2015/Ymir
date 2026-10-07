@@ -20,12 +20,35 @@ internal sealed partial class RuntimeWorkspaceFileReader(IAgentRuntimeManager ru
     /// <c>-mindepth 1</c> 讓根目錄 <c>.</c> 不被 <c>-name '.*'</c> 剪掉；隱藏檔與 node_modules 整個略過；
     /// <c>-type f</c> 不跟隨 symlink。輸出以 NUL 分隔：路徑、大小、修改時間（epoch 秒）。
     /// </summary>
-    internal const string ListScript =
-        "find . -mindepth 1 \\( -name '.*' -o -name node_modules \\) -prune -o -type f -printf '%P\\0%s\\0%T@\\0' 2>/dev/null | head -z -n \"$1\"";
+    internal const string ListScript = """
+        base=$(realpath -e .) || exit 3
+        dir="$2"
+        if [ "$dir" != . ]; then
+          current=.
+          IFS=/ read -ra segments <<< "$dir"
+          for segment in "${segments[@]}"; do
+            current="$current/$segment"
+            [ ! -L "$current" ] || exit 3
+          done
+          actual=$(realpath -e -- "$dir" 2>/dev/null) || exit 0
+          case "$actual" in "$base"/*) ;; *) exit 3 ;; esac
+        fi
+        [ -d "$dir" ] || exit 0
+        find "$dir" -mindepth 1 \( -name '.*' -o -name node_modules -o -path ./deliverables \) -prune -o -type f -printf '%P\0%s\0%T@\0' 2>/dev/null | head -z -n "$1"
+        """;
 
     internal const string ReadScript = """
         base=$(realpath -e .) || exit 3
         while IFS= read -r -d '' p; do
+          current=.
+          blocked=false
+          IFS=/ read -ra segments <<< "$p"
+          for segment in "${segments[@]}"; do
+            current="$current/$segment"
+            case "$segment" in .*|node_modules) blocked=true ;; esac
+            [ ! -L "$current" ] || blocked=true
+          done
+          if $blocked; then printf -- '-1\n'; continue; fi
           f=$(realpath -e -- "$p" 2>/dev/null) || { printf -- '-1\n'; continue; }
           case "$f" in "$base"/*) ;; *) printf -- '-1\n'; continue ;; esac
           if [ -L "$p" ] || [ ! -f "$f" ]; then printf -- '-1\n'; continue; fi
@@ -35,12 +58,19 @@ internal sealed partial class RuntimeWorkspaceFileReader(IAgentRuntimeManager ru
         done
         """;
 
-    public async Task<IReadOnlyList<WorkspaceFileEntry>> ListAsync(Guid userId, string workingDirectory, int limit, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<WorkspaceFileEntry>> ListAsync(Guid userId, string workingDirectory, int limit, CancellationToken cancellationToken) =>
+        ListDirectoryAsync(userId, workingDirectory, ".", limit, cancellationToken);
+
+    public async Task<IReadOnlyList<WorkspaceFileEntry>> ListDirectoryAsync(Guid userId, string workingDirectory, string relativeDirectory, int limit, CancellationToken cancellationToken)
     {
+        if (relativeDirectory != "." && !WorkspacePathRules.IsSafeRelativePath(relativeDirectory))
+        {
+            return [];
+        }
         var runtime = await runtimes.EnsureRuntimeAsync(userId, cancellationToken).ConfigureAwait(false);
         var spec = new RuntimeProcessSpec(
-            "sh",
-            ["-c", ListScript, "ymir-list", ((limit + 1) * 3).ToString(CultureInfo.InvariantCulture)],
+            "bash",
+            ["-c", ListScript, "ymir-list", ((limit + 1) * 3).ToString(CultureInfo.InvariantCulture), relativeDirectory],
             WorkingDirectory: workingDirectory);
         var process = await runtimes.StartProcessAsync(runtime.RuntimeId, spec, cancellationToken).ConfigureAwait(false);
         await using (process.ConfigureAwait(false))

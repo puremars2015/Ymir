@@ -28,10 +28,10 @@ flowchart TD
 
 | 元件 | 執行位置 | 入口或連線 | 責任 |
 |---|---|---|---|
-| Angular + nginx | `ymir-web` 容器，映像 `localhost/ymir/web:71b8e2c` | `127.0.0.1:4200`、`127.0.0.1:5080` → 容器 `80` | 提供 Angular 靜態網頁、SPA 路由及 API 反向代理 |
+| Angular + nginx | `ymir-web` 容器，映像 `localhost/ymir/web:sidebar-20261007` | `127.0.0.1:4200`、`127.0.0.1:5080` → 容器 `80` | 提供 Angular 靜態網頁、SPA 路由及 API 反向代理 |
 | Ymir API | Windows 背景程序 `dotnet Ymir.Api.dll` | `127.0.0.1:5081` | 登入、授權、專案、對話、附件、Agent 執行與管理功能 |
 | SQL Server | `ymir-sql` 容器 | `127.0.0.1:14330` → 容器 `1433` | Ymir 業務資料 |
-| Agent runtime | `ymir-user-{userId}` 容器，映像 `localhost/ymir/agent-runtime:dev` | API 透過 Docker 管理，無對外服務埠 | 執行 Pi Agent、工具與檔案操作 |
+| Agent runtime | `ymir-user-{userId}` 容器，映像 `localhost/ymir/agent-runtime:deliverables` | API 透過 Docker 管理，無對外服務埠 | 執行 Pi Agent、工具與檔案操作 |
 | LiteLLM | `ymir-litellm-litellm-1` 容器 | `127.0.0.1:4000` → 容器 `4000` | 模型路由、每位使用者的 virtual key、預算與用量 |
 | PostgreSQL | `ymir-litellm-litellm-db-1` 容器 | 容器 `5432`，未發布主機連接埠 | LiteLLM 的金鑰與用量資料 |
 | Cloudflare Tunnel | `ymir-tunnel-cloudflared-1` 容器 | 對外建立 Tunnel；內部連到 `http://ymir-web:80` | 將公開 HTTPS 網域導向本機網頁入口 |
@@ -49,11 +49,11 @@ nginx **1.31.6** 執行在 `ymir-web` 的 Linux 容器內，因此 Windows 程�
 - `/api/dev/*`、`/health`、`/alive` 在此入口被阻擋；其他網頁路徑以 `index.html` 處理 SPA 路由。
 - nginx 設定與靜態網頁已封裝在映像中；目前 `ymir-web` 沒有掛載外部設定檔。
 
-### 目前的上傳限制落差
+### 上傳大小限制
 
-應用程式允許單一附件 **50 MiB**（`50 × 1024 × 1024` bytes）。但目前 nginx 未設定 `client_max_body_size`，使用預設 `1m`，超過 1 MiB 的請求會在進入 API 前回傳 **413 Request Entity Too Large**。
+應用程式允許單一附件 **50 MiB**（`50 × 1024 × 1024` bytes），nginx 的 `server` 區塊也已設定 `client_max_body_size 50m;`，兩層限制一致。超過此上限的請求會回傳 **413 Request Entity Too Large**。
 
-已確認 6,781,783 bytes 的 PDF 被 nginx 記錄為 `client intended to send too large body`。這是目前部署的設定落差；需將 nginx 上限與應用程式上限對齊，並同步更新映像來源。本文件更新時尚未修正此設定。
+原先 6,781,783 bytes 的 PDF 因 nginx 預設 `1m` 被擋住；2026-10-07 已修正執行中的設定、重新載入 nginx，並同步更新部署來源 `%LOCALAPPDATA%\Ymir\deploy\web-sidebar-20261007\nginx.conf` 及 `localhost/ymir/web:sidebar-20261007` 映像。以未登入的大小探測請求確認：6,781,783 bytes 已通過 nginx 大小檢查並收到 API 的 401；50 MiB + 1 byte 仍由 nginx 回傳 413。此檢查未建立附件。
 
 ## 應用程式分層
 
@@ -89,6 +89,7 @@ API 採 BFF + HttpOnly Cookie，可支援 Entra ID OIDC 與本機帳號。前端
 3. Runtime 確保使用者容器存在，Harness 在容器內透過 RPC 啟動 Pi Agent。
 4. Pi 使用該使用者的 LiteLLM virtual key 呼叫模型，並在工作目錄執行工具。
 5. 執行事件先寫入 SQL Server，再發布；瀏覽器透過 SSE 接收輸出、工具事件及最終狀態。
+6. 成功執行後，後端只登記本次 `deliverables/{executionId}/` 中的交付成果，保存於 `vibemaker.execution_artifacts`；回覆下載卡片使用此紀錄，不以工作目錄的檔案變化推測成果。
 
 同一位使用者的對話共用一個 Agent 容器，專案與獨立對話各有工作目錄。Agent 容器不持有模型供應商金鑰、LiteLLM master key 或 Ymir 資料庫連線字串。
 
@@ -129,3 +130,15 @@ flowchart LR
 `src/Ymir.Api/Containerfile` 將 Angular build 包進 API 映像，由 API 提供網頁；此範本不依賴獨立 nginx。API 使用 `Runtime.Provider=Remote`，透過 `/run/ymir-runtime/runtime.sock` 與 token 呼叫主機 RuntimeHost。
 
 RuntimeHost 以主機上的專用帳號管理每位使用者的 Rootless Podman 容器；API 容器不掛載 Docker／Podman socket 或使用者 workspace。Windows Docker 的容器化 API 範本則透過 `host.docker.internal:5090` 呼叫主機 RuntimeHost。這些是程式碼支援的部署方式，目前本機未使用此拓撲。
+
+## 側欄導覽
+
+側欄採固定圖示與一致列高，專案、聊天群組以標題及分隔線區分。頂部漢堡按鈕可收合／展開側欄；桌面記住收合狀態，手機顯示抽屜並支援 Escape、遮罩與導覽後關閉。
+
+## 成果、專案檔案與工具暫存
+
+- **成果**：每次執行使用獨立的 `deliverables/{executionId}/`。單一成果直接下載；多個檔案以後端 ZIP 交付並保留目錄結構，包含網站必要的 `package.json`、lockfile。純閱讀或摘要不建立下載卡片，除非使用者要求可下載的文件。
+- **專案檔案**：工作目錄中的原始碼、設定與上傳附件，可在檔案面板切換查看或下載；不包含成果目錄及內部工具檔。
+- **工具與暫存**：工具安裝使用 `.ymir/tools/`，處理過程使用 `.ymir/tmp/`，不提供列表、單檔下載或 ZIP 下載。Agent 映像預裝 `pdftotext`，避免單純解析 PDF 時在工作目錄根建立 npm 專案。
+- **成果 API**：`GET /api/conversations/{id}/artifacts` 列出成功執行的成果；`/{executionId}/download?path=` 下載已登記的單檔；`/{executionId}/archive` 僅打包該次成果。同一個專案的對話共享成果，後端驗證擁有者、路徑、檔案大小與修改時間，拒絕 symlink、隱藏檔及依賴目錄。
+- **相容性**：成果紀錄保存於資料庫，重新整理或重啟後仍可查詢。失敗／取消不發布成果，歷史檔案不追溯分類、不自動刪除；舊有工具設定檔仍可在專案檔案中看到。

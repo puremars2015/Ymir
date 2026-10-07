@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace Ymir.Testing.FakeLlm;
 
@@ -14,7 +15,7 @@ namespace Ymir.Testing.FakeLlm;
 /// <item>其他 → 回覆「收到第 N 則使用者訊息：...」，N 可用來驗證 session 續接。</item>
 /// </list>
 /// </summary>
-public static class FakeLlmScript
+public static partial class FakeLlmScript
 {
     public const string CreateFileMarker = "[create-file]";
     public const string SlowMarker = "[slow]";
@@ -43,9 +44,13 @@ public static class FakeLlmScript
 
         if (lastUserText.Contains(CreateFileMarker, StringComparison.Ordinal))
         {
+            var systemText = string.Join("\n", messages.Where(m => m?["role"]?.GetValue<string>() == "system").Select(ExtractText));
+            var delivery = DeliveryDirectory().Matches(systemText).LastOrDefault()?.Value;
+            var command = delivery is null ? $"printf '{CreatedFileContent}' > {CreatedFileName}"
+                : $"mkdir -p {delivery} && printf '{CreatedFileContent}' > {delivery}/{CreatedFileName}";
             return FakeLlmReply.ToolCall(
                 "bash",
-                new JsonObject { ["command"] = $"printf '{CreatedFileContent}' > {CreatedFileName}" },
+                new JsonObject { ["command"] = command },
                 preamble: "我來建立檔案。");
         }
 
@@ -77,6 +82,9 @@ public static class FakeLlmScript
 
     /// <summary>回覆中「收到圖片：N」的前綴。</summary>
     public const string ImageCountPrefix = "（收到圖片）";
+
+    [GeneratedRegex("deliverables/[0-9a-f]{32}", RegexOptions.CultureInvariant)]
+    private static partial Regex DeliveryDirectory();
 
     private static int CountImages(JsonNode? message) =>
         message?["content"] is JsonArray parts ? parts.Count(p => p?["type"]?.GetValue<string>() == "image_url") : 0;

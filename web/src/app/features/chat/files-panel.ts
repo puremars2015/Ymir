@@ -12,8 +12,10 @@ import {
 } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
-import { WorkspaceFile } from '../../core/api/api-types';
+import { ArtifactGroup, WorkspaceFile } from '../../core/api/api-types';
 import { Markdown } from '../../shared/markdown';
+import { ArtifactDownload } from '../../shared/artifact-download';
+import { artifactDownloadUrl } from '../../core/files/artifact-files';
 import {
   archiveDownloadUrl,
   fileDirectory,
@@ -27,6 +29,7 @@ import {
 
 interface Preview {
   file: WorkspaceFile;
+  executionId?: string;
   kind: PreviewKind;
   loading: boolean;
   text?: string;
@@ -41,7 +44,7 @@ interface Preview {
  */
 @Component({
   selector: 'app-files-panel',
-  imports: [DatePipe, Markdown],
+  imports: [DatePipe, Markdown, ArtifactDownload],
   template: `
     <aside class="panel" aria-label="檔案">
       <header>
@@ -53,6 +56,27 @@ interface Preview {
           ×
         </button>
       </header>
+      <nav aria-label="檔案分類">
+        <button
+          type="button"
+          class="button secondary small"
+          [attr.aria-pressed]="tab() === 'artifacts'"
+          (click)="selectTab('artifacts')"
+        >
+          成果
+        </button>
+        <button
+          type="button"
+          class="button secondary small"
+          [attr.aria-pressed]="tab() === 'workspace'"
+          (click)="selectTab('workspace')"
+        >
+          專案檔案
+        </button>
+      </nav>
+      @if (tab() === 'workspace') {
+        <p class="muted small">工作目錄內容，包含原始碼及上傳附件；這些檔案不一定是交付成果。</p>
+      }
       @if (shared()) {
         <p class="muted small">這個專案的所有對話共用這些檔案。</p>
       }
@@ -64,7 +88,9 @@ interface Preview {
           <div class="preview-head">
             <button type="button" class="link" (click)="closePreview()">← 返回</button>
             <span class="name" [title]="p.file.path">{{ name(p.file) }}</span>
-            <a class="button secondary small" [href]="downloadUrl(p.file)" download>⬇ 下載</a>
+            <a class="button secondary small" [href]="downloadUrl(p.file, p.executionId)" download
+              >⬇ 下載</a
+            >
           </div>
           @if (p.loading) {
             <p class="muted small">載入中…</p>
@@ -90,8 +116,39 @@ interface Preview {
             }
           }
         </section>
+      } @else if (tab() === 'artifacts') {
+        @for (group of artifacts(); track group.executionId) {
+          <section aria-label="交付成果">
+            <h3>{{ group.createdAt | date: 'M/d HH:mm' }} 的成果</h3>
+            <app-artifact-download [group]="group" [conversationId]="conversationId()" />
+            <ul class="files">
+              @for (file of group.files; track file.path) {
+                <li class="file">
+                  <button type="button" class="open" (click)="openPreview(file, group.executionId)">
+                    <span class="icon" aria-hidden="true">{{ icon(file) }}</span>
+                    <span class="meta"
+                      ><span class="name">{{ file.path }}</span
+                      ><span class="muted small">{{ size(file) }}</span></span
+                    >
+                  </button>
+                  <a
+                    class="download"
+                    [href]="downloadUrl(file, group.executionId)"
+                    download
+                    [attr.aria-label]="'下載 ' + file.path"
+                    >⬇</a
+                  >
+                </li>
+              }
+            </ul>
+          </section>
+        } @empty {
+          <p class="muted small">
+            {{ loading() ? '載入中…' : '尚無交付成果。閱讀或分析附件的回覆會直接顯示在對話中。' }}
+          </p>
+        }
       } @else if (files().length > 0) {
-        <a class="button primary archive" [href]="archiveUrl()" download>⬇ 全部下載（.zip）</a>
+        <a class="button primary archive" [href]="archiveUrl()" download>⬇ 下載專案檔案（ZIP）</a>
         <ul class="files">
           @for (file of files(); track file.path) {
             <li class="file">
@@ -262,6 +319,8 @@ export class FilesPanel {
 
   readonly conversationId = input.required<string>();
   readonly files = input.required<WorkspaceFile[]>();
+  readonly artifacts = input<ArtifactGroup[]>([]);
+  protected readonly tab = signal<'artifacts' | 'workspace'>('artifacts');
   readonly truncated = input(false);
   readonly loading = input(false);
   readonly error = input<string | null>(null);
@@ -276,37 +335,46 @@ export class FilesPanel {
     // 換對話時關閉預覽
     effect(() => {
       this.conversationId();
-      untracked(() => this.closePreview());
+      untracked(() => {
+        this.closePreview();
+        this.tab.set('artifacts');
+      });
     });
     inject(DestroyRef).onDestroy(() => this.closePreview());
   }
 
-  protected openPreview(file: WorkspaceFile): void {
+  protected selectTab(tab: 'artifacts' | 'workspace'): void {
+    this.closePreview();
+    this.tab.set(tab);
+  }
+
+  protected openPreview(file: WorkspaceFile, executionId?: string): void {
     this.closePreview();
     const kind = previewKind(file.path, file.size);
-    const url = fileDownloadUrl(this.conversationId(), file.path);
+    const url = this.downloadUrl(file, executionId);
     if (kind === 'text' || kind === 'markdown') {
-      this.preview.set({ file, kind, loading: true });
+      this.preview.set({ file, executionId, kind, loading: true });
       this.request = this.api.fetchFileText(url).subscribe({
-        next: (text) => this.preview.set({ file, kind, loading: false, text }),
+        next: (text) => this.preview.set({ file, executionId, kind, loading: false, text }),
         error: (e: unknown) =>
-          this.preview.set({ file, kind, loading: false, error: describeApiError(e) }),
+          this.preview.set({ file, executionId, kind, loading: false, error: describeApiError(e) }),
       });
     } else if (kind === 'image') {
-      this.preview.set({ file, kind, loading: true });
+      this.preview.set({ file, executionId, kind, loading: true });
       this.request = this.api.fetchFileBlob(url).subscribe({
         next: (blob) =>
           this.preview.set({
             file,
+            executionId,
             kind,
             loading: false,
             imageUrl: URL.createObjectURL(imageBlob(blob, file.path)),
           }),
         error: (e: unknown) =>
-          this.preview.set({ file, kind, loading: false, error: describeApiError(e) }),
+          this.preview.set({ file, executionId, kind, loading: false, error: describeApiError(e) }),
       });
     } else {
-      this.preview.set({ file, kind, loading: false });
+      this.preview.set({ file, executionId, kind, loading: false });
     }
   }
 
@@ -325,8 +393,10 @@ export class FilesPanel {
     return archiveDownloadUrl(this.conversationId());
   }
 
-  protected downloadUrl(file: WorkspaceFile): string {
-    return fileDownloadUrl(this.conversationId(), file.path);
+  protected downloadUrl(file: WorkspaceFile, executionId?: string): string {
+    return executionId
+      ? artifactDownloadUrl(this.conversationId(), executionId, file.path)
+      : fileDownloadUrl(this.conversationId(), file.path);
   }
 
   protected name(file: WorkspaceFile): string {

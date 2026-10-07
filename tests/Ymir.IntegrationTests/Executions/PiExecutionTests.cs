@@ -5,6 +5,7 @@ using Ymir.IntegrationTests.Api;
 using Ymir.IntegrationTests.PiAgent;
 using Ymir.Testing.FakeLlm;
 using Ymir.VibeMaker.Application.Runtime;
+using Ymir.VibeMaker.Application.Files;
 using Ymir.VibeMaker.Contracts.Executions;
 using Ymir.VibeMaker.Contracts.Projects;
 using Ymir.VibeMaker.Contracts.Settings;
@@ -59,7 +60,7 @@ public class PiExecutionTests(PiApiFactory factory) : IClassFixture<PiApiFactory
         Assert.Contains(firstEvents, e => e.EventType == ExecutionEventNames.ToolStarted);
         // 專案的檔案群組：{使用者目錄}/workspace/projects/{projectId}（ADR-0007）
         var directories = UserDirectories.For(factory.WorkspaceRoot, await GetUserIdAsync(client));
-        var file = Path.Combine(directories.HostPathOf(RuntimePaths.ProjectDirectory(project.Id)), FakeLlmScript.CreatedFileName);
+        var file = Path.Combine(directories.HostPathOf(RuntimePaths.ProjectDirectory(project.Id)), ArtifactService.DirectoryFor(first.ExecutionId), FakeLlmScript.CreatedFileName);
         Assert.Equal(FakeLlmScript.CreatedFileContent, await File.ReadAllTextAsync(file, TestContext.Current.CancellationToken));
 
         // 同一個 Conversation 的 AgentSession 續接：模型收到第 2 則使用者訊息
@@ -80,7 +81,7 @@ public class PiExecutionTests(PiApiFactory factory) : IClassFixture<PiApiFactory
 
         Assert.Equal(ExecutionEventNames.ExecutionCompleted, events[^1].EventType);
         var directories = UserDirectories.For(factory.WorkspaceRoot, await GetUserIdAsync(client));
-        var file = Path.Combine(directories.HostPathOf(RuntimePaths.ConversationDirectory(conversation.Id)), FakeLlmScript.CreatedFileName);
+        var file = Path.Combine(directories.HostPathOf(RuntimePaths.ConversationDirectory(conversation.Id)), ArtifactService.DirectoryFor(sent.ExecutionId), FakeLlmScript.CreatedFileName);
         Assert.True(File.Exists(file), "未分組對話的檔案應在 chats/{conversationId}");
         Assert.False(File.Exists(Path.Combine(directories.Workspace, FakeLlmScript.CreatedFileName)), "不應寫到使用者 workspace 根目錄");
     }

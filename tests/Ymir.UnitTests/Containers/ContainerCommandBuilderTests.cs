@@ -56,8 +56,8 @@ public class ContainerCommandBuilderTests
 
         Assert.Equal(
             [
-                $"type=bind,source={UserRoot}/workspace,target={RuntimePaths.Workspace}",
-                $"type=bind,source={UserRoot}/agent-state,target={RuntimePaths.AgentState}",
+                $"type=bind,source={Path.GetFullPath(UserRoot + "/workspace")},target={RuntimePaths.Workspace}",
+                $"type=bind,source={Path.GetFullPath(UserRoot + "/agent-state")},target={RuntimePaths.AgentState}",
             ],
             mounts);
         Assert.DoesNotContain("--volume", args);

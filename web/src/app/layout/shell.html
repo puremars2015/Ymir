@@ -1,11 +1,24 @@
-<div class="shell" [class.drawer-open]="drawerOpen()">
-  <aside class="sidebar" aria-label="側邊欄">
+<div
+  class="shell"
+  [class.drawer-open]="drawerOpen()"
+  [class.sidebar-collapsed]="sidebarCollapsed()"
+>
+  <aside
+    id="main-sidebar"
+    class="sidebar"
+    aria-label="側邊欄"
+    [inert]="!sidebarVisible()"
+    [attr.aria-hidden]="!sidebarVisible()"
+  >
     <div class="sidebar-top">
-      <a routerLink="/" class="brand"><strong>Web-Pro</strong> Ymir</a>
+      <a routerLink="/" class="brand">
+        <span class="brand-mark" aria-hidden="true">Y</span>
+        <span><strong>Web-Pro Ymir</strong><small>VIBE MAKER</small></span>
+      </a>
       <button
         type="button"
         class="icon close-drawer"
-        (click)="drawerOpen.set(false)"
+        (click)="closeDrawer()"
         aria-label="關閉側邊欄"
       >
         ✕
@@ -18,13 +31,20 @@
       [routerLinkActiveOptions]="{ exact: true }"
       routerLinkActive="active"
     >
-      <span aria-hidden="true">✎</span> 新對話
+      <span class="nav-icon" aria-hidden="true"
+        ><svg viewBox="0 0 24 24">
+          <path
+            d="M12 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 3l5 5M10 14l1-5 8-8 4 4-8 8-5 1Z"
+          /></svg
+      ></span>
+      <span class="item-label">新對話</span>
     </a>
 
     <nav class="sections">
       <section class="section">
         <header class="section-header">
           <span>專案</span>
+          <span class="section-rule" aria-hidden="true"></span>
           <button
             type="button"
             class="icon"
@@ -52,16 +72,6 @@
           @for (group of store.groups().projects; track group.project.id) {
             <li class="project">
               <div class="row has-menu" [class.menu-open]="isMenuOpen('project', group.project.id)">
-                <button
-                  type="button"
-                  class="icon chevron"
-                  [class.open]="isExpanded(group.project.id)"
-                  (click)="toggle(group.project.id)"
-                  [attr.aria-expanded]="isExpanded(group.project.id)"
-                  [attr.aria-label]="'展開 ' + group.project.name"
-                >
-                  ›
-                </button>
                 @if (isEditing('project', group.project.id)) {
                   <ng-container *ngTemplateOutlet="renameInput" />
                 } @else {
@@ -70,8 +80,26 @@
                     routerLinkActive="active"
                     class="item project-link"
                   >
-                    <span aria-hidden="true">📁</span> {{ group.project.name }}
+                    <span class="nav-icon" aria-hidden="true"
+                      ><svg viewBox="0 0 24 24">
+                        <path
+                          d="M3 7h18v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 4"
+                        /></svg
+                    ></span>
+                    <span class="item-label">{{ group.project.name }}</span>
                   </a>
+                  <button
+                    type="button"
+                    class="icon chevron"
+                    [class.open]="isExpanded(group.project.id)"
+                    (click)="toggle(group.project.id)"
+                    [attr.aria-expanded]="isExpanded(group.project.id)"
+                    [attr.aria-label]="
+                      (isExpanded(group.project.id) ? '收合 ' : '展開 ') + group.project.name
+                    "
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+                  </button>
                   <ng-container
                     *ngTemplateOutlet="
                       itemMenu;
@@ -107,7 +135,9 @@
       </section>
 
       <section class="section">
-        <header class="section-header"><span>聊天</span></header>
+        <header class="section-header">
+          <span>聊天</span><span class="section-rule" aria-hidden="true"></span>
+        </header>
         <ul class="items">
           @for (conversation of store.groups().ungrouped; track conversation.id) {
             <li>
@@ -132,7 +162,11 @@
             routerLinkActive="active"
             class="item conversation-link"
             [title]="conversation.title"
-            >{{ conversation.title }}</a
+            ><span class="nav-icon" aria-hidden="true"
+              ><svg viewBox="0 0 24 24">
+                <path d="M21 11a8 8 0 0 1-8 8H7l-5 3 1-6a8 8 0 0 1-1-5 9 9 0 0 1 19 0Z" />
+                <path d="M7 10h10M7 14h6" /></svg></span
+            ><span class="item-label">{{ conversation.title }}</span></a
           >
           <ng-container
             *ngTemplateOutlet="
@@ -210,14 +244,23 @@
     }
   </aside>
 
-  <div class="backdrop" (click)="drawerOpen.set(false)" aria-hidden="true"></div>
+  <div class="backdrop" (click)="closeDrawer()" aria-hidden="true"></div>
 
   <main class="content">
-    <header class="mobile-bar">
-      <button type="button" class="icon" (click)="drawerOpen.set(true)" aria-label="開啟側邊欄">
-        ☰
+    <header class="shell-bar">
+      <button
+        #sidebarToggle
+        type="button"
+        class="icon sidebar-toggle"
+        (click)="toggleSidebar()"
+        [attr.aria-label]="sidebarVisible() ? '收合側邊欄' : '開啟側邊欄'"
+        [attr.title]="sidebarVisible() ? '收合側邊欄' : '開啟側邊欄'"
+        aria-controls="main-sidebar"
+        [attr.aria-expanded]="sidebarVisible()"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
       </button>
-      <a routerLink="/" class="brand"><strong>Web-Pro</strong> Ymir</a>
+      <div class="workspace-label"><small>工作空間</small><span>Vibe Maker</span></div>
     </header>
     <router-outlet />
   </main>

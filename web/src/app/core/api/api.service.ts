@@ -2,6 +2,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
+  ArtifactGroup,
   AdminMakeTopic,
   Attachment,
   AdminOverview,
@@ -172,6 +173,10 @@ export class ApiService {
 
   adminUsage(days: number): Observable<AdminUsage> {
     return this.http.get<AdminUsage>('/api/admin/usage', { params: { days } });
+  }
+
+  listConversationArtifacts(conversationId: string): Observable<ArtifactGroup[]> {
+    return this.http.get<ArtifactGroup[]>(`/api/conversations/${conversationId}/artifacts`);
   }
 
   listConversationFiles(conversationId: string): Observable<WorkspaceFiles> {

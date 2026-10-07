@@ -29,3 +29,5 @@
 ## 決策
 ## 影響
 ```
+
+- [ADR-0015：交付成果與工作檔案分離](0015-explicit-execution-deliverables.md)

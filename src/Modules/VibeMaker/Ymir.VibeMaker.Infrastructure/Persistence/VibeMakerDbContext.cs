@@ -10,6 +10,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 {
     public const string Schema = "vibemaker";
 
+    public DbSet<ExecutionArtifact> ExecutionArtifacts => Set<ExecutionArtifact>();
+
     public DbSet<Project> Projects => Set<Project>();
 
     public DbSet<Conversation> Conversations => Set<Conversation>();
@@ -35,6 +37,15 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.Entity<ExecutionArtifact>(artifact =>
+        {
+            artifact.ToTable("execution_artifacts");
+            artifact.HasKey(a => a.Id);
+            artifact.Property(a => a.Id).ValueGeneratedNever();
+            artifact.Property(a => a.Path).HasMaxLength(1024).IsRequired();
+            artifact.HasIndex(a => a.ExecutionId);
+            artifact.HasOne<AgentExecution>().WithMany().HasForeignKey(a => a.ExecutionId).OnDelete(DeleteBehavior.Cascade);
+        });
 
         modelBuilder.Entity<Project>(project =>
         {

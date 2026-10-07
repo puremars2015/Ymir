@@ -3,6 +3,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   ElementRef,
   inject,
   Injector,
@@ -10,7 +11,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -40,7 +41,8 @@ type ItemKind = 'conversation' | 'project';
   ],
   host: {
     '(document:click)': 'closeMenu($event)',
-    '(document:keydown.escape)': 'menu.set(null)',
+    '(document:keydown.escape)': 'closeOverlays()',
+    '(document:keydown.tab)': 'trapDrawerFocus($event)',
   },
   templateUrl: './shell.html',
   styleUrl: './shell.scss',
@@ -53,12 +55,20 @@ export class Shell implements OnInit {
   private readonly injector = inject(Injector);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly projectInput = viewChild<ElementRef<HTMLInputElement>>('projectInput');
+  private readonly sidebarToggle = viewChild<ElementRef<HTMLButtonElement>>('sidebarToggle');
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly mobileQuery = globalThis.window?.matchMedia?.('(max-width: 768px)');
+  protected readonly mobile = signal(this.mobileQuery?.matches ?? false);
+  protected readonly sidebarCollapsed = signal(readSidebarCollapsed());
+  protected readonly sidebarVisible = computed(() =>
+    this.mobile() ? this.drawerOpen() : !this.sidebarCollapsed(),
+  );
 
   protected readonly drawerOpen = signal(false);
   protected readonly creatingProject = signal(false);
   protected readonly projectName = signal('');
   protected readonly error = signal<string | null>(null);
-  private readonly expanded = signal<ReadonlySet<string>>(new Set());
+  private readonly expanded = signal<ReadonlyMap<string, boolean>>(new Map());
   /** 開啟中的「⋯」選單與 inline 改名的項目，格式 `kind:id`。 */
   protected readonly menu = signal<string | null>(null);
   private readonly editing = signal<{ kind: ItemKind; id: string; original: string } | null>(null);
@@ -86,25 +96,84 @@ export class Shell implements OnInit {
   });
 
   ngOnInit(): void {
+    const onResize = () => {
+      this.mobile.set(this.mobileQuery?.matches ?? false);
+      this.drawerOpen.set(false);
+      this.menu.set(null);
+    };
+    this.mobileQuery?.addEventListener('change', onResize);
+    this.destroyRef.onDestroy(() => this.mobileQuery?.removeEventListener('change', onResize));
     this.store.refresh().subscribe({ error: (e: unknown) => this.error.set(describeApiError(e)) });
     // 抽屜模式下，切換頁面後自動收起
     this.router.events
-      .pipe(filter((e) => e instanceof NavigationEnd))
+      .pipe(
+        filter((e) => e instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe(() => this.drawerOpen.set(false));
   }
 
+  protected toggleSidebar(): void {
+    this.menu.set(null);
+    if (this.mobile()) {
+      if (this.drawerOpen()) {
+        this.closeDrawer();
+      } else {
+        this.drawerOpen.set(true);
+        afterNextRender(
+          () => this.host.nativeElement.querySelector<HTMLAnchorElement>('.new-chat')?.focus(),
+          { injector: this.injector },
+        );
+      }
+      return;
+    }
+    this.sidebarCollapsed.update((collapsed) => !collapsed);
+    try {
+      localStorage.setItem('ymir.sidebarCollapsed', String(this.sidebarCollapsed()));
+    } catch {
+      /* 儲存不可用時仍可正常收合。 */
+    }
+  }
+
+  protected closeDrawer(): void {
+    this.drawerOpen.set(false);
+    this.sidebarToggle()?.nativeElement.focus();
+  }
+
+  protected closeOverlays(): void {
+    if (this.menu()) this.menu.set(null);
+    else if (this.drawerOpen()) this.closeDrawer();
+  }
+
+  protected trapDrawerFocus(event: Event): void {
+    if (!(event instanceof KeyboardEvent)) return;
+    if (!this.mobile() || !this.drawerOpen()) return;
+    const elements = [
+      ...this.host.nativeElement.querySelectorAll<HTMLElement>(
+        '.sidebar a[href], .sidebar button:not(:disabled), .sidebar input:not(:disabled)',
+      ),
+    ].filter((element) => element.getClientRects().length > 0);
+    const target = event.shiftKey ? elements.at(-1) : elements[0];
+    const boundary = event.shiftKey ? elements[0] : elements.at(-1);
+    if (
+      target &&
+      (document.activeElement === boundary ||
+        !this.host.nativeElement.querySelector('.sidebar')?.contains(document.activeElement))
+    ) {
+      event.preventDefault();
+      target.focus();
+    }
+  }
+
   protected isExpanded(projectId: string): boolean {
-    return this.expanded().has(projectId) || this.activeProjectId() === projectId;
+    return this.expanded().get(projectId) ?? this.activeProjectId() === projectId;
   }
 
   protected toggle(projectId: string): void {
+    const open = !this.isExpanded(projectId);
     this.expanded.update((set) => {
-      const next = new Set(set);
-      if (next.has(projectId)) {
-        next.delete(projectId);
-      } else {
-        next.add(projectId);
-      }
+      const next = new Map(set);
+      next.set(projectId, open);
       return next;
     });
   }
@@ -233,5 +302,13 @@ export class Shell implements OnInit {
       this.store.clear();
       void this.router.navigate(['/login']);
     });
+  }
+}
+
+function readSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem('ymir.sidebarCollapsed') === 'true';
+  } catch {
+    return false;
   }
 }

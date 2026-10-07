@@ -47,7 +47,7 @@ const reply = await page.locator('.turn.assistant:not(.turn-files)').last().inne
 if (!reply.includes('uploads/'))
   throw new Error(`agent did not receive the attachment path: ${reply}`);
 const sawImage = reply.includes('（收到圖片）1');
-if ((await page.locator('.turn-files').count()) > 0) {
+if ((await page.locator('app-artifact-download a').count()) > 0) {
   throw new Error('uploaded attachments must not be listed as files produced by the agent');
 }
 await page.screenshot({ path: `${outDir}/attach-02-sent.png` });
@@ -80,6 +80,7 @@ await page.waitForSelector('.turn.user app-attachment-list img[alt="second.png"]
 const thumbs = await page.locator('.turn.user app-attachment-list img').count();
 if (thumbs !== 2) throw new Error(`expected 2 thumbnails after reload, got ${thumbs}`);
 await page.click('.files-toggle');
+await page.getByRole('button', { name: '專案檔案', exact: true }).click();
 await page.waitForSelector('app-files-panel .file:has-text("demo.mp4")');
 const listed = await page.locator('app-files-panel .file').count();
 if (listed !== 3) throw new Error(`expected 3 uploaded files in the panel, got ${listed}`);

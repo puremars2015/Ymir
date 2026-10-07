@@ -7,6 +7,9 @@ namespace Ymir.VibeMaker.Application.Files;
 /// </summary>
 public interface IWorkspaceFileReader
 {
+    /// <summary>列出指定安全子目錄，回傳相對於子目錄的路徑；不跟隨 symlink。</summary>
+    Task<IReadOnlyList<WorkspaceFileEntry>> ListDirectoryAsync(Guid userId, string workingDirectory, string relativeDirectory, int limit, CancellationToken cancellationToken);
+
     /// <summary>列出工作目錄內的一般檔案（不含隱藏檔、node_modules、symlink），最多 <paramref name="limit"/> + 1 筆。</summary>
     Task<IReadOnlyList<WorkspaceFileEntry>> ListAsync(Guid userId, string workingDirectory, int limit, CancellationToken cancellationToken);
 

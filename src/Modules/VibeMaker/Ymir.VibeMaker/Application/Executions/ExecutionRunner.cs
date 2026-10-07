@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Ymir.Platform.Auditing;
 using Ymir.VibeMaker.Application.Agents;
 using Ymir.VibeMaker.Application.Extensions;
+using Ymir.VibeMaker.Application.Files;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Application.Runtime;
@@ -17,6 +18,7 @@ namespace Ymir.VibeMaker.Application.Executions;
 /// </summary>
 public sealed class ExecutionRunner(
     IVibeMakerDbContext db,
+    ArtifactService artifacts,
     IAgentRuntimeManager runtimeManager,
     IAgentHarness harness,
     RuntimeCredentialService credentials,
@@ -149,12 +151,14 @@ public sealed class ExecutionRunner(
         AgentEvent? terminal = null;
         try
         {
+            var workingDirectory = await GetWorkingDirectoryAsync(execution, stoppingToken).ConfigureAwait(false);
+            await PrepareDeliveryAsync(runtime.RuntimeId, execution.Id, workingDirectory, runToken).ConfigureAwait(false);
             var request = new AgentRunRequest(
                 executionId,
                 runtime.RuntimeId,
                 session.Id,
                 await GetPromptAsync(execution, stoppingToken).ConfigureAwait(false),
-                await GetWorkingDirectoryAsync(execution, stoppingToken).ConfigureAwait(false),
+                workingDirectory,
                 credential.ApiKey,
                 models.Resolve(execution.ModelId),
                 await GetSystemPromptsAsync(execution, stoppingToken).ConfigureAwait(false),
@@ -212,6 +216,16 @@ public sealed class ExecutionRunner(
         switch (terminal)
         {
             case AgentCompleted:
+                try
+                {
+                    await artifacts.RegisterAsync(execution, await GetWorkingDirectoryAsync(execution, cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+                }
+#pragma warning disable CA1031 // 成果登記失敗不應使 execution 卡在 RUNNING；無紀錄則不推薦下載。
+                catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+#pragma warning restore CA1031
+                {
+                    logger.LogError(ex, "Failed to register deliverables for execution {ExecutionId}", execution.Id);
+                }
                 execution.Complete(assistantMessage?.Id, now);
                 terminalEvent = new ExecutionCompletedEvent(execution.Id, assistantMessage?.Id);
                 break;
@@ -296,7 +310,21 @@ public sealed class ExecutionRunner(
             prompts.Add(projectPrompt);
         }
 
+        prompts.Add(ArtifactService.PromptFor(execution.Id));
         return prompts;
+    }
+
+    private async Task PrepareDeliveryAsync(Guid runtimeId, Guid executionId, string workingDirectory, CancellationToken ct)
+    {
+        var spec = new RuntimeProcessSpec("bash", ["-c", "for p in deliverables .ymir .ymir/tools .ymir/tmp \"$1\"; do [ ! -L \"$p\" ] || exit 3; done; mkdir -p -- \"$1\" .ymir/tools .ymir/tmp", "ymir-delivery", ArtifactService.DirectoryFor(executionId)], WorkingDirectory: workingDirectory);
+        var process = await runtimeManager.StartProcessAsync(runtimeId, spec, ct).ConfigureAwait(false);
+        await using (process.ConfigureAwait(false))
+        {
+            process.CloseStandardInput();
+            await process.StandardOutput.CopyToAsync(Stream.Null, ct).ConfigureAwait(false);
+            if (await process.WaitForExitAsync(ct).ConfigureAwait(false) != 0)
+                throw new IOException("Could not prepare delivery directory.");
+        }
     }
 
     /// <summary>SA §12：runtime 的建立與啟動寫入稽核（原本就在執行時不寫，避免每次 execution 都產生一筆）。</summary>

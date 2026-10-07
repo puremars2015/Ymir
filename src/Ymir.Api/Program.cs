@@ -72,6 +72,7 @@ app.MapProjectEndpoints();
 app.MapSettingsEndpoints();
 app.MapConversationEndpoints();
 app.MapWorkspaceFileEndpoints();
+app.MapArtifactEndpoints();
 app.MapAttachmentEndpoints();
 app.MapExecutionEndpoints();
 app.MapAdminEndpoints();

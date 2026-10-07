@@ -779,6 +779,113 @@
         }
       }
     },
+    "/api/conversations/{conversationId}/artifacts": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "ListConversationArtifacts",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ArtifactGroupResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversationId}/artifacts/{executionId}/download": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "DownloadArtifact",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversationId}/artifacts/{executionId}/archive": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "DownloadArtifactArchive",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/executions/{executionId}/events": {
       "get": {
         "tags": [
@@ -1840,6 +1947,43 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ArtifactGroupResponse": {
+        "required": [
+          "executionId",
+          "conversationId",
+          "messageId",
+          "createdAt",
+          "files"
+        ],
+        "type": "object",
+        "properties": {
+          "executionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "messageId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceFileResponse"
+            }
           }
         }
       },

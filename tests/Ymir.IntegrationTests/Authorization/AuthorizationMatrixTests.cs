@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+using Ymir.VibeMaker.Application.Files;
+using Ymir.VibeMaker.Application.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Ymir.Api.Endpoints;
 using Ymir.IntegrationTests.Api;
@@ -33,6 +36,9 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         {
             Content = JsonContent.Create(new UpdateConversationRequest("secret chat")),
         },
+        ["GET /api/conversations/{conversationId:guid}/artifacts/"] = r => Get($"/api/conversations/{r.ConversationId}/artifacts"),
+        ["GET /api/conversations/{conversationId:guid}/artifacts/{executionId:guid}/download"] = r => Get($"/api/conversations/{r.ConversationId}/artifacts/{r.ExecutionId}/download?path=hello.txt"),
+        ["GET /api/conversations/{conversationId:guid}/artifacts/{executionId:guid}/archive"] = r => Get($"/api/conversations/{r.ConversationId}/artifacts/{r.ExecutionId}/archive"),
         ["GET /api/conversations/{conversationId:guid}/files/"] = r => Get($"/api/conversations/{r.ConversationId}/files"),
         ["GET /api/conversations/{conversationId:guid}/files/download"] = r => Get($"/api/conversations/{r.ConversationId}/files/download?path=hello.txt"),
         ["GET /api/conversations/{conversationId:guid}/files/archive"] = r => Get($"/api/conversations/{r.ConversationId}/files/archive"),
@@ -185,6 +191,17 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
             .HostPathOf(Ymir.VibeMaker.Application.Runtime.RuntimePaths.ProjectDirectory(project.Id));
         Directory.CreateDirectory(projectDirectory);
         await File.WriteAllTextAsync(Path.Combine(projectDirectory, "hello.txt"), "owner file", ct);
+        var artifactDirectory = Path.Combine(projectDirectory, "deliverables", sent.ExecutionId.ToString("N"));
+        Directory.CreateDirectory(artifactDirectory);
+        await File.WriteAllTextAsync(Path.Combine(artifactDirectory, "hello.txt"), "owner artifact", ct);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IVibeMakerDbContext>();
+            var execution = await db.AgentExecutions.SingleAsync(e => e.Id == sent.ExecutionId, ct);
+            await scope.ServiceProvider.GetRequiredService<ArtifactService>().RegisterAsync(execution, Ymir.VibeMaker.Application.Runtime.RuntimePaths.ProjectDirectory(project.Id), ct);
+            await db.SaveChangesAsync(ct);
+        }
+
 
         var failures = new List<string>();
         foreach (var (endpoint, createRequest) in ResourceRequests.Select(kv => (kv.Key, kv.Value)).Concat(ArchiveRequests))

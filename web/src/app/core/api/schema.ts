@@ -324,6 +324,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/conversations/{conversationId}/artifacts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListConversationArtifacts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/conversations/{conversationId}/artifacts/{executionId}/download': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['DownloadArtifact'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/conversations/{conversationId}/artifacts/{executionId}/archive': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['DownloadArtifactArchive'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/executions/{executionId}/events': {
     parameters: {
       query?: never;
@@ -705,6 +753,17 @@ export interface components {
       lastLoginAt: null | string;
       /** Format: date-time */
       createdAt: string;
+    };
+    ArtifactGroupResponse: {
+      /** Format: uuid */
+      executionId: string;
+      /** Format: uuid */
+      conversationId: string;
+      /** Format: uuid */
+      messageId: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      files: components['schemas']['WorkspaceFileResponse'][];
     };
     AttachmentResponse: {
       /** Format: uuid */
@@ -1740,6 +1799,72 @@ export interface operations {
       header?: never;
       path: {
         conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ListConversationArtifacts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ArtifactGroupResponse'][];
+        };
+      };
+    };
+  };
+  DownloadArtifact: {
+    parameters: {
+      query?: {
+        path?: string;
+      };
+      header?: never;
+      path: {
+        conversationId: string;
+        executionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  DownloadArtifactArchive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+        executionId: string;
       };
       cookie?: never;
     };

@@ -32,6 +32,7 @@ export type OidcSettings = Schemas['OidcSettingsResponse'];
 export type OidcSettingsSource = Schemas['OidcSettingsSource'];
 export type SaveOidcSettingsRequest = Schemas['SaveOidcSettingsRequest'];
 export type OidcTestResult = Schemas['OidcTestResponse'];
+export type ArtifactGroup = Schemas['ArtifactGroupResponse'];
 export type WorkspaceFile = Schemas['WorkspaceFileResponse'];
 export type TunnelSettings = Schemas['TunnelSettingsResponse'];
 export type WorkspaceFiles = Schemas['WorkspaceFilesResponse'];

@@ -6,6 +6,8 @@ using Ymir.IntegrationTests.Executions;
 using Ymir.IntegrationTests.PiAgent;
 using Ymir.Testing.FakeLlm;
 using Ymir.VibeMaker.Application.Runtime;
+using Ymir.VibeMaker.Application.Files;
+using Ymir.VibeMaker.Contracts.Files;
 using Ymir.VibeMaker.Contracts.Executions;
 using Ymir.VibeMaker.Infrastructure.Runtime;
 
@@ -92,16 +94,17 @@ public class RemoteRuntimeApiTests(RemoteRuntimeApiFactory factory) : IClassFixt
         Assert.Equal(ExecutionEventNames.ExecutionCompleted, events[^1].EventType);
         var me = await client.GetFromJsonAsync<MeResponse>("/api/me", JsonDefaults.Options, ct);
         var directory = UserDirectories.For(factory.HostWorkspaceRoot, me!.Id).HostPathOf(RuntimePaths.ProjectDirectory(project.Id));
-        Assert.Equal(FakeLlmScript.CreatedFileContent, await File.ReadAllTextAsync(Path.Combine(directory, FakeLlmScript.CreatedFileName), ct));
+        Assert.Equal(FakeLlmScript.CreatedFileContent, await File.ReadAllTextAsync(Path.Combine(directory, ArtifactService.DirectoryFor(sent.ExecutionId), FakeLlmScript.CreatedFileName), ct));
         Assert.False(Directory.Exists(Path.Combine(factory.WorkspaceRoot, "must-not-be-used")));
 
         // 檔案下載也經由 runtime host（API 容器不掛載 workspace，ADR-0008）
-        var files = await client.GetFromJsonAsync<Ymir.VibeMaker.Contracts.Files.WorkspaceFilesResponse>($"/api/conversations/{conversation.Id}/files", JsonDefaults.Options, ct);
+        var groups = await client.GetFromJsonAsync<List<ArtifactGroupResponse>>($"/api/conversations/{conversation.Id}/artifacts", JsonDefaults.Options, ct);
+        var files = Assert.Single(groups!);
         Assert.Equal([FakeLlmScript.CreatedFileName], files!.Files.Select(f => f.Path));
         Assert.Equal(
             FakeLlmScript.CreatedFileContent,
-            await client.GetStringAsync($"/api/conversations/{conversation.Id}/files/download?path={FakeLlmScript.CreatedFileName}", ct));
-        using var archive = await client.GetAsync($"/api/conversations/{conversation.Id}/files/archive", ct);
+            await client.GetStringAsync($"/api/conversations/{conversation.Id}/artifacts/{sent.ExecutionId}/download?path={FakeLlmScript.CreatedFileName}", ct));
+        using var archive = await client.GetAsync($"/api/conversations/{conversation.Id}/artifacts/{sent.ExecutionId}/archive", ct);
         using var zip = new System.IO.Compression.ZipArchive(new MemoryStream(await archive.Content.ReadAsByteArrayAsync(ct)));
         Assert.Equal([FakeLlmScript.CreatedFileName], zip.Entries.Select(e => e.FullName));
     }

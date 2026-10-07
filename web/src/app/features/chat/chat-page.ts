@@ -16,7 +16,13 @@ import { ComposerSubmission } from '../../core/make/make-command';
 import { RouterLink } from '@angular/router';
 import { concatMap, forkJoin, from, Observable, of, Subscription, switchMap, toArray } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
-import { Attachment, ChatMessage, Conversation, WorkspaceFile } from '../../core/api/api-types';
+import {
+  ArtifactGroup,
+  Attachment,
+  ChatMessage,
+  Conversation,
+  WorkspaceFile,
+} from '../../core/api/api-types';
 import {
   applyExecutionEvent,
   ExecutionView,
@@ -25,13 +31,6 @@ import {
 import { ExecutionStreamService } from '../../core/executions/execution-stream.service';
 import { resumeTurnFrom } from '../../core/executions/resume-turn';
 import { normalizeTitle } from '../../core/navigation/navigation-edits';
-import {
-  changedFiles,
-  fileDownloadUrl,
-  fileIcon,
-  fileName,
-  formatSize,
-} from '../../core/files/workspace-files';
 import { resolveModel } from '../../core/models/model-selection';
 import { ModelStore } from '../../core/models/model.store';
 import { NavigationStore } from '../../core/navigation/navigation.store';
@@ -42,6 +41,7 @@ import { Markdown } from '../../shared/markdown';
 import { ModelPicker } from '../../shared/model-picker';
 import { AttachmentList } from '../../shared/attachment-list';
 import { FilesPanel } from './files-panel';
+import { ArtifactDownload } from '../../shared/artifact-download';
 
 interface LiveTurn {
   prompt: string;
@@ -58,7 +58,16 @@ interface LiveTurn {
 @Component({
   selector: 'app-chat-page',
   host: { class: 'chat-surface' },
-  imports: [RouterLink, Composer, ModelPicker, AssistantText, Markdown, FilesPanel, AttachmentList],
+  imports: [
+    RouterLink,
+    Composer,
+    ModelPicker,
+    AssistantText,
+    Markdown,
+    FilesPanel,
+    AttachmentList,
+    ArtifactDownload,
+  ],
   templateUrl: './chat-page.html',
   styleUrl: './chat-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -99,10 +108,18 @@ export class ChatPage {
   protected readonly filesLoading = signal(false);
   protected readonly filesError = signal<string | null>(null);
   protected readonly filesOpen = signal(false);
-  /** 剛結束的這一輪新增 / 修改的檔案，顯示在回覆下方方便直接下載。 */
-  protected readonly turnFiles = signal<WorkspaceFile[]>([]);
-  /** 送出前的檔案清單；接回執行中的工作時不知道執行前的狀態，為 null（不顯示這一輪的檔案）。 */
-  private filesBeforeTurn: WorkspaceFile[] | null = null;
+  protected readonly artifacts = signal<ArtifactGroup[]>([]);
+  protected readonly artifactCount = computed(() =>
+    this.artifacts().reduce((sum, group) => sum + group.files.length, 0),
+  );
+  protected readonly artifactByMessage = computed(
+    () =>
+      new Map(
+        this.artifacts()
+          .filter((group) => group.conversationId === this.conversationId())
+          .map((group) => [group.messageId, group]),
+      ),
+  );
 
   protected readonly editingTitle = signal(false);
   protected readonly titleDraft = signal('');
@@ -166,7 +183,6 @@ export class ChatPage {
             prompt,
             accepted.executionId,
             accepted.eventStreamUrl,
-            false,
             attachments,
           );
         },
@@ -204,11 +220,8 @@ export class ChatPage {
     prompt: string,
     executionId: string,
     url: string,
-    resumed = false,
     attachments: Attachment[] = [],
   ): void {
-    this.filesBeforeTurn = resumed ? null : this.files();
-    this.turnFiles.set([]);
     this.live.set({ prompt, attachments, executionId, view: initialExecutionView() });
     this.stream = this.streams.stream(url).subscribe({
       next: (event) =>
@@ -289,7 +302,7 @@ export class ChatPage {
     this.editingTitle.set(false);
     this.messages.set([]);
     this.files.set([]);
-    this.turnFiles.set([]);
+    this.artifacts.set([]);
     this.refreshFiles();
 
     forkJoin([
@@ -310,7 +323,6 @@ export class ChatPage {
             resumed.prompt,
             resumed.executionId,
             `/api/executions/${resumed.executionId}/events`,
-            true,
             resumed.attachments,
           );
           return;
@@ -330,49 +342,35 @@ export class ChatPage {
   }
 
   private finish(conversationId: string, error: string | null): void {
+    if (conversationId !== this.conversationId()) return;
     this.error.set(error);
     this.reloadMessages(conversationId, () => this.live.set(null));
-    const before = this.filesBeforeTurn;
-    // 使用者這一輪上傳的附件不算 Agent 產生的檔案
-    const uploaded = new Set(this.live()?.attachments.map((a) => a.path));
-    this.refreshFiles((files) =>
-      this.turnFiles.set(
-        before ? changedFiles(before, files).filter((f) => !uploaded.has(f.path)) : [],
-      ),
-    );
+    this.refreshFiles();
   }
 
-  protected refreshFiles(after?: (files: WorkspaceFile[]) => void): void {
+  protected refreshFiles(): void {
     const conversationId = this.conversationId();
     this.filesLoading.set(true);
     this.filesError.set(null);
-    this.api.listConversationFiles(conversationId).subscribe({
-      next: (result) => {
+    forkJoin([
+      this.api.listConversationFiles(conversationId),
+      this.api.listConversationArtifacts(conversationId),
+    ]).subscribe({
+      next: ([result, artifacts]) => {
         if (conversationId !== this.conversationId()) {
           return;
         }
         this.files.set(result.files);
         this.filesTruncated.set(result.truncated);
         this.filesLoading.set(false);
-        after?.(result.files);
+        this.artifacts.set(artifacts);
       },
       error: (error: unknown) => {
+        if (conversationId !== this.conversationId()) return;
         this.filesLoading.set(false);
         this.filesError.set(describeApiError(error));
       },
     });
-  }
-
-  protected downloadUrl(file: WorkspaceFile): string {
-    return fileDownloadUrl(this.conversationId(), file.path);
-  }
-
-  protected fileLabel(file: WorkspaceFile): string {
-    return `${fileIcon(file.path)} ${fileName(file.path)}`;
-  }
-
-  protected fileSize(file: WorkspaceFile): string {
-    return formatSize(file.size);
   }
 
   private reloadMessages(conversationId: string, after?: () => void): void {

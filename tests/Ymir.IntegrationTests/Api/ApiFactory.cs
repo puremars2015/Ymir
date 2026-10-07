@@ -24,7 +24,7 @@ public class ApiFactory : WebApplicationFactory<Program>
         builder.UseEnvironment("Development");
         builder.UseSetting("ConnectionStrings:ymir", _database.ConnectionString);
         builder.UseSetting("VibeMaker:Harness", "Scripted");
-        builder.UseSetting("VibeMaker:Runtime:Provider", "Local");
+        builder.UseSetting("VibeMaker:Runtime:Provider", OperatingSystem.IsWindows() ? "Docker" : "Local");
         builder.UseSetting("VibeMaker:Runtime:WorkspaceRoot", WorkspaceRoot);
         // 所有測試共用同一個來源 IP；rate limit 另有專門的測試。
         builder.UseSetting("Ymir:Auth:LocalAccounts:LoginAttemptsPerMinute", "1000");
