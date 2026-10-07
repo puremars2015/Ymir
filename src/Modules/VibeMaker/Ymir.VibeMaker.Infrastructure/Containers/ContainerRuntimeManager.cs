@@ -28,6 +28,12 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
         {
             var runtimeId = _runtimesByUser.TryGetValue(userId, out var known) ? known.RuntimeId : Guid.NewGuid();
             var state = await InspectAsync(userId, cancellationToken).ConfigureAwait(false);
+            var transition = state switch
+            {
+                null => RuntimeTransition.Created,
+                "running" => RuntimeTransition.None,
+                _ => RuntimeTransition.Started,
+            };
             switch (state)
             {
                 case null:
@@ -53,7 +59,7 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
 
             var runtime = new RuntimeInfo(runtimeId, userId, ProviderName(), ContainerCommandBuilder.ContainerName(userId), _options.Image, RuntimeStatus.Running);
             _runtimesByUser[userId] = runtime;
-            return runtime;
+            return runtime with { Transition = transition };
         }
         finally
         {

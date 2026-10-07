@@ -27,12 +27,16 @@ internal sealed class LocalRuntimeManager : IAgentRuntimeManager
 
     public Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var runtime = _runtimesByUser.GetOrAdd(userId, id =>
+        if (_runtimesByUser.TryGetValue(userId, out var existing))
         {
-            UserDirectories.For(_options.WorkspaceRoot, id).EnsureCreated();
-            return new RuntimeInfo(Guid.NewGuid(), id, ProviderName, id.ToString("N"), "local", RuntimeStatus.Running);
-        });
-        return Task.FromResult(runtime);
+            return Task.FromResult(existing);
+        }
+
+        UserDirectories.For(_options.WorkspaceRoot, userId).EnsureCreated();
+        var created = new RuntimeInfo(Guid.NewGuid(), userId, ProviderName, userId.ToString("N"), "local", RuntimeStatus.Running);
+        var runtime = _runtimesByUser.GetOrAdd(userId, created);
+        // 並行時只有實際加入的那一次算「建立」。
+        return Task.FromResult(ReferenceEquals(runtime, created) ? runtime with { Transition = RuntimeTransition.Created } : runtime);
     }
 
     public Task StartAsync(Guid runtimeId, CancellationToken cancellationToken) => Task.CompletedTask;

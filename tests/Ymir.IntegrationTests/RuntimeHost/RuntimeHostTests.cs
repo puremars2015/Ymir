@@ -41,7 +41,12 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
         var userId = Guid.NewGuid();
 
         var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, TestContext.Current.CancellationToken);
+        var again = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, TestContext.Current.CancellationToken);
         var status = await fixture.RuntimeManager.GetStatusAsync(runtime.RuntimeId, TestContext.Current.CancellationToken);
+
+        // 建立 / 已在執行的資訊經協定傳回 API，供稽核使用（SA §12）
+        Assert.Equal(RuntimeTransition.Created, runtime.Transition);
+        Assert.Equal(RuntimeTransition.None, again.Transition);
 
         Assert.Equal(userId, runtime.UserId);
         Assert.Equal("LOCAL", runtime.Provider);

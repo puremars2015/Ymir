@@ -77,6 +77,7 @@ public sealed class ExecutionRunner(
             await AppendAsync(executionId, new StatusEvent("正在準備 Runtime"), stoppingToken).ConfigureAwait(false);
             runtime = await runtimeManager.EnsureRuntimeAsync(execution.UserId, runToken).ConfigureAwait(false);
             await RecordRuntimeAsync(runtime, stoppingToken).ConfigureAwait(false);
+            await AuditRuntimeTransitionAsync(runtime, stoppingToken).ConfigureAwait(false);
             session = await GetOrCreateSessionAsync(execution, runtime, stoppingToken).ConfigureAwait(false);
             // 使用者的 LiteLLM virtual key（ADR-0004）：只放進 Agent 程序的環境變數，container 內不會有 master key。
             credential = await credentials.GetAsync(execution.UserId, runtime.RuntimeId, runToken, policy.MonthlyBudget).ConfigureAwait(false);
@@ -107,6 +108,9 @@ public sealed class ExecutionRunner(
 #pragma warning restore CA1031
         {
             logger.LogError(ex, "Failed to prepare runtime for execution {ExecutionId}", executionId);
+            await auditLog.WriteAsync(
+                new AuditEntry("system", "runtime.ensure", "user", execution.UserId.ToString("D"), AuditResult.Failure, timeProvider.GetUtcNow(), null),
+                stoppingToken).ConfigureAwait(false);
             await FinishAsync(execution, new AgentFailed(ExecutionErrorCodes.RuntimeStartFailed, "無法啟動執行環境，請稍後再試。"), stoppingToken).ConfigureAwait(false);
             return;
         }
@@ -249,6 +253,23 @@ public sealed class ExecutionRunner(
         }
 
         return prompts;
+    }
+
+    /// <summary>SA §12：runtime 的建立與啟動寫入稽核（原本就在執行時不寫，避免每次 execution 都產生一筆）。</summary>
+    private async Task AuditRuntimeTransitionAsync(RuntimeInfo runtime, CancellationToken cancellationToken)
+    {
+        var action = runtime.Transition switch
+        {
+            RuntimeTransition.Created => "runtime.create",
+            RuntimeTransition.Started => "runtime.start",
+            _ => null,
+        };
+        if (action is not null)
+        {
+            await auditLog.WriteAsync(
+                new AuditEntry("system", action, "user", runtime.UserId.ToString("D"), AuditResult.Success, timeProvider.GetUtcNow(), null),
+                cancellationToken).ConfigureAwait(false);
+        }
     }
 
     private async Task RecordRuntimeAsync(RuntimeInfo runtime, CancellationToken cancellationToken)

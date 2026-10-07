@@ -41,6 +41,9 @@ public sealed class RuntimeLifecycleService(
                     logger.LogInformation("Runtime of user {UserId} reconciled from {Recorded} to {Actual}", record.UserId, record.Status, actual);
                     record.MarkStatus(actual, timeProvider.GetUtcNow());
                     changed++;
+                    await auditLog.WriteAsync(
+                        new AuditEntry("system", "runtime.reconcile", "user", record.UserId.ToString("D"), AuditResult.Success, timeProvider.GetUtcNow(), null),
+                        cancellationToken).ConfigureAwait(false);
                 }
             }
 #pragma warning disable CA1031 // 單一使用者查詢失敗（例如 runtime host 暫時無法連線）不影響其他紀錄。

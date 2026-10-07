@@ -133,6 +133,9 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
         using var admin = await factory.LoginAsync($"idle-admin-{Guid.NewGuid():N}", UserRole.Admin);
         var audit = await admin.GetFromJsonAsync<AuditLogPageResponse>($"/api/admin/audit?action=runtime.idle_stop&userId={userId}", JsonDefaults.Options, Ct);
         Assert.Contains(audit!.Items, e => e.Action == "runtime.idle_stop" && e.ActorName == "system");
+        // SA §12：建立 runtime 也寫稽核（AC-12）
+        var created = await admin.GetFromJsonAsync<AuditLogPageResponse>($"/api/admin/audit?action=runtime.create&userId={userId}", JsonDefaults.Options, Ct);
+        Assert.Contains(created!.Items, e => e.Action == "runtime.create" && e.TargetId == userId.ToString("D"));
 
         // 停止不刪除檔案；下一次送訊息自動啟動，閒置時間從執行結束重新計算
         var (_, again) = await client.SendMessageAsync(conversation.Id, "again");
@@ -175,6 +178,9 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
 
         Assert.True(changed >= 1);
         Assert.Equal(RuntimeStatus.NotCreated, (await RuntimeRecordAsync(userId)).Status);
+        using var admin = await factory.LoginAsync($"reconcile-admin-{Guid.NewGuid():N}", UserRole.Admin);
+        var audit = await admin.GetFromJsonAsync<AuditLogPageResponse>($"/api/admin/audit?action=runtime.reconcile&userId={userId}", JsonDefaults.Options, Ct);
+        Assert.Contains(audit!.Items, e => e.Action == "runtime.reconcile");
     }
 
     [Fact]

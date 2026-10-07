@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Ymir.Platform.Auditing;
 using Ymir.VibeMaker.Application.Executions;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
@@ -17,6 +18,7 @@ public sealed class UserDeactivationService(
     ExecutionService executions,
     RuntimeCredentialService credentials,
     IAgentRuntimeManager runtimes,
+    IAuditLog auditLog,
     TimeProvider timeProvider,
     ILogger<UserDeactivationService> logger)
 {
@@ -53,6 +55,9 @@ public sealed class UserDeactivationService(
                 await runtimes.StopForUserAsync(userId, cancellationToken).ConfigureAwait(false);
                 record.MarkStatus(RuntimeStatus.Stopped, timeProvider.GetUtcNow());
                 await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+                await auditLog.WriteAsync(
+                    new AuditEntry(actor, "runtime.stop", "user", userId.ToString("D"), AuditResult.Success, timeProvider.GetUtcNow(), null),
+                    cancellationToken).ConfigureAwait(false);
             }
         }
         catch (Exception ex)

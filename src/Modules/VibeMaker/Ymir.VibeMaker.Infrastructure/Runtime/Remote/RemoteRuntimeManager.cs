@@ -117,7 +117,7 @@ internal sealed class RemoteRuntimeManager : IAgentRuntimeManager, IDisposable
         var message = await response.Content.ReadFromJsonAsync<RuntimeInfoMessage>(RuntimeHostProtocol.JsonOptions, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException($"Runtime host {operation} returned an empty response.");
         var runtime = message.ToRuntimeInfo();
-        _runtimes[runtime.RuntimeId] = runtime;
+        _runtimes[runtime.RuntimeId] = runtime with { Transition = RuntimeTransition.None };
         return runtime;
     }
 
