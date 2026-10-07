@@ -141,6 +141,8 @@ OpenRouter API key 僅注入 LiteLLM，使用者與 Agent 使用限定模型的�
 
 「管理 → 系統設定 → 開放模型」可勾選已接入的模型及指定預設，至少保留一個，並可還原部署設定。開放清單以 `vibemaker.model_access` 保存於既有 `platform.system_settings`，重啟後保留、不需要新 migration，管理員修改寫入稽核。
 
+「管理 → 使用者 → 模型權限」對每個模型提供「依系統設定／允許／不允許」。預設動態繼承系統開放清單；可額外允許系統未開放但部署已接入的模型，或禁止個人使用已開放的模型。個人覆寫保存於 `platform.system_settings` 的 `vibemaker.user_model_access.{userId}`；「全部依系統設定」清除覆寫。允許個人沒有任何可用模型，此時不能送出新訊息。系統預設不可用時取個人生效清單第一個作為預設。個人設定端點為 `GET/PUT/DELETE /api/admin/users/{userId}/models`；對話選單、執行與 virtual key 均套用個人權限。詳見 [ADR-0019](docs/adr/0019-user-model-access.md)。
+
 `GET/PUT/DELETE /api/admin/settings/models` 受 Admin／XSRF 保護；使用者的 `/api/models`、送出訊息、排隊工作啟動及 LiteLLM 新 virtual key 一致採用生效清單。已開始的工作繼續完成，下次執行模型集合改變時换發金鑰；尚未開始而模型被關閉的工作明確失敗。模型頁面載入與視窗回到前景時重新查詢。詳見 [ADR-0016](docs/adr/0016-admin-model-access.md)。
 
 ## 模型與思考設定

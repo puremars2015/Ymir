@@ -88,7 +88,7 @@ public sealed class ExecutionRunner(
         EffectiveExtensions extensions;
         try
         {
-            var modelPolicy = await modelAccess.GetAsync(runToken).ConfigureAwait(false);
+            var modelPolicy = await modelAccess.GetForUserAsync(execution.UserId, runToken).ConfigureAwait(false);
             if (modelPolicy.DefaultModelId is null || (execution.ModelId is not null && !modelPolicy.IsAvailable(execution.ModelId)))
             {
                 await FinishAsync(execution, new AgentFailed(ExecutionErrorCodes.ModelNotAvailable, "此模型已停止開放，請選擇其他模型。"), stoppingToken).ConfigureAwait(false);

@@ -725,6 +725,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/users/{userId}/models': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetUserModelAccess'];
+    put: operations['AdminSaveUserModelAccess'];
+    post?: never;
+    delete: operations['AdminResetUserModelAccess'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/make-topics': {
     parameters: {
       query?: never;
@@ -1142,6 +1158,11 @@ export interface components {
       internet?: components['schemas']['ExtensionGrantSetting'];
       oneDrive?: components['schemas']['ExtensionGrantSetting'];
     };
+    SaveUserModelAccessRequest: {
+      overrides: {
+        [key: string]: boolean;
+      };
+    };
     SendMessageRequest: {
       content: string;
       /** Format: uuid */
@@ -1229,6 +1250,20 @@ export interface components {
       internet: components['schemas']['ExtensionGrantSetting'];
       oneDrive: components['schemas']['ExtensionGrantSetting'];
       effective: components['schemas']['ExtensionValues'];
+    };
+    UserModelAccessResponse: {
+      models: components['schemas']['UserModelOptionResponse'][];
+      defaultModelId: null | string;
+      isValid: boolean;
+      /** Format: date-time */
+      updatedAt: null | string;
+    };
+    UserModelOptionResponse: {
+      id: string;
+      displayName: string;
+      systemEnabled: boolean;
+      override: null | boolean;
+      enabled: boolean;
     };
     /** @enum {unknown} */
     UserRole: 'User' | 'Admin';
@@ -2679,6 +2714,76 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ModelAccessResponse'];
+        };
+      };
+    };
+  };
+  AdminGetUserModelAccess: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UserModelAccessResponse'];
+        };
+      };
+    };
+  };
+  AdminSaveUserModelAccess: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveUserModelAccessRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UserModelAccessResponse'];
+        };
+      };
+    };
+  };
+  AdminResetUserModelAccess: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UserModelAccessResponse'];
         };
       };
     };
