@@ -420,3 +420,25 @@
 </details>
 
 ---
+
+### #008 · CI 修正：`dotnet format` 檢查
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 03:20 · `🔧修正`
+
+- **問題**：#46（O1）的 `.NET build & test` 在 `dotnet format --verify-no-changes` 失敗。原因是 main 上其他人的變更留下的格式問題，O1 本身的程式沒有違規：
+  - `ExecutionArtifact.cs` 一行有兩個初始化；
+  - 3 個測試檔的 using 順序不對。
+- **修正**：執行 `dotnet format Ymir.slnx`，只有空白與 using 排序的機械式變更，沒有改到任何行為。
+- **驗證**：
+  - 本機 `dotnet format --verify-no-changes` 0 錯誤；
+  - `dotnet build` 0 警告；
+  - `AuthorizationMatrixTests`、`RemoteRuntimeApiTests` 通過。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---

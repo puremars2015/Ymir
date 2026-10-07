@@ -12,7 +12,8 @@ public sealed class ExecutionArtifact
 
     public static ExecutionArtifact Create(Guid executionId, string path, long size, DateTimeOffset modifiedAt) => new()
     {
-        Id = Guid.CreateVersion7(), ExecutionId = executionId,
+        Id = Guid.CreateVersion7(),
+        ExecutionId = executionId,
         Path = DomainGuard.RequiredText(path, 1024, nameof(path)),
         Size = size >= 0 ? size : throw new DomainValidationException("Invalid artifact size."),
         ModifiedAt = modifiedAt,
