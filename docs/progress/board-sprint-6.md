@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-07 23:00 ・ 狀態：**🚧 進行中（A1 擴充政策）**
+> 最後更新：2026-10-07 23:30 ・ 狀態：**🚧 進行中（A1 擴充政策）**
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -26,13 +26,14 @@
   | 1 | 權限粒度 | 全域預設 + 每人覆寫 |
   | 2 | 第一階段能力 | `skills` 與 `mcp` 都做 |
   | 3 | Gateway | 獨立服務 |
-  | 4 | Egress | 先做 spike 再決定 |
+  | 4 | Egress | 管理員控制（`internet` 能力，全域預設 + 每人覆寫），**預設允許**（A0 後決定） |
 
 | # | 工作項目 | 狀態 | 前置 / 待決定 |
 |---|---|---|---|
 | A0 | ADR-0012 spike：實測 Pi 1.0.0 在 RPC 模式的 `--no-skills` / `--skill`、能否不讀使用者層 `mcp.json`、平台 MCP 設定能否放在 Agent 不可寫的位置，以及 rootless Podman 能否限制 egress；結果寫回 ADR-0012 | ✅ | — |
-| A1 | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy` + 每人覆寫資料表<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | 🚧 | — |
-| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | A1；**❓待確認**：正式主機是否採用 `--internal` network（ADR-0012「Egress 建議」） |
+| A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`、`internet`）+ 每人覆寫資料表<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | 🚧 | — |
+| A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• 受限網路部署文件 | ⏳ | A1a |
+| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | A1a、A1b |
 | R0 | RAG ADR（ADR-0013）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite（sqlite-vec）部署、權限 | ⏳ | **❓待決定**：Embedding 模型與硬體、文件格式與容量、外部回答模型的資料政策 |
 | R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ⏳ | R0 經使用者確認 |
 | R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ⏳ | R1 |
@@ -110,6 +111,34 @@
   - 這會讓使用者自建、需要連外的 MCP 失效。
   - 請使用者確認是否同意。A2 開工前需要答案，A1 不受影響。
 - **下一步**：A1 擴充政策實作。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #003 · Egress 決定：管理員控制對外連線，預設允許
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 23:30 · `📢公告` `📐設計`
+
+- **使用者決定**：
+  - Agent container 能否對外連線改由管理員控制；
+  - 預設允許；
+  - 不論允許與否，Agent 都要連得到 LiteLLM 與 MCP Gateway。
+- **設計**（寫進 [ADR-0012 A.8](../adr/0012-agent-extensions-and-platform-mcp.md)）：
+  - 新能力 `internet`，與 `skills` / `mcp` 同一套「全域預設 + 每人覆寫」。
+  - 關閉時 container 改用主機預先建立的 `--internal` network（`VibeMaker:Runtime:RestrictedNetwork`），LiteLLM 與 gateway 接在同一個 network。
+  - 沒有設定受限網路時，執行以摘要錯誤失敗，不會退回成可以對外連線。
+  - Network 只能在建立 container 時決定：以 label 比對政策，不符時在使用者沒有其他執行中的 execution 時重建（寫稽核 `runtime.recreate`），否則等下一次執行再套用。
+  - Runtime host 只多接受 enum，network 名稱來自 runtime host 自己的設定，符合 ADR-0008 紅線。
+- **工作項目**：A1 拆成 A1a（擴充政策與 Pi 參數）與 A1b（對外連線）；A2 的 egress 待確認項目移除。
+- **驗證**：只改文件；`git diff --check`。
+- **未驗證、待使用者環境確認**：rootless Podman 下的受限網路行為。
+- **下一步**：A1a 實作。
 
 <details>
 <summary>💬 回覆（0）</summary>

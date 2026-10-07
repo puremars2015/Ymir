@@ -15,7 +15,7 @@
 | [0009](0009-entra-id-and-local-accounts.md) | 企業帳號（Entra ID OIDC）與本機帳號密碼登入 | 已採納 |
 | [0010](0010-admin-editable-system-settings.md) | 管理介面與可由網頁修改的系統設定（Entra ID、Cloudflare Tunnel） | 已採納 |
 | [0011](0011-runtime-lifecycle-policy.md) | Runtime 生命週期與執行政策（閒置停止、對帳、配額、用量） | 已採納 |
-| [0012](0012-agent-extensions-and-platform-mcp.md) | Agent 擴充能力：管理員管制的使用者自建擴充，與開發人員維護的平台 MCP | 已採納（egress 第一階段不強制） |
+| [0012](0012-agent-extensions-and-platform-mcp.md) | Agent 擴充能力：管理員管制的使用者自建擴充，與開發人員維護的平台 MCP | 已採納（egress 由管理員控制，預設允許） |
 
 新增 ADR 時複製以下格式：
 
