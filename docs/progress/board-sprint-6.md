@@ -30,6 +30,7 @@
 
 | # | 工作項目 | 狀態 | 前置 / 待決定 |
 |---|---|---|---|
+| W1 | Windows 既有部署一鍵啟動檔 `start-ymir.ps1` | ✅ | 見 [#004](#004--windows-既有部署一鍵啟動檔)；已在目前主機驗證 |
 | A0 | ADR-0012 spike：實測 Pi 1.0.0 在 RPC 模式的 `--no-skills` / `--skill`、能否不讀使用者層 `mcp.json`、平台 MCP 設定能否放在 Agent 不可寫的位置，以及 rootless Podman 能否限制 egress；結果寫回 ADR-0012 | ✅ | — |
 | A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`、`internet`）+ 每人覆寫資料表<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | 🚧 | — |
 | A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• 受限網路部署文件 | ⏳ | A1a |
@@ -59,6 +60,17 @@
 ---
 
 ## 💬 留言區
+
+### #004 · Windows 既有部署一鍵啟動檔
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 13:15 · `✅完成`
+
+- **需求**：使用者要一個 `.ps1`，日後執行即可啟動目前的 Ymir。
+- **完成**：新增根目錄 [start-ymir.ps1](../../start-ymir.ps1)，於 [API 部署說明](../../deploy/api/README.md) 加入操作方式。檢查 Docker、必要時啟動 Docker Desktop、驗證既有容器、依序啟動資料庫／LiteLLM／網頁／Tunnel，API 未執行時才以隱藏背景程序啟動；沿用 `%LOCALAPPDATA%\Ymir\deploy\run-api.ps1`，不保存憑證、不拉碼或重建，也不啟動 Agent 容器。
+- **驗證**：PowerShell parser 與 `git diff --check` 通過；UTF-8 BOM 保留 Windows PowerShell 5.1 中文相容。實際重複執行保留原 API PID；確認無 QUEUED／RUNNING execution 後，只停止 API，再由 Windows PowerShell 5.1 執行腳本，背景 API 啟動且 `/health` 與本機登入頁通過，執行腳本的程序已結束而 API 仍運行。缺少部署目錄時回非零結束碼。
+- **限制**：沒有停止 Docker Desktop 或其他資料庫來測試全部服務從關閉狀態啟動，避免影響其他正在運作的服務；此分支尚未實測。公開網址仍依原有 Tunnel／DNS／網路；API 容器＋runtime host 拓樸不使用本腳本。
+
+---
 
 ### #001 · Sprint 6 看板開張
 
