@@ -442,3 +442,26 @@
 </details>
 
 ---
+
+### #009 · CI 修正：準備階段逾時誤報為執行環境錯誤
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 03:40 · `🔧修正`
+
+- **問題**：#46 重跑 CI 時，`ExecutionTimeoutTests` 失敗：預期 `AGENT_TIMEOUT`，實際是 `AGENT_RUNTIME_ERROR`。
+  - log 顯示逾時發生在 main 新增的 `PrepareDeliveryAsync`（Agent 啟動前建立交付目錄）。
+  - 這一步拋出的 `TaskCanceledException` 被通用 catch 當成執行環境錯誤。
+  - 這是 main 既有的時序問題，不是 O1 的變更造成的；只在準備階段剛好碰上逾時時才會發生，本機跑了 3 次都通過。
+- **修正**：`ExecutionRunner` 在通用 catch 之前，先處理 `runToken` 已取消的 `OperationCanceledException`，轉為 `AgentCancelled`，再由既有邏輯判斷是逾時（`AGENT_TIMEOUT`）還是使用者取消。
+- **測試**：新增 `ExecutionTimeoutDuringPreparationTests`（約 6 毫秒的逾時，涵蓋 Agent 啟動前的各階段）。
+- **驗證**：
+  - `dotnet build`、`dotnet format --verify-no-changes` 0 錯誤；
+  - `ExecutionTimeout*`、`ExecutionFlowTests` 共 9 個通過。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---

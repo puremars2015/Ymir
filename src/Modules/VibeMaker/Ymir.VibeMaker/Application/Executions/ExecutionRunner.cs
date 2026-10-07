@@ -175,6 +175,12 @@ public sealed class ExecutionRunner(
                 await AppendAsync(executionId, agentEvent.ToExecutionEvent(executionId), stoppingToken).ConfigureAwait(false);
             }
         }
+        catch (OperationCanceledException) when (runToken.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
+        {
+            // Agent 啟動前的準備工作（例如建立交付目錄）期間逾時或被使用者取消：交給下方的逾時 / 取消處理，
+            // 不是執行環境錯誤（SA §13 AGENT_TIMEOUT）。harness 本身取消時不拋例外，不會走到這裡。
+            terminal = new AgentCancelled(string.Empty);
+        }
 #pragma warning disable CA1031 // 同上：任何例外都要結束 execution。
         catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
 #pragma warning restore CA1031
