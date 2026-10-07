@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-08 06:00 ・ 狀態：**🚧 進行中（A2、R0 完成；接著 R1→R2→H0→H1→H2，使用者要求先不合併回 main）**
+> 最後更新：2026-10-08 06:00 ・ 狀態：**🚧 進行中（A2、R0、R1 完成；接著 R2→H0→H1→H2，使用者要求先不合併回 main）**
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -44,7 +44,7 @@
 | O1 | OneDrive 連結 / 解除連結：<br>• `onedrive` 能力<br>• 授權碼 + PKCE 連結流程、refresh token 加密保存<br>• 根資料夾、設定頁<br>• FakeGraph 測試替身 | ✅ | — |
 | O2 | OneDrive 同步：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | ✅ | — |
 | R0 | RAG ADR（ADR-0014）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite 部署、權限 | ✅ | 使用者 2026-10-08 決定：Embedding 經 LiteLLM；回答模型由管理員標記可用於知識庫 |
-| R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ⏳ | R0 經使用者確認 |
+| R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ✅ | 見 #015 |
 | R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ⏳ | R1 |
 | H0 | 網站託管 ADR（ADR-0016；0015 已用於明確交付成果）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ⏳ | 使用者 2026-10-08 決定：網域為設定值 `<代碼>.<BaseDomain>`（真實 DNS / Tunnel 待使用者環境）；可見範圍由網站擁有者選擇，Ymir 管理員一律可看 |
 | H1 | 公開網站發布：網站與版本、產物檢查、Nginx 託管、原子切換、取消發布 | ⏳ | H0 經使用者確認 |
@@ -70,6 +70,33 @@
 
 ## 💬 留言區
 
+### #015 · R1 完成：專案知識庫的文件索引
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 08:00 · `✅完成`
+
+- **做了什麼**（ADR-0014 R1）：
+  - **上傳**：專案頁新增「知識庫」卡，可上傳、看狀態（自動更新）、重試、移除。
+  - **API**：`/api/projects/{id}/knowledge/*`，驗證擁有者，已加入授權矩陣。
+  - **背景索引** `KnowledgeIndexWorker`：
+    1. 擷取文字：TXT / Markdown / 文字型 PDF（含頁碼）/ DOCX（禁止 DTD）；
+    2. 切段：依句尾、有重疊、不跨頁；
+    3. 經 LiteLLM `/v1/embeddings` 向量化（使用者的 virtual key；embedding 模型自動加入 key 的允許模型）；
+    4. 寫入每專案一份 SQLite。
+  - **版本切換**：新版本完整寫入才切換（同檔名只有一份 Ready），失敗保留舊版本，重啟時重做、不會產生重複段落。
+  - **儲存位置**：原始檔與 SQLite 放在 API 自己的 volume `Ymir:Knowledge:Root`，不在 Agent workspace。
+  - **Fake LLM**：新增 `/v1/embeddings`（固定的字元 bigram 向量）。
+- **驗證**：
+  - `dotnet build`（0 警告）、`dotnet format --verify-no-changes`。
+  - `dotnet test --solution`：681 / 681 通過，新增：
+    - `KnowledgeBaseTests` 5 個：各格式索引、無效檔案摘要、新版本取代與移除後不再召回、專案與使用者隔離、重啟重做。
+    - `KnowledgeDisabledTests` 1 個。
+    - `KnowledgeRulesTests` 11 個。
+  - 前端 lint、136 個測試、build 都通過。
+  - 知識庫的 e2e 在 R2（問答）完成後一起做。
+- **未驗證、待使用者環境確認**：真實 Embedding 模型的品質與速度、正式 volume 的備份。
+- **下一步**：R2 問答。
+
+---
 ### #014 · R0 完成：ADR-0014 RAG 知識庫
 
 > 👤 **Claude（AI）** · 🕒 2026-10-08 06:40 · `✅完成`
