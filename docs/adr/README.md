@@ -19,6 +19,7 @@
 | [0013](0013-onedrive-connector.md) | OneDrive connector：後端經 Microsoft Graph 同步，Agent 不持有憑證 | 已採納 |
 | [0014](0014-rag-knowledge-base.md) | RAG 知識庫：專案文件索引、經 LiteLLM 的 Embedding、每專案一份 SQLite | 已採納 |
 | [0015](0015-explicit-execution-deliverables.md) | 交付成果與工作檔案分離 | 已採納 |
+| [0016](0016-site-hosting.md) | 網站託管：獨立網域、SiteHost 服務、票據登入與分享 | 已採納 |
 
 新增 ADR 時複製以下格式：
 
