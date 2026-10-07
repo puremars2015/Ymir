@@ -58,6 +58,21 @@ describe('Composer', () => {
     expect(textarea.value).toBe('');
   });
 
+  it('offers both commands for slash and filters help prefixes', async () => {
+    const { type, host, fixture, textarea, press, submissions } = await setup();
+    await type('/');
+    expect(host.querySelector('.help-hint')).not.toBeNull();
+    expect(host.querySelector('.make-hint')).not.toBeNull();
+    await type('/he');
+    expect(host.querySelector('.make-hint')).toBeNull();
+    host.querySelector<HTMLButtonElement>('.help-hint')!.click();
+    await fixture.whenStable();
+    expect(textarea.value).toBe('/help');
+    await press({});
+    expect(submissions).toEqual([{ content: '/help', makeTopicId: null, files: [] }]);
+    expect(host.querySelector('.make-picker')).toBeNull();
+  });
+
   it('does not send on Shift+Enter or while an IME is composing', async () => {
     const { sent, type, press } = await setup();
     await type('你好');

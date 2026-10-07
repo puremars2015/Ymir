@@ -19,6 +19,7 @@ import {
   showsMakeHint,
 } from '../core/make/make-command';
 import { MakeTopicStore } from '../core/make/make-topic.store';
+import { HELP_COMMAND, showsHelpHint } from '../core/make/help-command';
 import { addAttachments, submissionContent } from '../core/attachments/attachment-rules';
 import { formatSize } from '../core/files/workspace-files';
 
@@ -67,11 +68,19 @@ import { formatSize } from '../core/files/workspace-files';
           </div>
         }
       </section>
-    } @else if (hint()) {
-      <button type="button" class="make-hint" (click)="useMakeHint()">
-        <code>{{ makeCommand }}</code>
-        <span>建置小工具或網站（直接送出可選主題，或在後面描述要做什麼）</span>
-      </button>
+    } @else {
+      @if (helpHint()) {
+        <button type="button" class="help-hint" (click)="useHelpHint()">
+          <code>{{ helpCommand }}</code>
+          <span>了解 Ymir 的用途與指令</span>
+        </button>
+      }
+      @if (hint()) {
+        <button type="button" class="make-hint" (click)="useMakeHint()">
+          <code>{{ makeCommand }}</code>
+          <span>引導建立小工具、網站、簡報或文件</span>
+        </button>
+      }
     }
     @if (notice()) {
       <p class="notice" role="status">{{ notice() }}</p>
@@ -244,7 +253,8 @@ import { formatSize } from '../core/files/workspace-files';
       background: var(--text);
       color: var(--surface);
     }
-    .make-hint {
+    .make-hint,
+    .help-hint {
       display: flex;
       align-items: center;
       gap: 0.75rem;
@@ -328,9 +338,11 @@ export class Composer {
   readonly stopped = output<void>();
 
   protected readonly makeCommand = MAKE_COMMAND;
+  protected readonly helpCommand = HELP_COMMAND;
   protected readonly text = signal('');
   protected readonly pickerOpen = signal(false);
   protected readonly hint = computed(() => showsMakeHint(this.text()));
+  protected readonly helpHint = computed(() => showsHelpHint(this.text()));
   protected readonly files = signal<File[]>([]);
   protected readonly notice = signal<string | null>(null);
   protected readonly dragging = signal(false);
@@ -439,6 +451,11 @@ export class Composer {
 
   protected useMakeHint(): void {
     this.text.set(`${MAKE_COMMAND} `);
+    this.inputRef()?.nativeElement.focus();
+  }
+
+  protected useHelpHint(): void {
+    this.text.set(HELP_COMMAND);
     this.inputRef()?.nativeElement.focus();
   }
 }

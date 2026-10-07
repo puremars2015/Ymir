@@ -41,6 +41,25 @@ public class MakeCommandTests(MakeApiFactory factory) : IClassFixture<MakeApiFac
     }
 
     [Fact]
+    public async Task Help_SendsPlatformFactsToAgent_AndKeepsOriginalMessage()
+    {
+        Assert.SkipUnless(PiHarnessFixture.IsPiOnPath(), "pi is not on PATH");
+        using var client = await factory.LoginAsync("help-member");
+        var conversation = await client.CreateConversationAsync(null, "help");
+        var (_, sent) = await client.SendMessageAsync(conversation.Id, "/help");
+        var events = await client.ReadEventsAsync(sent!.EventStreamUrl);
+        Assert.Equal(ExecutionEventNames.ExecutionCompleted, events[^1].EventType);
+        var prompt = LastUserMessageToModel();
+        Assert.Contains("Ymir 是企業 AI 平台", prompt, StringComparison.Ordinal);
+        Assert.Contains("1. /help", prompt, StringComparison.Ordinal);
+        Assert.Contains("2. /make", prompt, StringComparison.Ordinal);
+        Assert.Contains("建立公告 Word", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("/opt/ymir/templates", prompt, StringComparison.Ordinal);
+        var messages = await client.GetMessagesAsync(conversation.Id);
+        Assert.Equal("/help", messages.First(m => m.Role == "USER").Content);
+    }
+
+    [Fact]
     public async Task DocumentTopics_IncludeGuidanceAndPlatformTemplate()
     {
         var ct = TestContext.Current.CancellationToken;
