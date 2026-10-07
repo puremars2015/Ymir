@@ -85,6 +85,7 @@
 - **簡報工具**：映像預裝鎖定版本 python-pptx 1.0.2／lxml 5.3.2 與 Noto CJK 字型；提供建置指引，避免建立工具用 npm 專案。只有最終 PPTX／DOCX 交付，JSON、腳本與模板不放入成果目錄。
 - **驗證**：Release build（0 警告）、完整格式檢查、406 個單元測試成功（5 個 Windows shell 測試依原設計略過）、9 個 Make 整合測試成功（真實 Pi + Fake LLM）、前端 lint 與 141 個測試成功；`make-flow.mjs` 瀏覽器流程（含四主題、管理員排序／停用／刪除）通過。修正端對端測試原本假設只有兩個主題的排序步驟；Windows 專用 Make fixture 經 host.docker.internal 連 Fake LLM，避免容器 localhost 連線錯誤。沒有呼叫付費模型。
 - **文件驗證**：5 個模板建置測試（package 保留、可變段落／條列、換行、XML 特殊字元、錯誤欄位及模板覆寫保護）通過；原始文件 2 頁與模板／測試成品各 1 頁均使用 LibreOffice 渲染並查看。唯讀 uid 1000 映像內 DOCX 建置與 PPTX 建置／重新讀取通過；提供可在文件映像內執行的模板測試腳本。
+- **補充驗證與 CI 修正**：另以長公告產生 2 頁文件並查看跨頁正文及頁尾。遠端 CI 揭露既有 ModelAccessTests 共用資料庫的順序依賴：管理政策測試停用模型後影響思考深度測試；改為每個測試使用獨立 factory／資料庫，不改產品行為、不略過測試，2 個模型政策整合測試本機通過。
 - **部署**：本機已套用 DocumentMakeTopics migration、publish API、建置 `make-documents-20261008` Agent 映像。確認沒有 QUEUED／RUNNING execution 後更新 API；移除 3 個舊映像容器，下一次使用由 API 重建，workspace／agent-state bind mounts 保留。API health 與前端回應 200，資料庫已登記兩個新主題。前端選單動態載入主題，無需更改使用者介面或重新建置前端。
 - **限制**：實際模型的文件設計品質尚未用付費模型驗證；Agent 映像不含 Office 渲染器，要求其如實說明無法視覺檢查的情況。長公告可跨頁，需依內容檢查分頁；平台模板沿用來源的非 A4 頁面尺寸。
 
