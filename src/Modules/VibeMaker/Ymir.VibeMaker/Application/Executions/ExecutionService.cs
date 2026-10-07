@@ -82,6 +82,10 @@ public sealed class ExecutionService(
 
             agentPrompt = MakePromptBuilder.ForDescription(makeDescription, await makeTopics.ListEnabledPromptsAsync(cancellationToken).ConfigureAwait(false));
         }
+        else if (HelpPromptBuilder.IsHelpCommand(request.Content))
+        {
+            agentPrompt = HelpPromptBuilder.Build(await makeTopics.ListEnabledPromptsAsync(cancellationToken).ConfigureAwait(false));
+        }
 
         var conversation = await db.Conversations.SingleOrDefaultAsync(c => c.Id == conversationId && c.UserId == userId && c.Status == ConversationStatus.Active, cancellationToken)
             .ConfigureAwait(false);
