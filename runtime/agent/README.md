@@ -20,6 +20,8 @@ Pi 版本以 `--build-arg PI_VERSION=x.y.z` 指定（預設 1.0.0）。升級 Pi
 | `/workspace` | host `{WorkspaceRoot}/{workspaceId}/workspace` | 使用者的專案檔案（持久化） |
 | `/agent-state` | host `{WorkspaceRoot}/{workspaceId}/agent-state` | Pi 設定（`pi-agent/`，含 `models.json`）與 session 檔（`sessions/`），container 重建後 Agent 不失憶 |
 | `/tmp`、`/home/agent` | tmpfs | 暫存；root filesystem 為唯讀 |
+| `/opt/ymir/templates` | 映像內建、唯讀 | `/make` 公告 DOCX 模板／建置器與簡報建置指引；不列入使用者成果 |
+| `/opt/ymir/python` | 映像內建、唯讀 | Python venv（預設 `python3`），包含鎖定版本的 python-pptx／lxml；預裝 Noto CJK 字型 |
 
 Host 路徑只由 user id 推導（`UserDirectories`：`{WorkspaceRoot}/users/{userId}/workspace`、`agent-state`），API 不接受任何外部傳入的路徑（SA §12）。
 

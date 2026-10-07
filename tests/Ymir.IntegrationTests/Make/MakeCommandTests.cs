@@ -12,7 +12,7 @@ using Ymir.VibeMaker.Contracts.Make;
 namespace Ymir.IntegrationTests.Make;
 
 /// <summary><c>/make</c>：主題按鈕、依描述判斷主題、Admin 管理主題（真實 Pi + Fake LLM 檢查送到模型的內容）。</summary>
-public class MakeCommandTests(PiApiFactory factory) : IClassFixture<PiApiFactory>
+public class MakeCommandTests(MakeApiFactory factory) : IClassFixture<MakeApiFactory>
 {
     private static readonly Guid SmallToolTopicId = Guid.Parse("0199b7a0-0000-7000-8000-000000000001");
 
@@ -37,7 +37,42 @@ public class MakeCommandTests(PiApiFactory factory) : IClassFixture<PiApiFactory
 
         var topics = await client.GetFromJsonAsync<List<MakeTopicResponse>>("/api/make-topics", JsonDefaults.Options, TestContext.Current.CancellationToken);
 
-        Assert.Equal(["小工具架設", "網站系統架設"], topics!.Take(2).Select(t => t.Name));
+        Assert.Equal(["小工具架設", "網站系統架設", "建立簡報", "建立公告 Word"], topics!.Take(4).Select(t => t.Name));
+    }
+
+    [Fact]
+    public async Task DocumentTopics_IncludeGuidanceAndPlatformTemplate()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var admin = await factory.LoginAsync("make-document-admin", UserRole.Admin);
+        var topics = await admin.GetFromJsonAsync<List<AdminMakeTopicResponse>>("/api/admin/make-topics", JsonDefaults.Options, ct);
+        var presentation = Assert.Single(topics!, t => t.Id == Guid.Parse("0199b7a0-0000-7000-8000-000000000003"));
+        var announcement = Assert.Single(topics!, t => t.Id == Guid.Parse("0199b7a0-0000-7000-8000-000000000004"));
+        Assert.True(presentation.IsEnabled);
+        Assert.True(announcement.IsEnabled);
+        Assert.Contains("逐頁大綱", presentation.Instructions, StringComparison.Ordinal);
+        Assert.Contains(".pptx", presentation.Instructions, StringComparison.Ordinal);
+        Assert.Contains("/opt/ymir/templates/announcement/template.docx", announcement.Instructions, StringComparison.Ordinal);
+        Assert.Contains("build.py", announcement.Instructions, StringComparison.Ordinal);
+        Assert.Contains("不交付", announcement.Instructions, StringComparison.Ordinal);
+        Assert.Contains("聯絡窗口", announcement.Instructions, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("0199b7a0-0000-7000-8000-000000000003", "建立簡報", "逐頁大綱")]
+    [InlineData("0199b7a0-0000-7000-8000-000000000004", "建立公告 Word", "build.py")]
+    public async Task DocumentTopicButton_AsksQuestionsBeforeCreatingDeliverables(string id, string name, string instruction)
+    {
+        Assert.SkipUnless(PiHarnessFixture.IsPiOnPath(), "pi is not on PATH");
+        using var client = await factory.LoginAsync("make-doc-" + id);
+        var conversation = await client.CreateConversationAsync(null, "make documents");
+        var (_, sent) = await client.SendMessageAsync(conversation.Id, "/make " + name, makeTopicId: Guid.Parse(id));
+        var events = await client.ReadEventsAsync(sent!.EventStreamUrl);
+        Assert.Equal(ExecutionEventNames.ExecutionCompleted, events[^1].EventType);
+        var prompt = LastUserMessageToModel();
+        Assert.Contains(instruction, prompt, StringComparison.Ordinal);
+        Assert.Contains("先不要建立任何檔案", prompt, StringComparison.Ordinal);
+        Assert.Contains("本次成果目錄", prompt, StringComparison.Ordinal);
     }
 
     [Fact]
