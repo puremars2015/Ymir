@@ -16,6 +16,7 @@
 | [0010](0010-admin-editable-system-settings.md) | 管理介面與可由網頁修改的系統設定（Entra ID、Cloudflare Tunnel） | 已採納 |
 | [0011](0011-runtime-lifecycle-policy.md) | Runtime 生命週期與執行政策（閒置停止、對帳、配額、用量） | 已採納 |
 | [0012](0012-agent-extensions-and-platform-mcp.md) | Agent 擴充能力：管理員管制的使用者自建擴充，與開發人員維護的平台 MCP | 已採納（egress 由管理員控制，預設允許） |
+| [0013](0013-onedrive-connector.md) | OneDrive connector：後端經 Microsoft Graph 同步，Agent 不持有憑證 | 已採納 |
 
 新增 ADR 時複製以下格式：
 
