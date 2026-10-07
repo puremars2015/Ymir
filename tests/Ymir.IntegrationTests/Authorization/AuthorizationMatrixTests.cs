@@ -51,6 +51,10 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         },
         ["DELETE /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}"] = r => new HttpRequestMessage(HttpMethod.Delete, $"/api/projects/{r.ProjectId}/knowledge/documents/{r.ExecutionId}"),
         ["POST /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}/retry"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{r.ProjectId}/knowledge/documents/{r.ExecutionId}/retry"),
+        ["POST /api/projects/{projectId:guid}/knowledge/ask"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{r.ProjectId}/knowledge/ask")
+        {
+            Content = JsonContent.Create(new AskKnowledgeRequest("secret?", null)),
+        },
         ["POST /api/conversations/{conversationId:guid}/attachments"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/attachments?fileName=intrusion.txt")
         {
             Content = new ByteArrayContent("intrusion"u8.ToArray()),
@@ -80,6 +84,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["POST /api/projects/{projectId:guid}/knowledge/documents"] = HttpStatusCode.Conflict,
         ["DELETE /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}"] = HttpStatusCode.NotFound,
         ["POST /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}/retry"] = HttpStatusCode.NotFound,
+        ["POST /api/projects/{projectId:guid}/knowledge/ask"] = HttpStatusCode.Conflict,
     };
 
     /// <summary>

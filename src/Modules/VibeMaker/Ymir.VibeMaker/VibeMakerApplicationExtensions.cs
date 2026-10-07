@@ -37,6 +37,7 @@ public static class VibeMakerApplicationExtensions
         services.AddSingleton<Application.Connectors.OneDrive.OneDriveSyncSignal>();
         services.AddScoped<Application.PlatformMcp.PlatformMcpService>();
         services.AddScoped<Application.Knowledge.KnowledgeBaseService>();
+        services.AddScoped<Application.Knowledge.KnowledgeQueryService>();
         services.AddSingleton<Application.Knowledge.KnowledgeSignal>();
         services.AddSingleton<Application.Knowledge.KnowledgeLocks>();
         services.AddSingleton<VibeMakerTelemetry>();

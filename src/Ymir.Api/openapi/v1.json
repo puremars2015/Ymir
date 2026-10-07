@@ -1701,6 +1701,47 @@
         }
       }
     },
+    "/api/projects/{projectId}/knowledge/ask": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "AskKnowledgeBase",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskKnowledgeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeAnswerResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/connectors/onedrive": {
       "get": {
         "tags": [
@@ -2317,6 +2358,27 @@
           }
         }
       },
+      "AskKnowledgeRequest": {
+        "required": [
+          "question",
+          "modelId"
+        ],
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "modelId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "AttachmentResponse": {
         "required": [
           "id",
@@ -2857,6 +2919,39 @@
           }
         }
       },
+      "KnowledgeAnswerResponse": {
+        "required": [
+          "answer",
+          "insufficientData",
+          "modelAllowed",
+          "modelId",
+          "citations"
+        ],
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "insufficientData": {
+            "type": "boolean"
+          },
+          "modelAllowed": {
+            "type": "boolean"
+          },
+          "modelId": {
+            "type": "string"
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeCitationResponse"
+            }
+          }
+        }
+      },
       "KnowledgeBaseResponse": {
         "required": [
           "enabled",
@@ -2897,6 +2992,72 @@
             "items": {
               "$ref": "#/components/schemas/KnowledgeDocumentResponse"
             }
+          }
+        }
+      },
+      "KnowledgeCitationResponse": {
+        "required": [
+          "number",
+          "documentId",
+          "fileName",
+          "version",
+          "ordinal",
+          "page",
+          "excerpt",
+          "score"
+        ],
+        "type": "object",
+        "properties": {
+          "number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "ordinal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "score": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -3195,6 +3356,10 @@
           },
           "supportsImages": {
             "type": "boolean"
+          },
+          "allowKnowledgeBase": {
+            "type": "boolean",
+            "default": false
           }
         }
       },

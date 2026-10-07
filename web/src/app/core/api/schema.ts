@@ -693,6 +693,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/projects/{projectId}/knowledge/ask': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['AskKnowledgeBase'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/connectors/onedrive': {
     parameters: {
       query?: never;
@@ -925,6 +941,10 @@ export interface components {
       createdAt: string;
       files: components['schemas']['WorkspaceFileResponse'][];
     };
+    AskKnowledgeRequest: {
+      question: null | string;
+      modelId: null | string;
+    };
     AttachmentResponse: {
       /** Format: uuid */
       id: string;
@@ -1049,6 +1069,13 @@ export interface components {
       internet: boolean;
       oneDrive: boolean;
     };
+    KnowledgeAnswerResponse: {
+      answer: null | string;
+      insufficientData: boolean;
+      modelAllowed: boolean;
+      modelId: string;
+      citations: components['schemas']['KnowledgeCitationResponse'][];
+    };
     KnowledgeBaseResponse: {
       enabled: boolean;
       /** Format: int64 */
@@ -1057,6 +1084,22 @@ export interface components {
       maxDocuments: number | string;
       supportedExtensions: string[];
       documents: components['schemas']['KnowledgeDocumentResponse'][];
+    };
+    KnowledgeCitationResponse: {
+      /** Format: int32 */
+      number: number | string;
+      /** Format: uuid */
+      documentId: string;
+      fileName: string;
+      /** Format: int32 */
+      version: number | string;
+      /** Format: int32 */
+      ordinal: number | string;
+      /** Format: int32 */
+      page: null | number | string;
+      excerpt: string;
+      /** Format: double */
+      score: number | string;
     };
     KnowledgeDocumentResponse: {
       /** Format: uuid */
@@ -1131,6 +1174,8 @@ export interface components {
       displayName: string;
       isDefault: boolean;
       supportsImages: boolean;
+      /** @default false */
+      allowKnowledgeBase: boolean;
     };
     MyExtensionsResponse: {
       skillsAllowed: boolean;
@@ -2701,6 +2746,32 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  AskKnowledgeBase: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AskKnowledgeRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeAnswerResponse'];
+        };
       };
     };
   };

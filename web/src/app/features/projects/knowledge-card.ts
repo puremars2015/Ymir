@@ -1,7 +1,9 @@
 import { DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   effect,
   inject,
@@ -11,10 +13,13 @@ import {
 } from '@angular/core';
 import { concatMap, from, Subscription, timer } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
-import { KnowledgeBase, KnowledgeDocument } from '../../core/api/api-types';
+import { KnowledgeAnswer, KnowledgeBase, KnowledgeDocument } from '../../core/api/api-types';
+import { ModelStore } from '../../core/models/model.store';
 import { formatSize } from '../../core/files/workspace-files';
 import {
   hasPendingDocuments,
+  knowledgeAnswerNotice,
+  knowledgeModels,
   knowledgeStatusLabel,
   validateKnowledgeFile,
 } from '../../core/knowledge/knowledge-rules';
@@ -25,7 +30,7 @@ import {
  */
 @Component({
   selector: 'app-knowledge-card',
-  imports: [DatePipe],
+  imports: [DatePipe, FormsModule],
   template: `
     <section class="knowledge stack" aria-label="知識庫">
       <h2>知識庫</h2>
@@ -72,6 +77,70 @@ import {
               <li class="muted">還沒有文件。</li>
             }
           </ul>
+
+          @if (hasReady(k)) {
+            <form class="ask stack" (ngSubmit)="ask()">
+              <label
+                >根據文件提問
+                <textarea
+                  name="knowledgeQuestion"
+                  rows="2"
+                  [ngModel]="question()"
+                  (ngModelChange)="question.set($event)"
+                  placeholder="例如：特別休假要提前幾天申請？"
+                ></textarea>
+              </label>
+              <div class="row">
+                @if (answerModels().length > 0) {
+                  <select
+                    name="knowledgeModel"
+                    [ngModel]="modelId()"
+                    (ngModelChange)="modelId.set($event)"
+                    aria-label="回答模型"
+                  >
+                    @for (m of answerModels(); track m.id) {
+                      <option [value]="m.id">{{ m.displayName }}</option>
+                    }
+                  </select>
+                } @else {
+                  <span class="muted small"
+                    >管理員尚未開放可用於知識庫的模型，只會列出相關段落。</span
+                  >
+                }
+                <button type="submit" [disabled]="asking() || !question().trim()">
+                  {{ asking() ? '查詢中…' : '提問' }}
+                </button>
+              </div>
+            </form>
+            @if (answer(); as a) {
+              <section class="answer stack" aria-label="知識庫回答">
+                @if (notice(a); as n) {
+                  <p class="muted">{{ n }}</p>
+                }
+                @if (a.answer) {
+                  <p class="text">{{ a.answer }}</p>
+                }
+                @if (a.citations.length > 0) {
+                  <ol class="citations">
+                    @for (c of a.citations; track c.number) {
+                      <li>
+                        <details>
+                          <summary>
+                            [{{ c.number }}] {{ c.fileName }}
+                            @if (c.page) {
+                              · 第 {{ c.page }} 頁
+                            }
+                            · 段落 {{ ordinal(c.ordinal) }}
+                          </summary>
+                          <p class="excerpt">{{ c.excerpt }}</p>
+                        </details>
+                      </li>
+                    }
+                  </ol>
+                }
+              </section>
+            }
+          }
         }
       } @else if (!error()) {
         <p class="muted">載入中…</p>
@@ -118,6 +187,31 @@ import {
       text-overflow: ellipsis;
       max-width: 100%;
     }
+    .row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .ask label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .answer .text,
+    .excerpt {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .citations {
+      margin: 0;
+      padding-left: 1.25rem;
+      font-size: 0.875rem;
+    }
+    .excerpt {
+      margin: 0.25rem 0 0.5rem;
+      color: var(--text-muted);
+    }
     .actions {
       margin-left: auto;
       display: flex;
@@ -128,24 +222,70 @@ import {
 })
 export class KnowledgeCard {
   private readonly api = inject(ApiService);
+  private readonly modelStore = inject(ModelStore);
 
   readonly projectId = input.required<string>();
   protected readonly kb = signal<KnowledgeBase | null>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly question = signal('');
+  protected readonly asking = signal(false);
+  protected readonly answer = signal<KnowledgeAnswer | null>(null);
+  protected readonly answerModels = computed(() => knowledgeModels(this.modelStore.models()));
+  protected readonly modelId = signal<string | null>(null);
 
   private poll: Subscription | null = null;
 
   constructor() {
+    this.modelStore.load();
+    effect(() => {
+      const first = this.answerModels()[0];
+      if (first && !untracked(() => this.modelId())) {
+        untracked(() => this.modelId.set(first.id));
+      }
+    });
     effect(() => {
       this.projectId();
       untracked(() => {
         this.kb.set(null);
         this.error.set(null);
+        this.answer.set(null);
         this.load();
       });
     });
     inject(DestroyRef).onDestroy(() => this.poll?.unsubscribe());
+  }
+
+  protected hasReady(kb: KnowledgeBase): boolean {
+    return kb.documents.some((d) => d.status === 'Ready');
+  }
+
+  protected notice(answer: KnowledgeAnswer): string | null {
+    return knowledgeAnswerNotice(answer);
+  }
+
+  protected ordinal(value: number | string): number {
+    return Number(value) + 1;
+  }
+
+  protected ask(): void {
+    const text = this.question().trim();
+    if (!text) {
+      return;
+    }
+
+    this.asking.set(true);
+    this.error.set(null);
+    this.api.askKnowledge(this.projectId(), text, this.modelId()).subscribe({
+      next: (answer) => {
+        this.answer.set(answer);
+        this.asking.set(false);
+      },
+      error: (e: unknown) => {
+        this.error.set(describeApiError(e));
+        this.asking.set(false);
+      },
+    });
   }
 
   protected status(document: KnowledgeDocument): string {

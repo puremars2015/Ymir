@@ -1,6 +1,8 @@
 import { KnowledgeDocument } from '../api/api-types';
 import {
   hasPendingDocuments,
+  knowledgeAnswerNotice,
+  knowledgeModels,
   knowledgeStatusLabel,
   validateKnowledgeFile,
 } from './knowledge-rules';
@@ -36,5 +38,39 @@ describe('knowledge rules', () => {
     expect(
       validateKnowledgeFile({ name: 'a.txt', size: 2 * 1024 * 1024 }, exts, 1024 * 1024),
     ).toContain('超過 1 MB');
+  });
+
+  it('filters knowledge models and explains answers', () => {
+    const models = [
+      {
+        id: 'a',
+        displayName: 'A',
+        isDefault: true,
+        supportsImages: false,
+        allowKnowledgeBase: false,
+      },
+      {
+        id: 'b',
+        displayName: 'B',
+        isDefault: false,
+        supportsImages: false,
+        allowKnowledgeBase: true,
+      },
+    ];
+    expect(knowledgeModels(models).map((m) => m.id)).toEqual(['b']);
+    const base = {
+      answer: 'x',
+      insufficientData: false,
+      modelAllowed: true,
+      modelId: 'b',
+      citations: [],
+    };
+    expect(knowledgeAnswerNotice(base)).toBeNull();
+    expect(knowledgeAnswerNotice({ ...base, answer: null, insufficientData: true })).toContain(
+      '沒有足夠',
+    );
+    expect(knowledgeAnswerNotice({ ...base, answer: null, modelAllowed: false })).toContain(
+      '只列出相關段落',
+    );
   });
 });

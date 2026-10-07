@@ -18,6 +18,7 @@ import {
   MyExtensions,
   OneDriveStatus,
   ConversationOneDrive,
+  KnowledgeAnswer,
   KnowledgeBase,
   KnowledgeDocument,
   McpServerAccess,
@@ -384,6 +385,18 @@ export class ApiService {
       `/api/projects/${projectId}/knowledge/documents/${documentId}/retry`,
       null,
     );
+  }
+
+  /** 知識庫問答（ADR-0014 §8）：回答與引用；資料不足或模型未獲允許時沒有回答。 */
+  askKnowledge(
+    projectId: string,
+    question: string,
+    modelId: string | null,
+  ): Observable<KnowledgeAnswer> {
+    return this.http.post<KnowledgeAnswer>(`/api/projects/${projectId}/knowledge/ask`, {
+      question,
+      modelId,
+    });
   }
 
   cancelExecution(executionId: string): Observable<CancelExecutionResponse> {

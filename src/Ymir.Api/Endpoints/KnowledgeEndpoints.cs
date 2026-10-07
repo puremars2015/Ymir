@@ -4,6 +4,7 @@ using Ymir.Api.Auth;
 using Ymir.Api.Problems;
 using Ymir.Platform.Identity;
 using Ymir.VibeMaker.Application.Knowledge;
+using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Domain;
 
 namespace Ymir.Api.Endpoints;
@@ -23,7 +24,38 @@ internal static class KnowledgeEndpoints
             .Produces<KnowledgeDocumentResponse>(StatusCodes.Status201Created);
         group.MapDelete("/documents/{documentId:guid}", RemoveAsync).WithName("RemoveKnowledgeDocument");
         group.MapPost("/documents/{documentId:guid}/retry", RetryAsync).WithName("RetryKnowledgeDocument");
+        group.MapPost("/ask", AskAsync).WithName("AskKnowledgeBase").Produces<KnowledgeAnswerResponse>();
         return endpoints;
+    }
+
+    private static async Task<IResult> AskAsync(
+        Guid projectId,
+        AskKnowledgeRequest request,
+        ICurrentUser currentUser,
+        KnowledgeQueryService service,
+        CancellationToken cancellationToken)
+    {
+        (KnowledgeAnswer? Answer, KnowledgeAskError Error)? result;
+        try
+        {
+            result = await service.AskAsync(currentUser.UserId, projectId, request.Question, request.ModelId, currentUser.ActorName, cancellationToken);
+        }
+        catch (KnowledgeException ex)
+        {
+            return ApiProblem.Create(StatusCodes.Status502BadGateway, "KNOWLEDGE_UPSTREAM", ex.Message);
+        }
+        catch (ModelCredentialException)
+        {
+            return ApiProblem.Create(StatusCodes.Status502BadGateway, "KNOWLEDGE_UPSTREAM", "暫時無法連線到模型服務，請稍後再試。");
+        }
+
+        return result switch
+        {
+            null => TypedResults.NotFound(),
+            ({ } answer, _) => TypedResults.Ok(KnowledgeAnswerResponse.From(answer)),
+            (_, KnowledgeAskError.Disabled) => ApiProblem.Create(StatusCodes.Status409Conflict, "KNOWLEDGE_DISABLED", "知識庫尚未設定（需要 Embedding 模型），請洽管理員。"),
+            _ => ApiProblem.Create(StatusCodes.Status400BadRequest, "KNOWLEDGE_QUESTION_INVALID", $"請輸入問題（最多 {KnowledgeQueryService.MaxQuestionLength} 字）。"),
+        };
     }
 
     private static async Task<Results<Ok<KnowledgeBaseResponse>, NotFound>> GetAsync(
@@ -128,3 +160,22 @@ public sealed record KnowledgeDocumentResponse(
     internal static KnowledgeDocumentResponse From(KnowledgeDocument document) =>
         new(document.Id, document.FileName, document.Version, document.Size, document.Status, document.ChunkCount, document.Error, document.CreatedAt, document.UpdatedAt);
 }
+
+public sealed record AskKnowledgeRequest(string? Question, string? ModelId);
+
+/// <param name="Answer">模型的回答；資料不足或模型未獲允許時為 null。</param>
+/// <param name="InsufficientData">文件沒有涵蓋這個問題（沒有呼叫模型）。</param>
+/// <param name="ModelAllowed">選用的模型是否可用於知識庫；false 時只回檢索到的段落。</param>
+public sealed record KnowledgeAnswerResponse(
+    string? Answer,
+    bool InsufficientData,
+    bool ModelAllowed,
+    string ModelId,
+    IReadOnlyList<KnowledgeCitationResponse> Citations)
+{
+    internal static KnowledgeAnswerResponse From(KnowledgeAnswer answer) =>
+        new(answer.Answer, answer.InsufficientData, answer.ModelAllowed, answer.ModelId,
+            [.. answer.Citations.Select(c => new KnowledgeCitationResponse(c.Number, c.DocumentId, c.FileName, c.Version, c.Ordinal, c.Page, c.Excerpt, c.Score))]);
+}
+
+public sealed record KnowledgeCitationResponse(int Number, Guid DocumentId, string FileName, int Version, int Ordinal, int? Page, string Excerpt, double Score);

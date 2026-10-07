@@ -40,6 +40,13 @@ public interface IEmbeddingClient
     Task<IReadOnlyList<float[]>> EmbedAsync(string apiKey, string model, IReadOnlyList<string> inputs, CancellationToken cancellationToken);
 }
 
+/// <summary>經 LiteLLM chat completions 生成回答（ADR-0014 §8）；使用該使用者的 virtual key，不串流。</summary>
+public interface IKnowledgeAnswerClient
+{
+    /// <summary>失敗時拋出 <see cref="KnowledgeException"/>（訊息是給使用者看的摘要）。</summary>
+    Task<string> CompleteAsync(string apiKey, string model, string systemPrompt, string userPrompt, CancellationToken cancellationToken);
+}
+
 /// <param name="Page">PDF 的頁碼；其他格式為 null。</param>
 public sealed record TextChunk(int Ordinal, int? Page, string Text);
 

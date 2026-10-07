@@ -35,7 +35,13 @@ public sealed class KnowledgeApiFactory : ApiFactory
         builder.UseSetting("VibeMaker:Rag:ChunkOverlap", "20");
         builder.UseSetting("VibeMaker:Rag:MaxFileBytes", "1048576");
         builder.UseSetting("Ymir:Knowledge:Root", KnowledgeRoot);
+        builder.UseSetting("VibeMaker:Models:0:Id", FakeLlmEndpoints.ModelId);
+        builder.UseSetting("VibeMaker:Models:0:AllowKnowledgeBase", "true");
+        builder.UseSetting("VibeMaker:Models:1:Id", RestrictedModel);
     }
+
+    /// <summary>沒有被管理員標記可用於知識庫的模型。</summary>
+    public const string RestrictedModel = "restricted-model";
 
     public override async ValueTask DisposeAsync()
     {

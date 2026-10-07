@@ -87,6 +87,8 @@ cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:network -- <截圖
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:onedrive -- <截圖目錄>
 # 平台 MCP（ADR-0012 B；需要 Fake MCP、MCP Gateway、API 的 Ymir__Mcp__*，見 deploy/mcp/README.md「本機驗證」）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:mcp -- <截圖目錄>
+# 知識庫（ADR-0014；Fake LLM + API 的 VibeMaker__Rag__EmbeddingModel 等，見 web/e2e/knowledge-flow.mjs 開頭）
+cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:knowledge -- <截圖目錄>
 
 # 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
 dotnet run --project src/Ymir.AppHost
@@ -127,7 +129,7 @@ Agent 擴充能力（ADR-0012）：管理員在「管理 → 系統設定」設�
 
 OneDrive connector（ADR-0013）：管理員開放 `oneDrive` 能力後，使用者在個人設定連結（`/api/connectors/onedrive/connect` → Microsoft 授權碼 + PKCE → `/callback`，state 存在加密的短期 cookie、綁定使用者；企業帳號必須連到同一個 oid）。沿用登入的 Entra 註冊（`OidcOneDriveSettingsSource`），需在 Entra 加 `Files.ReadWrite`、`offline_access` 委派權限與 callback redirect URI。`OneDriveConnectionService` 保存 Data Protection 加密的 refresh token（換發時輪替、`invalid_grant` → `NeedsReauth`），access token 只在記憶體；Graph 呼叫在 `GraphOneDriveClient`（429 / 503 依 Retry-After 重試，base URL `Ymir:Connectors:OneDrive:GraphBaseUrl` 只給測試替身用）。同步（`OneDriveSyncService`，指南 `docs/guides/onedrive.md`）：`ExecutionRunner` 在 Agent 啟動前（持有使用者鎖）下載雲端變更，執行結束後把工作排進 `vibemaker.onedrive_sync_scopes.upload_pending`，由 `OneDriveSyncWorker` 以 `UserExecutionLocks.TryAcquire` 取鎖後下載 + 上傳（持久化、重啟後繼續、失敗退避重試 5 次）。專案 → `<根>/projects/<名稱>-<id8>`、未分組對話 → `<根>/chats/<標題>-<id8>`；雲端以 eTag + If-Match、本機以大小 + 修改時間比對，兩邊都改時原檔名放雲端版本、本機版本另存「(OneDrive 衝突 時間)」副本（兩邊都有），不同步刪除；檔案只經 `IWorkspaceFileReader` / `IWorkspaceFileWriter` 在 runtime 內讀寫，Agent 拿不到任何 Graph 憑證。`deliverables/` 只上傳不下載。對話端點 `GET /api/conversations/{id}/onedrive`、`POST .../onedrive/sync`（未就緒回 409 `ONEDRIVE_NOT_READY`）；檔案面板的 `app-onedrive-sync` 顯示雲端保存狀態，與任務結果分開。
 
-RAG 知識庫（ADR-0014）：專案擁有者在專案頁上傳文件（`/api/projects/{id}/knowledge/*`），`KnowledgeIndexWorker` 背景擷取（TXT / Markdown / 文字型 PDF / DOCX）→ `TextChunker` 切段 → 經 LiteLLM `/v1/embeddings`（使用者 virtual key，模型 `VibeMaker:Rag:EmbeddingModel`，沒設定時停用）→ 寫入每專案一份 SQLite（`SqliteVectorStore`，暴力餘弦搜尋）。原始檔與 SQLite 放在 API 自己的 volume `Ymir:Knowledge:Root/<userId>/<projectId>/`（不是 Agent workspace、不掛給 Agent）；新版本索引成功才切換（filtered unique index：同檔名只一份 Ready），失敗保留舊版本，重啟時 `ReconcileAsync` 重做。
+RAG 知識庫（ADR-0014）：專案擁有者在專案頁上傳文件（`/api/projects/{id}/knowledge/*`），`KnowledgeIndexWorker` 背景擷取（TXT / Markdown / 文字型 PDF / DOCX）→ `TextChunker` 切段 → 經 LiteLLM `/v1/embeddings`（使用者 virtual key，模型 `VibeMaker:Rag:EmbeddingModel`，沒設定時停用）→ 寫入每專案一份 SQLite（`SqliteVectorStore`，暴力餘弦搜尋）。原始檔與 SQLite 放在 API 自己的 volume `Ymir:Knowledge:Root/<userId>/<projectId>/`（不是 Agent workspace、不掛給 Agent）；新版本索引成功才切換（filtered unique index：同檔名只一份 Ready），失敗保留舊版本，重啟時 `ReconcileAsync` 重做。問答 `POST /api/projects/{id}/knowledge/ask`（`KnowledgeQueryService`）：只在該專案、相同 embedding 模型的 Ready 版本中檢索，低於 `MinScore` 回「資料不足」且不呼叫模型；只有 `VibeMaker:Models:N:AllowKnowledgeBase=true` 的模型會收到片段（否則只回段落），片段放在 `<knowledge>` 資料區塊並要求以 `[n]` 標註。
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
 

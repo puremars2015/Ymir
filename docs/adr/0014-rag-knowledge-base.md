@@ -97,7 +97,8 @@
   1. 問題向量化；
   2. 只在該專案、模型相容的有效版本中，取前 k 段；
   3. 最高分低於門檻（預設 0.2）或沒有任何段落時，回「資料不足」，不呼叫模型。
-- 回答模型必須是管理員標記 `AllowKnowledgeBase` 的模型（`VibeMaker:Models:N:AllowKnowledgeBase=true`）。沒有時回 403 摘要；介面只顯示檢索到的段落，不生成回答。
+- 回答模型必須是管理員標記 `AllowKnowledgeBase` 的模型（`VibeMaker:Models:N:AllowKnowledgeBase=true`）。選用未標記的模型時，回應的 `modelAllowed` 為 false：片段**不會**送給該模型，只回傳檢索到的段落（實作時由原本的 403 改為這個做法，使用者仍能看到出處）。
+- 低於相似度門檻的段落不列為引用。
 - 經 LiteLLM chat completions、使用者的 virtual key 生成回答：
   - system prompt 要求只依片段回答、以 `[n]` 標註來源、文件沒有涵蓋時直接說明；
   - 片段放在明確標示的資料區塊，避免文件內的指令被當成指示。

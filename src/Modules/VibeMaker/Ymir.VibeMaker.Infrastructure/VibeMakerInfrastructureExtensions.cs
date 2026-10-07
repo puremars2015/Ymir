@@ -178,9 +178,13 @@ public static class VibeMakerInfrastructureExtensions
     {
         var defaultModel = configuration.GetSection(PiAgentOptions.SectionName).GetValue(nameof(PiAgentOptions.ModelId), new PiAgentOptions().ModelId)!;
         var models = configuration.GetSection("VibeMaker:Models").GetChildren()
-            .Select(section => (Id: section["Id"]?.Trim(), DisplayName: section["DisplayName"]?.Trim(), SupportsImages: section.GetValue<bool>("SupportsImages")))
+            .Select(section => (
+                Id: section["Id"]?.Trim(),
+                DisplayName: section["DisplayName"]?.Trim(),
+                SupportsImages: section.GetValue<bool>("SupportsImages"),
+                AllowKnowledgeBase: section.GetValue<bool>("AllowKnowledgeBase")))
             .Where(m => !string.IsNullOrEmpty(m.Id))
-            .Select(m => new ModelDescriptor(m.Id!, string.IsNullOrEmpty(m.DisplayName) ? m.Id! : m.DisplayName!, m.SupportsImages))
+            .Select(m => new ModelDescriptor(m.Id!, string.IsNullOrEmpty(m.DisplayName) ? m.Id! : m.DisplayName!, m.SupportsImages, m.AllowKnowledgeBase))
             .DistinctBy(m => m.Id)
             .ToList();
         if (!models.Any(m => m.Id == defaultModel))
@@ -214,6 +218,7 @@ public static class VibeMakerInfrastructureExtensions
         services.AddSingleton<Application.Knowledge.IVectorStore, Knowledge.SqliteVectorStore>();
         services.AddSingleton<Application.Knowledge.IDocumentTextExtractor, Knowledge.DocumentTextExtractor>();
         services.AddHttpClient<Application.Knowledge.IEmbeddingClient, Knowledge.LiteLlmEmbeddingClient>(Knowledge.LiteLlmEmbeddingClient.HttpClientName);
+        services.AddHttpClient<Application.Knowledge.IKnowledgeAnswerClient, Knowledge.LiteLlmAnswerClient>(Knowledge.LiteLlmAnswerClient.HttpClientName);
         services.AddHostedService<Knowledge.KnowledgeIndexWorker>();
     }
 
