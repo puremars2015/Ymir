@@ -1,40 +1,67 @@
 :root {
-  color-scheme: light dark;
-  /* 參考 Web-Pro 官網的深藍、淺藍與白色；所有頁面共用品牌色。 */
-  --text: #20364b;
-  --text-muted: #5f7385;
+  color-scheme: light;
+  /* 參考 AppDashboard 的鈷藍、灰白底與深色石板配色；所有頁面共用。 */
+  --text: #273447;
+  --heading: #111827;
+  --user-bubble: #315cf6;
+  --user-text: #ffffff;
+  --input: #ffffff;
+  --header: #ffffff;
+  --text-muted: #687789;
   --surface: #ffffff;
-  --surface-muted: #f0f6fb;
-  --surface-active: #e2eff9;
-  --sidebar: #f5f9fc;
-  --background: #f8fafc;
-  --border: #d7e3ee;
-  --accent: #004ea0;
-  --accent-hover: #003d7d;
-  --accent-soft: #e2eff9;
-  --focus-ring: #0085c8;
-  --card-shadow: 0 12px 36px rgb(0 78 160 / 8%);
+  --surface-muted: #f7f9fc;
+  --surface-active: #edf3ff;
+  --sidebar: #ffffff;
+  --background: #f4f7fb;
+  --border: #dbe4ef;
+  --accent: #315cf6;
+  --accent-hover: #2449d8;
+  --accent-soft: #edf3ff;
+  --focus-ring: #315cf6;
+  --card-shadow: 0 12px 28px -18px rgb(22 34 51 / 35%), 0 2px 8px -4px rgb(22 34 51 / 12%);
   --accent-contrast: #ffffff;
-  --danger: #dc2626;
+  --danger: #e05264;
+  --success: #0f9b7a;
+  --warning: #c87914;
+  --warning-soft: #fff0d7;
+  --danger-soft: #fde5ea;
+}
+
+@mixin dark-theme {
+  color-scheme: dark;
+  --text: #d8e0e7;
+  --heading: #f3f6f9;
+  --user-bubble: #6d88ff;
+  --user-text: #0e1524;
+  --input: #151b26;
+  --header: #141d2d;
+  --text-muted: #9aa8b9;
+  --surface: #182235;
+  --surface-muted: #151b26;
+  --surface-active: #1c2940;
+  --sidebar: #0d1119;
+  --background: #0e1524;
+  --border: #2b3a50;
+  --accent: #6d88ff;
+  --accent-hover: #8ea2ff;
+  --accent-soft: #1c2940;
+  --focus-ring: #6d88ff;
+  --card-shadow: 0 18px 45px -30px rgb(0 0 0 / 85%);
+  --accent-contrast: #0e1524;
+  --danger: #fb7185;
+  --success: #34d399;
+  --warning: #f4b95b;
+  --warning-soft: rgb(244 185 91 / 15%);
+  --danger-soft: rgb(251 113 133 / 15%);
+}
+
+:root[data-theme='dark'] {
+  @include dark-theme;
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --text: #e7f1fa;
-    --text-muted: #a3b8ca;
-    --surface: #142a3e;
-    --surface-muted: #1b354c;
-    --surface-active: #204461;
-    --sidebar: #102438;
-    --background: #0e1e2e;
-    --border: #365269;
-    --accent: #85c7ff;
-    --accent-hover: #addcff;
-    --accent-soft: #204461;
-    --focus-ring: #85c7ff;
-    --card-shadow: 0 12px 36px rgb(0 0 0 / 20%);
-    --accent-contrast: #0e1e2e;
-    --danger: #f87171;
+  :root:not([data-theme='light']) {
+    @include dark-theme;
   }
 }
 
@@ -57,26 +84,19 @@ code {
   font-size: 0.875em;
 }
 
-/* 對話以白底呈現，避免系統深色模式降低藍色漸層的可讀性。 */
+/* 對話區與其他頁面共用主題，包含標頭、訊息與輸入區。 */
 .chat-surface {
-  color-scheme: light;
-  --text: #111111;
-  --text-muted: #404040;
-  --surface: #ffffff;
-  --surface-muted: #f0f6fb;
-  --surface-active: #e2eff9;
-  --border: #d7e3ee;
-  --accent: #004ea0;
-  --accent-hover: #003d7d;
-  --accent-contrast: #ffffff;
-  --accent-soft: #e2eff9;
-  --focus-ring: #0085c8;
-  --danger: #dc2626;
   color: var(--text);
-  background: linear-gradient(180deg, #edf6ff 0%, #ffffff 30%, #ffffff 100%);
+  background: var(--background);
 }
 
 /* 共用元件樣式（讓各 component 的 style 保持精簡） */
+h1,
+h2,
+h3 {
+  color: var(--heading);
+}
+
 h1 {
   font-size: 1.375rem;
   margin: 0 0 1rem;
@@ -91,7 +111,7 @@ select {
   padding: 0.625rem 0.875rem;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--input);
   color: var(--text);
   font: inherit;
 }

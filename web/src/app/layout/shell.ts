@@ -20,6 +20,7 @@ import { AuthService } from '../core/auth/auth.service';
 import { NavigationStore } from '../core/navigation/navigation.store';
 import { normalizeTitle } from '../core/navigation/navigation-edits';
 import { parseActiveRoute } from './active-route';
+import { ThemeSwitcher } from '../shared/theme-switcher';
 
 type ItemKind = 'conversation' | 'project';
 
@@ -29,7 +30,14 @@ type ItemKind = 'conversation' | 'project';
  */
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, NgTemplateOutlet],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    FormsModule,
+    NgTemplateOutlet,
+    ThemeSwitcher,
+  ],
   host: {
     '(document:click)': 'closeMenu($event)',
     '(document:keydown.escape)': 'menu.set(null)',

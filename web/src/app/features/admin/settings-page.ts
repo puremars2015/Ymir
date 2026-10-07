@@ -267,13 +267,13 @@ import { TunnelSettingsCard } from './tunnel-settings-card';
       gap: 0.75rem;
     }
     .warn-text {
-      color: #b45309;
+      color: var(--warning);
     }
     .test {
       color: var(--danger);
     }
     .test.ok {
-      color: #15803d;
+      color: var(--success);
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

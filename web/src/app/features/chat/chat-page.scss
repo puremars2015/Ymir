@@ -81,7 +81,7 @@
   padding: 0.75rem 1.25rem;
   font-size: 0.9375rem;
   min-height: 1.5rem;
-  background: linear-gradient(110deg, #e2efff, #f4fbff 65%, #ffffff);
+  background: var(--header);
   border-bottom: 1px solid var(--border);
 
   .crumb {
@@ -182,9 +182,9 @@
       max-width: 80%;
       padding: 0.625rem 1rem;
       border-radius: 1.25rem;
-      background: linear-gradient(135deg, #dceeff, #b9def8);
-      color: var(--text);
-      box-shadow: 0 4px 12px rgb(0 78 160 / 12%);
+      background: var(--user-bubble);
+      color: var(--user-text);
+      box-shadow: var(--card-shadow);
       white-space: pre-wrap;
     }
   }
@@ -195,8 +195,8 @@
     padding: 1rem 1.25rem;
     border: 1px solid var(--border);
     border-radius: 1rem;
-    background: #ffffff;
-    box-shadow: 0 4px 16px rgb(0 78 160 / 4%);
+    background: var(--surface);
+    box-shadow: var(--card-shadow);
   }
 
   &.error-message .bubble {

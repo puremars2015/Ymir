@@ -265,10 +265,10 @@ import { AdminTabs } from './admin-tabs';
       border-radius: 999px;
     }
     .quota[data-level='near'] {
-      background: rgb(245 158 11 / 18%);
+      background: var(--warning-soft);
     }
     .quota[data-level='reached'] {
-      background: rgb(220 38 38 / 15%);
+      background: var(--danger-soft);
       color: var(--danger);
       font-weight: 600;
     }
