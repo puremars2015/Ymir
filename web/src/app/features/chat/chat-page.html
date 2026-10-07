@@ -101,17 +101,14 @@
       }
       <li class="turn assistant live" [attr.data-status]="turn.view.status">
         <div class="bubble">
-          @if (turn.view.statusText) {
+          @if (working()) {
+            <p class="status" role="status">正在工作中......</p>
+          } @else if (turn.view.statusText) {
             <p class="status">{{ turn.view.statusText }}</p>
-          }
-          @for (tool of turn.view.tools; track tool.callId) {
-            <p class="tool" [attr.data-state]="tool.state">
-              <span class="tool-name">{{ tool.tool }}</span> <code>{{ tool.summary }}</code>
-            </p>
           }
           @if (turn.view.text | assistantText: true; as text) {
             <app-markdown [text]="text" />
-          } @else if (!turn.view.statusText && !turn.view.tools.length) {
+          } @else if (!turn.view.statusText && !working()) {
             <p class="status typing" aria-label="Agent 思考中">●●●</p>
           }
         </div>

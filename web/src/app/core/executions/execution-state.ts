@@ -28,6 +28,11 @@ export const initialExecutionView = (): ExecutionView => ({
   error: null,
 });
 
+/** 多個工具重疊時仍只顯示一個工作提示；終止事件優先，不保留未結束工具的提示。 */
+export function hasRunningTools(view: ExecutionView): boolean {
+  return view.status === 'running' && view.tools.some((tool) => tool.state === 'running');
+}
+
 /** 純函式：套用一個事件並回傳新的狀態（不修改輸入）。 */
 export function applyExecutionEvent(view: ExecutionView, event: ExecutionEvent): ExecutionView {
   switch (event.type) {

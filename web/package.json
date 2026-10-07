@@ -13,6 +13,7 @@
     "e2e:auth": "node e2e/auth-flow.mjs",
     "e2e:make": "node e2e/make-flow.mjs",
     "e2e:help": "node e2e/help-flow.mjs",
+    "e2e:tool-progress": "node e2e/tool-progress-flow.mjs",
     "e2e:admin": "node e2e/admin-flow.mjs",
     "e2e:artifacts": "node e2e/artifacts-flow.mjs",
     "e2e:sidebar": "node e2e/sidebar-flow.mjs",
