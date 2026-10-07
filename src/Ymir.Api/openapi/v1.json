@@ -1541,6 +1541,8 @@
         "required": [
           "days",
           "dailyExecutionLimit",
+          "modelUsageAvailable",
+          "monthlyBudgetUsd",
           "users"
         ],
         "type": "object",
@@ -1560,6 +1562,17 @@
               "string"
             ],
             "format": "int32"
+          },
+          "modelUsageAvailable": {
+            "type": "boolean"
+          },
+          "monthlyBudgetUsd": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           },
           "users": {
             "type": "array",
@@ -2404,7 +2417,8 @@
           "idleTimeoutMinutes",
           "executionTimeoutMinutes",
           "maxPendingExecutionsPerUser",
-          "dailyExecutionLimit"
+          "dailyExecutionLimit",
+          "monthlyBudgetUsd"
         ],
         "type": "object",
         "properties": {
@@ -2439,6 +2453,14 @@
               "string"
             ],
             "format": "int32"
+          },
+          "monthlyBudgetUsd": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
           }
         }
       },
@@ -2643,6 +2665,15 @@
               "string"
             ],
             "format": "int32"
+          },
+          "monthlyBudgetUsd": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double",
+            "default": 0
           }
         }
       },
@@ -2925,7 +2956,14 @@
           "runMinutes",
           "last24Hours",
           "lastExecutionAt",
-          "runtimeStatus"
+          "runtimeStatus",
+          "spendUsd",
+          "promptTokens",
+          "completionTokens",
+          "modelRequests",
+          "budgetSpendUsd",
+          "budgetUsd",
+          "budgetResetAt"
         ],
         "type": "object",
         "properties": {
@@ -3000,6 +3038,67 @@
                 "$ref": "#/components/schemas/RuntimeStatus"
               }
             ]
+          },
+          "spendUsd": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "promptTokens": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "completionTokens": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "modelRequests": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "budgetSpendUsd": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "budgetUsd": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "budgetResetAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },

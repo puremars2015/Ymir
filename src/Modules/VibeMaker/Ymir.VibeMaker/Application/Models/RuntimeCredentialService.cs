@@ -18,7 +18,8 @@ public sealed class RuntimeCredentialService(
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _locks = new();
 
     /// <exception cref="ModelCredentialException">無法取得 key。</exception>
-    public async Task<RuntimeModelCredential> GetAsync(Guid userId, Guid runtimeId, CancellationToken cancellationToken)
+    /// <param name="monthlyBudget">目前執行政策的每月預算（ADR-0011）；發新 key 時一併套用到模型入口的使用者。</param>
+    public async Task<RuntimeModelCredential> GetAsync(Guid userId, Guid runtimeId, CancellationToken cancellationToken, decimal? monthlyBudget = null)
     {
         var settings = options.Value;
         if (TryGetValid(userId, settings) is { } cached)
@@ -37,7 +38,7 @@ public sealed class RuntimeCredentialService(
             }
 
             var issued = await gateway.IssueRuntimeCredentialAsync(
-                new RuntimeCredentialRequest(userId, runtimeId, settings.AllowedModels.ToList(), settings.KeyLifetime, settings.MaxBudget),
+                new RuntimeCredentialRequest(userId, runtimeId, settings.AllowedModels.ToList(), settings.KeyLifetime, settings.MaxBudget, monthlyBudget),
                 cancellationToken).ConfigureAwait(false);
 
             if (_credentials.TryGetValue(userId, out var previous))

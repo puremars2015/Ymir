@@ -4,6 +4,7 @@ using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Users;
 using Ymir.VibeMaker.Application.Admin;
+using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Domain;
 
@@ -40,7 +41,7 @@ internal static class AdminRuntimeEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var settings = new RuntimePolicySettings(request.IdleTimeoutMinutes, request.ExecutionTimeoutMinutes, request.MaxPendingExecutionsPerUser, request.DailyExecutionLimit);
+        var settings = new RuntimePolicySettings(request.IdleTimeoutMinutes, request.ExecutionTimeoutMinutes, request.MaxPendingExecutionsPerUser, request.DailyExecutionLimit, request.MonthlyBudgetUsd);
         if (settings.Validate() is { } problem)
         {
             return ApiProblem.Create(StatusCodes.Status400BadRequest, "VALIDATION_FAILED", problem);
@@ -72,7 +73,9 @@ internal static class AdminRuntimeEndpoints
         int? days,
         AdminStatsService stats,
         RuntimePolicyService policies,
+        IModelGateway models,
         IUserDirectory users,
+        TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         var range = days ?? 7;
@@ -81,10 +84,21 @@ internal static class AdminRuntimeEndpoints
             return ApiProblem.Create(StatusCodes.Status400BadRequest, "VALIDATION_FAILED", $"days 必須在 1～{MaxUsageDays} 之間。");
         }
 
-        var usage = await stats.GetUsageAsync(range, cancellationToken);
+        var usage = (await stats.GetUsageAsync(range, cancellationToken)).ToDictionary(u => u.UserId);
         var policy = await policies.GetAsync(cancellationToken);
+
+        // 模型用量來自 LiteLLM（ADR-0004、ADR-0011）：只用過模型、這段期間沒有 execution 的使用者也列出。
+        IReadOnlyDictionary<Guid, ModelUserUsage> modelUsage = new Dictionary<Guid, ModelUserUsage>();
+        if (models.SupportsUsage)
+        {
+            var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
+            var userIds = usage.Keys.Union(await stats.ListRuntimeUserIdsAsync(cancellationToken)).ToList();
+            modelUsage = await models.GetUsageAsync(userIds, today.AddDays(-(range - 1)), today, cancellationToken);
+        }
+
+        var rows = usage.Keys.Union(modelUsage.Where(m => m.Value.Requests > 0 || m.Value.Spend > 0).Select(m => m.Key)).ToList();
         var names = new Dictionary<Guid, string>();
-        foreach (var userId in usage.Select(u => u.UserId).Distinct())
+        foreach (var userId in rows)
         {
             if (await users.FindAsync(userId, cancellationToken) is { } user)
             {
@@ -95,17 +109,35 @@ internal static class AdminRuntimeEndpoints
         return TypedResults.Ok(new AdminUsageResponse(
             range,
             policy.DailyExecutionLimit,
-            [.. usage.Select(u => new UserUsageResponse(
-                u.UserId,
-                names.GetValueOrDefault(u.UserId) ?? "（已刪除的使用者）",
-                u.Executions,
-                u.Completed,
-                u.Failed,
-                u.Cancelled,
-                Math.Round(u.RunTime.TotalMinutes, 2),
-                u.Last24Hours,
-                u.LastExecutionAt,
-                u.RuntimeStatus))]));
+            models.SupportsUsage,
+            policy.MonthlyBudgetUsd,
+            [.. rows
+                .Select(userId =>
+                {
+                    var u = usage.GetValueOrDefault(userId);
+                    var m = modelUsage.GetValueOrDefault(userId);
+                    return new UserUsageResponse(
+                        userId,
+                        names.GetValueOrDefault(userId) ?? "（已刪除的使用者）",
+                        u?.Executions ?? 0,
+                        u?.Completed ?? 0,
+                        u?.Failed ?? 0,
+                        u?.Cancelled ?? 0,
+                        Math.Round(u?.RunTime.TotalMinutes ?? 0, 2),
+                        u?.Last24Hours ?? 0,
+                        u?.LastExecutionAt,
+                        u?.RuntimeStatus,
+                        m?.Spend,
+                        m?.PromptTokens,
+                        m?.CompletionTokens,
+                        m?.Requests,
+                        m?.Budget?.Spend,
+                        m?.Budget?.MaxBudget,
+                        m?.Budget?.ResetAt);
+                })
+                .OrderByDescending(r => r.Executions)
+                .ThenByDescending(r => r.SpendUsd ?? 0)
+                .ThenByDescending(r => r.LastExecutionAt)]));
     }
 
     private static async Task<RuntimePolicyResponse> ToResponseAsync(RuntimePolicyState state, IUserDirectory users, CancellationToken cancellationToken)
@@ -125,16 +157,19 @@ internal static class AdminRuntimeEndpoints
         policy.IdleTimeout.TotalMinutes,
         policy.ExecutionTimeout.TotalMinutes,
         policy.MaxPendingExecutionsPerUser,
-        policy.DailyExecutionLimit);
+        policy.DailyExecutionLimit,
+        policy.MonthlyBudgetUsd);
 }
 
 /// <param name="IdleTimeoutMinutes">0 表示不自動停止。</param>
 /// <param name="DailyExecutionLimit">0 表示不限制。</param>
-public sealed record SaveRuntimePolicyRequest(int IdleTimeoutMinutes, int ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit);
+/// <param name="MonthlyBudgetUsd">每人每月模型預算（美元），由 LiteLLM 強制；0 表示不限制。</param>
+public sealed record SaveRuntimePolicyRequest(int IdleTimeoutMinutes, int ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd = 0);
 
 /// <param name="IdleTimeoutMinutes">0 表示不自動停止。</param>
 /// <param name="DailyExecutionLimit">0 表示不限制。</param>
-public sealed record RuntimePolicyValues(double IdleTimeoutMinutes, double ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit);
+/// <param name="MonthlyBudgetUsd">0 表示不限制。</param>
+public sealed record RuntimePolicyValues(double IdleTimeoutMinutes, double ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd);
 
 /// <param name="Effective">目前生效的值。</param>
 /// <param name="Deployment">部署設定（.env）的值；還原後使用。</param>
@@ -146,10 +181,15 @@ public sealed record RuntimePolicyResponse(
     string? UpdatedByName);
 
 /// <param name="DailyExecutionLimit">目前的每日上限（0 表示不限制），用來標示接近上限的使用者。</param>
-public sealed record AdminUsageResponse(int Days, int DailyExecutionLimit, IReadOnlyList<UserUsageResponse> Users);
+/// <param name="ModelUsageAvailable">是否連接 LiteLLM；false 時沒有費用、token 與預算資料。</param>
+/// <param name="MonthlyBudgetUsd">目前的每人每月模型預算（0 表示不限制）。</param>
+public sealed record AdminUsageResponse(int Days, int DailyExecutionLimit, bool ModelUsageAvailable, decimal MonthlyBudgetUsd, IReadOnlyList<UserUsageResponse> Users);
 
 /// <param name="RunMinutes">Agent 實際執行時間（開始到結束）的總和。</param>
 /// <param name="Last24Hours">過去 24 小時的執行數（與每日上限比較）。</param>
+/// <param name="SpendUsd">期間內的模型費用（LiteLLM；依設定的單價計算）。null 表示沒有資料或無法取得。</param>
+/// <param name="BudgetSpendUsd">本期（30 天預算週期）已花費。</param>
+/// <param name="BudgetUsd">LiteLLM 上這位使用者的預算上限。</param>
 public sealed record UserUsageResponse(
     Guid UserId,
     string DisplayName,
@@ -160,4 +200,11 @@ public sealed record UserUsageResponse(
     double RunMinutes,
     int Last24Hours,
     DateTimeOffset? LastExecutionAt,
-    RuntimeStatus? RuntimeStatus);
+    RuntimeStatus? RuntimeStatus,
+    decimal? SpendUsd,
+    long? PromptTokens,
+    long? CompletionTokens,
+    long? ModelRequests,
+    decimal? BudgetSpendUsd,
+    decimal? BudgetUsd,
+    DateTimeOffset? BudgetResetAt);

@@ -607,6 +607,9 @@ export interface components {
       days: number | string;
       /** Format: int32 */
       dailyExecutionLimit: number | string;
+      modelUsageAvailable: boolean;
+      /** Format: double */
+      monthlyBudgetUsd: number | string;
       users: components['schemas']['UserUsageResponse'][];
     };
     AdminUserResponse: {
@@ -816,6 +819,8 @@ export interface components {
       maxPendingExecutionsPerUser: number | string;
       /** Format: int32 */
       dailyExecutionLimit: number | string;
+      /** Format: double */
+      monthlyBudgetUsd: number | string;
     };
     /** @enum {unknown} */
     RuntimeStatus: 'NotCreated' | 'Created' | 'Running' | 'Busy' | 'Stopped' | 'Error' | 'Deleted';
@@ -861,6 +866,11 @@ export interface components {
       maxPendingExecutionsPerUser: number | string;
       /** Format: int32 */
       dailyExecutionLimit: number | string;
+      /**
+       * Format: double
+       * @default 0
+       */
+      monthlyBudgetUsd: number | string;
     };
     SendMessageRequest: {
       content: string;
@@ -945,6 +955,20 @@ export interface components {
       /** Format: date-time */
       lastExecutionAt: null | string;
       runtimeStatus: null | components['schemas']['RuntimeStatus'];
+      /** Format: double */
+      spendUsd: null | number | string;
+      /** Format: int64 */
+      promptTokens: null | number | string;
+      /** Format: int64 */
+      completionTokens: null | number | string;
+      /** Format: int64 */
+      modelRequests: null | number | string;
+      /** Format: double */
+      budgetSpendUsd: null | number | string;
+      /** Format: double */
+      budgetUsd: null | number | string;
+      /** Format: date-time */
+      budgetResetAt: null | string;
     };
     WorkspaceFileResponse: {
       path: string;

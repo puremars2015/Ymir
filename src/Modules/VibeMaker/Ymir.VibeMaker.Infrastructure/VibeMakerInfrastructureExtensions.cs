@@ -60,6 +60,11 @@ public static class VibeMakerInfrastructureExtensions
                 options.DailyExecutionLimit = daily;
             }
 
+            if (configuration.GetSection(ModelCredentialOptions.SectionName).GetValue<decimal?>(nameof(ExecutionOptions.MonthlyBudgetUsd)) is >= 0 and var budget)
+            {
+                options.MonthlyBudgetUsd = budget;
+            }
+
             if (runtime.GetValue<double?>(nameof(RuntimeOptions.IdleCheckIntervalSeconds)) is > 0 and var interval)
             {
                 options.IdleCheckInterval = TimeSpan.FromSeconds(interval);

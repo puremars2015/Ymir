@@ -72,7 +72,7 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
         {
             var saved = await SavePolicyAsync(admin, new SaveRuntimePolicyRequest(45, 20, 3, 100));
             Assert.Equal(OidcSettingsSource.Database, saved.Source);
-            Assert.Equal(new RuntimePolicyValues(45, 20, 3, 100), saved.Effective);
+            Assert.Equal(new RuntimePolicyValues(45, 20, 3, 100, 0), saved.Effective);
             Assert.Equal(0.001, saved.Deployment.IdleTimeoutMinutes, 6);
             Assert.NotNull(saved.UpdatedByName);
 
@@ -194,6 +194,8 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
 
         var row = Assert.Single(usage!.Users, u => u.UserId == userId);
         Assert.Equal(7, usage.Days);
+        Assert.False(usage.ModelUsageAvailable); // 沒有連接 LiteLLM
+        Assert.Null(row.SpendUsd);
         Assert.Equal(2, row.Executions);
         Assert.Equal(2, row.Completed);
         Assert.Equal(2, row.Last24Hours);

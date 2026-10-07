@@ -23,6 +23,7 @@ public sealed class ExecutionService(
     ModelCatalog models,
     MakeTopicService makeTopics,
     Runtime.RuntimePolicyService policies,
+    ModelBudgetGuard budgets,
     TimeProvider timeProvider)
 {
     public static string EventStreamUrl(Guid executionId) => $"/api/executions/{executionId}/events";
@@ -242,6 +243,13 @@ public sealed class ExecutionService(
             {
                 return SubmitMessageResult.QuotaExceeded($"已達每日執行次數上限（24 小時內 {policy.DailyExecutionLimit} 次），請稍後再試或聯絡管理員。");
             }
+        }
+
+        if (await budgets.FindExceededAsync(userId, policy.MonthlyBudget, cancellationToken).ConfigureAwait(false) is { } budget)
+        {
+            var reset = budget.ResetAt is { } at ? $"，將於 {at.ToLocalTime():MM/dd} 重置" : string.Empty;
+            return SubmitMessageResult.QuotaExceeded(
+                string.Create(System.Globalization.CultureInfo.InvariantCulture, $"本月模型預算已用完（US${budget.MaxBudget:0.##}{reset}），請聯絡管理員。"));
         }
 
         return null;

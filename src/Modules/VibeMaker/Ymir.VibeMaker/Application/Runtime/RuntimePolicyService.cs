@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -8,15 +9,22 @@ using Ymir.VibeMaker.Application.Executions;
 namespace Ymir.VibeMaker.Application.Runtime;
 
 /// <summary>目前生效的執行政策（ADR-0011）。<see cref="TimeSpan.Zero"/> / 0 表示不限制。</summary>
-public sealed record RuntimePolicy(TimeSpan IdleTimeout, TimeSpan ExecutionTimeout, int MaxPendingExecutionsPerUser, int DailyExecutionLimit);
+/// <param name="MonthlyBudgetUsd">每人每月模型預算（美元），由 LiteLLM 強制（ADR-0004）；0 表示不限制。</param>
+public sealed record RuntimePolicy(TimeSpan IdleTimeout, TimeSpan ExecutionTimeout, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd = 0)
+{
+    /// <summary>給模型入口的預算；0 → null（不限制）。</summary>
+    public decimal? MonthlyBudget => MonthlyBudgetUsd > 0 ? MonthlyBudgetUsd : null;
+}
 
-/// <summary>管理介面編輯的值（分鐘 / 次數）；存在 <c>platform.system_settings</c>（ADR-0010），不含機密。</summary>
-public sealed record RuntimePolicySettings(int IdleTimeoutMinutes, int ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit)
+/// <summary>管理介面編輯的值（分鐘 / 次數 / 美元）；存在 <c>platform.system_settings</c>（ADR-0010），不含機密。</summary>
+/// <param name="MonthlyBudgetUsd">預設 0：較早儲存、沒有這個欄位的設定仍然有效（視為不限制）。</param>
+public sealed record RuntimePolicySettings(int IdleTimeoutMinutes, int ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd = 0)
 {
     public const int MaxIdleTimeoutMinutes = 24 * 60;
     public const int MaxExecutionTimeoutMinutes = 240;
     public const int MaxPendingLimit = 50;
     public const int MaxDailyLimit = 10_000;
+    public const decimal MaxMonthlyBudgetUsd = 100_000;
 
     /// <summary>不合法時回傳給使用者看的訊息。</summary>
     public string? Validate() =>
@@ -24,13 +32,16 @@ public sealed record RuntimePolicySettings(int IdleTimeoutMinutes, int Execution
         : ExecutionTimeoutMinutes is < 1 or > MaxExecutionTimeoutMinutes ? $"單次執行上限必須在 1～{MaxExecutionTimeoutMinutes} 分鐘之間。"
         : MaxPendingExecutionsPerUser is < 1 or > MaxPendingLimit ? $"每人同時排隊的工作數必須在 1～{MaxPendingLimit} 之間。"
         : DailyExecutionLimit is < 0 or > MaxDailyLimit ? $"每人每日執行次數必須在 0～{MaxDailyLimit} 之間（0 表示不限制）。"
+        : MonthlyBudgetUsd is < 0 or > MaxMonthlyBudgetUsd || decimal.Round(MonthlyBudgetUsd, 2) != MonthlyBudgetUsd
+            ? $"每人每月模型預算必須在 0～{MaxMonthlyBudgetUsd:0} 美元之間，最多兩位小數（0 表示不限制）。"
         : null;
 
     public RuntimePolicy ToPolicy() => new(
         TimeSpan.FromMinutes(IdleTimeoutMinutes),
         TimeSpan.FromMinutes(ExecutionTimeoutMinutes),
         MaxPendingExecutionsPerUser,
-        DailyExecutionLimit);
+        DailyExecutionLimit,
+        MonthlyBudgetUsd);
 }
 
 /// <param name="Stored">管理介面儲存的值（沒有則為 null，使用部署設定）。</param>
@@ -61,7 +72,8 @@ public sealed partial class RuntimePolicyService(
         deployment.Value.IdleTimeout,
         deployment.Value.Timeout,
         deployment.Value.MaxPendingExecutionsPerUser,
-        deployment.Value.DailyExecutionLimit);
+        deployment.Value.DailyExecutionLimit,
+        deployment.Value.MonthlyBudgetUsd);
 
     public async Task<RuntimePolicy> GetAsync(CancellationToken cancellationToken) =>
         (await GetStateAsync(cancellationToken).ConfigureAwait(false)).Effective;
@@ -115,6 +127,7 @@ public sealed partial class RuntimePolicyService(
             throw new ArgumentException(problem, nameof(settings));
         }
 
+        var before = (await RefreshAsync(cancellationToken).ConfigureAwait(false)).Effective;
         var scope = scopeFactory.CreateAsyncScope();
         await using (scope.ConfigureAwait(false))
         {
@@ -122,18 +135,63 @@ public sealed partial class RuntimePolicyService(
                 .SetAsync(Key, JsonSerializer.Serialize(settings, JsonOptions), updatedBy, cancellationToken).ConfigureAwait(false);
         }
 
-        return await RefreshAsync(cancellationToken).ConfigureAwait(false);
+        var state = await RefreshAsync(cancellationToken).ConfigureAwait(false);
+        await PropagateBudgetAsync(before, state.Effective, cancellationToken).ConfigureAwait(false);
+        return state;
     }
 
     public async Task<RuntimePolicyState> ResetAsync(CancellationToken cancellationToken)
     {
+        var before = (await RefreshAsync(cancellationToken).ConfigureAwait(false)).Effective;
         var scope = scopeFactory.CreateAsyncScope();
         await using (scope.ConfigureAwait(false))
         {
             await scope.ServiceProvider.GetRequiredService<ISystemSettingsStore>().DeleteAsync([Key], cancellationToken).ConfigureAwait(false);
         }
 
-        return await RefreshAsync(cancellationToken).ConfigureAwait(false);
+        var state = await RefreshAsync(cancellationToken).ConfigureAwait(false);
+        await PropagateBudgetAsync(before, state.Effective, cancellationToken).ConfigureAwait(false);
+        return state;
+    }
+
+    /// <summary>
+    /// 預算有變更時，套用到所有用過 runtime 的使用者（LiteLLM 的使用者預算）。best effort：失敗只記錄，
+    /// 下一次發 key 時也會再套用一次（<see cref="Models.RuntimeCredentialService"/>）。
+    /// </summary>
+    private async Task PropagateBudgetAsync(RuntimePolicy before, RuntimePolicy after, CancellationToken cancellationToken)
+    {
+        if (before.MonthlyBudgetUsd == after.MonthlyBudgetUsd)
+        {
+            return;
+        }
+
+        var scope = scopeFactory.CreateAsyncScope();
+        await using (scope.ConfigureAwait(false))
+        {
+            var gateway = scope.ServiceProvider.GetRequiredService<Models.IModelGateway>();
+            if (!gateway.SupportsUsage)
+            {
+                return;
+            }
+
+            var userIds = await scope.ServiceProvider.GetRequiredService<Persistence.IVibeMakerDbContext>().AgentRuntimes
+                .Select(r => r.UserId).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
+            var failed = 0;
+            foreach (var userId in userIds)
+            {
+                try
+                {
+                    await gateway.ApplyUserBudgetAsync(userId, after.MonthlyBudget, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Models.ModelCredentialException ex)
+                {
+                    failed++;
+                    LogBudgetApplyFailed(logger, userId, ex);
+                }
+            }
+
+            LogBudgetApplied(logger, userIds.Count - failed, userIds.Count, after.MonthlyBudgetUsd);
+        }
     }
 
     public void Dispose() => _lock.Dispose();
@@ -150,6 +208,12 @@ public sealed partial class RuntimePolicyService(
             return null;
         }
     }
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to apply the monthly model budget to user {UserId}; it will be applied with the next key")]
+    private static partial void LogBudgetApplyFailed(ILogger logger, Guid userId, Exception exception);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Applied monthly model budget {Budget} to {Applied}/{Total} users")]
+    private static partial void LogBudgetApplied(ILogger logger, int applied, int total, decimal budget);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to load the runtime policy setting; keeping the previous value")]
     private static partial void LogLoadFailed(ILogger logger, Exception exception);
