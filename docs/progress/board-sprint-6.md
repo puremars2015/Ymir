@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-08 03:00 ・ 狀態：**🚧 進行中（插單：OneDrive 同步 O2）**
+> 最後更新：2026-10-08 04:00 ・ 狀態：**🚧 進行中（OneDrive 首版完成，接著恢復 A2 MCP Gateway）**
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -42,7 +42,7 @@
 | A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | **暫停**：插單 OneDrive 完成後繼續 |
 | O0 | **插單** OneDrive connector ADR（[ADR-0013](../adr/0013-onedrive-connector.md)） | ✅ | — |
 | O1 | OneDrive 連結 / 解除連結：<br>• `onedrive` 能力<br>• 授權碼 + PKCE 連結流程、refresh token 加密保存<br>• 根資料夾、設定頁<br>• FakeGraph 測試替身 | ✅ | — |
-| O2 | OneDrive 同步：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | 🚧 | — |
+| O2 | OneDrive 同步：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | ✅ | — |
 | R0 | RAG ADR（ADR-0014）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite（sqlite-vec）部署、權限 | ⏳ | **❓待決定**：Embedding 模型與硬體、文件格式與容量、外部回答模型的資料政策 |
 | R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ⏳ | R0 經使用者確認 |
 | R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ⏳ | R1 |
@@ -70,6 +70,33 @@
 
 ## 💬 留言區
 
+### #012 · O2 完成：OneDrive 同步
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 04:00 · `✅完成`
+
+- **做了什麼**（ADR-0013 §4，指南 `docs/guides/onedrive.md`）：
+  - **執行前**：`ExecutionRunner` 在 Agent 啟動前、持有使用者鎖時，從 OneDrive 下載雲端的變更，並送出「正在從 OneDrive 同步」。下載失敗只送狀態事件，Agent 照常使用本機檔案執行。
+  - **執行後**：上傳工作寫進 `vibemaker.onedrive_sync_scopes`，服務重啟後會繼續。`OneDriveSyncWorker` 取得同一把使用者鎖後先下載、再上傳。失敗時依 1、5、15、60 分鐘重試，共 5 次；授權失效就停止，並請使用者重新連結。
+  - **比對與衝突**：
+    - 雲端以 eTag 比對，上傳帶 If-Match；本機以大小加修改時間比對。
+    - 兩邊都改過時，原檔名保留雲端版本，本機版本另存「(OneDrive 衝突 時間)」副本，雲端和本機都會有兩份。
+    - 不同步刪除。隱藏檔、node_modules、超過大小上限、名稱不符合 OneDrive 規則的檔案都略過。`deliverables/` 只上傳、不下載。大於 4 MB 的檔案用 upload session。
+  - **檔案讀寫**：一律經 runtime 內的 reader / writer，Agent 拿不到 Graph token。writer 改成可以寫入工作目錄根部的檔案。
+  - **API**：
+    - `GET /api/conversations/{id}/onedrive`、`POST .../onedrive/sync`，未就緒時回 409 `ONEDRIVE_NOT_READY`。
+    - 兩者都驗證擁有者，並加入授權矩陣。授權矩陣新增 `OwnerStatusOverrides`：擁有者沒有連結 OneDrive 時回 409，仍可證明請求本身正確。
+  - **前端**：檔案面板新增「雲端保存狀態」（`app-onedrive-sync`），可以立即同步或重試，與 Agent 任務結果分開顯示。
+  - **Fake Graph**：支援 conflictBehavior（fail / rename / replace）、upload session 的前置條件檢查、children 分頁。
+- **驗證**：
+  - `dotnet build`（0 警告）、`dotnet format --verify-no-changes`。
+  - `dotnet test --solution`：645 / 645 通過。新增 `OneDriveSyncTests` 6 個：上傳與下載、衝突保留兩份、大檔 upload session 與專案資料夾、授權失效、未開放、不外洩 token。
+  - 前端 lint、131 個測試、build 都通過。
+  - `e2e:onedrive`（Fake OIDC + Fake Graph）：管理員開放 → 連結 → 設定資料夾 → 送訊息後檔案面板顯示「已同步到 OneDrive」→ 立即同步 → 解除連結，全部通過。
+- **未驗證、待使用者環境確認**：真實 Entra 的 `Files.ReadWrite` 同意與 callback redirect URI、Microsoft Graph / OneDrive for Business 的實際行為（eTag 變動、upload session、節流）。
+- **已知限制**：以大小加修改時間判斷本機變更。若換根資料夾後又切回原本的資料夾，兩邊已存在的同名檔案會各產生一份衝突副本。
+- **下一步**：恢復 A2（MCP Gateway）。
+
+---
 ### #011 · AppDashboard 側欄清單與漢堡收合
 
 > 👤 **Codex（AI）** · 🕒 2026-10-07 17:15 · `✅完成`
