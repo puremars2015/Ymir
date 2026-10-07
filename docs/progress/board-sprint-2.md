@@ -54,6 +54,7 @@
 | LiteLLM 用量與每人每月預算（費用、token、預算由 LiteLLM 強制） | ✅ | 見 [#031](#031--接上-litellm模型用量與每人每月預算)；真正的 LiteLLM 回應格式**未驗證、待使用者環境確認**（步驟見 deploy/litellm/README.md） |
 | Sprint 5 驗收計畫（交給 Codex 執行） | 📝 | 計畫見 [sprint5-acceptance-plan.md](../planning/sprint5-acceptance-plan.md)，見 [#033](#033--sprint-5驗收計畫交給-codex與強化提案) |
 | Sprint 5 強化（Claude）：稽核補齊、監控指標、安全標頭、健康檢查、保存期限與備份 | ✅ | 使用者選 1、2、3、6、7，見 [#034](#034--sprint-5-強化稽核監控安全標頭健康檢查保存期限)；其餘（rate limit、CI 掃描、對外網路、壓測）待定 |
+| Agent 擴充能力（管理員管制的使用者自建 skill / MCP；開發人員維護的平台 MCP：EIP / MES / embedding） | 📝 | 只寫了 ADR 草案，尚未實作；見 [#036](#036--agent-擴充能力adr-0012-草案) 與 [ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)，等使用者回覆待決定事項 |
 | 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
@@ -62,6 +63,35 @@
 ---
 
 ## 💬 留言區
+
+### #036 · Agent 擴充能力：ADR-0012 草案
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 20:30 · `❓待決定`
+
+使用者問「使用者能不能透過 Agent 自己新增 connector / addon / skill」。查證結果：**目前不能**（Ymir 啟動 Pi 時沒有載入任何擴充設定；SA §3 排除 MCP、SA §22 列為後續）。使用者接著提出兩個目標，已寫成 [ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)（狀態：提議中，**只有文件，沒有改任何程式**）：
+
+1. **管理員管制、成員自建**：預設全部關閉；管理員設全域預設與每人覆寫；在啟動 Pi 時由伺服器端強制（`--no-skills` 等），不靠前端隱藏。第一階段做 `skills` 與 `mcp`，可執行的 `extensions` 暫不開放。
+2. **平台 MCP 只由開發人員建置**：服務目錄放版控（`deploy/mcp/servers.json`），管理員只能開關與授權、不能新增服務；Agent 只能經 MCP Gateway 呼叫，拿每人專屬的短期 token，Agent container 內沒有任何平台憑證。
+
+查證過程發現：Pi 的使用者層目錄 `/agent-state/pi-agent` 本來就是 Agent 可寫的，所以今天 Agent 已經可能自己放 skill 或 `mcp.json`，只是沒有政策也沒有稽核；ADR-0012 落地才會有控制。
+
+**驗證**：只讀了 Pi 1.0.0 隨附文件與現有程式碼，沒有實際跑 Pi 載入 skill / MCP。ADR 裡列了「待驗證項目」，第一步要用 spike 實測（尤其是 Pi 能否不讀使用者層 `mcp.json`、平台設定能否放在 Agent 不可寫的位置）。
+
+**❓待決定**（詳見 ADR-0012 最後一節）：
+
+1. 權限粒度：全域預設 + 每人覆寫就夠，還是也要角色 / 群組？
+2. `mcp` 能力第一階段就開放，還是先只開 `skills`？
+3. Gateway 與 API 同程序，或獨立服務？（建議獨立）
+4. Agent container 的 egress 要不要先收斂？（開發計畫 §8）
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #035 · RAG 知識庫後續計畫
 
