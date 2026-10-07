@@ -8,7 +8,7 @@ describe('applyExecutionEvent', () => {
   it('accumulates text and tracks tool calls until completion', () => {
     const view = run([
       { type: 'execution.started', data: { executionId: 'e1' } },
-      { type: 'status', data: { text: '正在準備 Runtime' } },
+      { type: 'status', data: { text: '正在準備回覆......' } },
       { type: 'assistant.delta', data: { text: '我來建立檔案。' } },
       { type: 'tool.started', data: { tool: 'bash', callId: 'c1', summary: 'npm install' } },
       { type: 'tool.completed', data: { callId: 'c1', success: true } },

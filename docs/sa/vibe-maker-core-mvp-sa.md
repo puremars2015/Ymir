@@ -355,7 +355,7 @@ MVP 建議 SSE 用於單向 Agent streaming；控制命令（send/cancel）走 R
 | assistant.delta | LLM/Agent 文字增量 | {"text":"正在建立"} |
 | tool.started | 工具開始 | {"tool":"shell","callId":"...","summary":"npm install"} |
 | tool.completed | 工具完成 | {"callId":"...","success":true} |
-| status | 非文字狀態 | {"text":"正在準備 Runtime"} |
+| status | 非文字狀態 | {"text":"正在準備回覆......"} |
 | execution.completed | 執行完成 | {"messageId":"..."} |
 | execution.failed | 執行失敗 | {"code":"AGENT_RUNTIME_ERROR","message":"..."} |
 | execution.cancelled | 使用者中止 | {"executionId":"..."} |

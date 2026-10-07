@@ -18,7 +18,7 @@ internal sealed class ScriptedAgentHarness : IAgentHarness
         AgentEvent[] script =
         [
             new AgentStarted(),
-            new AgentStatus("（示範模式）正在準備 Runtime"),
+            new AgentStatus("（示範模式）正在準備回覆......"),
             new AgentTextDelta("收到你的訊息："),
             new AgentTextDelta(request.Prompt),
             new AgentToolStarted("bash", "demo-call-1", "ls -la"),
