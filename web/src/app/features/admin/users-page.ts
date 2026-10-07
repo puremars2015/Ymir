@@ -489,7 +489,12 @@ export class UsersPage implements OnInit {
       ({ state, policy }) =>
         this.extensions.set({
           user,
-          draft: { skills: state.skills, mcp: state.mcp, internet: state.internet },
+          draft: {
+            skills: state.skills,
+            mcp: state.mcp,
+            internet: state.internet,
+            oneDrive: state.oneDrive,
+          },
           defaults: policy.defaults,
         }),
     );

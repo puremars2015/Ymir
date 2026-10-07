@@ -1490,6 +1490,67 @@
         }
       }
     },
+    "/api/connectors/onedrive": {
+      "get": {
+        "tags": [
+          "Connectors"
+        ],
+        "operationId": "GetOneDriveStatus",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OneDriveStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Connectors"
+        ],
+        "operationId": "DisconnectOneDrive",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OneDriveStatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/connectors/onedrive/root": {
+      "put": {
+        "tags": [
+          "Connectors"
+        ],
+        "operationId": "SetOneDriveRoot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOneDriveRootRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/admin/settings/oidc": {
       "get": {
         "tags": [
@@ -2537,7 +2598,8 @@
         "required": [
           "skills",
           "mcp",
-          "internet"
+          "internet",
+          "oneDrive"
         ],
         "type": "object",
         "properties": {
@@ -2548,6 +2610,9 @@
             "type": "boolean"
           },
           "internet": {
+            "type": "boolean"
+          },
+          "oneDrive": {
             "type": "boolean"
           }
         }
@@ -2781,6 +2846,7 @@
           "skillsAllowed",
           "mcpAllowed",
           "internetAllowed",
+          "oneDriveAllowed",
           "inventoryAvailable",
           "skills",
           "mcpServers"
@@ -2794,6 +2860,9 @@
             "type": "boolean"
           },
           "internetAllowed": {
+            "type": "boolean"
+          },
+          "oneDriveAllowed": {
             "type": "boolean"
           },
           "inventoryAvailable": {
@@ -2916,6 +2985,61 @@
           },
           "message": {
             "type": "string"
+          }
+        }
+      },
+      "OneDriveLinkState": {
+        "enum": [
+          "NotConnected",
+          "Connected",
+          "NeedsReauth"
+        ]
+      },
+      "OneDriveStatusResponse": {
+        "required": [
+          "allowed",
+          "available",
+          "state",
+          "account",
+          "rootPath",
+          "connectedAt",
+          "lastError"
+        ],
+        "type": "object",
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/OneDriveLinkState"
+          },
+          "account": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "rootPath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "connectedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastError": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3173,6 +3297,10 @@
           "internet": {
             "type": "boolean",
             "default": true
+          },
+          "oneDrive": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -3350,6 +3478,9 @@
           },
           "internet": {
             "$ref": "#/components/schemas/ExtensionGrantSetting"
+          },
+          "oneDrive": {
+            "$ref": "#/components/schemas/ExtensionGrantSetting"
           }
         }
       },
@@ -3465,6 +3596,20 @@
             "items": {
               "$ref": "#/components/schemas/ServiceHealthItem"
             }
+          }
+        }
+      },
+      "SetOneDriveRootRequest": {
+        "required": [
+          "path"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3669,6 +3814,7 @@
           "skills",
           "mcp",
           "internet",
+          "oneDrive",
           "effective"
         ],
         "type": "object",
@@ -3680,6 +3826,9 @@
             "$ref": "#/components/schemas/ExtensionGrantSetting"
           },
           "internet": {
+            "$ref": "#/components/schemas/ExtensionGrantSetting"
+          },
+          "oneDrive": {
             "$ref": "#/components/schemas/ExtensionGrantSetting"
           },
           "effective": {
@@ -3945,6 +4094,9 @@
     },
     {
       "name": "Admin"
+    },
+    {
+      "name": "Connectors"
     }
   ]
 }

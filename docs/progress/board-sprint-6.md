@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-08 01:30 ・ 狀態：**🚧 進行中（A2 MCP Gateway）**
+> 最後更新：2026-10-08 03:00 ・ 狀態：**🚧 進行中（插單：OneDrive 同步 O2）**
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -37,6 +37,7 @@
 | W7 | 圖示開啟模型與思考深度面板 | ✅ | execution 保存深度、Pi／LiteLLM 實際參數、手機與鍵盤操作；ADR-0017，見 #016 |
 | W6 | 模型名稱與輸入能力圖示 | ✅ | 移除 provider 後綴、文字／圖片 SVG、自訂可存取選單；見 #014 |
 | W5 | 手機對話輸入區靠近底部 | ✅ | 新／既有對話、鍵盤與安全區、訊息獨立捲動；見 #013 |
+| W8 | PWA：手機可「加入主畫面」安裝 | ✅ | 見 #018；iOS / Android 實機安裝**待使用者環境確認** |
 | W4 | AppDashboard 側欄清單與漢堡收合 | ✅ | 圖示、列高與群組分隔線；桌面記住收合，手機抽屜；見 #011 |
 | W3 | AppDashboard 配色與淺色／深色／自動切換 | ✅ | 見 [#008](#008--appdashboard-配色與主題切換) |
 | W2 | Ubuntu 既有 Docker 部署啟動檔 `start-ymir.sh` | ✅ | 見 [#005](#005--ubuntu-既有-docker-部署啟動檔)；語法與隔離模擬通過，實機待驗證 |
@@ -44,11 +45,14 @@
 | A0 | ADR-0012 spike：實測 Pi 1.0.0 在 RPC 模式的 `--no-skills` / `--skill`、能否不讀使用者層 `mcp.json`、平台 MCP 設定能否放在 Agent 不可寫的位置，以及 rootless Podman 能否限制 egress；結果寫回 ADR-0012 | ✅ | — |
 | A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`）+ 每人覆寫資料表 `vibemaker.user_extension_grants`<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | ✅ | — |
 | A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• `internet` 能力加入擴充政策（全域 + 每人）<br>• 受限網路部署文件 | ✅ | — |
-| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | — |
-| R0 | RAG ADR（ADR-0013）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite（sqlite-vec）部署、權限 | ⏳ | **❓待決定**：Embedding 模型與硬體、文件格式與容量、外部回答模型的資料政策 |
+| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | **暫停**：插單 OneDrive 完成後繼續 |
+| O0 | **插單** OneDrive connector ADR（[ADR-0013](../adr/0013-onedrive-connector.md)） | ✅ | — |
+| O1 | OneDrive 連結 / 解除連結：<br>• `onedrive` 能力<br>• 授權碼 + PKCE 連結流程、refresh token 加密保存<br>• 根資料夾、設定頁<br>• FakeGraph 測試替身 | ✅ | — |
+| O2 | OneDrive 同步：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | 🚧 | — |
+| R0 | RAG ADR（ADR-0014）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite（sqlite-vec）部署、權限 | ⏳ | **❓待決定**：Embedding 模型與硬體、文件格式與容量、外部回答模型的資料政策 |
 | R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ⏳ | R0 經使用者確認 |
 | R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ⏳ | R1 |
-| H0 | 網站託管 ADR（ADR-0014）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ⏳ | **❓待決定**：網域與 DNS / Tunnel、公司模式的帳號範圍、配額 |
+| H0 | 網站託管 ADR（ADR-0015）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ⏳ | **❓待決定**：網域與 DNS / Tunnel、公司模式的帳號範圍、配額 |
 | H1 | 公開網站發布：網站與版本、產物檢查、Nginx 託管、原子切換、取消發布 | ⏳ | H0 經使用者確認 |
 | H2 | 身分與分享：公司模式、指定使用者、分享給我的網站 | ⏳ | H1 |
 | C1 | 對話附加檔案 / 圖片 / 影片給 Agent（使用者回報） | ✅ | 見 [#006](#006--對話可以附加檔案圖片影片給-agent)；真實視覺模型**待使用者環境確認** |
@@ -71,6 +75,46 @@
 ---
 
 ## 💬 留言區
+
+### #019 · 解決 main 與遠端合併衝突
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 22:53 · `✅完成`
+
+完成使用者已開始的 merge（本機 1 個提交、遠端 8 個提交）：index.html 保留本機 `interactive-widget=resizes-content` 與遠端 PWA manifest／iOS meta；看板保留兩邊所有內容，PWA 的重複 W5／#012 改為 W8／#018，原留言文字保留。OpenRouter、模型管理、思考深度與 OneDrive／PWA 功能均保留。修正 3 處檔尾換行及 ModelAccessTests using 排序，使 dotnet format 驗證通過。
+
+驗證：Release solution build 零警告／錯誤；前端 lint、136 測試、build 通過；後端完整 Windows 測試實際結果 583 通過、50 失敗、7 略過，失敗包含 Windows 不支援 Local runtime 的 fixture，以及 Docker／Pi 的 Fake LLM 位址與 runtime 預期不一致，未修改或停用測試來掩蓋。合併相关 OpenAPI 快照 1、OneDrive 9、WebAppHosting 11、Models 8 個整合測試另行通過。完整 Runtime／Pi 路徑需由 Linux CI 驗證。本次測試建立的暫時 Docker 容器已清理，原有服務保留；未更新目前部署的 API／前端。
+
+此合併會以正常提交保留雙方歷史，完成 pull 並 push 至 origin/main，不使用 force push。
+
+---
+
+### #018 · PWA：手機可安裝到主畫面
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 19:00 · `✅完成`
+
+前端本來就是 SPA，補上 PWA 安裝能力，使用者用手機開網址即可「加入主畫面」，以獨立視窗開啟。
+
+- **新增**：`manifest.webmanifest`、192／512／maskable 圖示（暫由 `apple-touch-icon.png` 放大產生，有正式 logo 再替換）、`sw.js`、`index.html` 的 manifest 與 iOS meta、`viewport-fit=cover`。
+- **service worker 只快取帶雜湊的靜態檔**（cache-first）；`/api`（含 SSE、登入、下載）與 `index.html` 一律不經快取，登入狀態仍是 HttpOnly cookie（ADR-0002），不碰任何憑證。沒有離線功能（Agent 需要連線）。
+- **登入頁安裝提示**：Android 顯示原生安裝按鈕（`beforeinstallprompt`），iOS 顯示「分享 → 加入主畫面」說明，已安裝則不顯示（`PwaInstallService` + 純函式 `pwa-rules.ts`）。
+- **伺服器**：`WebAppHostingExtensions` 對 `index.html`、`sw.js`、`manifest.webmanifest` 回 `Cache-Control: no-cache`，手機才會取得新版。
+- **CSP 不需修改**：`manifest-src` / `worker-src` 退回 `default-src` / `script-src 'self'`。沒有新增相依套件（手寫 service worker）。
+
+驗證：
+- 前端 lint 通過、131 個測試通過（含新增 `pwa-rules.spec.ts`）、production build 通過；
+- `dotnet build`、`dotnet format --verify-no-changes`、`WebAppHostingTests` 11 個通過（含新增 no-cache 與 manifest content-type）；
+- Playwright（Chromium、iPhone 尺寸）：service worker 啟用、manifest 可讀、重新整理後只快取 5 個雜湊檔（無 `/api`、無 `index.html`）、登入頁顯示 iOS 說明。
+
+**未驗證、待使用者環境確認**：真實 iPhone / Android 在 HTTPS 網域（Cloudflare Tunnel）上的安裝與登入（iOS 主畫面 App 的 cookie 與 Safari 分開，第一次需重新登入；Entra OIDC 在獨立視窗內的跳轉需實機測）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #017 · 清理本機未使用 Docker 容器與映像
 
@@ -106,14 +150,6 @@
 
 本機 API 更新至 `api-model-access-20261007`（確認排隊／執行數為 0），前端映像 `localhost/ymir/web:model-access-20261007`；保留 API launcher／前端旧容器備份。未重啟 LiteLLM／SQL／Agent，也不改動目前開放模型。
 
-<details>
-<summary>💬 回覆（0）</summary>
-
-（尚無回覆）
-
-</details>
-
----
 ### #014 · 模型名稱與輸入能力圖示
 
 > 👤 **Codex（AI）** · 🕒 2026-10-07 18:10 · `✅完成`
@@ -161,6 +197,7 @@ README 已更新，本機前端映像為 `localhost/ymir/web:model-picker-202610
 現有 PostgreSQL volume、master key、salt、MiniMax key 保留；服務設定備份位於本機部署目錄。變更僅部署設定與文件，不修改 API 契約／資料庫 schema，也不新增圖片生成、語音或 embeddings 的 UI。
 
 ---
+
 ### #011 · AppDashboard 側欄清單與漢堡收合
 
 > 👤 **Codex（AI）** · 🕒 2026-10-07 17:15 · `✅完成`
@@ -430,6 +467,123 @@ README 已更新，本機前端映像為 `localhost/ymir/web:model-picker-202610
   - 沙箱是 root Podman：掛載目錄的擁有者問題改用 Docker 模式（`ContainerExecutable=podman`）跑完，與網路行為無關。
 - **未驗證、待使用者環境確認**：rootless Podman（`ymir` 帳號）下兩個 network 與 LiteLLM container 的實際行為，可用 `npm run e2e:network` 驗證。
 - **下一步**：A2 MCP Gateway（獨立服務 `Ymir.McpGateway`、每人短期 token、`deploy/mcp/servers.json`、存取清單、echo 服務）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #006 · 插單：OneDrive connector（ADR-0013）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 02:00 · `📢公告` `📐設計`
+
+- **背景**：使用者要求插單實作已規劃的 OneDrive 功能（[計畫](../planning/onedrive-workspace-plan.md) 的方法二）：使用者開啟後可以連到自己的 OneDrive。A2（MCP Gateway）暫停，等 OneDrive 完成後繼續。
+- **使用者決定**：
+  - 首版做「連結 + 自動同步」；
+  - 使用公司帳號，權限為 `Files.ReadWrite`（整個 OneDrive，使用者自選根資料夾）；
+  - 由管理員開放（擴充政策新增 `onedrive` 能力，預設關閉），使用者自己連結。
+- **設計**（[ADR-0013](../adr/0013-onedrive-connector.md)）：
+  - 沿用 Ymir 的 Entra 應用程式註冊，另走一個授權碼 + PKCE 的連結流程；
+  - refresh token 以 Data Protection 加密，只在後端使用，Agent 拿不到；
+  - 執行前下載、執行後由持久化工作上傳；以 eTag / If-Match 避免覆蓋，衝突時保留兩份；首版不同步刪除。
+  - CLAUDE.md 的「不得保存 IdP token」紅線補上這個例外。
+- **編號**：RAG、網站託管的 ADR 順延為 ADR-0014、0015。
+- **驗證**：只改文件；`git diff --check`。
+- **未驗證、待使用者環境確認**：真實 Entra 權限同意與 Microsoft Graph（沙箱連不到，改用 FakeGraph）。
+- **下一步**：O1 連結與解除連結。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #007 · O1 完成：OneDrive 連結與解除連結
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 03:00 · `✅完成`
+
+- **做了什麼**（ADR-0013 §1～§3、§6）：
+  - **能力**：擴充政策新增 `oneDrive`（全域預設 + 每人覆寫，預設關閉）；管理介面、使用者頁、個人設定頁自動帶出。
+  - **連結流程**：
+    - `GET /api/connectors/onedrive/connect` 以授權碼 + PKCE 導向 Microsoft（scope `offline_access Files.ReadWrite User.Read`）；
+    - state 與 verifier 存在 Data Protection 加密、只用一次、綁定使用者的短期 cookie；
+    - `/callback` 驗證 state、使用者與過期時間；企業帳號必須連到同一個 oid（`mismatch` 會被拒絕）；
+    - 導回只用站內路徑，結果以 `?onedrive=` 代碼表示，不轉送 IdP 的錯誤內容。
+  - **憑證**：
+    - 新資料表 `vibemaker.onedrive_connections`（migration `OneDriveConnections`）只存加密的 refresh token；
+    - 換發時輪替；`invalid_grant` → `NeedsReauth`，重新連結後恢復；
+    - access token 只放記憶體；token 不在任何回應、log、稽核。
+  - **根資料夾**：`PUT /api/connectors/onedrive/root` 只接受名稱路徑，後端在使用者自己的 drive 逐層取得或建立；規則見 `OneDrivePaths`。
+  - **Graph**：`GraphOneDriveClient` 在 429 / 503 時依 Retry-After 重試，錯誤只回摘要。
+  - **其他**：
+    - 稽核 `connector.onedrive.connect` / `disconnect` / `root.update`；
+    - 端點加入授權矩陣（只作用在目前使用者）；
+    - 解除連結不需要能力，被關閉的使用者也能移除自己的 token。
+  - **測試替身**：
+    - Fake OIDC 新增 refresh token（輪替、撤銷）、scope、OneDrive callback redirect URI，login_hint 改用最後一個值並接受 `帳號@網域`；
+    - Fake Graph 放在同一個 server 的 `/graph/v1.0`：記憶體 drive、eTag / If-Match 412、upload session、注入 429。
+  - **前端**：個人設定頁的「OneDrive」卡片：連結 / 重新連結 / 解除連結、同步資料夾、狀態與結果訊息。
+- **驗證**：
+  - `dotnet test --solution`：621 通過。
+    - 新增整合測試 `OneDriveConnectionTests`：完整連結流程、token 不外洩、根資料夾建立、稽核、未開放回 403、帳號不符、偽造 state、撤銷後 NeedsReauth 與重新連結、refresh token 輪替、429 重試、不合法路徑；
+    - 新增單元測試 `OneDriveRulesTests`。
+  - OpenAPI 快照與 schema 已更新；前端 lint、125 個 Vitest、build 通過。
+  - 新的 `npm run e2e:onedrive` 在沙箱用瀏覽器跑完：管理員開放 → 使用者連結（真的經過授權導向）→ 設定資料夾 → 解除連結。
+- **與計畫的差異**：Fake Graph 沒有獨立成 `Ymir.Testing.FakeGraph` 專案，改放在 Fake OIDC 同一個 server，access token 由同一個 issuer 驗證，e2e 少啟動一個服務。
+- **未驗證、待使用者環境確認**：真實 Entra 的 `Files.ReadWrite` 同意、Microsoft Graph 與 OneDrive for Business（沙箱連不到）。
+- **下一步**：O2 同步（執行前下載、執行後上傳、衝突保留兩份、雲端保存狀態）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #008 · CI 修正：`dotnet format` 檢查
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 03:20 · `🔧修正`
+
+- **問題**：#46（O1）的 `.NET build & test` 在 `dotnet format --verify-no-changes` 失敗。原因是 main 上其他人的變更留下的格式問題，O1 本身的程式沒有違規：
+  - `ExecutionArtifact.cs` 一行有兩個初始化；
+  - 3 個測試檔的 using 順序不對。
+- **修正**：執行 `dotnet format Ymir.slnx`，只有空白與 using 排序的機械式變更，沒有改到任何行為。
+- **驗證**：
+  - 本機 `dotnet format --verify-no-changes` 0 錯誤；
+  - `dotnet build` 0 警告；
+  - `AuthorizationMatrixTests`、`RemoteRuntimeApiTests` 通過。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #009 · CI 修正：準備階段逾時誤報為執行環境錯誤
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 03:40 · `🔧修正`
+
+- **問題**：#46 重跑 CI 時，`ExecutionTimeoutTests` 失敗：預期 `AGENT_TIMEOUT`，實際是 `AGENT_RUNTIME_ERROR`。
+  - log 顯示逾時發生在 main 新增的 `PrepareDeliveryAsync`（Agent 啟動前建立交付目錄）。
+  - 這一步拋出的 `TaskCanceledException` 被通用 catch 當成執行環境錯誤。
+  - 這是 main 既有的時序問題，不是 O1 的變更造成的；只在準備階段剛好碰上逾時時才會發生，本機跑了 3 次都通過。
+- **修正**：`ExecutionRunner` 在通用 catch 之前，先處理 `runToken` 已取消的 `OperationCanceledException`，轉為 `AgentCancelled`，再由既有邏輯判斷是逾時（`AGENT_TIMEOUT`）還是使用者取消。
+- **測試**：新增 `ExecutionTimeoutDuringPreparationTests`（約 6 毫秒的逾時，涵蓋 Agent 啟動前的各階段）。
+- **驗證**：
+  - `dotnet build`、`dotnet format --verify-no-changes` 0 錯誤；
+  - `ExecutionTimeout*`、`ExecutionFlowTests` 共 9 個通過。
 
 <details>
 <summary>💬 回覆（0）</summary>

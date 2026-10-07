@@ -34,6 +34,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<UserExtensionGrant> UserExtensionGrants => Set<UserExtensionGrant>();
 
+    public DbSet<OneDriveConnection> OneDriveConnections => Set<OneDriveConnection>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -180,6 +182,22 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             grant.Property(g => g.Capability).HasConversion<UpperSnakeCaseEnumConverter<ExtensionCapability>>().HasMaxLength(30);
             grant.Property(g => g.Effect).HasConversion<UpperSnakeCaseEnumConverter<ExtensionGrantEffect>>().HasMaxLength(30);
             grant.Property(g => g.UpdatedBy).HasMaxLength(UserExtensionGrant.UpdatedByMaxLength).IsRequired();
+        });
+
+        modelBuilder.Entity<OneDriveConnection>(connection =>
+        {
+            // ADR-0013：一位使用者最多一個 OneDrive 連結；refresh token 只存 Data Protection 加密後的值。
+            connection.ToTable("onedrive_connections");
+            connection.HasKey(c => c.UserId);
+            connection.Property(c => c.UserId).ValueGeneratedNever();
+            connection.Property(c => c.MicrosoftUserId).HasMaxLength(OneDriveConnection.MicrosoftUserIdMaxLength).IsRequired();
+            connection.Property(c => c.UserPrincipalName).HasMaxLength(OneDriveConnection.UserPrincipalNameMaxLength).IsRequired();
+            connection.Property(c => c.DriveId).HasMaxLength(OneDriveConnection.DriveIdMaxLength).IsRequired();
+            connection.Property(c => c.RootItemId).HasMaxLength(OneDriveConnection.ItemIdMaxLength);
+            connection.Property(c => c.RootPath).HasMaxLength(OneDriveConnection.RootPathMaxLength);
+            connection.Property(c => c.ProtectedRefreshToken).IsRequired();
+            connection.Property(c => c.Status).HasConversion<UpperSnakeCaseEnumConverter<OneDriveConnectionStatus>>().HasMaxLength(30);
+            connection.Property(c => c.LastError).HasMaxLength(OneDriveConnection.ErrorMaxLength);
         });
 
         modelBuilder.ApplySnakeCaseNames();

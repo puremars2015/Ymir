@@ -37,7 +37,7 @@ internal static class ExtensionEndpoints
     {
         var effective = await policy.ResolveAsync(currentUser.UserId, cancellationToken);
         var items = await inventory.ListAsync(currentUser.UserId, cancellationToken);
-        return new MyExtensionsResponse(effective.Skills, effective.Mcp, effective.Internet, items is not null, items?.Skills ?? [], items?.McpServers ?? []);
+        return new MyExtensionsResponse(effective.Skills, effective.Mcp, effective.Internet, effective.OneDrive, items is not null, items?.Skills ?? [], items?.McpServers ?? []);
     }
 
     private static async Task<ExtensionPolicyResponse> GetPolicyAsync(
@@ -57,7 +57,7 @@ internal static class ExtensionEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var state = await policy.SaveAsync(new ExtensionPolicySettings(request.Skills, request.Mcp, request.Internet), currentUser.ActorName, cancellationToken);
+        var state = await policy.SaveAsync(new ExtensionPolicySettings(request.Skills, request.Mcp, request.Internet, request.OneDrive), currentUser.ActorName, cancellationToken);
         await auditLog.WriteAsync(
             new AuditEntry(currentUser.ActorName, "admin.settings.extensions.update", "setting", ExtensionPolicyService.Key, AuditResult.Success, timeProvider.GetUtcNow(), null),
             cancellationToken);
@@ -96,6 +96,7 @@ internal static class ExtensionEndpoints
                 [ExtensionCapability.Skills] = ToEffect(request.Skills),
                 [ExtensionCapability.Mcp] = ToEffect(request.Mcp),
                 [ExtensionCapability.Internet] = ToEffect(request.Internet),
+                [ExtensionCapability.OneDrive] = ToEffect(request.OneDrive),
             },
             currentUser.ActorName,
             cancellationToken);
@@ -121,7 +122,10 @@ internal static class ExtensionEndpoints
         ToSetting(state, ExtensionCapability.Skills),
         ToSetting(state, ExtensionCapability.Mcp),
         ToSetting(state, ExtensionCapability.Internet),
-        new ExtensionValues(state.Effective.Skills, state.Effective.Mcp, state.Effective.Internet));
+        ToSetting(state, ExtensionCapability.OneDrive),
+        ToValues(state.Effective));
+
+    private static ExtensionValues ToValues(EffectiveExtensions values) => new(values.Skills, values.Mcp, values.Internet, values.OneDrive);
 
     private static async Task<ExtensionPolicyResponse> ToResponseAsync(
         ExtensionPolicyState state,
@@ -133,7 +137,7 @@ internal static class ExtensionEndpoints
             ? (await users.FindAsync(userId, cancellationToken))?.DisplayName
             : null;
         return new ExtensionPolicyResponse(
-            new ExtensionValues(state.Effective.Skills, state.Effective.Mcp, state.Effective.Internet),
+            new ExtensionValues(state.Effective.Skills, state.Effective.Mcp, state.Effective.Internet, state.Effective.OneDrive),
             runtimes.RestrictedNetwork,
             state.Stored?.UpdatedAt,
             updatedByName);
@@ -151,17 +155,23 @@ public enum ExtensionGrantSetting
 }
 
 /// <param name="Internet">能否對外連線（ADR-0012 A.8）。</param>
-public sealed record ExtensionValues(bool Skills, bool Mcp, bool Internet);
+/// <param name="OneDrive">能否連結自己的 OneDrive（ADR-0013）。</param>
+public sealed record ExtensionValues(bool Skills, bool Mcp, bool Internet, bool OneDrive);
 
 /// <param name="Internet">省略時為允許（與預設相同）。</param>
-public sealed record SaveExtensionPolicyRequest(bool Skills, bool Mcp, bool Internet = true);
+/// <param name="OneDrive">省略時為不允許（與預設相同）。</param>
+public sealed record SaveExtensionPolicyRequest(bool Skills, bool Mcp, bool Internet = true, bool OneDrive = false);
 
 /// <param name="Defaults">全域預設（沒有個人覆寫的成員套用這個值）。沒有設定過時 skill / MCP 關閉、對外連線允許。</param>
 /// <param name="RestrictedNetwork">關閉對外連線能否生效：沒有設定受限網路時，被關閉的成員無法執行 Agent。</param>
 public sealed record ExtensionPolicyResponse(ExtensionValues Defaults, RestrictedNetworkSupport RestrictedNetwork, DateTimeOffset? UpdatedAt, string? UpdatedByName);
 
 /// <param name="Internet">省略時為依全域預設。</param>
-public sealed record SaveUserExtensionsRequest(ExtensionGrantSetting Skills, ExtensionGrantSetting Mcp, ExtensionGrantSetting Internet = ExtensionGrantSetting.Inherit);
+public sealed record SaveUserExtensionsRequest(
+    ExtensionGrantSetting Skills,
+    ExtensionGrantSetting Mcp,
+    ExtensionGrantSetting Internet = ExtensionGrantSetting.Inherit,
+    ExtensionGrantSetting OneDrive = ExtensionGrantSetting.Inherit);
 
 /// <param name="Effective">套用全域預設與覆寫後的結果。</param>
-public sealed record UserExtensionsResponse(ExtensionGrantSetting Skills, ExtensionGrantSetting Mcp, ExtensionGrantSetting Internet, ExtensionValues Effective);
+public sealed record UserExtensionsResponse(ExtensionGrantSetting Skills, ExtensionGrantSetting Mcp, ExtensionGrantSetting Internet, ExtensionGrantSetting OneDrive, ExtensionValues Effective);

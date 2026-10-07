@@ -121,25 +121,25 @@ public class ExtensionPolicyTests(PiApiFactory factory) : IClassFixture<PiApiFac
 
         var initial = await admin.GetFromJsonAsync<ExtensionPolicyResponse>("/api/admin/settings/extensions", JsonDefaults.Options, Ct);
         // 預設：skill / MCP 關閉、對外連線允許（ADR-0012 A.8）；Local runtime 無法限制網路。
-        Assert.Equal(new ExtensionValues(false, false, true), initial!.Defaults);
+        Assert.Equal(new ExtensionValues(false, false, true, false), initial!.Defaults);
         Assert.Equal(Ymir.VibeMaker.Application.Runtime.RestrictedNetworkSupport.NotEnforced, initial.RestrictedNetwork);
 
         try
         {
             using var save = await admin.PutAsJsonAsync("/api/admin/settings/extensions", new SaveExtensionPolicyRequest(true, false, false), JsonDefaults.Options, Ct);
             var saved = await save.Content.ReadFromJsonAsync<ExtensionPolicyResponse>(JsonDefaults.Options, Ct);
-            Assert.Equal(new ExtensionValues(true, false, false), saved!.Defaults);
+            Assert.Equal(new ExtensionValues(true, false, false, false), saved!.Defaults);
             Assert.NotNull(saved.UpdatedAt);
 
             var inherited = await admin.GetFromJsonAsync<UserExtensionsResponse>($"/api/admin/users/{memberId}/extensions", JsonDefaults.Options, Ct);
             Assert.Equal(
-                new UserExtensionsResponse(ExtensionGrantSetting.Inherit, ExtensionGrantSetting.Inherit, ExtensionGrantSetting.Inherit, new ExtensionValues(true, false, false)),
+                new UserExtensionsResponse(ExtensionGrantSetting.Inherit, ExtensionGrantSetting.Inherit, ExtensionGrantSetting.Inherit, ExtensionGrantSetting.Inherit, new ExtensionValues(true, false, false, false)),
                 inherited);
 
             using var overrideResponse = await admin.PutAsJsonAsync(
                 $"/api/admin/users/{memberId}/extensions", new SaveUserExtensionsRequest(ExtensionGrantSetting.Deny, ExtensionGrantSetting.Allow, ExtensionGrantSetting.Allow), JsonDefaults.Options, Ct);
             var overridden = await overrideResponse.Content.ReadFromJsonAsync<UserExtensionsResponse>(JsonDefaults.Options, Ct);
-            Assert.Equal(new ExtensionValues(false, true, true), overridden!.Effective);
+            Assert.Equal(new ExtensionValues(false, true, true, false), overridden!.Effective);
 
             // 成員只看得到自己的有效能力；還沒有執行環境時不建立 container，清單為空。
             var mine = (await member.GetFromJsonAsync<MyExtensionsResponse>("/api/extensions", JsonDefaults.Options, Ct))!;

@@ -9,7 +9,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 |---|---|
 | `docs/sa/vibe-maker-core-mvp-sa.md` | SA（需求、資料模型、API、SSE 契約、驗收條件），以章節編號引用，例如「SA §10」 |
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
-| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0012） |
+| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0013） |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
 | `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
@@ -31,7 +31,7 @@ tests/
   Ymir.UnitTests/                    含 Fixtures/pi-rpc/：Pi 1.0.0 的真實 RPC 錄製
   Ymir.IntegrationTests/             WebApplicationFactory + SQL Server（每個 fixture 獨立資料庫）+ 真實 Pi；含授權矩陣、OpenAPI 快照
   Ymir.Testing.FakeLlm/              OpenAI 相容假模型（[create-file] / [slow] / [fail] 腳本）
-  Ymir.Testing.FakeOidc/             模擬 Entra ID 的 OIDC 伺服器（tid / oid / pairwise sub / roles、PKCE），測試與本機開發用
+  Ymir.Testing.FakeOidc/             模擬 Entra ID 的 OIDC 伺服器（tid / oid / pairwise sub / roles、PKCE、refresh token）與 Fake Graph（`/graph/v1.0`，OneDrive），測試與本機開發用
 web/                                 Angular 22（standalone、signals、zoneless、Vitest、ESLint）；src/app/core/api/schema.ts 由 OpenAPI 產生；e2e/ Playwright 腳本
 runtime/agent/                       Agent runtime Containerfile
 deploy/cloudflared/                  cloudflared ingress 設定範本（指南 docs/guides/cloudflare-tunnel.md）
@@ -80,6 +80,8 @@ cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:make -- <截圖目
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:admin -- <截圖目錄>
 # 對外連線管制（ADR-0012 A.8；需要 Podman 與兩個 network，前置步驟見 web/e2e/network-flow.mjs 開頭）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:network -- <截圖目錄>
+# OneDrive connector（ADR-0013；需要 Fake OIDC，API 設定見 web/e2e/onedrive-flow.mjs 開頭）
+cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:onedrive -- <截圖目錄>
 
 # 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
 dotnet run --project src/Ymir.AppHost
@@ -116,6 +118,8 @@ Runtime 生命週期（ADR-0011）：`RuntimeLifecycleWorker` 啟動時對帳、
 
 Agent 擴充能力（ADR-0012）：管理員在「管理 → 系統設定」設定全域預設（`vibemaker.extension_policy`），在「使用者」頁設定每人覆寫（`vibemaker.user_extension_grants`）；`ExtensionPolicyService` 解析、`ExecutionRunner` 每次執行帶入 `AgentRunRequest.Extensions`。`PiAgentHarness` **一律** `--no-extensions`（Agent 寫的 extension 不得載入），沒有 `skills` 加 `--no-skills`，有 `mcp` 才 `-e builtin:mcp`；每次執行前重寫 agent dir 的 `settings.json` / `trust.json` / `mcp.json`（使用者自建 MCP 在 `mcp.user.json`）與平台 skill（`PiExtensionConfig`）。成員端 `GET /api/extensions` 只回名稱，不回 MCP 設定內容。對外連線（`internet` 能力，預設允許，ADR-0012 A.8）：關閉時 `ExecutionRunner` 以 `RuntimeNetworkAccess.Restricted` 呼叫 `EnsureRuntimeAsync`，container 改接 `VibeMaker:Runtime:RestrictedNetwork`（`--internal`，名稱只來自部署設定；runtime host 只接受 `network=internet|restricted`）；label `ymir.network` 不符時重建並稽核 `runtime.recreate`；沒有設定受限網路時執行失敗，**不得**退回成可以對外連線。
 
+OneDrive connector（ADR-0013）：管理員開放 `oneDrive` 能力後，使用者在個人設定連結（`/api/connectors/onedrive/connect` → Microsoft 授權碼 + PKCE → `/callback`，state 存在加密的短期 cookie、綁定使用者；企業帳號必須連到同一個 oid）。沿用登入的 Entra 註冊（`OidcOneDriveSettingsSource`），需在 Entra 加 `Files.ReadWrite`、`offline_access` 委派權限與 callback redirect URI。`OneDriveConnectionService` 保存 Data Protection 加密的 refresh token（換發時輪替、`invalid_grant` → `NeedsReauth`），access token 只在記憶體；Graph 呼叫在 `GraphOneDriveClient`（429 / 503 依 Retry-After 重試，base URL `Ymir:Connectors:OneDrive:GraphBaseUrl` 只給測試替身用）。同步（O2）在後端進行，Agent 拿不到任何 Graph 憑證。
+
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
 
 模型金鑰（ADR-0004）：設定 `VibeMaker__LiteLlm__BaseUrl` 與 `VibeMaker__LiteLlm__MasterKey` 後，API 為每位使用者向 LiteLLM 發 virtual key（帶 `user_id`，發 key 前 upsert LiteLLM 使用者並套用每月預算）；用量頁的費用 / token 與預算檢查都經 `IModelGateway` 讀 LiteLLM，Ymir 不自己保存；非 Development 未設定會拒絕啟動。本機可用 `FAKE_LLM_MASTER_KEY=<任意值>` 讓 Fake LLM 模擬 LiteLLM 的 key 管理（說明見 `deploy/litellm/README.md`）。
@@ -145,7 +149,7 @@ API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:de
 - 回給瀏覽器的錯誤與 tool 事件只能是摘要：不得含 stack trace、host path、token、完整 command output（SA §10、§12）。原始細節只寫 server log。
 - `LocalRuntimeManager` 沒有隔離，只允許 Development 環境（DI 會在其他環境拒絕啟動）。
 - API container 不得掛載 container runtime socket（podman.sock / docker.sock）或使用者 workspace，只能經由 runtime host（ADR-0008）。Runtime host 的端點只接受 user id 與 runtime 內的程序規格，不得新增接受 host 路徑、image、掛載或資源設定的端點；改動協定時同步更新 `RuntimeHostProtocolTests` 與 `RuntimeHostTests`。Runtime host token 只放在部署 secret，不得進版控；不得用 rootless Podman 帳號 `ymir` 跑 API container。
-- 不得保存 IdP token（`SaveTokens=false`）；登入後導回位址只接受站內相對路徑（`SafeRedirect`）。Entra client secret 只放在 `deploy/api/.env`、部署 secret，或經管理介面以 Data Protection 加密存進 `platform.system_settings`（ADR-0010）；任何 API 回應、稽核、log 都不得包含 secret 值，`ISystemSettingsStore.SetAsync`（明文）不得用來存機密。本機帳號密碼只存 `PasswordHasher` 雜湊，不得記錄、回傳或寫入 log；登入端點的錯誤訊息不得區分「帳號不存在」與「密碼錯誤」。
+- 不得保存登入的 IdP token（`SaveTokens=false`）；OneDrive connector 的 refresh token 是唯一例外（ADR-0013）：只以 Data Protection 加密存在 `vibemaker.onedrive_connections`、只在後端使用，不得回傳、記錄、寫入稽核或傳進 Agent container；登入後導回位址只接受站內相對路徑（`SafeRedirect`）。Entra client secret 只放在 `deploy/api/.env`、部署 secret，或經管理介面以 Data Protection 加密存進 `platform.system_settings`（ADR-0010）；任何 API 回應、稽核、log 都不得包含 secret 值，`ISystemSettingsStore.SetAsync`（明文）不得用來存機密。本機帳號密碼只存 `PasswordHasher` 雜湊，不得記錄、回傳或寫入 log；登入端點的錯誤訊息不得區分「帳號不存在」與「密碼錯誤」。
 - 模型供應商金鑰（例如 `MINIMAX_API_KEY`）與 LiteLLM master key 只放在 `deploy/*/.env` 或部署環境的 secret，不得進版控、不得進 Agent container。
 - 對外公開（`Ymir:PublicEdge`，ADR-0006）不得在 Development 環境開啟；API 只綁 127.0.0.1、只信任 cloudflared 的 `X-Forwarded-*`。Tunnel 憑證不得進版控、不得進 API 或 Agent container；由管理介面設定時只經 runtime host 寫入 `ymir` 帳號的 600 檔案（ADR-0010），API 與資料庫不得保存、回應與稽核不得包含 token。Runtime host 的 tunnel 端點只接受 token 字串，檔案位置與服務名稱只來自 runtime host 設定；新增端點時同步更新 `TunnelEndpointTests.RuntimeHost_ExposesOnlyTheReviewedEndpoints`。
 

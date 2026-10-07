@@ -20,6 +20,9 @@ import { MyExtensions } from '../../core/api/api-types';
             }
           </li>
           <li>
+            OneDrive 連結：<strong>{{ d.oneDriveAllowed ? '已開放' : '未開放' }}</strong>
+          </li>
+          <li>
             對外連線：<strong>{{ d.internetAllowed ? '允許' : '只能連到平台的模型與服務' }}</strong>
           </li>
           <li>

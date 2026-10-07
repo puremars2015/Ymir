@@ -16,6 +16,7 @@ import {
   ExtensionPolicy,
   ExtensionValues,
   MyExtensions,
+  OneDriveStatus,
   SaveUserExtensionsRequest,
   UserExtensions,
   AdminUsage,
@@ -171,6 +172,19 @@ export class ApiService {
     request: SaveUserExtensionsRequest,
   ): Observable<UserExtensions> {
     return this.http.put<UserExtensions>(`/api/admin/users/${userId}/extensions`, request);
+  }
+
+  /** OneDrive 連結狀態（ADR-0013）；不含任何 token。 */
+  getOneDriveStatus(): Observable<OneDriveStatus> {
+    return this.http.get<OneDriveStatus>('/api/connectors/onedrive');
+  }
+
+  setOneDriveRoot(path: string): Observable<OneDriveStatus> {
+    return this.http.put<OneDriveStatus>('/api/connectors/onedrive/root', { path });
+  }
+
+  disconnectOneDrive(): Observable<OneDriveStatus> {
+    return this.http.delete<OneDriveStatus>('/api/connectors/onedrive');
   }
 
   /** 目前使用者的擴充能力與自建擴充（只回自己的資料）。 */

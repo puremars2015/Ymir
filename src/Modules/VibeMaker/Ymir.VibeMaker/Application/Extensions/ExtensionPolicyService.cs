@@ -10,7 +10,8 @@ namespace Ymir.VibeMaker.Application.Extensions;
 
 /// <summary>某位成員目前有效的擴充能力（ADR-0012 A.3）；啟動 Agent 時由伺服器據此組合 Pi 參數與 container 的網路。</summary>
 /// <param name="Internet">能否對外連線（ADR-0012 A.8）；使用者 2026-10-07 決定預設允許。</param>
-public sealed record EffectiveExtensions(bool Skills, bool Mcp, bool Internet = true)
+/// <param name="OneDrive">能否連結自己的 OneDrive（ADR-0013）；預設關閉。</param>
+public sealed record EffectiveExtensions(bool Skills, bool Mcp, bool Internet = true, bool OneDrive = false)
 {
     /// <summary>沒有使用者自建擴充（ADR-0012 A.1 預設拒絕）；對外連線維持預設允許。</summary>
     public static readonly EffectiveExtensions None = new(false, false);
@@ -22,6 +23,7 @@ public sealed record EffectiveExtensions(bool Skills, bool Mcp, bool Internet = 
         ExtensionCapability.Skills => Skills,
         ExtensionCapability.Mcp => Mcp,
         ExtensionCapability.Internet => Internet,
+        ExtensionCapability.OneDrive => OneDrive,
         _ => false,
     };
 }
@@ -30,7 +32,7 @@ public sealed record EffectiveExtensions(bool Skills, bool Mcp, bool Internet = 
 /// 全域預設，存在 <c>platform.system_settings</c>（明文 JSON，不含機密，ADR-0010）。沒有設定時 skill 與 MCP 關閉、對外連線允許；
 /// A1b 之前儲存、沒有 <c>internet</c> 欄位的設定也視為允許。
 /// </summary>
-public sealed record ExtensionPolicySettings(bool Skills, bool Mcp, bool Internet = true);
+public sealed record ExtensionPolicySettings(bool Skills, bool Mcp, bool Internet = true, bool OneDrive = false);
 
 /// <param name="Stored">管理員儲存的值（沒有則為 null，使用預設）。</param>
 public sealed record ExtensionPolicyState(ExtensionPolicySettings Effective, SystemSettingValue? Stored);
@@ -182,7 +184,8 @@ public sealed partial class ExtensionPolicyService(
         return new EffectiveExtensions(
             Resolve(ExtensionCapability.Skills, global.Skills),
             Resolve(ExtensionCapability.Mcp, global.Mcp),
-            Resolve(ExtensionCapability.Internet, global.Internet));
+            Resolve(ExtensionCapability.Internet, global.Internet),
+            Resolve(ExtensionCapability.OneDrive, global.OneDrive));
     }
 
     internal static ExtensionPolicySettings? Parse(string json)

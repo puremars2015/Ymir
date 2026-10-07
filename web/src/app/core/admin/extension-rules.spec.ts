@@ -21,8 +21,8 @@ describe('extension rules', () => {
   });
 
   it('summarizes every capability in a fixed order', () => {
-    expect(capabilitySummary({ skills: true, mcp: false, internet: true })).toBe(
-      '自建 skill：允許・自建 MCP server：不允許・對外連線：允許',
+    expect(capabilitySummary({ skills: true, mcp: false, internet: true, oneDrive: false })).toBe(
+      '自建 skill：允許・自建 MCP server：不允許・OneDrive 連結：不允許・對外連線：允許',
     );
   });
 

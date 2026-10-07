@@ -499,6 +499,70 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                     b.ToTable("message_attachments", "vibemaker");
                 });
 
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveConnection", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("ConnectedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("connected_at");
+
+                    b.Property<string>("DriveId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("drive_id");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("last_error");
+
+                    b.Property<string>("MicrosoftUserId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("microsoft_user_id");
+
+                    b.Property<string>("ProtectedRefreshToken")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("protected_refresh_token");
+
+                    b.Property<string>("RootItemId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("root_item_id");
+
+                    b.Property<string>("RootPath")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)")
+                        .HasColumnName("root_path");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UserPrincipalName")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)")
+                        .HasColumnName("user_principal_name");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_onedrive_connections");
+
+                    b.ToTable("onedrive_connections", "vibemaker");
+                });
+
             modelBuilder.Entity("Ymir.VibeMaker.Domain.Project", b =>
                 {
                     b.Property<Guid>("Id")

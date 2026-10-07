@@ -11,6 +11,9 @@ public enum ExtensionCapability
 
     /// <summary>Agent container 能否連到 LiteLLM 與 gateway 以外的位址（ADR-0012 A.8）；全域預設允許。</summary>
     Internet,
+
+    /// <summary>連結自己的 OneDrive 並同步工作檔案（ADR-0013）；預設關閉，不影響 Pi 參數。</summary>
+    OneDrive,
 }
 
 /// <summary>每人覆寫的效果；沒有資料列表示繼承全域預設。</summary>
