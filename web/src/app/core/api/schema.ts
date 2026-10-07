@@ -597,6 +597,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/connectors/onedrive': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetOneDriveStatus'];
+    put?: never;
+    post?: never;
+    delete: operations['DisconnectOneDrive'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/connectors/onedrive/root': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['SetOneDriveRoot'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/settings/oidc': {
     parameters: {
       query?: never;
@@ -876,6 +908,7 @@ export interface components {
       skills: boolean;
       mcp: boolean;
       internet: boolean;
+      oneDrive: boolean;
     };
     LoginProvidersResponse: {
       oidc: boolean;
@@ -927,6 +960,7 @@ export interface components {
       skillsAllowed: boolean;
       mcpAllowed: boolean;
       internetAllowed: boolean;
+      oneDriveAllowed: boolean;
       inventoryAvailable: boolean;
       skills: string[];
       mcpServers: string[];
@@ -955,6 +989,18 @@ export interface components {
     OidcTestResponse: {
       ok: boolean;
       message: string;
+    };
+    /** @enum {unknown} */
+    OneDriveLinkState: 'NotConnected' | 'Connected' | 'NeedsReauth';
+    OneDriveStatusResponse: {
+      allowed: boolean;
+      available: boolean;
+      state: components['schemas']['OneDriveLinkState'];
+      account: null | string;
+      rootPath: null | string;
+      /** Format: date-time */
+      connectedAt: null | string;
+      lastError: null | string;
     };
     PasswordLoginRequest: {
       account: null | string;
@@ -1018,6 +1064,8 @@ export interface components {
       mcp: boolean;
       /** @default true */
       internet: boolean;
+      /** @default false */
+      oneDrive: boolean;
     };
     SaveMakeTopicRequest: {
       name: string;
@@ -1056,6 +1104,7 @@ export interface components {
       skills: components['schemas']['ExtensionGrantSetting'];
       mcp: components['schemas']['ExtensionGrantSetting'];
       internet?: components['schemas']['ExtensionGrantSetting'];
+      oneDrive?: components['schemas']['ExtensionGrantSetting'];
     };
     SendMessageRequest: {
       content: string;
@@ -1083,6 +1132,9 @@ export interface components {
     ServiceHealthResponse: {
       status: string;
       checks: components['schemas']['ServiceHealthItem'][];
+    };
+    SetOneDriveRootRequest: {
+      path: null | string;
     };
     SetPublicHostnameRequest: {
       hostname: null | string;
@@ -1132,6 +1184,7 @@ export interface components {
       skills: components['schemas']['ExtensionGrantSetting'];
       mcp: components['schemas']['ExtensionGrantSetting'];
       internet: components['schemas']['ExtensionGrantSetting'];
+      oneDrive: components['schemas']['ExtensionGrantSetting'];
       effective: components['schemas']['ExtensionValues'];
     };
     /** @enum {unknown} */
@@ -2302,6 +2355,68 @@ export interface operations {
         content: {
           'application/json': components['schemas']['UserExtensionsResponse'];
         };
+      };
+    };
+  };
+  GetOneDriveStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OneDriveStatusResponse'];
+        };
+      };
+    };
+  };
+  DisconnectOneDrive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OneDriveStatusResponse'];
+        };
+      };
+    };
+  };
+  SetOneDriveRoot: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetOneDriveRootRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

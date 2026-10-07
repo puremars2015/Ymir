@@ -31,6 +31,8 @@ public static class VibeMakerApplicationExtensions
         services.AddSingleton<Application.Extensions.ExtensionPolicyService>();
         services.AddSingleton<Application.Extensions.IExtensionPolicy>(sp => sp.GetRequiredService<Application.Extensions.ExtensionPolicyService>());
         services.AddSingleton<UserExecutionLocks>();
+        services.AddScoped<Application.Connectors.OneDrive.OneDriveConnectionService>();
+        services.AddSingleton<Application.Connectors.OneDrive.OneDriveAccessTokenCache>();
         services.AddSingleton<VibeMakerTelemetry>();
         services.AddSingleton<RuntimeCredentialService>();
         services.AddSingleton<ModelBudgetGuard>();

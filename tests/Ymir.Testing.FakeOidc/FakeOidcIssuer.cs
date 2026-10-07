@@ -28,8 +28,13 @@ public sealed class FakeOidcIssuer : IDisposable
         return code;
     }
 
-    /// <summary>驗證 code、redirect_uri、client 與 PKCE；成功時回傳 id_token。</summary>
-    public string? Redeem(string code, string clientId, string clientSecret, string redirectUri, string? codeVerifier, string issuer)
+    public static readonly TimeSpan AccessTokenLifetime = TimeSpan.FromHours(1);
+
+    private readonly ConcurrentDictionary<string, AccessGrant> _accessTokens = new();
+    private readonly ConcurrentDictionary<string, RefreshGrant> _refreshTokens = new();
+
+    /// <summary>驗證 code、redirect_uri、client 與 PKCE；成功時回傳 id_token 與 access token（要求 offline_access 時另有 refresh token）。</summary>
+    public RedeemResult? Redeem(string code, string clientId, string clientSecret, string redirectUri, string? codeVerifier, string issuer)
     {
         if (!_codes.TryRemove(code, out var pending) || pending.ExpiresAt < DateTimeOffset.UtcNow)
         {
@@ -56,7 +61,51 @@ public sealed class FakeOidcIssuer : IDisposable
             }
         }
 
-        return CreateIdToken(pending.Login, request.Nonce, issuer);
+        return new RedeemResult(CreateIdToken(pending.Login, request.Nonce, issuer), IssueTokens(pending.Login.Account, request.Scope));
+    }
+
+    /// <summary>refresh token 換發（每次輪替）；已撤銷或 client 不符時回傳 null（Entra 回 <c>invalid_grant</c>）。</summary>
+    public FakeTokens? Refresh(string refreshToken, string clientId, string clientSecret)
+    {
+        if (clientId != _settings.ClientId || clientSecret != _settings.ClientSecret || !_refreshTokens.TryRemove(refreshToken, out var grant))
+        {
+            return null;
+        }
+
+        return IssueTokens(grant.Account, grant.Scope);
+    }
+
+    /// <summary>測試用：撤銷帳號的所有 refresh token（模擬密碼變更或權限撤回）。</summary>
+    public void RevokeRefreshTokens(string account)
+    {
+        foreach (var (token, grant) in _refreshTokens)
+        {
+            if (string.Equals(grant.Account, account, StringComparison.OrdinalIgnoreCase))
+            {
+                _refreshTokens.TryRemove(token, out _);
+            }
+        }
+    }
+
+    /// <summary>Fake Graph 驗證 access token：回傳帳號（小寫），無效或過期時為 null。</summary>
+    public string? ResolveAccessToken(string? accessToken) =>
+        accessToken is not null && _accessTokens.TryGetValue(accessToken, out var grant) && grant.ExpiresAt > DateTimeOffset.UtcNow ? grant.Account : null;
+
+    public string UserPrincipalName(string account) => $"{account.ToLowerInvariant()}@{_settings.UserDomain}";
+
+    private FakeTokens IssueTokens(string account, string scope)
+    {
+        var normalized = account.ToLowerInvariant();
+        var accessToken = "fake-at-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
+        _accessTokens[accessToken] = new AccessGrant(normalized, DateTimeOffset.UtcNow.Add(AccessTokenLifetime));
+        string? refreshToken = null;
+        if (scope.Split(' ', StringSplitOptions.RemoveEmptyEntries).Contains("offline_access"))
+        {
+            refreshToken = "fake-rt-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            _refreshTokens[refreshToken] = new RefreshGrant(normalized, scope);
+        }
+
+        return new FakeTokens(accessToken, refreshToken, scope);
     }
 
     public JsonWebKey PublicJwk()
@@ -111,8 +160,16 @@ public sealed class FakeOidcIssuer : IDisposable
     }
 
     private sealed record PendingCode(FakeLogin Login, AuthorizeRequest Request, DateTimeOffset ExpiresAt);
+
+    private sealed record AccessGrant(string Account, DateTimeOffset ExpiresAt);
+
+    private sealed record RefreshGrant(string Account, string Scope);
 }
+
+public sealed record FakeTokens(string AccessToken, string? RefreshToken, string Scope);
+
+public sealed record RedeemResult(string IdToken, FakeTokens Tokens);
 
 public sealed record FakeLogin(string Account, string DisplayName, bool IsAdmin);
 
-public sealed record AuthorizeRequest(string ClientId, string RedirectUri, string State, string? Nonce, string? CodeChallenge);
+public sealed record AuthorizeRequest(string ClientId, string RedirectUri, string State, string? Nonce, string? CodeChallenge, string Scope = "openid profile");

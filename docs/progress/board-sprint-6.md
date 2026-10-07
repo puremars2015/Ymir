@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-08 02:00 ・ 狀態：**🚧 進行中（插單：OneDrive connector）**
+> 最後更新：2026-10-08 03:00 ・ 狀態：**🚧 進行中（插單：OneDrive 同步 O2）**
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -39,10 +39,10 @@
 | A0 | ADR-0012 spike：實測 Pi 1.0.0 在 RPC 模式的 `--no-skills` / `--skill`、能否不讀使用者層 `mcp.json`、平台 MCP 設定能否放在 Agent 不可寫的位置，以及 rootless Podman 能否限制 egress；結果寫回 ADR-0012 | ✅ | — |
 | A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`）+ 每人覆寫資料表 `vibemaker.user_extension_grants`<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | ✅ | — |
 | A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• `internet` 能力加入擴充政策（全域 + 每人）<br>• 受限網路部署文件 | ✅ | — |
-| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | — |
+| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | **暫停**：插單 OneDrive 完成後繼續 |
 | O0 | **插單** OneDrive connector ADR（[ADR-0013](../adr/0013-onedrive-connector.md)） | ✅ | — |
-| O1 | OneDrive 連結 / 解除連結：<br>• `onedrive` 能力<br>• 授權碼 + PKCE 連結流程、refresh token 加密保存<br>• 根資料夾、設定頁<br>• FakeGraph 測試替身 | 🚧 | O0 |
-| O2 | OneDrive 同步：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | ⏳ | O1 |
+| O1 | OneDrive 連結 / 解除連結：<br>• `onedrive` 能力<br>• 授權碼 + PKCE 連結流程、refresh token 加密保存<br>• 根資料夾、設定頁<br>• FakeGraph 測試替身 | ✅ | — |
+| O2 | OneDrive 同步：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | 🚧 | — |
 | R0 | RAG ADR（ADR-0014）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite（sqlite-vec）部署、權限 | ⏳ | **❓待決定**：Embedding 模型與硬體、文件格式與容量、外部回答模型的資料政策 |
 | R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ⏳ | R0 經使用者確認 |
 | R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ⏳ | R1 |
@@ -367,6 +367,95 @@
 - **驗證**：只改文件；`git diff --check`。
 - **未驗證、待使用者環境確認**：真實 Entra 權限同意與 Microsoft Graph（沙箱連不到，改用 FakeGraph）。
 - **下一步**：O1 連結與解除連結。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #007 · O1 完成：OneDrive 連結與解除連結
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 03:00 · `✅完成`
+
+- **做了什麼**（ADR-0013 §1～§3、§6）：
+  - **能力**：擴充政策新增 `oneDrive`（全域預設 + 每人覆寫，預設關閉）；管理介面、使用者頁、個人設定頁自動帶出。
+  - **連結流程**：
+    - `GET /api/connectors/onedrive/connect` 以授權碼 + PKCE 導向 Microsoft（scope `offline_access Files.ReadWrite User.Read`）；
+    - state 與 verifier 存在 Data Protection 加密、只用一次、綁定使用者的短期 cookie；
+    - `/callback` 驗證 state、使用者與過期時間；企業帳號必須連到同一個 oid（`mismatch` 會被拒絕）；
+    - 導回只用站內路徑，結果以 `?onedrive=` 代碼表示，不轉送 IdP 的錯誤內容。
+  - **憑證**：
+    - 新資料表 `vibemaker.onedrive_connections`（migration `OneDriveConnections`）只存加密的 refresh token；
+    - 換發時輪替；`invalid_grant` → `NeedsReauth`，重新連結後恢復；
+    - access token 只放記憶體；token 不在任何回應、log、稽核。
+  - **根資料夾**：`PUT /api/connectors/onedrive/root` 只接受名稱路徑，後端在使用者自己的 drive 逐層取得或建立；規則見 `OneDrivePaths`。
+  - **Graph**：`GraphOneDriveClient` 在 429 / 503 時依 Retry-After 重試，錯誤只回摘要。
+  - **其他**：
+    - 稽核 `connector.onedrive.connect` / `disconnect` / `root.update`；
+    - 端點加入授權矩陣（只作用在目前使用者）；
+    - 解除連結不需要能力，被關閉的使用者也能移除自己的 token。
+  - **測試替身**：
+    - Fake OIDC 新增 refresh token（輪替、撤銷）、scope、OneDrive callback redirect URI，login_hint 改用最後一個值並接受 `帳號@網域`；
+    - Fake Graph 放在同一個 server 的 `/graph/v1.0`：記憶體 drive、eTag / If-Match 412、upload session、注入 429。
+  - **前端**：個人設定頁的「OneDrive」卡片：連結 / 重新連結 / 解除連結、同步資料夾、狀態與結果訊息。
+- **驗證**：
+  - `dotnet test --solution`：621 通過。
+    - 新增整合測試 `OneDriveConnectionTests`：完整連結流程、token 不外洩、根資料夾建立、稽核、未開放回 403、帳號不符、偽造 state、撤銷後 NeedsReauth 與重新連結、refresh token 輪替、429 重試、不合法路徑；
+    - 新增單元測試 `OneDriveRulesTests`。
+  - OpenAPI 快照與 schema 已更新；前端 lint、125 個 Vitest、build 通過。
+  - 新的 `npm run e2e:onedrive` 在沙箱用瀏覽器跑完：管理員開放 → 使用者連結（真的經過授權導向）→ 設定資料夾 → 解除連結。
+- **與計畫的差異**：Fake Graph 沒有獨立成 `Ymir.Testing.FakeGraph` 專案，改放在 Fake OIDC 同一個 server，access token 由同一個 issuer 驗證，e2e 少啟動一個服務。
+- **未驗證、待使用者環境確認**：真實 Entra 的 `Files.ReadWrite` 同意、Microsoft Graph 與 OneDrive for Business（沙箱連不到）。
+- **下一步**：O2 同步（執行前下載、執行後上傳、衝突保留兩份、雲端保存狀態）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #008 · CI 修正：`dotnet format` 檢查
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 03:20 · `🔧修正`
+
+- **問題**：#46（O1）的 `.NET build & test` 在 `dotnet format --verify-no-changes` 失敗。原因是 main 上其他人的變更留下的格式問題，O1 本身的程式沒有違規：
+  - `ExecutionArtifact.cs` 一行有兩個初始化；
+  - 3 個測試檔的 using 順序不對。
+- **修正**：執行 `dotnet format Ymir.slnx`，只有空白與 using 排序的機械式變更，沒有改到任何行為。
+- **驗證**：
+  - 本機 `dotnet format --verify-no-changes` 0 錯誤；
+  - `dotnet build` 0 警告；
+  - `AuthorizationMatrixTests`、`RemoteRuntimeApiTests` 通過。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #009 · CI 修正：準備階段逾時誤報為執行環境錯誤
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 03:40 · `🔧修正`
+
+- **問題**：#46 重跑 CI 時，`ExecutionTimeoutTests` 失敗：預期 `AGENT_TIMEOUT`，實際是 `AGENT_RUNTIME_ERROR`。
+  - log 顯示逾時發生在 main 新增的 `PrepareDeliveryAsync`（Agent 啟動前建立交付目錄）。
+  - 這一步拋出的 `TaskCanceledException` 被通用 catch 當成執行環境錯誤。
+  - 這是 main 既有的時序問題，不是 O1 的變更造成的；只在準備階段剛好碰上逾時時才會發生，本機跑了 3 次都通過。
+- **修正**：`ExecutionRunner` 在通用 catch 之前，先處理 `runToken` 已取消的 `OperationCanceledException`，轉為 `AgentCancelled`，再由既有邏輯判斷是逾時（`AGENT_TIMEOUT`）還是使用者取消。
+- **測試**：新增 `ExecutionTimeoutDuringPreparationTests`（約 6 毫秒的逾時，涵蓋 Agent 啟動前的各階段）。
+- **驗證**：
+  - `dotnet build`、`dotnet format --verify-no-changes` 0 錯誤；
+  - `ExecutionTimeout*`、`ExecutionFlowTests` 共 9 個通過。
 
 <details>
 <summary>💬 回覆（0）</summary>

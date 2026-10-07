@@ -2,13 +2,13 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
-using Ymir.VibeMaker.Application.Files;
-using Ymir.VibeMaker.Application.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Ymir.Api.Endpoints;
 using Ymir.IntegrationTests.Api;
 using Ymir.IntegrationTests.Executions;
 using Ymir.Platform.Users;
+using Ymir.VibeMaker.Application.Files;
+using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Contracts.Conversations;
 using Ymir.VibeMaker.Contracts.Make;
 using Ymir.VibeMaker.Contracts.Projects;
@@ -154,6 +154,11 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "GET /api/me/settings/",
         "PUT /api/me/settings/",
         "GET /api/extensions",
+        "GET /api/connectors/onedrive/",
+        "GET /api/connectors/onedrive/connect",
+        "GET /api/connectors/onedrive/callback",
+        "PUT /api/connectors/onedrive/root",
+        "DELETE /api/connectors/onedrive/",
     ];
 
     private sealed record OwnedResources(Guid ProjectId, Guid ConversationId, Guid ExecutionId);

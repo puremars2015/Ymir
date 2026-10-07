@@ -34,6 +34,8 @@ public interface IVibeMakerDbContext
 
     DbSet<UserExtensionGrant> UserExtensionGrants { get; }
 
+    DbSet<OneDriveConnection> OneDriveConnections { get; }
+
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity)
         where TEntity : class;
 
