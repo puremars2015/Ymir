@@ -33,6 +33,8 @@ import {
   Me,
   ModelOption,
   ModelAccess,
+  UserModelAccess,
+  SaveUserModelAccess,
   SaveModelAccess,
   SendMessageResponse,
   Project,
@@ -45,6 +47,18 @@ import {
 /** 呼叫 Ymir API。認證靠同源 HttpOnly cookie，XSRF header 由 HttpClient 自動加上（ADR-0002）。 */
 @Injectable({ providedIn: 'root' })
 export class ApiService {
+  adminGetUserModelAccess(userId: string): Observable<UserModelAccess> {
+    return this.http.get<UserModelAccess>(`/api/admin/users/${userId}/models`);
+  }
+  adminSaveUserModelAccess(
+    userId: string,
+    request: SaveUserModelAccess,
+  ): Observable<UserModelAccess> {
+    return this.http.put<UserModelAccess>(`/api/admin/users/${userId}/models`, request);
+  }
+  adminResetUserModelAccess(userId: string): Observable<UserModelAccess> {
+    return this.http.delete<UserModelAccess>(`/api/admin/users/${userId}/models`);
+  }
   getModelAccess(): Observable<ModelAccess> {
     return this.http.get<ModelAccess>('/api/admin/settings/models');
   }

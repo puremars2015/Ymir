@@ -53,7 +53,7 @@ public sealed class ExecutionService(
             return existing;
         }
 
-        var models = await modelAccess.GetAsync(cancellationToken).ConfigureAwait(false);
+        var models = await modelAccess.GetForUserAsync(userId, cancellationToken).ConfigureAwait(false);
         if (models.DefaultModelId is null || (request.ModelId is not null && !models.IsAvailable(request.ModelId)))
         {
             return SubmitMessageResult.ModelNotAvailable;

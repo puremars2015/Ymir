@@ -1793,6 +1793,105 @@
         }
       }
     },
+    "/api/admin/users/{userId}/models": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetUserModelAccess",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserModelAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveUserModelAccess",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveUserModelAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserModelAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminResetUserModelAccess",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserModelAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/make-topics": {
       "get": {
         "tags": [
@@ -3494,6 +3593,20 @@
           }
         }
       },
+      "SaveUserModelAccessRequest": {
+        "required": [
+          "overrides"
+        ],
+        "type": "object",
+        "properties": {
+          "overrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
       "SendMessageRequest": {
         "required": [
           "content",
@@ -3872,6 +3985,69 @@
           },
           "effective": {
             "$ref": "#/components/schemas/ExtensionValues"
+          }
+        }
+      },
+      "UserModelAccessResponse": {
+        "required": [
+          "models",
+          "defaultModelId",
+          "isValid",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserModelOptionResponse"
+            }
+          },
+          "defaultModelId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isValid": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "UserModelOptionResponse": {
+        "required": [
+          "id",
+          "displayName",
+          "systemEnabled",
+          "override",
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "systemEnabled": {
+            "type": "boolean"
+          },
+          "override": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
           }
         }
       },
