@@ -22,6 +22,7 @@ import { ApiService, describeApiError } from '../../core/api/api.service';
 import { OidcSettings, OidcTestResult } from '../../core/api/api-types';
 import { AdminTabs } from './admin-tabs';
 import { ExtensionSettingsCard } from './extension-settings-card';
+import { PlatformMcpCard } from './platform-mcp-card';
 import { RuntimeSettingsCard } from './runtime-settings-card';
 import { TunnelSettingsCard } from './tunnel-settings-card';
 
@@ -35,6 +36,7 @@ import { TunnelSettingsCard } from './tunnel-settings-card';
     AdminTabs,
     DatePipe,
     ExtensionSettingsCard,
+    PlatformMcpCard,
     FormsModule,
     RuntimeSettingsCard,
     TunnelSettingsCard,
@@ -197,6 +199,7 @@ import { TunnelSettingsCard } from './tunnel-settings-card';
       <app-tunnel-settings-card />
       <app-runtime-settings-card />
       <app-extension-settings-card />
+      <app-platform-mcp-card />
     </section>
   `,
   styles: `

@@ -48,6 +48,10 @@ public static class VibeMakerInfrastructureExtensions
         services.AddSingleton<Application.Connectors.OneDrive.IOneDriveTokenProtector, Connectors.OneDrive.DataProtectionOneDriveTokenProtector>();
         services.Configure<Application.Connectors.OneDrive.OneDriveSyncOptions>(configuration.GetSection(Connectors.OneDrive.OneDriveOptions.SectionName));
         services.AddHostedService<Connectors.OneDrive.OneDriveSyncWorker>();
+
+        // 平台 MCP（ADR-0012 B）：設定 gateway 位址時才啟用；目錄與簽章金鑰不合法時拒絕啟動。
+        services.Configure<Application.PlatformMcp.McpOptions>(configuration.GetSection(Application.PlatformMcp.McpOptions.SectionName));
+        services.AddSingleton(PlatformMcpCatalogLoader.Load(configuration));
         services.AddHealthChecks()
             .AddCheck<Health.DatabaseHealthCheck>("database", tags: [Health.VibeMakerHealthChecks.ReadyTag], timeout: Health.VibeMakerHealthChecks.Timeout)
             .AddCheck<Health.RuntimeHealthCheck>("runtime", tags: [Health.VibeMakerHealthChecks.ReadyTag], timeout: Health.VibeMakerHealthChecks.Timeout)
@@ -234,3 +238,23 @@ public enum HarnessKind
     /// <summary>固定腳本的假 Agent，不需要 runtime 與 LLM。</summary>
     Scripted = 1,
 }
+
+/// <summary>啟動時載入平台 MCP 服務目錄（ADR-0012 B.1）。</summary>
+internal static class PlatformMcpCatalogLoader
+{
+    public static Application.PlatformMcp.McpCatalog Load(IConfiguration configuration)
+    {
+        var options = configuration.GetSection(Application.PlatformMcp.McpOptions.SectionName).Get<Application.PlatformMcp.McpOptions>()
+            ?? new Application.PlatformMcp.McpOptions();
+        if (!options.IsEnabled)
+        {
+            return Application.PlatformMcp.McpCatalog.Empty;
+        }
+
+        Application.PlatformMcp.McpGatewayToken.EnsureKeyIsStrong(options.TokenSigningKey, "Ymir:Mcp:TokenSigningKey");
+        return string.IsNullOrWhiteSpace(options.CatalogPath)
+            ? throw new InvalidOperationException("Ymir:Mcp:CatalogPath is required when Ymir:Mcp:GatewayUrl is set.")
+            : Application.PlatformMcp.McpCatalog.Load(options.CatalogPath);
+    }
+}
+

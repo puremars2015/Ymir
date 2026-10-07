@@ -31,6 +31,14 @@ import { MyExtensions } from '../../core/api/api-types';
               <span class="muted">（{{ d.mcpServers.join('、') }}）</span>
             }
           </li>
+          <li>
+            平台服務：
+            @if (d.platformMcpServers.length > 0) {
+              <strong>{{ platformNames(d) }}</strong>
+            } @else {
+              <strong>沒有</strong>
+            }
+          </li>
         </ul>
         <p class="muted hint">
           @if (d.skillsAllowed || d.mcpAllowed) {
@@ -76,6 +84,10 @@ export class MyExtensionsCard implements OnInit {
 
   protected readonly data = signal<MyExtensions | null>(null);
   protected readonly error = signal<string | null>(null);
+
+  protected platformNames(data: MyExtensions): string {
+    return data.platformMcpServers.map((s) => s.name).join('、');
+  }
 
   ngOnInit(): void {
     this.api.getMyExtensions().subscribe({

@@ -18,6 +18,9 @@ import {
   MyExtensions,
   OneDriveStatus,
   ConversationOneDrive,
+  McpServerAccess,
+  PlatformMcpServers,
+  SaveMcpServerAccessRequest,
   SaveUserExtensionsRequest,
   UserExtensions,
   AdminUsage,
@@ -218,6 +221,21 @@ export class ApiService {
 
   fetchFileBlob(url: string): Observable<Blob> {
     return this.http.get(url, { responseType: 'blob' });
+  }
+
+  /** 平台 MCP 服務與存取清單（ADR-0012 B.4）；不含後端位址。 */
+  adminListMcpServers(): Observable<PlatformMcpServers> {
+    return this.http.get<PlatformMcpServers>('/api/admin/mcp-servers');
+  }
+
+  adminSaveMcpServerAccess(
+    name: string,
+    request: SaveMcpServerAccessRequest,
+  ): Observable<McpServerAccess> {
+    return this.http.put<McpServerAccess>(
+      `/api/admin/mcp-servers/${encodeURIComponent(name)}/access`,
+      request,
+    );
   }
 
   adminListUsers(search: string): Observable<AdminUser[]> {

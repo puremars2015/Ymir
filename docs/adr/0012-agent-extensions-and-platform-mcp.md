@@ -192,3 +192,12 @@
 
 - 對外連線改由管理員控制（`internet` 能力，全域預設 + 每人覆寫），**預設允許**。設計見 A.8。
 - 正式主機要關閉對外連線前，需先依部署文件建立受限網路並把 LiteLLM 與 gateway 接上；rootless 的實際行為待使用者在正式主機確認。
+
+## 階段 2 實作附註（2026-10-08，A2）
+
+- **Gateway**：`src/Ymir.McpGateway`，獨立程序與部署單元（`deploy/mcp/`）。`/mcp/{服務}` 以反向代理轉送 streamable HTTP MCP（POST / GET / DELETE），只轉送 MCP 需要的標頭；後端憑證依目錄的 `credentialEnv` 從 gateway 自己的部署 secret 取得，Agent 的 token 不會送到後端。
+- **Token**：`ymcp1.{payload}.{HMAC-SHA256}`，payload 含 user id、允許的服務（簽發時的「目錄 ∩ 存取清單」）、到期時間。API 與 gateway 共用簽章金鑰（`Ymir:Mcp:TokenSigningKey` / `McpGateway:TokenSigningKey`，至少 32 字元，只放部署 secret）。期限 = 該次執行的逾時 + 5 分鐘，上限 1 小時；因此**管理員撤銷存取最慢在 token 期限內生效**，gateway 不讀 Ymir 的業務資料表（只用資料庫寫稽核）。
+- **注入 Pi**：每次執行把可用服務寫進 `mcp.json`：`{"url": "<gateway>/mcp/<服務>", "headers": {"Authorization": "Bearer ${YMIR_MCP_TOKEN}"}, "description": ..., "exposure": "direct"}`（Pi 1.0.0 的 `headers` 支援環境變數展開），名稱衝突時平台優先；token 以 `exec --env YMIR_MCP_TOKEN` 傳入。有平台服務時，即使使用者沒有 `mcp` 能力也載入 `builtin:mcp`，但不合併使用者自建的項目。
+- **存取清單**：`vibemaker.mcp_server_access`（服務名稱、啟用、模式：所有使用者 / 只有管理員 / 指定使用者），目錄中沒有紀錄的服務視為停用。管理端點 `GET /api/admin/mcp-servers`、`PUT /api/admin/mcp-servers/{name}/access`；成員端 `GET /api/extensions` 的 `platformMcpServers` 只回名稱與說明。
+- **稽核與限制**：`mcp.tool.call`（actor `user:{id}`、target `{服務}/{工具}`，不含參數與回傳）、`mcp.access.denied`、`admin.mcp.access.update`；每人每分鐘請求上限（預設 60，回 429），POST 逾時（預設 120 秒），請求本文上限 1 MB。
+- **驗證**：整合測試以真實 Pi + Fake LLM（`[mcp-echo]`）+ gateway + Fake MCP（`tests/Ymir.Testing.FakeMcp`）端到端呼叫 echo 工具；另測偽造 / 過期 token、未授權服務、rate limit、後端只收到 gateway 的憑證、`mcp.json` 不含 token 值。真實後端服務與正式主機受限網路連到 gateway 的路由**未驗證、待使用者環境確認**。

@@ -597,6 +597,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/mcp-servers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminListMcpServers'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/mcp-servers/{name}/access': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['AdminSaveMcpServerAccess'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/connectors/onedrive': {
     parameters: {
       query?: never;
@@ -967,6 +999,15 @@ export interface components {
       /** Format: int32 */
       sortOrder: number | string;
     };
+    /** @enum {unknown} */
+    McpAccessMode: 'Everyone' | 'AdminsOnly' | 'SelectedUsers';
+    McpServerAccessResponse: {
+      name: string;
+      description: string;
+      enabled: boolean;
+      mode: components['schemas']['McpAccessMode'];
+      userIds: string[];
+    };
     MeResponse: {
       /** Format: uuid */
       id: string;
@@ -1007,6 +1048,7 @@ export interface components {
       inventoryAvailable: boolean;
       skills: string[];
       mcpServers: string[];
+      platformMcpServers: components['schemas']['PlatformMcpServerSummary'][];
     };
     OidcSettingsResponse: {
       source: components['schemas']['OidcSettingsSource'];
@@ -1052,6 +1094,14 @@ export interface components {
     PasswordLoginRequest: {
       account: null | string;
       password: null | string;
+    };
+    PlatformMcpServersResponse: {
+      enabled: boolean;
+      servers: components['schemas']['McpServerAccessResponse'][];
+    };
+    PlatformMcpServerSummary: {
+      name: string;
+      description: string;
     };
     ProjectResponse: {
       /** Format: uuid */
@@ -1121,6 +1171,11 @@ export interface components {
       /** Format: int32 */
       sortOrder: number | string;
       isEnabled: boolean;
+    };
+    SaveMcpServerAccessRequest: {
+      enabled: boolean;
+      mode: components['schemas']['McpAccessMode'];
+      userIds: null | string[];
     };
     SaveOidcSettingsRequest: {
       enabled: boolean;
@@ -2402,6 +2457,50 @@ export interface operations {
         content: {
           'application/json': components['schemas']['UserExtensionsResponse'];
         };
+      };
+    };
+  };
+  AdminListMcpServers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlatformMcpServersResponse'];
+        };
+      };
+    };
+  };
+  AdminSaveMcpServerAccess: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveMcpServerAccessRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

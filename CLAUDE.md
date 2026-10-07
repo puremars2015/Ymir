@@ -22,6 +22,7 @@ src/
   Ymir.ServiceDefaults/              OpenTelemetry、health check
   Ymir.Edge/                         對外入口（Cloudflare Tunnel，ADR-0006）：可信任 proxy 的 X-Forwarded-*、Host 限制、HSTS、提供 Angular build
   Ymir.Api/Containerfile             API image（含 Angular build；Provider=Remote，ADR-0008）
+  Ymir.McpGateway/                   平台 MCP Gateway（ADR-0012 B）：驗證每人短期 token、依 deploy/mcp/servers.json 轉送到後端、rate limit、稽核
   Ymir.RuntimeHost/                  主機服務（ADR-0008）：Unix socket + token，以 user id 管理 Agent container、WebSocket 轉送 stdio
   Platform/Ymir.Platform[.Infrastructure]/         共用核心：使用者、本機帳號密碼（LocalCredential）、身份（ICurrentUser）、稽核；schema platform
   Modules/VibeMaker/Ymir.VibeMaker/                Domain/（實體、狀態機）+ Application/（Projects、Conversations、Executions 用例；IAgentHarness、IAgentRuntimeManager、IModelGateway）
@@ -31,12 +32,14 @@ tests/
   Ymir.UnitTests/                    含 Fixtures/pi-rpc/：Pi 1.0.0 的真實 RPC 錄製
   Ymir.IntegrationTests/             WebApplicationFactory + SQL Server（每個 fixture 獨立資料庫）+ 真實 Pi；含授權矩陣、OpenAPI 快照
   Ymir.Testing.FakeLlm/              OpenAI 相容假模型（[create-file] / [slow] / [fail] 腳本）
+  Ymir.Testing.FakeMcp/              streamable HTTP 的 echo MCP server（gateway 測試用）
   Ymir.Testing.FakeOidc/             模擬 Entra ID 的 OIDC 伺服器（tid / oid / pairwise sub / roles、PKCE、refresh token）與 Fake Graph（`/graph/v1.0`，OneDrive），測試與本機開發用
 web/                                 Angular 22（standalone、signals、zoneless、Vitest、ESLint）；src/app/core/api/schema.ts 由 OpenAPI 產生；e2e/ Playwright 腳本
 runtime/agent/                       Agent runtime Containerfile
 deploy/cloudflared/                  cloudflared ingress 設定範本（指南 docs/guides/cloudflare-tunnel.md）
 deploy/litellm/                      LiteLLM proxy sample（MiniMax 國際站 + Fake LLM）；金鑰只放在 .env（已被 gitignore）
 deploy/api/                          API container：Linux 用 rootful Podman + Quadlet（ymir-api.container），Windows 用 Docker Desktop（compose.windows.yml）；唯讀、只掛 socket 目錄與 Data Protection 金鑰
+deploy/mcp/                          平台 MCP 服務目錄 servers.json（版控）、gateway 的 systemd unit 與設定範本
 deploy/runtime-host/                 runtime host 的 systemd unit、設定範本與安裝指南
 spikes/pi-rpc-poc/                   技術驗證主控台程式
 ```
@@ -82,6 +85,8 @@ cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:admin -- <截圖�
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:network -- <截圖目錄>
 # OneDrive connector（ADR-0013；需要 Fake OIDC，API 設定見 web/e2e/onedrive-flow.mjs 開頭）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:onedrive -- <截圖目錄>
+# 平台 MCP（ADR-0012 B；需要 Fake MCP、MCP Gateway、API 的 Ymir__Mcp__*，見 deploy/mcp/README.md「本機驗證」）
+cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:mcp -- <截圖目錄>
 
 # 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
 dotnet run --project src/Ymir.AppHost
@@ -118,6 +123,8 @@ Runtime 生命週期（ADR-0011）：`RuntimeLifecycleWorker` 啟動時對帳、
 
 Agent 擴充能力（ADR-0012）：管理員在「管理 → 系統設定」設定全域預設（`vibemaker.extension_policy`），在「使用者」頁設定每人覆寫（`vibemaker.user_extension_grants`）；`ExtensionPolicyService` 解析、`ExecutionRunner` 每次執行帶入 `AgentRunRequest.Extensions`。`PiAgentHarness` **一律** `--no-extensions`（Agent 寫的 extension 不得載入），沒有 `skills` 加 `--no-skills`，有 `mcp` 才 `-e builtin:mcp`；每次執行前重寫 agent dir 的 `settings.json` / `trust.json` / `mcp.json`（使用者自建 MCP 在 `mcp.user.json`）與平台 skill（`PiExtensionConfig`）。成員端 `GET /api/extensions` 只回名稱，不回 MCP 設定內容。對外連線（`internet` 能力，預設允許，ADR-0012 A.8）：關閉時 `ExecutionRunner` 以 `RuntimeNetworkAccess.Restricted` 呼叫 `EnsureRuntimeAsync`，container 改接 `VibeMaker:Runtime:RestrictedNetwork`（`--internal`，名稱只來自部署設定；runtime host 只接受 `network=internet|restricted`）；label `ymir.network` 不符時重建並稽核 `runtime.recreate`；沒有設定受限網路時執行失敗，**不得**退回成可以對外連線。
 
+平台 MCP（ADR-0012 B，指南 `deploy/mcp/README.md`）：服務只在版控的 `deploy/mcp/servers.json` 定義；Admin 在「管理 → 系統設定 → 平台 MCP 服務」只能啟用與設定對象（`vibemaker.mcp_server_access`）。`ExecutionRunner` 經 `PlatformMcpService.PrepareRunAsync` 取得「目錄 ∩ 存取清單」並簽發每人短期 token（`McpGatewayToken`，HMAC，`Ymir:Mcp:TokenSigningKey`），`PiExtensionConfig` 把 gateway 位址寫進 `mcp.json`（`Authorization: Bearer ${YMIR_MCP_TOKEN}`，檔案裡沒有 token 值，平台項目覆蓋同名的使用者項目），token 只以 `exec --env YMIR_MCP_TOKEN` 傳入。Gateway（`src/Ymir.McpGateway`）驗證 token、轉送並換成後端憑證（只在 gateway 的部署 secret）、每人 rate limit、稽核 `mcp.tool.call`；不得掛載 container runtime socket 或 workspace，不讀業務資料表。沒有設定 `Ymir:Mcp:GatewayUrl` 時平台 MCP 停用。
+
 OneDrive connector（ADR-0013）：管理員開放 `oneDrive` 能力後，使用者在個人設定連結（`/api/connectors/onedrive/connect` → Microsoft 授權碼 + PKCE → `/callback`，state 存在加密的短期 cookie、綁定使用者；企業帳號必須連到同一個 oid）。沿用登入的 Entra 註冊（`OidcOneDriveSettingsSource`），需在 Entra 加 `Files.ReadWrite`、`offline_access` 委派權限與 callback redirect URI。`OneDriveConnectionService` 保存 Data Protection 加密的 refresh token（換發時輪替、`invalid_grant` → `NeedsReauth`），access token 只在記憶體；Graph 呼叫在 `GraphOneDriveClient`（429 / 503 依 Retry-After 重試，base URL `Ymir:Connectors:OneDrive:GraphBaseUrl` 只給測試替身用）。同步（`OneDriveSyncService`，指南 `docs/guides/onedrive.md`）：`ExecutionRunner` 在 Agent 啟動前（持有使用者鎖）下載雲端變更，執行結束後把工作排進 `vibemaker.onedrive_sync_scopes.upload_pending`，由 `OneDriveSyncWorker` 以 `UserExecutionLocks.TryAcquire` 取鎖後下載 + 上傳（持久化、重啟後繼續、失敗退避重試 5 次）。專案 → `<根>/projects/<名稱>-<id8>`、未分組對話 → `<根>/chats/<標題>-<id8>`；雲端以 eTag + If-Match、本機以大小 + 修改時間比對，兩邊都改時原檔名放雲端版本、本機版本另存「(OneDrive 衝突 時間)」副本（兩邊都有），不同步刪除；檔案只經 `IWorkspaceFileReader` / `IWorkspaceFileWriter` 在 runtime 內讀寫，Agent 拿不到任何 Graph 憑證。`deliverables/` 只上傳不下載。對話端點 `GET /api/conversations/{id}/onedrive`、`POST .../onedrive/sync`（未就緒回 409 `ONEDRIVE_NOT_READY`）；檔案面板的 `app-onedrive-sync` 顯示雲端保存狀態，與任務結果分開。
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
@@ -150,6 +157,7 @@ API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:de
 - `LocalRuntimeManager` 沒有隔離，只允許 Development 環境（DI 會在其他環境拒絕啟動）。
 - API container 不得掛載 container runtime socket（podman.sock / docker.sock）或使用者 workspace，只能經由 runtime host（ADR-0008）。Runtime host 的端點只接受 user id 與 runtime 內的程序規格，不得新增接受 host 路徑、image、掛載或資源設定的端點；改動協定時同步更新 `RuntimeHostProtocolTests` 與 `RuntimeHostTests`。Runtime host token 只放在部署 secret，不得進版控；不得用 rootless Podman 帳號 `ymir` 跑 API container。
 - 不得保存登入的 IdP token（`SaveTokens=false`）；OneDrive connector 的 refresh token 是唯一例外（ADR-0013）：只以 Data Protection 加密存在 `vibemaker.onedrive_connections`、只在後端使用，不得回傳、記錄、寫入稽核或傳進 Agent container；登入後導回位址只接受站內相對路徑（`SafeRedirect`）。Entra client secret 只放在 `deploy/api/.env`、部署 secret，或經管理介面以 Data Protection 加密存進 `platform.system_settings`（ADR-0010）；任何 API 回應、稽核、log 都不得包含 secret 值，`ISystemSettingsStore.SetAsync`（明文）不得用來存機密。本機帳號密碼只存 `PasswordHasher` 雜湊，不得記錄、回傳或寫入 log；登入端點的錯誤訊息不得區分「帳號不存在」與「密碼錯誤」。
+- 平台 MCP 的 token 簽章金鑰與後端服務憑證只放部署 secret（`/etc/ymir/mcp-gateway.env`、`deploy/api/.env`），不得進版控、不得進 Agent container；Agent 只拿到短期 gateway token 的環境變數。
 - 模型供應商金鑰（例如 `MINIMAX_API_KEY`）與 LiteLLM master key 只放在 `deploy/*/.env` 或部署環境的 secret，不得進版控、不得進 Agent container。
 - 對外公開（`Ymir:PublicEdge`，ADR-0006）不得在 Development 環境開啟；API 只綁 127.0.0.1、只信任 cloudflared 的 `X-Forwarded-*`。Tunnel 憑證不得進版控、不得進 API 或 Agent container；由管理介面設定時只經 runtime host 寫入 `ymir` 帳號的 600 檔案（ADR-0010），API 與資料庫不得保存、回應與稽核不得包含 token。Runtime host 的 tunnel 端點只接受 token 字串，檔案位置與服務名稱只來自 runtime host 設定；新增端點時同步更新 `TunnelEndpointTests.RuntimeHost_ExposesOnlyTheReviewedEndpoints`。
 

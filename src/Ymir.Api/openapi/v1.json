@@ -1490,6 +1490,59 @@
         }
       }
     },
+    "/api/admin/mcp-servers": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminListMcpServers",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMcpServersResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/mcp-servers/{name}/access": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveMcpServerAccess",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveMcpServerAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/connectors/onedrive": {
       "get": {
         "tags": [
@@ -2704,6 +2757,44 @@
           }
         }
       },
+      "McpAccessMode": {
+        "enum": [
+          "Everyone",
+          "AdminsOnly",
+          "SelectedUsers"
+        ]
+      },
+      "McpServerAccessResponse": {
+        "required": [
+          "name",
+          "description",
+          "enabled",
+          "mode",
+          "userIds"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/McpAccessMode"
+          },
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "MeResponse": {
         "required": [
           "id",
@@ -2841,7 +2932,8 @@
           "oneDriveAllowed",
           "inventoryAvailable",
           "skills",
-          "mcpServers"
+          "mcpServers",
+          "platformMcpServers"
         ],
         "type": "object",
         "properties": {
@@ -2870,6 +2962,12 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "platformMcpServers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformMcpServerSummary"
             }
           }
         }
@@ -3070,6 +3168,39 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "PlatformMcpServersResponse": {
+        "required": [
+          "enabled",
+          "servers"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/McpServerAccessResponse"
+            }
+          }
+        }
+      },
+      "PlatformMcpServerSummary": {
+        "required": [
+          "name",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
           }
         }
       },
@@ -3345,6 +3476,32 @@
           },
           "isEnabled": {
             "type": "boolean"
+          }
+        }
+      },
+      "SaveMcpServerAccessRequest": {
+        "required": [
+          "enabled",
+          "mode",
+          "userIds"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/McpAccessMode"
+          },
+          "userIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },

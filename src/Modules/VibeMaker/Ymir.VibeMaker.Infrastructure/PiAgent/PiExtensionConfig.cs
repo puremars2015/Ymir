@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Ymir.VibeMaker.Application.Extensions;
+using Ymir.VibeMaker.Application.PlatformMcp;
 
 namespace Ymir.VibeMaker.Infrastructure.PiAgent;
 
@@ -28,7 +29,8 @@ internal static class PiExtensionConfig
 
     private static readonly JsonSerializerOptions s_writeOptions = new() { WriteIndented = true };
 
-    public static IReadOnlyList<string> BuildArguments(EffectiveExtensions extensions)
+    /// <param name="hasPlatformMcp">有平台 MCP 服務時，即使使用者沒有 <c>mcp</c> 能力也要載入 MCP 支援（只合併平台項目，ADR-0012 B）。</param>
+    public static IReadOnlyList<string> BuildArguments(EffectiveExtensions extensions, bool hasPlatformMcp = false)
     {
         ArgumentNullException.ThrowIfNull(extensions);
         List<string> arguments = ["--no-extensions"];
@@ -37,7 +39,7 @@ internal static class PiExtensionConfig
             arguments.Add("--no-skills");
         }
 
-        if (extensions.Mcp)
+        if (extensions.Mcp || hasPlatformMcp)
         {
             arguments.AddRange(["--extension", "builtin:mcp"]);
         }
@@ -53,9 +55,10 @@ internal static class PiExtensionConfig
     /// <summary>
     /// 產生該次執行的 <c>mcp.json</c>：允許 <c>mcp</c> 時帶入使用者自建的項目，否則為空。
     /// 只取 <c>mcpServers</c>；內容不是合法 JSON 物件時視為沒有（<paramref name="invalid"/> 為 true，由呼叫端記錄）。
-    /// 第二階段的平台 MCP 會在這裡合併且優先（ADR-0012 B.6）。
+    /// 平台 MCP 服務（<paramref name="platformServers"/>）最後合併，名稱相同時覆蓋使用者項目（ADR-0012 B.6），
+    /// 只寫 gateway 位址與 <c>Authorization: Bearer ${YMIR_MCP_TOKEN}</c>（Pi 在連線時才從環境變數展開），檔案裡沒有 token 值。
     /// </summary>
-    public static string BuildMcpConfig(string? userMcpJson, bool allowUserServers, out bool invalid)
+    public static string BuildMcpConfig(string? userMcpJson, bool allowUserServers, out bool invalid, IReadOnlyList<PlatformMcpServer>? platformServers = null)
     {
         invalid = false;
         var servers = new JsonObject();
@@ -84,8 +87,23 @@ internal static class PiExtensionConfig
             }
         }
 
+        foreach (var platform in platformServers ?? [])
+        {
+            servers[platform.Name] = new JsonObject
+            {
+                ["url"] = platform.Url.ToString(),
+                ["headers"] = new JsonObject { ["Authorization"] = $"Bearer ${{{PlatformMcpTokenEnvironmentVariable}}}" },
+                ["description"] = platform.Description,
+                // 直接列在工具清單，Agent 才看得到服務說明並自行判斷是否使用（ADR-0012 B.5）。
+                ["exposure"] = "direct",
+            };
+        }
+
         return new JsonObject { ["mcpServers"] = servers }.ToJsonString(s_writeOptions);
     }
+
+    /// <summary>gateway token 的環境變數名稱（ADR-0012 B.3）：以 <c>exec --env</c> 傳入，值不出現在程序參數。</summary>
+    public const string PlatformMcpTokenEnvironmentVariable = "YMIR_MCP_TOKEN";
 
     /// <summary>平台維護的 skill：告訴 Agent 擴充放在哪裡、何時生效與限制（ADR-0012 A.5）。只在至少一項能力開啟時載入。</summary>
     public static string BuildExtensionBuilderSkill(EffectiveExtensions extensions)

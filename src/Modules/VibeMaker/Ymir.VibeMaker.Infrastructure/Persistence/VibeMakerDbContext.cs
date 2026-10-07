@@ -40,6 +40,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<OneDriveSyncItem> OneDriveSyncItems => Set<OneDriveSyncItem>();
 
+    public DbSet<McpServerAccess> McpServerAccess => Set<McpServerAccess>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -229,6 +231,17 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             item.Property(i => i.ETag).HasMaxLength(OneDriveConnection.ItemIdMaxLength);
             item.HasIndex(i => i.ScopeId);
             item.HasOne<OneDriveSyncScope>().WithMany().HasForeignKey(i => i.ScopeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<McpServerAccess>(access =>
+        {
+            // ADR-0012 B.4：平台 MCP 服務的存取清單；服務本身只在版控的目錄中定義。
+            access.ToTable("mcp_server_access");
+            access.HasKey(a => a.ServerName);
+            access.Property(a => a.ServerName).HasMaxLength(40);
+            access.Property(a => a.Mode).HasConversion<UpperSnakeCaseEnumConverter<McpAccessMode>>().HasMaxLength(30);
+            access.Property(a => a.UserIdList).IsRequired();
+            access.Ignore(a => a.UserIds);
         });
 
         modelBuilder.ApplySnakeCaseNames();

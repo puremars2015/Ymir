@@ -11,6 +11,7 @@ namespace Ymir.Testing.FakeLlm;
 /// <item>使用者訊息含 <c>[slow]</c> → 緩慢串流很多段文字（用來測 abort）。</item>
 /// <item>使用者訊息含 <c>[markdown]</c> → 分段串流一段 Markdown（標題、程式碼區塊、清單、表格），測前端排版。</item>
 /// <item>使用者訊息含 <c>[fail]</c> → 回傳 HTTP 500（測模型端錯誤）。</item>
+/// <item>使用者訊息含 <c>[mcp-echo]</c> → 呼叫工具清單中第一個 <c>mcp__*__echo</c>（平台 MCP，ADR-0012 B），沒有時回覆 <see cref="NoMcpToolReply"/>。</item>
 /// <item>其他：回覆收到的文字；最後一則使用者訊息附有圖片時，加上 <see cref="ImageCountPrefix"/> 與張數。</item>
 /// <item>其他 → 回覆「收到第 N 則使用者訊息：...」，N 可用來驗證 session 續接。</item>
 /// </list>
@@ -21,6 +22,10 @@ public static partial class FakeLlmScript
     public const string SlowMarker = "[slow]";
     public const string FailMarker = "[fail]";
     public const string MarkdownMarker = "[markdown]";
+    public const string McpEchoMarker = "[mcp-echo]";
+    public const string McpEchoText = "ping from agent";
+    public const string McpReplyPrefix = "MCP 回應：";
+    public const string NoMcpToolReply = "沒有可用的 MCP 工具。";
     public const string CreatedFileName = "hello.txt";
     public const string CreatedFileContent = "Hello from Ymir";
 
@@ -34,7 +39,20 @@ public static partial class FakeLlmScript
 
         if (lastRole == "tool")
         {
-            return FakeLlmReply.Text(["已完成，", $"檔案 {CreatedFileName} 已建立。"]);
+            var toolText = ExtractText(last);
+            return toolText.Contains("echo: ", StringComparison.Ordinal)
+                ? FakeLlmReply.Text([McpReplyPrefix, toolText])
+                : FakeLlmReply.Text(["已完成，", $"檔案 {CreatedFileName} 已建立。"]);
+        }
+
+        if (lastUserText.Contains(McpEchoMarker, StringComparison.Ordinal))
+        {
+            var tool = (request["tools"]?.AsArray() ?? [])
+                .Select(t => t?["function"]?["name"]?.GetValue<string>())
+                .FirstOrDefault(n => n is not null && n.StartsWith("mcp__", StringComparison.Ordinal) && n.EndsWith("echo", StringComparison.Ordinal));
+            return tool is null
+                ? FakeLlmReply.Text([NoMcpToolReply])
+                : FakeLlmReply.ToolCall(tool, new JsonObject { ["text"] = McpEchoText }, preamble: "我來呼叫平台服務。");
         }
 
         if (lastUserText.Contains(FailMarker, StringComparison.Ordinal))

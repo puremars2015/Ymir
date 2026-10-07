@@ -85,6 +85,11 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     private static readonly Dictionary<string, Func<HttpRequestMessage>> AdminOnlyRequests = new()
     {
         ["GET /api/admin/users/"] = () => Get("/api/admin/users"),
+        ["GET /api/admin/mcp-servers/"] = () => Get("/api/admin/mcp-servers"),
+        ["PUT /api/admin/mcp-servers/{name}/access"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/mcp-servers/echo/access")
+        {
+            Content = JsonContent.Create(new SaveMcpServerAccessRequest(true, Ymir.VibeMaker.Domain.McpAccessMode.Everyone, [])),
+        },
         ["POST /api/admin/users/"] = () => new HttpRequestMessage(HttpMethod.Post, "/api/admin/users")
         {
             Content = JsonContent.Create(new CreateLocalUserRequest("intruder-made", "Intruder", null, UserRole.Admin, "intruder-password-123")),

@@ -7,6 +7,7 @@ using Ymir.VibeMaker.Application.Extensions;
 using Ymir.VibeMaker.Application.Files;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
+using Ymir.VibeMaker.Application.PlatformMcp;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
 using Ymir.VibeMaker.Domain;
@@ -30,6 +31,7 @@ public sealed class ExecutionRunner(
     RuntimePolicyService policies,
     IExtensionPolicy extensionPolicy,
     OneDriveSyncService oneDrive,
+    PlatformMcpService platformMcp,
     IAuditLog auditLog,
     VibeMakerTelemetry telemetry,
     TimeProvider timeProvider,
@@ -167,7 +169,9 @@ public sealed class ExecutionRunner(
                 models.Resolve(execution.ModelId),
                 await GetSystemPromptsAsync(execution, stoppingToken).ConfigureAwait(false),
                 extensions,
-                await GetAttachmentsAsync(execution, stoppingToken).ConfigureAwait(false));
+                await GetAttachmentsAsync(execution, stoppingToken).ConfigureAwait(false),
+                // 平台 MCP（ADR-0012 B）：目錄 ∩ 存取清單，token 期限涵蓋這次執行。
+                await platformMcp.PrepareRunAsync(execution.UserId, policy.ExecutionTimeout, runToken).ConfigureAwait(false));
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
             {
                 if (agentEvent is AgentCompleted or AgentFailed or AgentCancelled)

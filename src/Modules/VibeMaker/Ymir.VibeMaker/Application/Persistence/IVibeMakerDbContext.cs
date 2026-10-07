@@ -40,6 +40,8 @@ public interface IVibeMakerDbContext
 
     DbSet<OneDriveSyncItem> OneDriveSyncItems { get; }
 
+    DbSet<McpServerAccess> McpServerAccess { get; }
+
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity)
         where TEntity : class;
 

@@ -1,0 +1,10 @@
+{
+  "servers": [
+    {
+      "name": "echo",
+      "description": "測試用：把輸入的文字原樣回傳。",
+      "url": "http://127.0.0.1:5320/mcp",
+      "credentialEnv": "YMIR_MCP_ECHO_TOKEN"
+    }
+  ]
+}
