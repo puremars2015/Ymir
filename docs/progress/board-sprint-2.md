@@ -14,6 +14,7 @@
 
 | 工作項目 | 狀態 | 備註 |
 |---|---|---|
+| RAG 知識庫後續計畫 | 📝 | 共用 Embedding、每專案 SQLite、可選外部向量服務；僅記錄，尚未實作；見 [#035](#035--rag-知識庫後續計畫) |
 | 前端網站託管、發布與指定使用者分享計畫 | 📝 | 已記錄需求與開發階段，尚未實作；見 [#032](#032--前端網站託管發布與分享後續計畫) |
 | 對話黑字與淺藍漸層泡泡 | ✅ | 見 [#027](#027--對話文字改為黑色)；build 與版面預覽通過 |
 | 對話藍色漸層與白色閱讀底面 | ✅ | 見 [#026](#026--對話藍色漸層與白底)；lint/build 與版面預覽通過 |
@@ -53,7 +54,7 @@
 | LiteLLM 用量與每人每月預算（費用、token、預算由 LiteLLM 強制） | ✅ | 見 [#031](#031--接上-litellm模型用量與每人每月預算)；真正的 LiteLLM 回應格式**未驗證、待使用者環境確認**（步驟見 deploy/litellm/README.md） |
 | Sprint 5 驗收計畫（交給 Codex 執行） | 📝 | 計畫見 [sprint5-acceptance-plan.md](../planning/sprint5-acceptance-plan.md)，見 [#033](#033--sprint-5驗收計畫交給-codex與強化提案) |
 | Sprint 5 強化（Claude）：稽核補齊、監控指標、安全標頭、健康檢查、保存期限與備份 | ✅ | 使用者選 1、2、3、6、7，見 [#034](#034--sprint-5-強化稽核監控安全標頭健康檢查保存期限)；其餘（rate limit、CI 掃描、對外網路、壓測）待定 |
-| Agent 擴充能力（管理員管制的使用者自建 skill / MCP；開發人員維護的平台 MCP：EIP / MES / embedding） | 📝 | 只寫了 ADR 草案，尚未實作；見 [#035](#035--agent-擴充能力adr-0012-草案) 與 [ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)，等使用者回覆待決定事項 |
+| Agent 擴充能力（管理員管制的使用者自建 skill / MCP；開發人員維護的平台 MCP：EIP / MES / embedding） | 📝 | 只寫了 ADR 草案，尚未實作；見 [#036](#036--agent-擴充能力adr-0012-草案) 與 [ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)，等使用者回覆待決定事項 |
 | 使用者以 Entra 實際登入驗證 | 🚧 | redirect URI 已加入（使用者確認，見 [#018](#018--合併-main-的看板衝突redirect-uri-已加入)）；待填 client secret、指派使用者並依 [entra-id.md 第 5 節](../guides/entra-id.md#5-驗證清單)登入測試；**待使用者環境確認** |
 | 正式主機用完整 Containerfile 重跑 **Rootless Podman** 驗證 | ⏳ | 目前沒有 Linux 主機；可先在 WSL 2 Ubuntu 裝 Podman 驗證（見指南「效能建議」） |
 
@@ -63,7 +64,7 @@
 
 ## 💬 留言區
 
-### #035 · Agent 擴充能力：ADR-0012 草案
+### #036 · Agent 擴充能力：ADR-0012 草案
 
 > 👤 **Claude（AI）** · 🕒 2026-10-07 20:30 · `❓待決定`
 
@@ -89,6 +90,18 @@
 （尚無回覆）
 
 </details>
+
+---
+
+### #035 · RAG 知識庫後續計畫
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 11:09 · `📢公告`
+
+- **已確認**：使用者提供文件後建立向量索引並進行文件問答；Embedding 使用共用獨立容器；同一使用者可有多個專案，每個專案預設一份 SQLite 向量資料庫，同專案不同任務沿用；必要時選擇獲授權的外部共用向量服務。
+- **完成**：新增 [RAG 知識庫後續開發計畫](../planning/rag-knowledge-base-plan.md)，並加入主開發計畫。記錄匯入／切段／索引、引用問答、文件版本更新與移除、儲存 provider 抽象、隔離與持久保存、服務邊界、開發階段及驗收。
+- **驗證**：PowerShell 檢查規劃文件的相對 Markdown 檔案連結存在；`git diff --check` 通過。依先前查閱的 TEI、sqlite-vec 與 SQLite WAL 官方資料記錄技術候選及限制。僅文件變更，未跑應用程式 build／test，未安裝模型或驗證實際 RAG 效能。
+- **待確認**：Embedding 模型與硬體、第一個外部 provider、文件格式／容量及保存政策、外部回答模型的資料傳輸政策；知識庫分享尚未確認，首版預設私人，不繼承網站分享權限。
+- **範圍**：尚未實作；未變更程式、資料庫、容器或部署。實作前需補新 ADR。
 
 ---
 

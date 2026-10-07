@@ -67,7 +67,7 @@
 2. **Agent 只透過 Ymir MCP Gateway 連到平台服務**（SA §22 的 MCP Gateway）：
    - Gateway 是獨立於 Agent container 的服務，對 Agent 暴露 streamable HTTP MCP 端點；對後端的 EIP / MES / embedding 則以服務帳號連線。
    - **網路隔離**：Agent container 只能連到 gateway 與 LiteLLM，不能直接連 EIP / MES / embedding 後端。實際做法依 egress 決策（開發計畫 §8）與主機網路設定，列為待驗證項目 2。
-   - 對 embedding：LiteLLM 本來就能提供 `/v1/embeddings`，可直接沿用使用者的 virtual key（ADR-0004），不一定要再包一層；是否要包成 MCP 工具由開發人員依需求決定。
+   - 對 embedding：[RAG 知識庫計畫](../planning/rag-knowledge-base-plan.md) 已規劃平台共用的獨立 Embedding 容器，由後端而非 Agent 呼叫；若之後要讓 Agent 直接查知識庫，應包成平台 MCP 經 gateway 提供，不讓 Agent 直連。LiteLLM 本來就能提供 `/v1/embeddings`，可直接沿用使用者的 virtual key（ADR-0004），不一定要再包一層；是否要包成 MCP 工具由開發人員依需求決定。
 3. **每人專屬的短期 token，不使用共用憑證**：
    - 沿用 ADR-0004 的模式：API 為使用者簽發 gateway token（含 user id、有效期限，建議 ≤ 1 小時，每次執行重新簽發），以 `exec --env NAME` 傳入，值不出現在程序參數。
    - Pi 的 MCP 設定用 `--bearer-token-env-var` 引用，設定檔裡不含 token 值。
