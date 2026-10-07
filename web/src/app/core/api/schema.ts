@@ -164,6 +164,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/extensions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetMyExtensions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/make-topics': {
     parameters: {
       query?: never;
@@ -501,6 +517,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/settings/extensions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetExtensionPolicy'];
+    put: operations['AdminSaveExtensionPolicy'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/users/{userId}/extensions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetUserExtensions'];
+    put: operations['AdminSaveUserExtensions'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/settings/oidc': {
     parameters: {
       query?: never;
@@ -756,6 +804,20 @@ export interface components {
       cancelledToday: number | string;
       trend: components['schemas']['DailyExecutionResponse'][];
     };
+    /** @enum {unknown} */
+    ExtensionGrantSetting: 'Inherit' | 'Allow' | 'Deny';
+    ExtensionPolicyResponse: {
+      defaults: components['schemas']['ExtensionValues'];
+      restrictedNetwork: components['schemas']['RestrictedNetworkSupport'];
+      /** Format: date-time */
+      updatedAt: null | string;
+      updatedByName: null | string;
+    };
+    ExtensionValues: {
+      skills: boolean;
+      mcp: boolean;
+      internet: boolean;
+    };
     LoginProvidersResponse: {
       oidc: boolean;
       oidcDisplayName: null | string;
@@ -802,6 +864,14 @@ export interface components {
       isDefault: boolean;
       supportsImages: boolean;
     };
+    MyExtensionsResponse: {
+      skillsAllowed: boolean;
+      mcpAllowed: boolean;
+      internetAllowed: boolean;
+      inventoryAvailable: boolean;
+      skills: string[];
+      mcpServers: string[];
+    };
     OidcSettingsResponse: {
       source: components['schemas']['OidcSettingsSource'];
       enabled: boolean;
@@ -845,6 +915,8 @@ export interface components {
     ResetPasswordRequest: {
       newPassword: null | string;
     };
+    /** @enum {unknown} */
+    RestrictedNetworkSupport: 'Configured' | 'NotConfigured' | 'Unknown' | 'NotEnforced';
     RuntimePolicyResponse: {
       effective: components['schemas']['RuntimePolicyValues'];
       deployment: components['schemas']['RuntimePolicyValues'];
@@ -882,6 +954,12 @@ export interface components {
       /** Format: date-time */
       lastActiveAt: null | string;
     };
+    SaveExtensionPolicyRequest: {
+      skills: boolean;
+      mcp: boolean;
+      /** @default true */
+      internet: boolean;
+    };
     SaveMakeTopicRequest: {
       name: string;
       description: null | string;
@@ -914,6 +992,11 @@ export interface components {
        * @default 0
        */
       monthlyBudgetUsd: number | string;
+    };
+    SaveUserExtensionsRequest: {
+      skills: components['schemas']['ExtensionGrantSetting'];
+      mcp: components['schemas']['ExtensionGrantSetting'];
+      internet?: components['schemas']['ExtensionGrantSetting'];
     };
     SendMessageRequest: {
       content: string;
@@ -985,6 +1068,12 @@ export interface components {
       admins: number | string;
       /** Format: int32 */
       recentlyActive: number | string;
+    };
+    UserExtensionsResponse: {
+      skills: components['schemas']['ExtensionGrantSetting'];
+      mcp: components['schemas']['ExtensionGrantSetting'];
+      internet: components['schemas']['ExtensionGrantSetting'];
+      effective: components['schemas']['ExtensionValues'];
     };
     /** @enum {unknown} */
     UserRole: 'User' | 'Admin';
@@ -1287,6 +1376,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SendMessageResponse'];
+        };
+      };
+    };
+  };
+  GetMyExtensions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MyExtensionsResponse'];
         };
       };
     };
@@ -1975,6 +2084,98 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AdminUsageResponse'];
+        };
+      };
+    };
+  };
+  AdminGetExtensionPolicy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExtensionPolicyResponse'];
+        };
+      };
+    };
+  };
+  AdminSaveExtensionPolicy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveExtensionPolicyRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ExtensionPolicyResponse'];
+        };
+      };
+    };
+  };
+  AdminGetUserExtensions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UserExtensionsResponse'];
+        };
+      };
+    };
+  };
+  AdminSaveUserExtensions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveUserExtensionsRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UserExtensionsResponse'];
         };
       };
     };

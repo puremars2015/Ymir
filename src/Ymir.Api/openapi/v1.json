@@ -306,6 +306,26 @@
         }
       }
     },
+    "/api/extensions": {
+      "get": {
+        "tags": [
+          "Extensions"
+        ],
+        "operationId": "GetMyExtensions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyExtensionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/make-topics": {
       "get": {
         "tags": [
@@ -1245,6 +1265,124 @@
         }
       }
     },
+    "/api/admin/settings/extensions": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetExtensionPolicy",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtensionPolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveExtensionPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveExtensionPolicyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtensionPolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/extensions": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetUserExtensions",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserExtensionsResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveUserExtensions",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveUserExtensionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserExtensionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/settings/oidc": {
       "get": {
         "tags": [
@@ -2125,6 +2263,62 @@
           }
         }
       },
+      "ExtensionGrantSetting": {
+        "enum": [
+          "Inherit",
+          "Allow",
+          "Deny"
+        ]
+      },
+      "ExtensionPolicyResponse": {
+        "required": [
+          "defaults",
+          "restrictedNetwork",
+          "updatedAt",
+          "updatedByName"
+        ],
+        "type": "object",
+        "properties": {
+          "defaults": {
+            "$ref": "#/components/schemas/ExtensionValues"
+          },
+          "restrictedNetwork": {
+            "$ref": "#/components/schemas/RestrictedNetworkSupport"
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedByName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ExtensionValues": {
+        "required": [
+          "skills",
+          "mcp",
+          "internet"
+        ],
+        "type": "object",
+        "properties": {
+          "skills": {
+            "type": "boolean"
+          },
+          "mcp": {
+            "type": "boolean"
+          },
+          "internet": {
+            "type": "boolean"
+          }
+        }
+      },
       "LoginProvidersResponse": {
         "required": [
           "oidc",
@@ -2312,6 +2506,43 @@
           }
         }
       },
+      "MyExtensionsResponse": {
+        "required": [
+          "skillsAllowed",
+          "mcpAllowed",
+          "internetAllowed",
+          "inventoryAvailable",
+          "skills",
+          "mcpServers"
+        ],
+        "type": "object",
+        "properties": {
+          "skillsAllowed": {
+            "type": "boolean"
+          },
+          "mcpAllowed": {
+            "type": "boolean"
+          },
+          "internetAllowed": {
+            "type": "boolean"
+          },
+          "inventoryAvailable": {
+            "type": "boolean"
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mcpServers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "OidcSettingsResponse": {
         "required": [
           "source",
@@ -2490,6 +2721,14 @@
           }
         }
       },
+      "RestrictedNetworkSupport": {
+        "enum": [
+          "Configured",
+          "NotConfigured",
+          "Unknown",
+          "NotEnforced"
+        ]
+      },
       "RuntimePolicyResponse": {
         "required": [
           "effective",
@@ -2648,6 +2887,25 @@
           }
         }
       },
+      "SaveExtensionPolicyRequest": {
+        "required": [
+          "skills",
+          "mcp"
+        ],
+        "type": "object",
+        "properties": {
+          "skills": {
+            "type": "boolean"
+          },
+          "mcp": {
+            "type": "boolean"
+          },
+          "internet": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
       "SaveMakeTopicRequest": {
         "required": [
           "name",
@@ -2786,6 +3044,24 @@
             ],
             "format": "double",
             "default": 0
+          }
+        }
+      },
+      "SaveUserExtensionsRequest": {
+        "required": [
+          "skills",
+          "mcp"
+        ],
+        "type": "object",
+        "properties": {
+          "skills": {
+            "$ref": "#/components/schemas/ExtensionGrantSetting"
+          },
+          "mcp": {
+            "$ref": "#/components/schemas/ExtensionGrantSetting"
+          },
+          "internet": {
+            "$ref": "#/components/schemas/ExtensionGrantSetting"
           }
         }
       },
@@ -3094,6 +3370,29 @@
           }
         }
       },
+      "UserExtensionsResponse": {
+        "required": [
+          "skills",
+          "mcp",
+          "internet",
+          "effective"
+        ],
+        "type": "object",
+        "properties": {
+          "skills": {
+            "$ref": "#/components/schemas/ExtensionGrantSetting"
+          },
+          "mcp": {
+            "$ref": "#/components/schemas/ExtensionGrantSetting"
+          },
+          "internet": {
+            "$ref": "#/components/schemas/ExtensionGrantSetting"
+          },
+          "effective": {
+            "$ref": "#/components/schemas/ExtensionValues"
+          }
+        }
+      },
       "UserRole": {
         "enum": [
           "User",
@@ -3334,6 +3633,9 @@
     },
     {
       "name": "Conversations"
+    },
+    {
+      "name": "Extensions"
     },
     {
       "name": "Make"

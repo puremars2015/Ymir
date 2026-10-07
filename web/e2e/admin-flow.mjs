@@ -1,4 +1,4 @@
-// 管理介面的端對端驗證（ADR-0010、ADR-0011）：總覽、停止執行環境、稽核紀錄、系統設定（Entra ID、Tunnel、執行政策）、用量。
+// 管理介面的端對端驗證（ADR-0010、ADR-0011、ADR-0012）：總覽、停止執行環境、稽核紀錄、系統設定（Entra ID、Tunnel、執行政策、擴充能力）、用量。
 // 前置：SQL Server、Fake LLM（FAKE_LLM_MASTER_KEY=sk-dev，模擬 LiteLLM）、Fake OIDC（dotnet run --project tests/Ymir.Testing.FakeOidc）都已啟動；
 //       API 另設 VibeMaker__LiteLlm__BaseUrl=http://127.0.0.1:5199/、VibeMaker__LiteLlm__MasterKey=sk-dev（第 13 步：用量與每月預算）；
 //       API 以 VibeMaker__Harness=Pi、Ymir__Auth__Oidc__AuthorityHost=http://127.0.0.1:5299 啟動（不設定 Ymir__Auth__Oidc__Authority，
@@ -237,5 +237,39 @@ await admin.click('app-admin-tabs a:has-text("系統設定")');
 await admin.locator('app-runtime-settings-card button:has-text("還原為部署設定")').click();
 await admin.locator('app-runtime-settings-card [role=status]:has-text("已還原")').waitFor();
 step('monthly model budget enforced; usage page shows LiteLLM spend, tokens and budget');
+
+// 14. Agent 擴充能力（ADR-0012）：全域預設開放 skill；使用者頁對 worker 個人開放 MCP；worker 的個人設定頁看到結果
+const extensionCard = admin.locator('app-extension-settings-card');
+await extensionCard.locator('input[name=skills]').check();
+await extensionCard.locator('button:has-text("儲存")').click();
+await extensionCard.locator('[role=status]:has-text("下一則訊息")').waitFor();
+await extensionCard.locator('.summary:has-text("自建 skill：允許")').waitFor();
+await extensionCard.screenshot({ path: `${outDir}/11-settings-extensions.png` });
+await admin.click('app-admin-tabs a:has-text("使用者")');
+await admin.fill('app-users-page input[name=search]', workerAccount);
+await admin.click('app-users-page .search button');
+const workerUserRow = admin.locator(`app-users-page tr:has-text("${workerAccount}")`).first();
+await workerUserRow.locator('button:has-text("擴充能力")').click();
+const extensionForm = admin.locator('app-users-page .extension-form');
+await extensionForm
+  .locator('select[name=skills] option:has-text("依全域預設（允許）")')
+  .waitFor({ state: 'attached' });
+await extensionForm.locator('select[name=mcp]').selectOption('Allow');
+await admin.screenshot({ path: `${outDir}/12-user-extensions.png`, fullPage: true });
+await extensionForm.locator('button:has-text("儲存")').click();
+await admin.locator('app-users-page [role=status]:has-text("擴充能力")').waitFor();
+await worker.goto(`${baseUrl}/settings`);
+await worker
+  .locator('app-my-extensions-card li:has-text("自建 skill") strong:has-text("已開放")')
+  .waitFor();
+await worker
+  .locator('app-my-extensions-card li:has-text("自建 MCP server") strong:has-text("已開放")')
+  .waitFor();
+await worker.screenshot({ path: `${outDir}/13-my-extensions.png`, fullPage: true });
+await admin.click('app-admin-tabs a:has-text("系統設定")');
+await extensionCard.locator('input[name=skills]').uncheck();
+await extensionCard.locator('button:has-text("儲存")').click();
+await extensionCard.locator('.summary:has-text("自建 skill：不允許")').waitFor();
+step('extension policy: global default and per-user override saved; member sees the result');
 
 await browser.close();

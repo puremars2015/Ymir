@@ -162,4 +162,30 @@ public class RuntimeHostProtocolTests
     {
         Assert.Throws<InvalidOperationException>(() => RuntimeHostApp.ParseSocketMode(value));
     }
+
+    [Fact]
+    public void EnsurePath_SendsOnlyTheNetworkEnum()
+    {
+        var userId = Guid.Parse("6f9619ff-8b86-d011-b42d-00c04fc964ff");
+
+        Assert.Equal("/v1/users/6f9619ff8b86d011b42d00c04fc964ff/runtime", RuntimeHostProtocol.EnsurePath(userId, null));
+        Assert.Equal("/v1/users/6f9619ff8b86d011b42d00c04fc964ff/runtime?network=restricted", RuntimeHostProtocol.EnsurePath(userId, RuntimeNetworkAccess.Restricted));
+        Assert.Equal("/v1/users/6f9619ff8b86d011b42d00c04fc964ff/runtime?network=internet", RuntimeHostProtocol.EnsurePath(userId, RuntimeNetworkAccess.Internet));
+    }
+
+    [Theory]
+    [InlineData(null, true, null)]
+    [InlineData("internet", true, RuntimeNetworkAccess.Internet)]
+    [InlineData("restricted", true, RuntimeNetworkAccess.Restricted)]
+    [InlineData("Restricted", false, null)]
+    [InlineData("ymir-agents", false, null)]
+    [InlineData("host", false, null)]
+    [InlineData("1", false, null)]
+    [InlineData("", false, null)]
+    public void TryParseNetwork_AcceptsOnlyTheEnumValues(string? value, bool valid, RuntimeNetworkAccess? expected)
+    {
+        // ADR-0012 A.8 / ADR-0008：runtime host 不接受 network 名稱或其他資源設定。
+        Assert.Equal(valid, RuntimeHostProtocol.TryParseNetwork(value, out var network));
+        Assert.Equal(expected, network);
+    }
 }

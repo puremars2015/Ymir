@@ -43,6 +43,13 @@ export type AdminUsage = Schemas['AdminUsageResponse'];
 export type ServiceHealth = Schemas['ServiceHealthResponse'];
 export type ServiceHealthItem = Schemas['ServiceHealthItem'];
 export type UserUsage = Schemas['UserUsageResponse'];
+export type ExtensionPolicy = Schemas['ExtensionPolicyResponse'];
+export type ExtensionValues = Schemas['ExtensionValues'];
+export type ExtensionGrantSetting = Schemas['ExtensionGrantSetting'];
+export type UserExtensions = Schemas['UserExtensionsResponse'];
+export type SaveUserExtensionsRequest = Schemas['SaveUserExtensionsRequest'];
+export type MyExtensions = Schemas['MyExtensionsResponse'];
+export type RestrictedNetworkSupport = Schemas['RestrictedNetworkSupport'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

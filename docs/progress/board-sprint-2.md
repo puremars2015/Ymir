@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-07 13:10 ・ 狀態：**🚧 開發完成，待使用者以 Entra 實際登入驗證**
+> 最後更新：2026-10-07 21:30 ・ 狀態：**✅ 已結束（實際涵蓋路線圖 Sprint 2～5），後續移到 [Sprint 6](board-sprint-6.md)**
 
 **目標**：以企業帳號登入（OIDC / Entra ID，經由 BFF，ADR-0002），完成 Admin / User 權限與帳號停用流程。
 
@@ -14,7 +14,6 @@
 
 | 工作項目 | 狀態 | 備註 |
 |---|---|---|
-| 對話附加檔案 / 圖片 / 影片給 Agent（使用者回報） | ✅ | 見 [#037](#037--對話可以附加檔案圖片影片給-agent)；整合測試與 e2e 通過，真實視覺模型**待使用者環境確認** |
 | RAG 知識庫後續計畫 | 📝 | 共用 Embedding、每專案 SQLite、可選外部向量服務；僅記錄，尚未實作；見 [#035](#035--rag-知識庫後續計畫) |
 | 前端網站託管、發布與指定使用者分享計畫 | 📝 | 已記錄需求與開發階段，尚未實作；見 [#032](#032--前端網站託管發布與分享後續計畫) |
 | 對話黑字與淺藍漸層泡泡 | ✅ | 見 [#027](#027--對話文字改為黑色)；build 與版面預覽通過 |
@@ -65,27 +64,26 @@
 
 ## 💬 留言區
 
-### #037 · 對話可以附加檔案、圖片、影片給 Agent
+### #037 · Sprint 2 看板結束，移到 Sprint 6
 
-> 👤 **Claude（AI）** · 🕒 2026-10-07 13:10 · `✅完成`
+> 👤 **Claude（AI）** · 🕒 2026-10-07 21:30 · `📢公告`
 
-使用者回報：對話畫面沒辦法上傳檔案 / 圖片 / 影片給 Agent。規劃與設計決定寫在 [chat-attachments-plan.md](../planning/chat-attachments-plan.md)，摘要：
-
-- **使用方式**：輸入框左邊 📎 選檔，也可以拖放或貼上截圖；只附檔不打字也能送出。首頁、專案頁「直接開聊」也能附加（送出時才上傳）。單檔 50 MB、每則 10 個。
-- **存放**：檔案寫進使用者 runtime 工作目錄的 `uploads/`（專案對話共用專案目錄），會出現在檔案面板、可下載；Remote runtime host 一樣適用。新表 `vibemaker.message_attachments`（migration `MessageAttachments`）。
-- **Agent 怎麼拿到**：後端把附件路徑附加在送給 Agent 的內容（對話紀錄只顯示使用者文字），Agent 用工具讀取或處理（影片、PDF 等也一樣）。
-- **圖片直接給模型**：模型設定 `VibeMaker__Models__N__SupportsImages=true` 時，PNG / JPEG / GIF / WebP 以 Pi RPC `images` 一併送出（Pi 會自動縮圖）；模型選單顯示「（可看圖片）」。**預設是 false**，要開請確認該模型（經 LiteLLM）支援視覺輸入。
-- **安全**：上傳端點只接受自己的對話（加入授權矩陣）；附件只能綁自己、同對話、未送出的；檔名清理、路徑由伺服器產生；runtime 內以 `realpath` 拒絕 `uploads` 被換成指向外面的 symlink；圖片以檔頭判斷類型；縮圖只用 blob URL 的 `<img>`。
-
-**驗證**（實際跑過）：
-- `dotnet build Ymir.slnx`（0 警告）、`dotnet test --project tests/Ymir.UnitTests`（321 通過）、`dotnet test --project tests/Ymir.IntegrationTests`（197 通過，含真實 Pi 1.0.0 + Fake LLM：支援視覺的模型收到 1 張圖、不支援的不送；新增附件測試 10 個）。
-- `cd web && npm run lint && npm test -- --watch=false && npm run build`（111 個測試通過）。
-- 新增 e2e `npm run e2e:attach`（API 以 Pi harness、宣告模型可看圖）：首頁附加圖片開聊 → 模型收到圖片；對話中只附圖片 + 影片送出；重新整理後縮圖仍在、檔案面板列出 3 個上傳檔。
-- 過程中發現並修正：Guid v7 前 8 碼是時間戳，同一分鐘內同名檔案會覆蓋 → 改用 id 末 8 碼；剛上傳的附件不再被列為「這次 Agent 產生的檔案」。
-
-**未驗證、待使用者環境確認**：真實視覺模型（MiniMax 等）經 LiteLLM 收圖片的格式與效果；Cloudflare Tunnel 下上傳 50 MB 的實際表現。
-
-**後續（未做）**：每人工作目錄容量配額、影片抽影格 / 音訊轉文字 / PDF 轉文字工具、上傳進度條。
+- 這個看板從正式認證開始，實際做完了路線圖的 Sprint 2～5：
+  - 企業帳號與本機帳號登入、管理介面；
+  - 對話體驗；
+  - runtime 生命週期；
+  - LiteLLM 用量與預算；
+  - 驗收計畫與強化。
+- 使用者要求建立新的 Sprint，所以本看板到此結束。新工作在 [Sprint 6 看板](board-sprint-6.md)：ADR-0012 擴充能力與 MCP Gateway、RAG 知識庫、前端網站託管。
+- **移交給 Sprint 6 追蹤、仍待使用者環境確認的項目**：
+  - 真 Entra 登入（#018、#022）；
+  - 真 LiteLLM + MiniMax 與 `config.yaml` 單價（#031）；
+  - Linux rootless Podman + runtime host + Quadlet（#013、#014、#030）；
+  - Cloudflare Tunnel（#028）；
+  - Windows Docker Desktop（#003）；
+  - OTLP 指標匯出（#034）；
+  - 驗收計畫由 Codex 執行（#033）。
+- ADR-0012 依使用者決定改為「已採納（egress 待 spike）」：全域 + 每人覆寫、`skills` 與 `mcp`、Gateway 獨立服務、egress 先 spike。
 
 <details>
 <summary>💬 回覆（0）</summary>

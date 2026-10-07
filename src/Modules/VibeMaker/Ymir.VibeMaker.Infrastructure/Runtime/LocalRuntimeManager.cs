@@ -17,16 +17,26 @@ internal sealed class LocalRuntimeManager : IAgentRuntimeManager, Health.IRuntim
     private const string ProviderName = "LOCAL";
 
     private readonly RuntimeOptions _options;
+    private readonly ILogger<LocalRuntimeManager> _logger;
     private readonly ConcurrentDictionary<Guid, RuntimeInfo> _runtimesByUser = new();
 
     public LocalRuntimeManager(IOptions<RuntimeOptions> options, ILogger<LocalRuntimeManager> logger)
     {
         _options = options.Value;
+        _logger = logger;
         logger.LogWarning("Local runtime provider is enabled: agent processes run on the host WITHOUT isolation. Development only.");
     }
 
-    public Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, CancellationToken cancellationToken)
+    /// <summary>沒有隔離，也就無法限制網路（ADR-0012 A.8）。</summary>
+    public RestrictedNetworkSupport RestrictedNetwork => RestrictedNetworkSupport.NotEnforced;
+
+    public Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, RuntimeNetworkAccess? network, CancellationToken cancellationToken)
     {
+        if (network == RuntimeNetworkAccess.Restricted)
+        {
+            _logger.LogWarning("Restricted network requested for user {UserId}, but the Local runtime cannot restrict network access (development only)", userId);
+        }
+
         if (_runtimesByUser.TryGetValue(userId, out var existing))
         {
             return Task.FromResult(existing);

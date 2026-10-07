@@ -30,6 +30,8 @@ public interface IVibeMakerDbContext
 
     DbSet<MessageAttachment> MessageAttachments { get; }
 
+    DbSet<UserExtensionGrant> UserExtensionGrants { get; }
+
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity)
         where TEntity : class;
 

@@ -77,6 +77,7 @@ app.MapExecutionEndpoints();
 app.MapAdminEndpoints();
 app.MapAdminOverviewEndpoints();
 app.MapAdminRuntimeEndpoints();
+app.MapExtensionEndpoints();
 app.MapAdminSettingsEndpoints();
 app.MapMakeTopicEndpoints();
 app.MapDefaultEndpoints();

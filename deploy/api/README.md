@@ -67,6 +67,30 @@
 > - 如果 API log 出現 `Permission denied`，先用 `sudo ausearch -m avc -ts recent` 確認原因，再決定要用自訂 policy 模組或 `SecurityLabelType=`。
 > - 這一段在雲端沙箱無法驗證，**待使用者環境確認**。
 
+## Ubuntu：既有 Docker 部署的一鍵啟動
+
+若 Ubuntu 使用本專案的 Linux Docker API 部署（`compose.yml`，API 容器內包含前端）且已安裝 runtime host、SQL Server、LiteLLM 與 Cloudflare Tunnel，可在 repo 根目錄執行：
+
+```bash
+sudo bash ./start-ymir.sh
+```
+
+前置條件是 Ubuntu 的 systemd、Docker Engine、`curl`、`flock`，已存在的 API／SQL／LiteLLM PostgreSQL／LiteLLM／Tunnel 容器，以及已設定且可用的 `ymir-runtime-host.service`。首次安裝、API image 建置、憑證、資料遷移與 Linux Tunnel host networking 設定需先按各部署文件完成；Windows 的部署路徑與 `run-api.ps1` 不適用於 Ubuntu。
+
+腳本啟動必要服務並等待 runtime host、API readiness 及登入頁；已運行的服務不重啟，不建立容器、不更新程式碼、不寫入憑證，也不啟動 Agent runtime。缺少部署、名稱有歧義、容器 paused／restarting 或健康檢查逾時會回非零結束碼。服務由 Docker／systemd 持續運行，腳本成功後可關閉終端。
+
+預設識別 `ymir-sql`、`ymir-api` 與目前的 LiteLLM／Tunnel 名稱；若預設名稱不存在，除 SQL 外會依唯一的 Compose service label 尋找容器。多套部署或自訂名稱請明確指定，例如：
+
+```bash
+sudo env YMIR_SQL_CONTAINER=my-sql YMIR_API_CONTAINER=my-api \
+  YMIR_PG_CONTAINER=my-litellm-db YMIR_LITELLM_CONTAINER=my-litellm \
+  YMIR_TUNNEL_CONTAINER=my-cloudflared bash ./start-ymir.sh
+```
+
+預設 API 埠 `5080`、每階段等待 `120` 秒；可用 `YMIR_API_PORT`／`YMIR_START_TIMEOUT` 調整。自訂 runtime host 可用 `YMIR_RUNTIME_SERVICE`／`YMIR_RUNTIME_SOCKET`，詳見 `bash ./start-ymir.sh --help`。容器仍必須配置 Production／Remote provider 與正確的 loopback 埠及 socket 掛載。
+
+此腳本是 **Docker 版**，不會把既有 Podman 部署改成 Docker。正式 Linux 的 Podman Quadlet 部署仍按上一節與 runtime host 文件使用 systemd。腳本採 LF 行尾；可直接 `bash` 執行，不需要 `chmod`。
+
 ## Windows：Docker Desktop（開發 / 驗證）
 
 Docker Desktop 無法把 Windows 上的 Unix socket 掛進 Linux 容器，所以 Windows 的連線方式不同：
@@ -92,6 +116,26 @@ docker compose -f compose.windows.yml logs -f api
 - SQL Server 與 Fake LLM 照 [Windows 指南](../../docs/guides/windows-docker.md)第 1、3 節在主機上啟動。容器內經 `host.docker.internal` 連線，`.env.windows.example` 已經設定好。
 - 範本使用 Development（有免密碼的 dev 登入），**不可對外公開**。在 Windows 驗證 tunnel 時，請改用指南第 4 節的主機上 API。
 - 這一段在雲端沙箱無法驗證（沒有 Docker Desktop），**待使用者環境確認**。
+
+## Windows：既有主機 API 部署的一鍵啟動
+
+若目前使用「主機上的 .NET API + Docker 網頁／資料庫／模型閘道／Tunnel」部署，可在 PowerShell 執行：
+
+```powershell
+& "C:\Users\sean.ma\Documents\Ymir\start-ymir.ps1"
+```
+
+若 PowerShell 的執行原則禁止直接執行腳本，可只對本次程序使用：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\sean.ma\Documents\Ymir\start-ymir.ps1"
+```
+
+腳本預設讀取 `%LOCALAPPDATA%\Ymir\deploy\run-api.ps1`，沿用已部署版本的登入、模型與資料設定，不包含憑證，也不重新建置。其他部署目錄可透過 `-DeployDirectory` 指定；`-ApiPort` 須與該啟動檔的 API 埠一致。
+
+它會在必要時啟動 Docker Desktop、檢查所有容器存在、依序啟動 SQL Server／LiteLLM PostgreSQL／LiteLLM／網頁／Tunnel，並在 API 未執行時以背景程序啟動。已執行的服務直接保留；其他程式占用 API 埠時報錯，不會停止它或再啟動 API。完成後可關閉執行腳本的視窗，API 紀錄保存在部署目錄的 `logs\startup-*.log`。
+
+此腳本只啟動既有部署，未部署或容器不存在時顯示錯誤；不啟動使用者 Agent 容器。它不是上一節 API／runtime host 容器拓樸的啟動方式。對外網址仍需要原有 Cloudflare Tunnel／DNS 設定與網路可用。
 
 ## 維運
 

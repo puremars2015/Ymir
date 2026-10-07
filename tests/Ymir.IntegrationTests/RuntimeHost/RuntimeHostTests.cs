@@ -40,8 +40,8 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
     {
         var userId = Guid.NewGuid();
 
-        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, TestContext.Current.CancellationToken);
-        var again = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, TestContext.Current.CancellationToken);
+        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, network: null, TestContext.Current.CancellationToken);
+        var again = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, network: null, TestContext.Current.CancellationToken);
         var status = await fixture.RuntimeManager.GetStatusAsync(runtime.RuntimeId, TestContext.Current.CancellationToken);
 
         Assert.Null(await fixture.RuntimeManager.CheckAvailabilityAsync(TestContext.Current.CancellationToken)); // 健康檢查
@@ -60,7 +60,7 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
     {
         var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        await fixture.RuntimeManager.EnsureRuntimeAsync(userId, ct);
+        await fixture.RuntimeManager.EnsureRuntimeAsync(userId, network: null, ct);
 
         // API 重新啟動後的 manager 不認得任何 runtime id（ADR-0011）：查詢與停止只用 user id
         using var restarted = fixture.CreateManager(RuntimeHostFixture.Token);
@@ -76,7 +76,7 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
     [Fact]
     public async Task Process_StreamsStdinToStdout_AndReturnsExitCode()
     {
-        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(Guid.NewGuid(), network: null, TestContext.Current.CancellationToken);
         var payload = string.Concat(Enumerable.Repeat("中文 stdin 0123456789\n", 5000)); // 跨越多個 WebSocket frame
 
         var (exitCode, output, process) = await RunAsync(fixture.RuntimeManager, runtime.RuntimeId, new RuntimeProcessSpec("sh", ["-c", "cat; exit 3"]), payload);
@@ -92,7 +92,7 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
     {
         var userId = Guid.NewGuid();
         var projectId = Guid.NewGuid();
-        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, TestContext.Current.CancellationToken);
+        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, network: null, TestContext.Current.CancellationToken);
         var spec = new RuntimeProcessSpec(
             "sh",
             ["-c", "printf '%s' \"$YMIR_TEST_VALUE\" > env.txt; echo diagnostic >&2; exit 1"],
@@ -111,7 +111,7 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
     [Fact]
     public async Task Kill_StopsTheProcess()
     {
-        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(Guid.NewGuid(), network: null, TestContext.Current.CancellationToken);
         var process = await fixture.RuntimeManager.StartProcessAsync(runtime.RuntimeId, new RuntimeProcessSpec("sleep", ["60"]), TestContext.Current.CancellationToken);
 
         process.Kill();
@@ -128,7 +128,7 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
     {
         var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        await fixture.RuntimeManager.EnsureRuntimeAsync(userId, ct);
+        await fixture.RuntimeManager.EnsureRuntimeAsync(userId, network: null, ct);
         using var connection = fixture.CreateConnection();
         using var socket = await connection.ConnectWebSocketAsync(RuntimeHostProtocol.ProcessPath(userId), ct);
         await SendStartAsync(socket, new ProcessStartMessage("sh", ["-c", "echo $$; exec sleep 60"], null, RuntimePaths.Workspace), ct);
@@ -152,7 +152,7 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
     {
         var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
-        await fixture.RuntimeManager.EnsureRuntimeAsync(userId, ct);
+        await fixture.RuntimeManager.EnsureRuntimeAsync(userId, network: null, ct);
         using var connection = fixture.CreateConnection();
         using var socket = await connection.ConnectWebSocketAsync(RuntimeHostProtocol.ProcessPath(userId), ct);
 
@@ -166,7 +166,7 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
     [Fact]
     public async Task InvalidSpec_IsRejectedByTheClient()
     {
-        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(Guid.NewGuid(), network: null, TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<ArgumentException>(() =>
             fixture.RuntimeManager.StartProcessAsync(runtime.RuntimeId, new RuntimeProcessSpec("--privileged", []), TestContext.Current.CancellationToken));
@@ -202,6 +202,30 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
         Assert.Equal("ok", body);
     }
 
+    [Theory]
+    [InlineData("ymir-agents")]
+    [InlineData("host")]
+    [InlineData("Restricted")]
+    public async Task EnsureRuntime_AcceptsOnlyTheNetworkEnum(string network)
+    {
+        // ADR-0012 A.8 / ADR-0008：runtime host 不接受 network 名稱；名稱只來自 runtime host 自己的設定。
+        using var connection = fixture.CreateConnection();
+
+        using var response = await connection.Http.PostAsync(
+            new Uri($"{RuntimeHostProtocol.RuntimePath(Guid.NewGuid())}?network={Uri.EscapeDataString(network)}", UriKind.Relative), null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task EnsureRuntime_WithNetworkEnum_IsAccepted()
+    {
+        // fixture 的 runtime host 用 Local runtime（無法限制網路，只記錄警告）：協定本身接受 enum。
+        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(Guid.NewGuid(), RuntimeNetworkAccess.Restricted, TestContext.Current.CancellationToken);
+
+        Assert.Equal(RuntimeTransition.Created, runtime.Transition);
+    }
+
     [Fact]
     public async Task EmptyUserId_IsRejected()
     {
@@ -225,7 +249,7 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
         var ct = TestContext.Current.CancellationToken;
         var userId = Guid.NewGuid();
         var projectId = Guid.NewGuid();
-        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, ct);
+        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, network: null, ct);
 
         var events = new List<AgentEvent>();
         await foreach (var agentEvent in fixture.CreateHarness().RunAsync(
@@ -246,7 +270,7 @@ public class RuntimeHostTests(RuntimeHostFixture fixture) : IClassFixture<Runtim
     public async Task PiHarness_ThroughRuntimeHost_CancellationEndsWithCancelled()
     {
         Assert.SkipUnless(PiHarnessFixture.IsPiOnPath(), "pi is not on PATH (npm i -g @earendil-works/pi-coding-agent@1.0.0)");
-        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(Guid.NewGuid(), TestContext.Current.CancellationToken);
+        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(Guid.NewGuid(), network: null, TestContext.Current.CancellationToken);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
 
         var events = new List<AgentEvent>();

@@ -1,7 +1,7 @@
 namespace Ymir.VibeMaker.Infrastructure.Runtime;
 
 /// <summary>設定區段 <c>VibeMaker:Runtime</c>（對應 SA §17 的 Runtime:* / Workspace:*）。</summary>
-public sealed class RuntimeOptions
+public sealed partial class RuntimeOptions
 {
     public const string SectionName = "VibeMaker:Runtime";
 
@@ -29,6 +29,12 @@ public sealed class RuntimeOptions
     /// Container network；需能連到 LiteLLM（SA §7）。未設定時 Podman 用 <c>slirp4netns</c>、Docker 用 <c>bridge</c>。
     /// </summary>
     public string? Network { get; set; }
+
+    /// <summary>
+    /// 關閉對外連線時使用的 network（ADR-0012 A.8）：主機預先建立的 <c>--internal</c> network，LiteLLM 與 MCP Gateway 也接在上面。
+    /// 未設定時無法關閉對外連線（execution 會失敗，不會退回成可以對外連線）。
+    /// </summary>
+    public string? RestrictedNetwork { get; set; }
 
     /// <summary>SELinux 主機需要重新標記掛載目錄（<c>relabel=private</c>，等同 <c>:Z</c>；只適用 Podman）。</summary>
     public bool SelinuxRelabel { get; set; }
@@ -58,6 +64,26 @@ public sealed class RuntimeOptions
     public RemoteRuntimeOptions Remote { get; set; } = new();
 
     internal string ResolvedNetwork => Network ?? (Provider == RuntimeProvider.Docker ? "bridge" : "slirp4netns");
+
+    /// <summary>
+    /// 受限網路必須是具名的 network：不能是 host / 預設 network 等會對外連線或共用主機網路的模式。
+    /// 不合法時視為未設定以外的設定錯誤，啟動時就拒絕（<see cref="ValidateRestrictedNetwork"/>）。
+    /// </summary>
+    internal static bool IsValidRestrictedNetworkName(string name) =>
+        RestrictedNetworkNamePattern().IsMatch(name)
+        && name is not ("host" or "none" or "bridge" or "slirp4netns" or "pasta" or "private" or "default" or "podman");
+
+    internal void ValidateRestrictedNetwork()
+    {
+        if (RestrictedNetwork is { } name && !IsValidRestrictedNetworkName(name))
+        {
+            throw new InvalidOperationException(
+                "VibeMaker:Runtime:RestrictedNetwork must be the name of a dedicated --internal network (letters, digits, '.', '_', '-'), not host / bridge / slirp4netns / none.");
+        }
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex("^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$")]
+    private static partial System.Text.RegularExpressions.Regex RestrictedNetworkNamePattern();
 
     internal string ResolvedExecutable => ContainerExecutable ?? (Provider == RuntimeProvider.Docker ? "docker" : "podman");
 }

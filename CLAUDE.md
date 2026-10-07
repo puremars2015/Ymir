@@ -9,7 +9,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 |---|---|
 | `docs/sa/vibe-maker-core-mvp-sa.md` | SA（需求、資料模型、API、SSE 契約、驗收條件），以章節編號引用，例如「SA §10」 |
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
-| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0011） |
+| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0012） |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
 | `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
@@ -78,6 +78,8 @@ cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:make -- <截圖目
 # 管理介面：總覽、停止執行環境、稽核紀錄、系統設定（同 e2e 的前置）
 # 另需 Fake OIDC，API 加上 Ymir__Auth__Oidc__AuthorityHost=http://127.0.0.1:5299（不設定 Authority）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:admin -- <截圖目錄>
+# 對外連線管制（ADR-0012 A.8；需要 Podman 與兩個 network，前置步驟見 web/e2e/network-flow.mjs 開頭）
+cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:network -- <截圖目錄>
 
 # 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
 dotnet run --project src/Ymir.AppHost
@@ -111,6 +113,8 @@ Runtime 生命週期（ADR-0011）：`RuntimeLifecycleWorker` 啟動時對帳、
 - 備份指南：`docs/guides/backup-restore.md`。
 
 `/make`：對話輸入 `/make` 顯示管理員設定的主題按鈕（`vibemaker.make_topics`，Admin 在「管理 → Make 主題」維護）；給 Agent 的完整指示由後端 `MakePromptBuilder` 組合並存在 `AgentExecution.AgentPrompt`，對話紀錄只保留使用者輸入的文字。
+
+Agent 擴充能力（ADR-0012）：管理員在「管理 → 系統設定」設定全域預設（`vibemaker.extension_policy`），在「使用者」頁設定每人覆寫（`vibemaker.user_extension_grants`）；`ExtensionPolicyService` 解析、`ExecutionRunner` 每次執行帶入 `AgentRunRequest.Extensions`。`PiAgentHarness` **一律** `--no-extensions`（Agent 寫的 extension 不得載入），沒有 `skills` 加 `--no-skills`，有 `mcp` 才 `-e builtin:mcp`；每次執行前重寫 agent dir 的 `settings.json` / `trust.json` / `mcp.json`（使用者自建 MCP 在 `mcp.user.json`）與平台 skill（`PiExtensionConfig`）。成員端 `GET /api/extensions` 只回名稱，不回 MCP 設定內容。對外連線（`internet` 能力，預設允許，ADR-0012 A.8）：關閉時 `ExecutionRunner` 以 `RuntimeNetworkAccess.Restricted` 呼叫 `EnsureRuntimeAsync`，container 改接 `VibeMaker:Runtime:RestrictedNetwork`（`--internal`，名稱只來自部署設定；runtime host 只接受 `network=internet|restricted`）；label `ymir.network` 不符時重建並稽核 `runtime.recreate`；沒有設定受限網路時執行失敗，**不得**退回成可以對外連線。
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
 

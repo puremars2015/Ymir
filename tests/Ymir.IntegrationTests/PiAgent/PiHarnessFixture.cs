@@ -27,7 +27,7 @@ public sealed class PiHarnessFixture : IAsyncLifetime
     /// <summary>直接呼叫 harness 的 request（預設模型、沒有附加 system prompt）。</summary>
     public static AgentRunRequest Request(
         Guid runtimeId, Guid sessionId, string prompt, string? workingDirectory = null, string? modelId = null, IReadOnlyList<string>? systemPrompts = null, IReadOnlyList<AgentAttachment>? attachments = null) =>
-        new(Guid.NewGuid(), runtimeId, sessionId, prompt, workingDirectory ?? RuntimePaths.Workspace, ModelApiKey, modelId ?? FakeLlmEndpoints.ModelId, systemPrompts ?? [], attachments);
+        new(Guid.NewGuid(), runtimeId, sessionId, prompt, workingDirectory ?? RuntimePaths.Workspace, ModelApiKey, modelId ?? FakeLlmEndpoints.ModelId, systemPrompts ?? [], Attachments: attachments);
 
     public string WorkspaceRoot { get; } = Path.Combine(Path.GetTempPath(), "ymir-pi-it-" + Guid.NewGuid().ToString("N"));
 

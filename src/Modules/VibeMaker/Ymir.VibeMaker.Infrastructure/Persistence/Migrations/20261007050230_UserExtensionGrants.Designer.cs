@@ -12,8 +12,8 @@ using Ymir.VibeMaker.Infrastructure.Persistence;
 namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(VibeMakerDbContext))]
-    [Migration("20261007043653_MessageAttachments")]
-    partial class MessageAttachments
+    [Migration("20261007050230_UserExtensionGrants")]
+    partial class UserExtensionGrants
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -408,62 +408,6 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                     b.ToTable("messages", "vibemaker");
                 });
 
-            modelBuilder.Entity("Ymir.VibeMaker.Domain.MessageAttachment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)")
-                        .HasColumnName("content_type");
-
-                    b.Property<Guid>("ConversationId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("conversation_id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset")
-                        .HasColumnName("created_at");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("file_name");
-
-                    b.Property<Guid?>("MessageId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("message_id");
-
-                    b.Property<string>("Path")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)")
-                        .HasColumnName("path");
-
-                    b.Property<long>("Size")
-                        .HasColumnType("bigint")
-                        .HasColumnName("size");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_message_attachments");
-
-                    b.HasIndex("MessageId")
-                        .HasDatabaseName("ix_message_attachments_message_id");
-
-                    b.HasIndex("ConversationId", "MessageId")
-                        .HasDatabaseName("ix_message_attachments_conversation_id_message_id");
-
-                    b.ToTable("message_attachments", "vibemaker");
-                });
-
             modelBuilder.Entity("Ymir.VibeMaker.Domain.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -506,6 +450,39 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_projects_user_id");
 
                     b.ToTable("projects", "vibemaker");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.UserExtensionGrant", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("Capability")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("capability");
+
+                    b.Property<string>("Effect")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("effect");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("UserId", "Capability")
+                        .HasName("pk_user_extension_grants");
+
+                    b.ToTable("user_extension_grants", "vibemaker");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.UserSettings", b =>
@@ -583,22 +560,6 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_messages_conversations_conversation_id");
-                });
-
-            modelBuilder.Entity("Ymir.VibeMaker.Domain.MessageAttachment", b =>
-                {
-                    b.HasOne("Ymir.VibeMaker.Domain.Conversation", null)
-                        .WithMany()
-                        .HasForeignKey("ConversationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("fk_message_attachments_conversations_conversation_id");
-
-                    b.HasOne("Ymir.VibeMaker.Domain.Message", null)
-                        .WithMany()
-                        .HasForeignKey("MessageId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .HasConstraintName("fk_message_attachments_messages_message_id");
                 });
 #pragma warning restore 612, 618
         }
