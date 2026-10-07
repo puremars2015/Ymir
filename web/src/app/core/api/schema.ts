@@ -629,6 +629,70 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/projects/{projectId}/knowledge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetKnowledgeBase'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/projects/{projectId}/knowledge/documents': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['UploadKnowledgeDocument'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/projects/{projectId}/knowledge/documents/{documentId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations['RemoveKnowledgeDocument'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/projects/{projectId}/knowledge/documents/{documentId}/retry': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['RetryKnowledgeDocument'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/connectors/onedrive': {
     parameters: {
       query?: never;
@@ -985,6 +1049,34 @@ export interface components {
       internet: boolean;
       oneDrive: boolean;
     };
+    KnowledgeBaseResponse: {
+      enabled: boolean;
+      /** Format: int64 */
+      maxFileBytes: number | string;
+      /** Format: int32 */
+      maxDocuments: number | string;
+      supportedExtensions: string[];
+      documents: components['schemas']['KnowledgeDocumentResponse'][];
+    };
+    KnowledgeDocumentResponse: {
+      /** Format: uuid */
+      id: string;
+      fileName: string;
+      /** Format: int32 */
+      version: number | string;
+      /** Format: int64 */
+      size: number | string;
+      status: components['schemas']['KnowledgeDocumentStatus'];
+      /** Format: int32 */
+      chunkCount: number | string;
+      error: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {unknown} */
+    KnowledgeDocumentStatus: 'Pending' | 'Indexing' | 'Ready' | 'Failed' | 'Removed';
     LoginProvidersResponse: {
       oidc: boolean;
       oidcDisplayName: null | string;
@@ -2497,6 +2589,114 @@ export interface operations {
     responses: {
       /** @description OK */
       200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  GetKnowledgeBase: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeBaseResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  UploadKnowledgeDocument: {
+    parameters: {
+      query?: {
+        fileName?: string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/octet-stream': components['schemas']['Stream'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeDocumentResponse'];
+        };
+      };
+    };
+  };
+  RemoveKnowledgeDocument: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  RetryKnowledgeDocument: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeDocumentResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
         headers: {
           [name: string]: unknown;
         };

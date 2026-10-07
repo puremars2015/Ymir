@@ -25,6 +25,7 @@ import { ChatStarter } from '../../core/navigation/chat-starter.service';
 import { NavigationStore } from '../../core/navigation/navigation.store';
 import { Composer } from '../../shared/composer';
 import { ModelPicker } from '../../shared/model-picker';
+import { KnowledgeCard } from './knowledge-card';
 
 /**
  * 專案頁（ADR-0007）：專案是使用者執行環境內的一個檔案群組，同一專案的對話共用檔案。
@@ -32,7 +33,7 @@ import { ModelPicker } from '../../shared/model-picker';
  */
 @Component({
   selector: 'app-project-page',
-  imports: [Composer, ModelPicker, RouterLink, DatePipe, FormsModule],
+  imports: [Composer, ModelPicker, RouterLink, DatePipe, FormsModule, KnowledgeCard],
   templateUrl: './project-page.html',
   styleUrl: './project-page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

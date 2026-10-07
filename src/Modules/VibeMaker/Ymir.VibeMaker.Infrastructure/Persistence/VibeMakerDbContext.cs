@@ -42,6 +42,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<McpServerAccess> McpServerAccess => Set<McpServerAccess>();
 
+    public DbSet<KnowledgeDocument> KnowledgeDocuments => Set<KnowledgeDocument>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -242,6 +244,23 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             access.Property(a => a.Mode).HasConversion<UpperSnakeCaseEnumConverter<McpAccessMode>>().HasMaxLength(30);
             access.Property(a => a.UserIdList).IsRequired();
             access.Ignore(a => a.UserIds);
+        });
+
+        modelBuilder.Entity<KnowledgeDocument>(document =>
+        {
+            // ADR-0014：專案知識庫的文件版本；原始檔與向量在 API 自己的知識庫 volume。
+            document.ToTable("knowledge_documents");
+            document.HasKey(d => d.Id);
+            document.Property(d => d.Id).ValueGeneratedNever();
+            document.Property(d => d.FileName).HasMaxLength(KnowledgeDocument.FileNameMaxLength).IsRequired();
+            document.Property(d => d.ContentHash).HasMaxLength(64).IsRequired();
+            document.Property(d => d.Status).HasConversion<UpperSnakeCaseEnumConverter<KnowledgeDocumentStatus>>().HasMaxLength(30);
+            document.Property(d => d.EmbeddingModel).HasMaxLength(200);
+            document.Property(d => d.Error).HasMaxLength(KnowledgeDocument.ErrorMaxLength);
+            document.HasIndex(d => new { d.ProjectId, d.Status });
+            document.HasIndex(d => d.Status);
+            // 同專案同檔名最多一份可查詢的版本（新版本成功後才切換，ADR-0014 §7）。
+            document.HasIndex(d => new { d.ProjectId, d.FileName }).IsUnique().HasFilter("[status] = 'READY'");
         });
 
         modelBuilder.ApplySnakeCaseNames();

@@ -42,6 +42,8 @@ public interface IVibeMakerDbContext
 
     DbSet<McpServerAccess> McpServerAccess { get; }
 
+    DbSet<KnowledgeDocument> KnowledgeDocuments { get; }
+
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity)
         where TEntity : class;
 

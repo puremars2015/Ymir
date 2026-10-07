@@ -18,6 +18,8 @@ import {
   MyExtensions,
   OneDriveStatus,
   ConversationOneDrive,
+  KnowledgeBase,
+  KnowledgeDocument,
   McpServerAccess,
   PlatformMcpServers,
   SaveMcpServerAccessRequest,
@@ -355,6 +357,33 @@ export class ApiService {
       params: { fileName: file.name },
       headers: { 'Content-Type': 'application/octet-stream' },
     });
+  }
+
+  /** 專案知識庫（ADR-0014）。 */
+  getKnowledgeBase(projectId: string): Observable<KnowledgeBase> {
+    return this.http.get<KnowledgeBase>(`/api/projects/${projectId}/knowledge`);
+  }
+
+  uploadKnowledgeDocument(projectId: string, file: File): Observable<KnowledgeDocument> {
+    return this.http.post<KnowledgeDocument>(
+      `/api/projects/${projectId}/knowledge/documents`,
+      file,
+      {
+        params: { fileName: file.name },
+        headers: { 'Content-Type': 'application/octet-stream' },
+      },
+    );
+  }
+
+  removeKnowledgeDocument(projectId: string, documentId: string): Observable<void> {
+    return this.http.delete<void>(`/api/projects/${projectId}/knowledge/documents/${documentId}`);
+  }
+
+  retryKnowledgeDocument(projectId: string, documentId: string): Observable<KnowledgeDocument> {
+    return this.http.post<KnowledgeDocument>(
+      `/api/projects/${projectId}/knowledge/documents/${documentId}/retry`,
+      null,
+    );
   }
 
   cancelExecution(executionId: string): Observable<CancelExecutionResponse> {

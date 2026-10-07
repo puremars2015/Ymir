@@ -49,6 +49,8 @@ public static class VibeMakerInfrastructureExtensions
         services.Configure<Application.Connectors.OneDrive.OneDriveSyncOptions>(configuration.GetSection(Connectors.OneDrive.OneDriveOptions.SectionName));
         services.AddHostedService<Connectors.OneDrive.OneDriveSyncWorker>();
 
+        AddKnowledgeBase(services, configuration, isDevelopment);
+
         // 平台 MCP（ADR-0012 B）：設定 gateway 位址時才啟用；目錄與簽章金鑰不合法時拒絕啟動。
         services.Configure<Application.PlatformMcp.McpOptions>(configuration.GetSection(Application.PlatformMcp.McpOptions.SectionName));
         services.AddSingleton(PlatformMcpCatalogLoader.Load(configuration));
@@ -189,6 +191,32 @@ public static class VibeMakerInfrastructureExtensions
         return new ModelCatalog(models, defaultModel);
     }
 
+    /// <summary>RAG 知識庫（ADR-0014）：沒有設定 <c>VibeMaker:Rag:EmbeddingModel</c> 時停用（worker 不做事、上傳回 409）。</summary>
+    private static void AddKnowledgeBase(IServiceCollection services, IConfiguration configuration, bool isDevelopment)
+    {
+        var rag = configuration.GetSection(Application.Knowledge.KnowledgeOptions.SectionName);
+        services.Configure<Application.Knowledge.KnowledgeOptions>(rag);
+        var options = rag.Get<Application.Knowledge.KnowledgeOptions>() ?? new Application.Knowledge.KnowledgeOptions();
+        var root = configuration.GetSection(Knowledge.KnowledgeStorageOptions.SectionName).Get<Knowledge.KnowledgeStorageOptions>()?.Root;
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            root = options.IsEnabled && !isDevelopment
+                ? throw new InvalidOperationException("Ymir:Knowledge:Root is required when VibeMaker:Rag:EmbeddingModel is set (a persistent volume owned by the API, ADR-0014).")
+                : Path.Combine(Path.GetTempPath(), "ymir-knowledge");
+        }
+
+        var baseUrl = options.BaseUrl
+            ?? configuration.GetSection(LiteLlm.LiteLlmOptions.SectionName).Get<LiteLlm.LiteLlmOptions>()?.BaseUrl
+            ?? (configuration.GetSection(PiAgentOptions.SectionName).Get<PiAgentOptions>() ?? new PiAgentOptions()).ModelBaseUrl;
+        services.AddSingleton(new Knowledge.KnowledgePaths(root));
+        services.AddSingleton(new Knowledge.KnowledgeEndpoint(baseUrl));
+        services.AddSingleton<Application.Knowledge.IKnowledgeFileStore, Knowledge.FileSystemKnowledgeStore>();
+        services.AddSingleton<Application.Knowledge.IVectorStore, Knowledge.SqliteVectorStore>();
+        services.AddSingleton<Application.Knowledge.IDocumentTextExtractor, Knowledge.DocumentTextExtractor>();
+        services.AddHttpClient<Application.Knowledge.IEmbeddingClient, Knowledge.LiteLlmEmbeddingClient>(Knowledge.LiteLlmEmbeddingClient.HttpClientName);
+        services.AddHostedService<Knowledge.KnowledgeIndexWorker>();
+    }
+
     private static void AddModelGateway(IServiceCollection services, IConfiguration configuration, bool isDevelopment)
     {
         var section = configuration.GetSection(LiteLlmOptions.SectionName);
@@ -205,6 +233,13 @@ public static class VibeMakerInfrastructureExtensions
                 {
                     options.AllowedModels.Add(model.Id);
                 }
+            }
+
+            // 知識庫的 embedding 模型（ADR-0014 §3）也以使用者的 virtual key 呼叫。
+            if (configuration.GetValue<string>($"{Application.Knowledge.KnowledgeOptions.SectionName}:EmbeddingModel") is { Length: > 0 } embedding
+                && !options.AllowedModels.Contains(embedding))
+            {
+                options.AllowedModels.Add(embedding);
             }
         });
         services.TryAddSingleton(TimeProvider.System);

@@ -58,6 +58,9 @@ export type PlatformMcpServers = Schemas['PlatformMcpServersResponse'];
 export type McpServerAccess = Schemas['McpServerAccessResponse'];
 export type McpAccessMode = Schemas['McpAccessMode'];
 export type SaveMcpServerAccessRequest = Schemas['SaveMcpServerAccessRequest'];
+export type KnowledgeBase = Schemas['KnowledgeBaseResponse'];
+export type KnowledgeDocument = Schemas['KnowledgeDocumentResponse'];
+export type KnowledgeDocumentStatus = Schemas['KnowledgeDocumentStatus'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

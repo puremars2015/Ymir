@@ -22,6 +22,13 @@ public sealed class FakeLlmState
 
     public string? MasterKey { get; }
 
+    private int _embeddedTexts;
+
+    /// <summary>embeddings 端點累計向量化的文字數（RAG 測試用）。</summary>
+    public int EmbeddedTexts => Volatile.Read(ref _embeddedTexts);
+
+    internal void RecordEmbeddings(int count) => Interlocked.Add(ref _embeddedTexts, count);
+
     public IReadOnlyCollection<JsonObject> Requests => _requests;
 
     public JsonObject? LastRequest => _requests.LastOrDefault();

@@ -1543,6 +1543,164 @@
         }
       }
     },
+    "/api/projects/{projectId}/knowledge": {
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "GetKnowledgeBase",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeBaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/knowledge/documents": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "UploadKnowledgeDocument",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fileName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "$ref": "#/components/schemas/Stream"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeDocumentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/knowledge/documents/{documentId}": {
+      "delete": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "RemoveKnowledgeDocument",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/knowledge/documents/{documentId}/retry": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "RetryKnowledgeDocument",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeDocumentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/connectors/onedrive": {
       "get": {
         "tags": [
@@ -2698,6 +2856,122 @@
             "type": "boolean"
           }
         }
+      },
+      "KnowledgeBaseResponse": {
+        "required": [
+          "enabled",
+          "maxFileBytes",
+          "maxDocuments",
+          "supportedExtensions",
+          "documents"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxFileBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "maxDocuments": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "supportedExtensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeDocumentResponse"
+            }
+          }
+        }
+      },
+      "KnowledgeDocumentResponse": {
+        "required": [
+          "id",
+          "fileName",
+          "version",
+          "size",
+          "status",
+          "chunkCount",
+          "error",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/KnowledgeDocumentStatus"
+          },
+          "chunkCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "KnowledgeDocumentStatus": {
+        "enum": [
+          "Pending",
+          "Indexing",
+          "Ready",
+          "Failed",
+          "Removed"
+        ]
       },
       "LoginProvidersResponse": {
         "required": [
@@ -4236,6 +4510,9 @@
     },
     {
       "name": "Admin"
+    },
+    {
+      "name": "Knowledge"
     },
     {
       "name": "Connectors"

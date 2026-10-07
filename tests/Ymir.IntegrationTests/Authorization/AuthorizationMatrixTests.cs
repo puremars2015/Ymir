@@ -44,6 +44,13 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["GET /api/conversations/{conversationId:guid}/files/archive"] = r => Get($"/api/conversations/{r.ConversationId}/files/archive"),
         ["GET /api/conversations/{conversationId:guid}/onedrive/"] = r => Get($"/api/conversations/{r.ConversationId}/onedrive"),
         ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/onedrive/sync"),
+        ["GET /api/projects/{projectId:guid}/knowledge/"] = r => Get($"/api/projects/{r.ProjectId}/knowledge"),
+        ["POST /api/projects/{projectId:guid}/knowledge/documents"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{r.ProjectId}/knowledge/documents?fileName=intrusion.txt")
+        {
+            Content = new ByteArrayContent("intrusion"u8.ToArray()),
+        },
+        ["DELETE /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}"] = r => new HttpRequestMessage(HttpMethod.Delete, $"/api/projects/{r.ProjectId}/knowledge/documents/{r.ExecutionId}"),
+        ["POST /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}/retry"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{r.ProjectId}/knowledge/documents/{r.ExecutionId}/retry"),
         ["POST /api/conversations/{conversationId:guid}/attachments"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/attachments?fileName=intrusion.txt")
         {
             Content = new ByteArrayContent("intrusion"u8.ToArray()),
@@ -69,6 +76,10 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     private static readonly Dictionary<string, HttpStatusCode> OwnerStatusOverrides = new()
     {
         ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = HttpStatusCode.Conflict,
+        // 這個 fixture 沒有設定 Embedding 模型（知識庫停用）；文件 id 不存在。擁有者的成功路徑在 KnowledgeBaseTests。
+        ["POST /api/projects/{projectId:guid}/knowledge/documents"] = HttpStatusCode.Conflict,
+        ["DELETE /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}"] = HttpStatusCode.NotFound,
+        ["POST /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}/retry"] = HttpStatusCode.NotFound,
     };
 
     /// <summary>

@@ -3,6 +3,8 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="PdfPig" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Ymir.VibeMaker\Ymir.VibeMaker.csproj" />

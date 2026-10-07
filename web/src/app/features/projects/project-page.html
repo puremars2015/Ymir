@@ -61,6 +61,8 @@
       </form>
     </details>
 
+    <app-knowledge-card [projectId]="p.id" />
+
     <h2>對話</h2>
     <ul class="conversations">
       @for (conversation of conversations(); track conversation.id) {
