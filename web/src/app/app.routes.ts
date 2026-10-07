@@ -32,6 +32,11 @@ export const routes: Routes = [
         title: '專案 · Vibe Maker',
       },
       {
+        path: 'sites',
+        loadComponent: () => import('./features/sites/sites-page').then((m) => m.SitesPage),
+        title: '我的網站 · Vibe Maker',
+      },
+      {
         path: 'settings',
         loadComponent: () =>
           import('./features/settings/settings-page').then((m) => m.SettingsPage),

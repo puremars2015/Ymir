@@ -55,6 +55,16 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         {
             Content = JsonContent.Create(new AskKnowledgeRequest("secret?", null)),
         },
+        ["POST /api/conversations/{conversationId:guid}/sites"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/sites")
+        {
+            Content = JsonContent.Create(new PublishSiteRequest("intrusion", "dist")),
+        },
+        ["POST /api/sites/{siteId:guid}/publish"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/sites/{r.ExecutionId}/publish")
+        {
+            Content = JsonContent.Create(new RepublishSiteRequest(null, null, null)),
+        },
+        ["POST /api/sites/{siteId:guid}/unpublish"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/sites/{r.ExecutionId}/unpublish"),
+        ["DELETE /api/sites/{siteId:guid}"] = r => new HttpRequestMessage(HttpMethod.Delete, $"/api/sites/{r.ExecutionId}"),
         ["POST /api/conversations/{conversationId:guid}/attachments"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/attachments?fileName=intrusion.txt")
         {
             Content = new ByteArrayContent("intrusion"u8.ToArray()),
@@ -85,6 +95,11 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["DELETE /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}"] = HttpStatusCode.NotFound,
         ["POST /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}/retry"] = HttpStatusCode.NotFound,
         ["POST /api/projects/{projectId:guid}/knowledge/ask"] = HttpStatusCode.Conflict,
+        // 這個 fixture 沒有設定網站託管；網站 id 不存在。擁有者的成功路徑在 SiteHostingTests。
+        ["POST /api/conversations/{conversationId:guid}/sites"] = HttpStatusCode.Conflict,
+        ["POST /api/sites/{siteId:guid}/publish"] = HttpStatusCode.NotFound,
+        ["POST /api/sites/{siteId:guid}/unpublish"] = HttpStatusCode.NotFound,
+        ["DELETE /api/sites/{siteId:guid}"] = HttpStatusCode.NotFound,
     };
 
     /// <summary>
@@ -172,6 +187,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     private static readonly HashSet<string> NotResourceScoped =
     [
         "GET /api/me",
+        "GET /api/sites/",
         "POST /api/me/password",
         "POST /api/auth/logout",
         "GET /api/auth/providers",

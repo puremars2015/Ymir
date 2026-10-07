@@ -44,6 +44,10 @@ public interface IVibeMakerDbContext
 
     DbSet<KnowledgeDocument> KnowledgeDocuments { get; }
 
+    DbSet<Site> Sites { get; }
+
+    DbSet<SiteVersion> SiteVersions { get; }
+
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity)
         where TEntity : class;
 

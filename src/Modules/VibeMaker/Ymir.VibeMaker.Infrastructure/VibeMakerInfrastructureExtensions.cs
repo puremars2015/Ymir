@@ -51,6 +51,10 @@ public static class VibeMakerInfrastructureExtensions
 
         AddKnowledgeBase(services, configuration, isDevelopment);
 
+        // 網站託管（ADR-0016）：沒有設定 Ymir:Sites:BaseUrl / Root 時停用。
+        services.Configure<Application.Sites.SiteOptions>(configuration.GetSection(Application.Sites.SiteOptions.SectionName));
+        services.AddSingleton<Application.Sites.ISiteStorage, Sites.FileSystemSiteStorage>();
+
         // 平台 MCP（ADR-0012 B）：設定 gateway 位址時才啟用；目錄與簽章金鑰不合法時拒絕啟動。
         services.Configure<Application.PlatformMcp.McpOptions>(configuration.GetSection(Application.PlatformMcp.McpOptions.SectionName));
         services.AddSingleton(PlatformMcpCatalogLoader.Load(configuration));

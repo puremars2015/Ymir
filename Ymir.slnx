@@ -5,6 +5,7 @@
     <Project Path="src/Ymir.Edge/Ymir.Edge.csproj" />
     <Project Path="src/Ymir.McpGateway/Ymir.McpGateway.csproj" />
     <Project Path="src/Ymir.RuntimeHost/Ymir.RuntimeHost.csproj" />
+    <Project Path="src/Ymir.SiteHost/Ymir.SiteHost.csproj" />
     <Project Path="src/Ymir.ServiceDefaults/Ymir.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/src/Platform/">

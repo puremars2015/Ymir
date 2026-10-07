@@ -81,6 +81,7 @@ app.MapAdminRuntimeEndpoints();
 app.MapExtensionEndpoints();
 app.MapPlatformMcpEndpoints();
 app.MapKnowledgeEndpoints();
+app.MapSiteEndpoints();
 app.MapOneDriveEndpoints();
 app.MapAdminSettingsEndpoints();
 app.MapMakeTopicEndpoints();

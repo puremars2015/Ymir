@@ -63,6 +63,10 @@ export type KnowledgeDocument = Schemas['KnowledgeDocumentResponse'];
 export type KnowledgeDocumentStatus = Schemas['KnowledgeDocumentStatus'];
 export type KnowledgeAnswer = Schemas['KnowledgeAnswerResponse'];
 export type KnowledgeCitation = Schemas['KnowledgeCitationResponse'];
+export type Site = Schemas['SiteResponse'];
+export type Sites = Schemas['SitesResponse'];
+export type SiteAccessMode = Schemas['SiteAccessMode'];
+export type PublishSiteRequest = Schemas['PublishSiteRequest'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

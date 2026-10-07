@@ -15,5 +15,7 @@
     <InternalsVisibleTo Include="Ymir.IntegrationTests" />
     <!-- runtime host 共用 RuntimeHostProtocol 與 HostProcess（ADR-0008） -->
     <InternalsVisibleTo Include="Ymir.RuntimeHost" />
+    <!-- SiteHost 以同一個 DbContext 唯讀查詢網站（ADR-0016） -->
+    <InternalsVisibleTo Include="Ymir.SiteHost" />
   </ItemGroup>
 </Project>

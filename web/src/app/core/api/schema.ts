@@ -180,6 +180,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/conversations/{conversationId}/sites': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['PublishSite'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/make-topics': {
     parameters: {
       query?: never;
@@ -704,6 +720,70 @@ export interface paths {
     put?: never;
     post: operations['AskKnowledgeBase'];
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListSites'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/{siteId}/publish': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['RepublishSite'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/{siteId}/unpublish': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['UnpublishSite'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/{siteId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations['DeleteSite'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1251,6 +1331,18 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    PublishSiteRequest: {
+      name: null | string;
+      sourcePath: null | string;
+      /** @default false */
+      spaMode: boolean;
+    };
+    RepublishSiteRequest: {
+      /** Format: uuid */
+      conversationId: null | string;
+      sourcePath: null | string;
+      spaMode: null | boolean;
+    };
     ResetPasswordRequest: {
       newPassword: null | string;
     };
@@ -1381,6 +1473,37 @@ export interface components {
     SetTunnelTokenRequest: {
       token: null | string;
     };
+    /** @enum {unknown} */
+    SiteAccessMode: 'Public' | 'AllUsers' | 'SelectedUsers';
+    SiteResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** Format: uri */
+      url: null | string;
+      status: components['schemas']['SiteStatus'];
+      accessMode: components['schemas']['SiteAccessMode'];
+      spaMode: boolean;
+      /** Format: uuid */
+      conversationId: string;
+      sourcePath: string;
+      /** Format: int32 */
+      fileCount: number | string;
+      /** Format: int64 */
+      totalBytes: number | string;
+      /** Format: date-time */
+      publishedAt: null | string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    SitesResponse: {
+      enabled: boolean;
+      /** Format: int32 */
+      maxSites: number | string;
+      sites: components['schemas']['SiteResponse'][];
+    };
+    /** @enum {unknown} */
+    SiteStatus: 'Unpublished' | 'Published';
     /** Format: binary */
     Stream: string;
     TestOidcSettingsRequest: {
@@ -1747,6 +1870,32 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['MyExtensionsResponse'];
+        };
+      };
+    };
+  };
+  PublishSite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PublishSiteRequest'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SiteResponse'];
         };
       };
     };
@@ -2772,6 +2921,94 @@ export interface operations {
         content: {
           'application/json': components['schemas']['KnowledgeAnswerResponse'];
         };
+      };
+    };
+  };
+  ListSites: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SitesResponse'];
+        };
+      };
+    };
+  };
+  RepublishSite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        siteId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RepublishSiteRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SiteResponse'];
+        };
+      };
+    };
+  };
+  UnpublishSite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        siteId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SiteResponse'];
+        };
+      };
+    };
+  };
+  DeleteSite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        siteId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

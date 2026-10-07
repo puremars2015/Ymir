@@ -16,6 +16,7 @@ import { ArtifactGroup, WorkspaceFile } from '../../core/api/api-types';
 import { Markdown } from '../../shared/markdown';
 import { ArtifactDownload } from '../../shared/artifact-download';
 import { OneDriveSync } from './onedrive-sync';
+import { PublishSite } from './publish-site';
 import { artifactDownloadUrl } from '../../core/files/artifact-files';
 import {
   archiveDownloadUrl,
@@ -45,7 +46,7 @@ interface Preview {
  */
 @Component({
   selector: 'app-files-panel',
-  imports: [DatePipe, Markdown, ArtifactDownload, OneDriveSync],
+  imports: [DatePipe, Markdown, ArtifactDownload, OneDriveSync, PublishSite],
   template: `
     <aside class="panel" aria-label="檔案">
       <header>
@@ -151,6 +152,7 @@ interface Preview {
         }
       } @else if (files().length > 0) {
         <a class="button primary archive" [href]="archiveUrl()" download>⬇ 下載專案檔案（ZIP）</a>
+        <app-publish-site [conversationId]="conversationId()" [files]="files()" />
         <ul class="files">
           @for (file of files(); track file.path) {
             <li class="file">

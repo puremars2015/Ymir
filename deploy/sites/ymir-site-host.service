@@ -1,0 +1,30 @@
+# Ymir SiteHost（ADR-0016）：提供使用者發布的網站。安裝步驟見同目錄 README.md。
+[Unit]
+Description=Ymir SiteHost (published user sites)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ymir-sites
+Group=ymir-sites
+WorkingDirectory=/opt/ymir/site-host
+EnvironmentFile=/etc/ymir/site-host.env
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+ExecStart=/usr/bin/dotnet /opt/ymir/site-host/Ymir.SiteHost.dll
+Restart=on-failure
+RestartSec=5
+StateDirectory=ymir-site-host
+
+# 網站 volume 唯讀；不掛載 workspace 或 container runtime socket。
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadOnlyPaths=/opt/ymir /srv/ymir/sites
+InaccessiblePaths=/srv/ymir/workspaces /run/podman /var/run/docker.sock
+
+[Install]
+WantedBy=multi-user.target

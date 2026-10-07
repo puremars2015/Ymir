@@ -19,6 +19,9 @@ import {
   OneDriveStatus,
   ConversationOneDrive,
   KnowledgeAnswer,
+  PublishSiteRequest,
+  Site,
+  Sites,
   KnowledgeBase,
   KnowledgeDocument,
   McpServerAccess,
@@ -397,6 +400,31 @@ export class ApiService {
       question,
       modelId,
     });
+  }
+
+  /** 網站託管（ADR-0016）。 */
+  listSites(): Observable<Sites> {
+    return this.http.get<Sites>('/api/sites');
+  }
+
+  publishSite(conversationId: string, request: PublishSiteRequest): Observable<Site> {
+    return this.http.post<Site>(`/api/conversations/${conversationId}/sites`, request);
+  }
+
+  republishSite(siteId: string): Observable<Site> {
+    return this.http.post<Site>(`/api/sites/${siteId}/publish`, {
+      conversationId: null,
+      sourcePath: null,
+      spaMode: null,
+    });
+  }
+
+  unpublishSite(siteId: string): Observable<Site> {
+    return this.http.post<Site>(`/api/sites/${siteId}/unpublish`, null);
+  }
+
+  deleteSite(siteId: string): Observable<void> {
+    return this.http.delete<void>(`/api/sites/${siteId}`);
   }
 
   cancelExecution(executionId: string): Observable<CancelExecutionResponse> {

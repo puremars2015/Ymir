@@ -326,6 +326,47 @@
         }
       }
     },
+    "/api/conversations/{conversationId}/sites": {
+      "post": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "PublishSite",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishSiteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/make-topics": {
       "get": {
         "tags": [
@@ -1738,6 +1779,122 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/sites": {
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "ListSites",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{siteId}/publish": {
+      "post": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "RepublishSite",
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepublishSiteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{siteId}/unpublish": {
+      "post": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "UnpublishSite",
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{siteId}": {
+      "delete": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "DeleteSite",
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
           }
         }
       }
@@ -3680,6 +3837,60 @@
           }
         }
       },
+      "PublishSiteRequest": {
+        "required": [
+          "name",
+          "sourcePath"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourcePath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "spaMode": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "RepublishSiteRequest": {
+        "required": [
+          "conversationId",
+          "sourcePath",
+          "spaMode"
+        ],
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "sourcePath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "spaMode": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          }
+        }
+      },
       "ResetPasswordRequest": {
         "required": [
           "newPassword"
@@ -4222,6 +4433,122 @@
           }
         }
       },
+      "SiteAccessMode": {
+        "enum": [
+          "Public",
+          "AllUsers",
+          "SelectedUsers"
+        ]
+      },
+      "SiteResponse": {
+        "required": [
+          "id",
+          "name",
+          "url",
+          "status",
+          "accessMode",
+          "spaMode",
+          "conversationId",
+          "sourcePath",
+          "fileCount",
+          "totalBytes",
+          "publishedAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SiteStatus"
+          },
+          "accessMode": {
+            "$ref": "#/components/schemas/SiteAccessMode"
+          },
+          "spaMode": {
+            "type": "boolean"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourcePath": {
+            "type": "string"
+          },
+          "fileCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "totalBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "publishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SitesResponse": {
+        "required": [
+          "enabled",
+          "maxSites",
+          "sites"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxSites": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "sites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SiteResponse"
+            }
+          }
+        }
+      },
+      "SiteStatus": {
+        "enum": [
+          "Unpublished",
+          "Published"
+        ]
+      },
       "Stream": {
         "type": "string",
         "format": "binary"
@@ -4660,6 +4987,9 @@
     },
     {
       "name": "Extensions"
+    },
+    {
+      "name": "Sites"
     },
     {
       "name": "Make"

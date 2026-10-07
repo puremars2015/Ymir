@@ -40,6 +40,8 @@ public static class VibeMakerApplicationExtensions
         services.AddScoped<Application.Knowledge.KnowledgeQueryService>();
         services.AddSingleton<Application.Knowledge.KnowledgeSignal>();
         services.AddSingleton<Application.Knowledge.KnowledgeLocks>();
+        services.AddScoped<Application.Sites.SiteService>();
+        services.AddSingleton<Application.Sites.SiteLocks>();
         services.AddSingleton<VibeMakerTelemetry>();
         services.AddSingleton<RuntimeCredentialService>();
         services.AddSingleton<ModelBudgetGuard>();

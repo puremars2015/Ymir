@@ -44,6 +44,10 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<KnowledgeDocument> KnowledgeDocuments => Set<KnowledgeDocument>();
 
+    public DbSet<Site> Sites => Set<Site>();
+
+    public DbSet<SiteVersion> SiteVersions => Set<SiteVersion>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -261,6 +265,33 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             document.HasIndex(d => d.Status);
             // 同專案同檔名最多一份可查詢的版本（新版本成功後才切換，ADR-0014 §7）。
             document.HasIndex(d => new { d.ProjectId, d.FileName }).IsUnique().HasFilter("[status] = 'READY'");
+        });
+
+        modelBuilder.Entity<Site>(site =>
+        {
+            // ADR-0016：發布的網站；網址代碼由平台產生且唯一。
+            site.ToTable("sites");
+            site.HasKey(s => s.Id);
+            site.Property(s => s.Id).ValueGeneratedNever();
+            site.Property(s => s.Slug).HasMaxLength(Site.SlugLength).IsRequired();
+            site.Property(s => s.Name).HasMaxLength(Site.NameMaxLength).IsRequired();
+            site.Property(s => s.SourcePath).HasMaxLength(Site.SourcePathMaxLength).IsRequired();
+            site.Property(s => s.AccessMode).HasConversion<UpperSnakeCaseEnumConverter<SiteAccessMode>>().HasMaxLength(30);
+            site.Property(s => s.Status).HasConversion<UpperSnakeCaseEnumConverter<SiteStatus>>().HasMaxLength(30);
+            site.HasIndex(s => s.Slug).IsUnique();
+            site.HasIndex(s => s.UserId);
+        });
+
+        modelBuilder.Entity<SiteVersion>(version =>
+        {
+            version.ToTable("site_versions");
+            version.HasKey(v => v.Id);
+            version.Property(v => v.Id).ValueGeneratedNever();
+            version.Property(v => v.SourcePath).HasMaxLength(Site.SourcePathMaxLength).IsRequired();
+            version.Property(v => v.Status).HasConversion<UpperSnakeCaseEnumConverter<SiteVersionStatus>>().HasMaxLength(30);
+            version.Property(v => v.Error).HasMaxLength(SiteVersion.ErrorMaxLength);
+            version.HasIndex(v => v.SiteId);
+            version.HasOne<Site>().WithMany().HasForeignKey(v => v.SiteId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.ApplySnakeCaseNames();

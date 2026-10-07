@@ -14,6 +14,7 @@
     <ProjectReference Include="..\..\src\Modules\VibeMaker\Ymir.VibeMaker.Infrastructure\Ymir.VibeMaker.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Ymir.RuntimeHost\Ymir.RuntimeHost.csproj" />
     <ProjectReference Include="..\..\src\Ymir.McpGateway\Ymir.McpGateway.csproj" />
+    <ProjectReference Include="..\..\src\Ymir.SiteHost\Ymir.SiteHost.csproj" />
     <ProjectReference Include="..\..\src\Ymir.Api\Ymir.Api.csproj" />
   </ItemGroup>
   <ItemGroup>
