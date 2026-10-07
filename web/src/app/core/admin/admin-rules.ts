@@ -22,6 +22,12 @@ export const canStopRuntime = (status: RuntimeState): boolean =>
 
 const ACTION_LABELS: Record<string, string> = {
   'runtime.idle_stop': '閒置自動停止執行環境',
+  'runtime.create': '建立執行環境',
+  'runtime.start': '啟動執行環境',
+  'runtime.stop': '停止執行環境',
+  'runtime.reconcile': '同步執行環境狀態',
+  'runtime.ensure': '執行環境啟動失敗',
+  'system.retention.purge': '清理過期資料',
   'admin.settings.runtime.update': '修改執行政策',
   'admin.settings.runtime.reset': '還原執行政策',
   'auth.login': '開發登入',
@@ -140,4 +146,27 @@ export function trendBars(trend: DailyExecution[]): TrendBar[] {
       height: max === 0 ? 0 : Math.round((totals[i] / max) * 100),
     };
   });
+}
+
+const HEALTH_NAMES: Record<string, string> = {
+  database: '資料庫',
+  runtime: '執行環境',
+  litellm: 'LiteLLM（模型）',
+};
+
+/** 健康檢查項目的顯示名稱。 */
+export const healthName = (name: string): string => HEALTH_NAMES[name] ?? name;
+
+export type HealthLevel = 'ok' | 'warn' | 'down';
+
+export function healthLevel(status: string): HealthLevel {
+  if (status === 'Healthy') return 'ok';
+  return status === 'Degraded' ? 'warn' : 'down';
+}
+
+/** 有服務異常時，總覽最上方顯示的警告。 */
+export function healthWarnings(checks: { name: string; status: string }[]): string[] {
+  return checks
+    .filter((c) => healthLevel(c.status) === 'down')
+    .map((c) => `${healthName(c.name)}目前無法使用，Agent 可能無法執行。`);
 }

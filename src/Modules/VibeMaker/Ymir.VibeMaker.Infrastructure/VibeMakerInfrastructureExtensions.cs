@@ -36,6 +36,11 @@ public static class VibeMakerInfrastructureExtensions
         services.AddSingleton<Application.Files.IWorkspaceFileReader, Files.RuntimeWorkspaceFileReader>();
         services.AddHostedService<ExecutionWorker>();
         services.AddHostedService<RuntimeLifecycleWorker>();
+        services.AddHttpClient(nameof(Health.LiteLlmHealthCheck));
+        services.AddHealthChecks()
+            .AddCheck<Health.DatabaseHealthCheck>("database", tags: [Health.VibeMakerHealthChecks.ReadyTag], timeout: Health.VibeMakerHealthChecks.Timeout)
+            .AddCheck<Health.RuntimeHealthCheck>("runtime", tags: [Health.VibeMakerHealthChecks.ReadyTag], timeout: Health.VibeMakerHealthChecks.Timeout)
+            .AddCheck<Health.LiteLlmHealthCheck>("litellm", tags: [Health.VibeMakerHealthChecks.ReadyTag], timeout: Health.VibeMakerHealthChecks.Timeout);
         services.Configure<ExecutionOptions>(options =>
         {
             // 部署設定的預設值；管理介面儲存的執行政策優先（ADR-0011）。

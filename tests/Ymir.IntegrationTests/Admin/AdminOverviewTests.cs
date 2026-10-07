@@ -44,6 +44,23 @@ public class AdminOverviewTests(ApiFactory factory) : IClassFixture<ApiFactory>
     }
 
     [Fact]
+    public async Task Health_ReportsDatabaseRuntimeAndLiteLlm()
+    {
+        using var admin = await factory.LoginAsync($"health-admin-{Guid.NewGuid():N}", UserRole.Admin);
+
+        var health = await admin.GetFromJsonAsync<ServiceHealthResponse>("/api/admin/health", JsonDefaults.Options, Ct);
+
+        Assert.Equal("Healthy", health!.Status);
+        Assert.Equal(["database", "litellm", "runtime"], health.Checks.Select(c => c.Name).Order());
+        Assert.All(health.Checks, c => Assert.Equal("Healthy", c.Status));
+        Assert.Contains(health.Checks, c => c.Name == "runtime" && c.Description!.Contains("本機", StringComparison.Ordinal));
+        // 匿名的 /health 也包含 readiness，但只回狀態文字（不含細節）
+        using var anonymous = factory.CreateClient();
+        var text = await anonymous.GetStringAsync("/health", Ct);
+        Assert.Equal("Healthy", text);
+    }
+
+    [Fact]
     public async Task Overview_RejectsAnUnreasonableOffset()
     {
         using var admin = await factory.LoginAsync($"overview-offset-{Guid.NewGuid():N}", UserRole.Admin);

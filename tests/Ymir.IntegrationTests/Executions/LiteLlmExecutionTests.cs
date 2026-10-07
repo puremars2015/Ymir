@@ -125,4 +125,22 @@ public class UnreachableLiteLlmTests(UnreachableLiteLlmApiFactory factory) : ICl
         Assert.Equal(ExecutionErrorCodes.ModelProviderError, terminal.Data.GetProperty("code").GetString());
         Assert.DoesNotContain("127.0.0.1", terminal.Data.GetRawText(), StringComparison.Ordinal); // 不洩漏內部位址（SA §12）
     }
+
+    [Fact]
+    public async Task Health_ReportsLiteLlmUnreachable_WithoutInternalDetails()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var admin = await factory.LoginAsync("litellm-down-admin", Ymir.Platform.Users.UserRole.Admin);
+
+        var health = await admin.GetFromJsonAsync<AdminHealth>("/api/admin/health", JsonDefaults.Options, ct);
+
+        Assert.Equal("Unhealthy", health!.Status);
+        var litellm = Assert.Single(health.Checks, c => c.Name == "litellm");
+        Assert.Equal("Unhealthy", litellm.Status);
+        Assert.DoesNotContain("127.0.0.1", litellm.Description ?? string.Empty, StringComparison.Ordinal);
+        using var anonymous = factory.CreateClient();
+        Assert.Equal(System.Net.HttpStatusCode.ServiceUnavailable, (await anonymous.GetAsync("/health", ct)).StatusCode);
+    }
+
+    private sealed record AdminHealth(string Status, IReadOnlyList<ServiceHealthItem> Checks);
 }

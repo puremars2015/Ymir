@@ -165,18 +165,20 @@ internal sealed record RuntimeHostEndpoint(string? SocketPath, Uri? HttpUri)
 }
 
 /// <summary>Runtime 資訊（runtime host 回傳）。</summary>
+/// <param name="Transition">EnsureRuntime 是否建立或啟動了 container（稽核用）；舊版 runtime host 沒有這個欄位時為 None。</param>
 internal sealed record RuntimeInfoMessage(
     Guid RuntimeId,
     Guid UserId,
     string Provider,
     string ProviderRuntimeId,
     string ImageVersion,
-    RuntimeStatus Status)
+    RuntimeStatus Status,
+    RuntimeTransition Transition = RuntimeTransition.None)
 {
     public static RuntimeInfoMessage From(RuntimeInfo info) =>
-        new(info.RuntimeId, info.UserId, info.Provider, info.ProviderRuntimeId, info.ImageVersion, info.Status);
+        new(info.RuntimeId, info.UserId, info.Provider, info.ProviderRuntimeId, info.ImageVersion, info.Status, info.Transition);
 
-    public RuntimeInfo ToRuntimeInfo() => new(RuntimeId, UserId, Provider, ProviderRuntimeId, ImageVersion, Status);
+    public RuntimeInfo ToRuntimeInfo() => new(RuntimeId, UserId, Provider, ProviderRuntimeId, ImageVersion, Status, Transition);
 }
 
 /// <summary>

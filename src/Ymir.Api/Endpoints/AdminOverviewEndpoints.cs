@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Ymir.Api.Auth;
 using Ymir.Api.Problems;
 using Ymir.Platform.Auditing;
@@ -24,6 +25,7 @@ internal static class AdminOverviewEndpoints
         group.MapGet("/overview", GetOverviewAsync).WithName("AdminGetOverview").Produces<AdminOverviewResponse>();
         group.MapPost("/runtimes/{userId:guid}/stop", StopRuntimeAsync).WithName("AdminStopRuntime").Produces(StatusCodes.Status204NoContent);
         group.MapGet("/audit", SearchAuditAsync).WithName("AdminSearchAudit").Produces<AuditLogPageResponse>();
+        group.MapGet("/health", GetHealthAsync).WithName("AdminGetHealth").Produces<ServiceHealthResponse>();
         return endpoints;
     }
 
@@ -55,6 +57,15 @@ internal static class AdminOverviewEndpoints
                 executions.CancelledToday,
                 [.. executions.Trend.Select(d => new DailyExecutionResponse(d.Date, d.Total, d.Failed))]),
             [.. runtimes.Select(r => new RuntimeSummaryResponse(r.UserId, names.GetValueOrDefault(r.UserId) ?? "（已刪除的使用者）", r.Status, r.LastActiveAt))]));
+    }
+
+    /// <summary>readiness 檢查（資料庫、執行環境、LiteLLM）的結果；描述只有摘要，細節在 server log（SA §12）。</summary>
+    private static async Task<ServiceHealthResponse> GetHealthAsync(HealthCheckService health, CancellationToken cancellationToken)
+    {
+        var report = await health.CheckHealthAsync(r => r.Tags.Contains("ready"), cancellationToken);
+        return new ServiceHealthResponse(
+            report.Status.ToString(),
+            [.. report.Entries.Select(e => new ServiceHealthItem(e.Key, e.Value.Status.ToString(), e.Value.Description, (int)e.Value.Duration.TotalMilliseconds))]);
     }
 
     private static async Task<IResult> StopRuntimeAsync(Guid userId, AdminStatsService stats, ICurrentUser currentUser, CancellationToken cancellationToken) =>
@@ -119,6 +130,12 @@ public sealed record DailyExecutionResponse(DateOnly Date, int Total, int Failed
 public sealed record RuntimeSummaryResponse(Guid UserId, string DisplayName, RuntimeStatus Status, DateTimeOffset? LastActiveAt);
 
 public sealed record AuditLogPageResponse(List<AuditLogItemResponse> Items, long? NextBefore);
+
+/// <param name="Status">Healthy / Degraded / Unhealthy。</param>
+public sealed record ServiceHealthResponse(string Status, IReadOnlyList<ServiceHealthItem> Checks);
+
+/// <param name="Name">database / runtime / litellm。</param>
+public sealed record ServiceHealthItem(string Name, string Status, string? Description, int DurationMs);
 
 public sealed record AuditLogItemResponse(
     long Id,

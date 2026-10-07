@@ -23,9 +23,11 @@ public static class VibeMakerApplicationExtensions
         services.AddScoped<ExecutionEventWriter>();
         services.AddScoped<ExecutionRunner>();
         services.AddScoped<ExecutionReconciler>();
+        services.AddScoped<ExecutionEventRetention>();
         services.AddScoped<Application.Runtime.RuntimeLifecycleService>();
         services.AddSingleton<Application.Runtime.RuntimePolicyService>();
         services.AddSingleton<UserExecutionLocks>();
+        services.AddSingleton<VibeMakerTelemetry>();
         services.AddSingleton<RuntimeCredentialService>();
         services.AddSingleton<ModelBudgetGuard>();
         return services;

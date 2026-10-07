@@ -13,7 +13,7 @@ namespace Ymir.VibeMaker.Infrastructure.Containers;
 /// Agent 以 <c>exec -i</c> 執行（ADR-0003）。
 /// Sprint 0 狀態只存在記憶體；Sprint 1/4 改存 AGENT_RUNTIME 並加入 idle stop 與 reconciliation。
 /// </summary>
-internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, ILogger<ContainerRuntimeManager> logger) : IAgentRuntimeManager
+internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, ILogger<ContainerRuntimeManager> logger) : IAgentRuntimeManager, Health.IRuntimeAvailability
 {
     private readonly RuntimeOptions _options = options.Value;
     private readonly ConcurrentDictionary<Guid, RuntimeInfo> _runtimesByUser = new();
@@ -28,6 +28,12 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
         {
             var runtimeId = _runtimesByUser.TryGetValue(userId, out var known) ? known.RuntimeId : Guid.NewGuid();
             var state = await InspectAsync(userId, cancellationToken).ConfigureAwait(false);
+            var transition = state switch
+            {
+                null => RuntimeTransition.Created,
+                "running" => RuntimeTransition.None,
+                _ => RuntimeTransition.Started,
+            };
             switch (state)
             {
                 case null:
@@ -53,7 +59,7 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
 
             var runtime = new RuntimeInfo(runtimeId, userId, ProviderName(), ContainerCommandBuilder.ContainerName(userId), _options.Image, RuntimeStatus.Running);
             _runtimesByUser[userId] = runtime;
-            return runtime;
+            return runtime with { Transition = transition };
         }
         finally
         {
@@ -148,6 +154,13 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
         }
 
         return HostProcess.Start(_options.ResolvedExecutable, execArguments, workingDirectory: null, environment: spec.Environment);
+    }
+
+    /// <summary>container CLI 能否回應（<c>podman version</c> / <c>docker version</c>）。</summary>
+    public async Task<string?> CheckAvailabilityAsync(CancellationToken cancellationToken)
+    {
+        var (exitCode, _, _) = await ExecuteContainerCliAsync(["version", "--format", "{{.Client.Version}}"], cancellationToken).ConfigureAwait(false);
+        return exitCode == 0 ? null : $"{ProviderName()} 無法使用";
     }
 
     private async Task<string?> InspectAsync(Guid userId, CancellationToken cancellationToken)

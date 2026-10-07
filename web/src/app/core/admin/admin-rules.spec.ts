@@ -4,6 +4,9 @@ import {
   canStopRuntime,
   describeAuditAction,
   emptyAuditFilter,
+  healthLevel,
+  healthName,
+  healthWarnings,
   localDayStartIso,
   runtimeStatusLabel,
   trendBars,
@@ -68,5 +71,24 @@ describe('admin rules', () => {
       ['10/6', 100, 1],
     ]);
     expect(trendBars([{ date: '2026-10-06', total: 0, failed: 0 }])[0].height).toBe(0);
+  });
+});
+
+describe('service health rules', () => {
+  it('名稱與狀態', () => {
+    expect(healthName('database')).toBe('資料庫');
+    expect(healthName('other')).toBe('other');
+    expect(healthLevel('Healthy')).toBe('ok');
+    expect(healthLevel('Degraded')).toBe('warn');
+    expect(healthLevel('Unhealthy')).toBe('down');
+  });
+
+  it('異常的服務產生警告', () => {
+    expect(
+      healthWarnings([
+        { name: 'database', status: 'Healthy' },
+        { name: 'litellm', status: 'Unhealthy' },
+      ]),
+    ).toEqual(['LiteLLM（模型）目前無法使用，Agent 可能無法執行。']);
   });
 });
