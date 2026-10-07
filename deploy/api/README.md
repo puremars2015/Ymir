@@ -93,6 +93,26 @@ docker compose -f compose.windows.yml logs -f api
 - 範本使用 Development（有免密碼的 dev 登入），**不可對外公開**。在 Windows 驗證 tunnel 時，請改用指南第 4 節的主機上 API。
 - 這一段在雲端沙箱無法驗證（沒有 Docker Desktop），**待使用者環境確認**。
 
+## Windows：既有主機 API 部署的一鍵啟動
+
+若目前使用「主機上的 .NET API + Docker 網頁／資料庫／模型閘道／Tunnel」部署，可在 PowerShell 執行：
+
+```powershell
+& "C:\Users\sean.ma\Documents\Ymir\start-ymir.ps1"
+```
+
+若 PowerShell 的執行原則禁止直接執行腳本，可只對本次程序使用：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\sean.ma\Documents\Ymir\start-ymir.ps1"
+```
+
+腳本預設讀取 `%LOCALAPPDATA%\Ymir\deploy\run-api.ps1`，沿用已部署版本的登入、模型與資料設定，不包含憑證，也不重新建置。其他部署目錄可透過 `-DeployDirectory` 指定；`-ApiPort` 須與該啟動檔的 API 埠一致。
+
+它會在必要時啟動 Docker Desktop、檢查所有容器存在、依序啟動 SQL Server／LiteLLM PostgreSQL／LiteLLM／網頁／Tunnel，並在 API 未執行時以背景程序啟動。已執行的服務直接保留；其他程式占用 API 埠時報錯，不會停止它或再啟動 API。完成後可關閉執行腳本的視窗，API 紀錄保存在部署目錄的 `logs\startup-*.log`。
+
+此腳本只啟動既有部署，未部署或容器不存在時顯示錯誤；不啟動使用者 Agent 容器。它不是上一節 API／runtime host 容器拓樸的啟動方式。對外網址仍需要原有 Cloudflare Tunnel／DNS 設定與網路可用。
+
 ## 維運
 
 - **健康檢查**：
