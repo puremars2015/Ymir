@@ -12,7 +12,7 @@ namespace Ymir.VibeMaker.Infrastructure.Runtime.Remote;
 /// 呼叫主機上的 runtime host（<c>Ymir.RuntimeHost</c>，ADR-0008）。API 在容器內執行時使用：API 本身不執行 Podman、
 /// 不掛載 container runtime socket，也不知道任何 host 路徑；runtime host 只接受 user id 與 runtime 內的程序規格。
 /// </summary>
-internal sealed class RemoteRuntimeManager : IAgentRuntimeManager, IDisposable
+internal sealed class RemoteRuntimeManager : IAgentRuntimeManager, Health.IRuntimeAvailability, IDisposable
 {
     private readonly RuntimeHostConnection _connection;
     private readonly ILogger<RemoteRuntimeManager> _logger;
@@ -107,6 +107,13 @@ internal sealed class RemoteRuntimeManager : IAgentRuntimeManager, IDisposable
             socket.Dispose();
             throw;
         }
+    }
+
+    /// <summary>runtime host 的 <c>/health</c>（不需要 token、不含任何資訊）。</summary>
+    public async Task<string?> CheckAvailabilityAsync(CancellationToken cancellationToken)
+    {
+        using var response = await _connection.Http.GetAsync(new Uri("health", UriKind.Relative), cancellationToken).ConfigureAwait(false);
+        return response.IsSuccessStatusCode ? null : $"runtime host 回應 {(int)response.StatusCode}";
     }
 
     public void Dispose() => _connection.Dispose();

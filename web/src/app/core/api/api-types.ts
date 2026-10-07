@@ -39,6 +39,8 @@ export type RuntimePolicy = Schemas['RuntimePolicyResponse'];
 export type RuntimePolicyValues = Schemas['RuntimePolicyValues'];
 export type SaveRuntimePolicyRequest = Schemas['SaveRuntimePolicyRequest'];
 export type AdminUsage = Schemas['AdminUsageResponse'];
+export type ServiceHealth = Schemas['ServiceHealthResponse'];
+export type ServiceHealthItem = Schemas['ServiceHealthItem'];
 export type UserUsage = Schemas['UserUsageResponse'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */

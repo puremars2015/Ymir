@@ -11,6 +11,9 @@ import { RouterLink } from '@angular/router';
 import {
   browserUtcOffsetMinutes,
   canStopRuntime,
+  healthLevel,
+  healthName,
+  healthWarnings,
   runtimeStatusLabel,
   trendBars,
 } from '../../core/admin/admin-rules';
@@ -21,6 +24,7 @@ import {
   AdminOverview,
   OidcSettings,
   RuntimeSummary,
+  ServiceHealth,
   TunnelSettings,
 } from '../../core/api/api-types';
 import { AdminTabs } from './admin-tabs';
@@ -84,6 +88,21 @@ import { AdminTabs } from './admin-tabs';
             >
           </article>
         </div>
+
+        @if (health(); as h) {
+          <article class="card services">
+            <h2>服務狀態</h2>
+            <ul class="checks">
+              @for (check of h.checks; track check.name) {
+                <li [attr.data-level]="level(check.status)">
+                  <span class="dot" aria-hidden="true">●</span>
+                  <strong>{{ name(check.name) }}</strong>
+                  <span class="muted small">{{ check.description }}</span>
+                </li>
+              }
+            </ul>
+          </article>
+        }
 
         <article class="card trend">
           <h2>近 7 天執行數</h2>
@@ -331,6 +350,29 @@ import { AdminTabs } from './admin-tabs';
       border-color: var(--danger);
       background: rgb(220 38 38 / 10%);
     }
+    .checks {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+      gap: 0.5rem 1rem;
+    }
+    .checks li {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 0.375rem;
+    }
+    .checks .dot {
+      color: #15803d;
+    }
+    .checks [data-level='warn'] .dot {
+      color: #b45309;
+    }
+    .checks [data-level='down'] .dot {
+      color: var(--danger);
+    }
     .actions {
       display: inline-flex;
       gap: 0.75rem;
@@ -345,10 +387,16 @@ export class OverviewPage implements OnInit {
   protected readonly overview = signal<AdminOverview | null>(null);
   private readonly oidc = signal<OidcSettings | null>(null);
   private readonly tunnel = signal<TunnelSettings | null>(null);
+  protected readonly health = signal<ServiceHealth | null>(null);
   protected readonly warnings = computed(() => {
     const oidc = this.oidc();
     const tunnel = this.tunnel();
     return [
+      ...healthWarnings(this.health()?.checks ?? []).map((message) => ({
+        level: 'danger' as const,
+        message,
+        link: '/admin',
+      })),
       ...(tunnel ? tunnelWarnings(tunnel) : []),
       ...(oidc ? oidcWarnings(oidc, localToday()) : []),
     ];
@@ -385,6 +433,10 @@ export class OverviewPage implements OnInit {
   protected load(): void {
     this.loading.set(true);
     this.error.set(null);
+    this.api.adminHealth().subscribe({
+      next: (health) => this.health.set(health),
+      error: () => this.health.set(null),
+    });
     this.api.adminOverview(browserUtcOffsetMinutes()).subscribe({
       next: (overview) => {
         this.overview.set(overview);
@@ -395,6 +447,14 @@ export class OverviewPage implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  protected name(check: string): string {
+    return healthName(check);
+  }
+
+  protected level(status: string): string {
+    return healthLevel(status);
   }
 
   protected statusLabel(runtime: RuntimeSummary): string {

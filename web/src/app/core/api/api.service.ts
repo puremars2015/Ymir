@@ -12,6 +12,7 @@ import {
   RuntimePolicy,
   SaveRuntimePolicyRequest,
   AdminUsage,
+  ServiceHealth,
   WorkspaceFiles,
   AdminUser,
   ApiProblem,
@@ -132,6 +133,10 @@ export class ApiService {
 
   adminResetRuntimePolicy(): Observable<RuntimePolicy> {
     return this.http.delete<RuntimePolicy>('/api/admin/settings/runtime');
+  }
+
+  adminHealth(): Observable<ServiceHealth> {
+    return this.http.get<ServiceHealth>('/api/admin/health');
   }
 
   adminUsage(days: number): Observable<AdminUsage> {

@@ -12,7 +12,7 @@ namespace Ymir.VibeMaker.Infrastructure.Runtime;
 /// Runtime 內部路徑（<c>/workspace</c>、<c>/agent-state</c>）會被改寫成該使用者的 host 目錄（ADR-0007）。
 /// Sprint 0 狀態只存在記憶體；Sprint 1 起改存 AGENT_RUNTIME。
 /// </summary>
-internal sealed class LocalRuntimeManager : IAgentRuntimeManager
+internal sealed class LocalRuntimeManager : IAgentRuntimeManager, Health.IRuntimeAvailability
 {
     private const string ProviderName = "LOCAL";
 
@@ -38,6 +38,8 @@ internal sealed class LocalRuntimeManager : IAgentRuntimeManager
         // 並行時只有實際加入的那一次算「建立」。
         return Task.FromResult(ReferenceEquals(runtime, created) ? runtime with { Transition = RuntimeTransition.Created } : runtime);
     }
+
+    public Task<string?> CheckAvailabilityAsync(CancellationToken cancellationToken) => Task.FromResult<string?>(null);
 
     public Task StartAsync(Guid runtimeId, CancellationToken cancellationToken) => Task.CompletedTask;
 

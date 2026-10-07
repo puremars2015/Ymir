@@ -87,6 +87,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["GET /api/admin/overview"] = () => Get("/api/admin/overview?utcOffsetMinutes=480"),
         ["POST /api/admin/runtimes/{userId:guid}/stop"] = () => new HttpRequestMessage(HttpMethod.Post, $"/api/admin/runtimes/{Guid.NewGuid()}/stop"),
         ["GET /api/admin/audit"] = () => Get("/api/admin/audit"),
+        ["GET /api/admin/health"] = () => Get("/api/admin/health"),
         ["GET /api/admin/settings/oidc"] = () => Get("/api/admin/settings/oidc"),
         ["GET /api/admin/settings/tunnel"] = () => Get("/api/admin/settings/tunnel"),
         ["PUT /api/admin/settings/tunnel/token"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/tunnel/token")

@@ -20,6 +20,8 @@ public static class FakeLlmEndpoints
         }));
 
         endpoints.MapPost("/v1/chat/completions", HandleChatCompletionsAsync);
+        // 同 LiteLLM：不需要金鑰的存活檢查
+        endpoints.MapGet("/health/liveliness", () => Results.Text("I'm alive!"));
         endpoints.MapPost("/key/generate", HandleGenerateKeyAsync);
         endpoints.MapPost("/key/delete", HandleDeleteKeyAsync);
         endpoints.MapPost("/user/new", HandleNewUserAsync);
