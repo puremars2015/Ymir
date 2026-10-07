@@ -8,27 +8,31 @@ using Ymir.VibeMaker.Domain;
 
 namespace Ymir.VibeMaker.Application.Extensions;
 
-/// <summary>某位成員目前有效的擴充能力（ADR-0012 A.3）；啟動 Agent 時由伺服器據此組合 Pi 參數。</summary>
-public sealed record EffectiveExtensions(bool Skills, bool Mcp)
+/// <summary>某位成員目前有效的擴充能力（ADR-0012 A.3）；啟動 Agent 時由伺服器據此組合 Pi 參數與 container 的網路。</summary>
+/// <param name="Internet">能否對外連線（ADR-0012 A.8）；使用者 2026-10-07 決定預設允許。</param>
+public sealed record EffectiveExtensions(bool Skills, bool Mcp, bool Internet = true)
 {
-    /// <summary>預設拒絕（ADR-0012 A.1）。</summary>
+    /// <summary>沒有使用者自建擴充（ADR-0012 A.1 預設拒絕）；對外連線維持預設允許。</summary>
     public static readonly EffectiveExtensions None = new(false, false);
+
+    public Runtime.RuntimeNetworkAccess NetworkAccess => Internet ? Runtime.RuntimeNetworkAccess.Internet : Runtime.RuntimeNetworkAccess.Restricted;
 
     public bool Allows(ExtensionCapability capability) => capability switch
     {
         ExtensionCapability.Skills => Skills,
         ExtensionCapability.Mcp => Mcp,
+        ExtensionCapability.Internet => Internet,
         _ => false,
     };
 }
 
-/// <summary>全域預設，存在 <c>platform.system_settings</c>（明文 JSON，不含機密，ADR-0010）。沒有設定時全部關閉。</summary>
-public sealed record ExtensionPolicySettings(bool Skills, bool Mcp)
-{
-    public EffectiveExtensions ToEffective() => new(Skills, Mcp);
-}
+/// <summary>
+/// 全域預設，存在 <c>platform.system_settings</c>（明文 JSON，不含機密，ADR-0010）。沒有設定時 skill 與 MCP 關閉、對外連線允許；
+/// A1b 之前儲存、沒有 <c>internet</c> 欄位的設定也視為允許。
+/// </summary>
+public sealed record ExtensionPolicySettings(bool Skills, bool Mcp, bool Internet = true);
 
-/// <param name="Stored">管理員儲存的值（沒有則為 null，全部關閉）。</param>
+/// <param name="Stored">管理員儲存的值（沒有則為 null，使用預設）。</param>
 public sealed record ExtensionPolicyState(ExtensionPolicySettings Effective, SystemSettingValue? Stored);
 
 /// <summary>成員的覆寫與有效值；<see cref="Grants"/> 沒有的能力表示繼承全域預設。</summary>
@@ -81,7 +85,7 @@ public sealed partial class ExtensionPolicyService(
             {
                 var stored = await scope.ServiceProvider.GetRequiredService<ISystemSettingsStore>().GetAsync(Key, cancellationToken).ConfigureAwait(false);
                 var settings = stored is null ? null : Parse(stored.Value);
-                // 內容損毀時忽略，退回預設（全部關閉）。
+                // 內容損毀時忽略，退回預設。
                 _stored = settings is null ? null : stored;
                 _storedSettings = settings;
             }
@@ -175,7 +179,10 @@ public sealed partial class ExtensionPolicyService(
         bool Resolve(ExtensionCapability capability, bool fallback) =>
             grants.TryGetValue(capability, out var effect) ? effect == ExtensionGrantEffect.Allow : fallback;
 
-        return new EffectiveExtensions(Resolve(ExtensionCapability.Skills, global.Skills), Resolve(ExtensionCapability.Mcp, global.Mcp));
+        return new EffectiveExtensions(
+            Resolve(ExtensionCapability.Skills, global.Skills),
+            Resolve(ExtensionCapability.Mcp, global.Mcp),
+            Resolve(ExtensionCapability.Internet, global.Internet));
     }
 
     internal static ExtensionPolicySettings? Parse(string json)

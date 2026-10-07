@@ -1,4 +1,9 @@
-import { capabilitySummary, effectiveValue, grantLabel } from './extension-rules';
+import {
+  capabilitySummary,
+  effectiveValue,
+  grantLabel,
+  restrictedNetworkWarning,
+} from './extension-rules';
 
 describe('extension rules', () => {
   it('shows the inherited default next to the inherit option', () => {
@@ -16,8 +21,15 @@ describe('extension rules', () => {
   });
 
   it('summarizes every capability in a fixed order', () => {
-    expect(capabilitySummary({ skills: true, mcp: false })).toBe(
-      '自建 skill：允許・自建 MCP server：不允許',
+    expect(capabilitySummary({ skills: true, mcp: false, internet: true })).toBe(
+      '自建 skill：允許・自建 MCP server：不允許・對外連線：允許',
     );
+  });
+
+  it('warns unless the restricted network is configured', () => {
+    expect(restrictedNetworkWarning('Configured')).toBeNull();
+    expect(restrictedNetworkWarning('NotConfigured')).toContain('無法執行 Agent');
+    expect(restrictedNetworkWarning('Unknown')).toContain('runtime host');
+    expect(restrictedNetworkWarning('NotEnforced')).toContain('不會限制網路');
   });
 });

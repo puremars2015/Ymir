@@ -15,13 +15,29 @@ internal static class ContainerCommandBuilder
 
     public static string ContainerName(Guid userId) => $"ymir-user-{userId:N}";
 
+    /// <summary>記錄 container 建立時的對外連線模式；EnsureRuntime 據此判斷是否要依新的政策重建（ADR-0012 A.8）。</summary>
+    public const string NetworkLabel = "ymir.network";
+
+    public static string NetworkLabelValue(RuntimeNetworkAccess network) => network == RuntimeNetworkAccess.Restricted ? "restricted" : "internet";
+
+    /// <summary>沒有 label 的既有 container（A1b 之前建立）視為可以對外連線。</summary>
+    public static RuntimeNetworkAccess NetworkOfLabel(string? value) =>
+        value == "restricted" ? RuntimeNetworkAccess.Restricted : RuntimeNetworkAccess.Internet;
+
     public static IReadOnlyList<string> BuildRunArguments(
         RuntimeOptions options,
         Guid userId,
         Guid runtimeId,
-        UserDirectories directories)
+        UserDirectories directories,
+        RuntimeNetworkAccess network = RuntimeNetworkAccess.Internet)
     {
         ArgumentNullException.ThrowIfNull(options);
+        // 受限網路的名稱只來自部署設定；沒有設定時不退回成可以對外連線（ADR-0012 A.8）。
+        var networkName = network == RuntimeNetworkAccess.Restricted
+            ? options.RestrictedNetwork is { } restricted && RuntimeOptions.IsValidRestrictedNetworkName(restricted)
+                ? restricted
+                : throw new RuntimeNetworkUnavailableException("Restricted network is not configured (VibeMaker:Runtime:RestrictedNetwork).")
+            : options.ResolvedNetwork;
         var isDocker = options.Provider == RuntimeProvider.Docker;
         // --mount 而非 --volume：Windows 路徑（C:\...）的冒號不會和 --volume 的分隔符號混淆。
         var relabel = options.SelinuxRelabel && !isDocker ? ",relabel=private" : string.Empty;
@@ -42,6 +58,7 @@ internal static class ContainerCommandBuilder
             "--init",
             "--label", $"ymir.user-id={userId:D}",
             "--label", $"ymir.runtime-id={runtimeId:D}",
+            "--label", $"{NetworkLabel}={NetworkLabelValue(network)}",
             .. userMapping,
             "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges",
@@ -51,7 +68,7 @@ internal static class ContainerCommandBuilder
             "--pids-limit", options.PidsLimit.ToString(System.Globalization.CultureInfo.InvariantCulture),
             "--memory", options.MemoryLimit,
             "--cpus", options.CpuLimit,
-            "--network", options.ResolvedNetwork,
+            "--network", networkName,
             "--mount", $"type=bind,source={directories.Workspace},target={RuntimePaths.Workspace}{relabel}",
             "--mount", $"type=bind,source={directories.AgentState},target={RuntimePaths.AgentState}{relabel}",
             options.Image,
@@ -111,8 +128,9 @@ internal static class ContainerCommandBuilder
         return ["exec", ContainerName(userId), "mkdir", "-p", runtimeDirectory];
     }
 
+    /// <summary>輸出 <c>狀態|network label</c>；Podman 與 Docker 的 Go template 對不存在的 label 都輸出空字串。</summary>
     public static IReadOnlyList<string> BuildInspectStatusArguments(Guid userId) =>
-        ["container", "inspect", "--format", "{{.State.Status}}", ContainerName(userId)];
+        ["container", "inspect", "--format", $"{{{{.State.Status}}}}|{{{{index .Config.Labels \"{NetworkLabel}\"}}}}", ContainerName(userId)];
 
     public static IReadOnlyList<string> BuildStartArguments(Guid userId) => ["start", ContainerName(userId)];
 

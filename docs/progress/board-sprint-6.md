@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-08 00:30 ・ 狀態：**🚧 進行中（A1b 對外連線）**
+> 最後更新：2026-10-08 01:30 ・ 狀態：**🚧 進行中（A2 MCP Gateway）**
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -33,8 +33,8 @@
 | W1 | Windows 既有部署一鍵啟動檔 `start-ymir.ps1` | ✅ | 見 [#004](#004--windows-既有部署一鍵啟動檔)；已在目前主機驗證 |
 | A0 | ADR-0012 spike：實測 Pi 1.0.0 在 RPC 模式的 `--no-skills` / `--skill`、能否不讀使用者層 `mcp.json`、平台 MCP 設定能否放在 Agent 不可寫的位置，以及 rootless Podman 能否限制 egress；結果寫回 ADR-0012 | ✅ | — |
 | A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`）+ 每人覆寫資料表 `vibemaker.user_extension_grants`<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | ✅ | — |
-| A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• `internet` 能力加入擴充政策（全域 + 每人）<br>• 受限網路部署文件 | 🚧 | — |
-| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | A1a、A1b |
+| A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• `internet` 能力加入擴充政策（全域 + 每人）<br>• 受限網路部署文件 | ✅ | — |
+| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | — |
 | R0 | RAG ADR（ADR-0013）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite（sqlite-vec）部署、權限 | ⏳ | **❓待決定**：Embedding 模型與硬體、文件格式與容量、外部回答模型的資料政策 |
 | R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ⏳ | R0 經使用者確認 |
 | R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ⏳ | R1 |
@@ -190,6 +190,48 @@
   - `internet` 欄位移到 A1b，和強制機制一起上線，避免出現設定了卻不生效的選項。
   - 平台 skill 不放 image，改成每次執行前寫入 `/agent-state/ymir/skills/`，Local / Remote 都適用（ADR-0012 已更新）。
 - **下一步**：A1b 對外連線（`internet` 能力、受限網路、runtime host 協定）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #005 · A1b 完成：管理員控制 Agent 的對外連線
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 01:30 · `✅完成` `🔬實測`
+
+- **做了什麼**（ADR-0012 A.8）：
+  - **政策**：擴充政策新增 `internet`（全域預設與每人覆寫），預設允許；A1b 之前儲存、沒有這個欄位的設定也視為允許。
+  - **Runtime**：`EnsureRuntimeAsync(userId, network, ct)`。
+    - 關閉時 container 改接 `VibeMaker:Runtime:RestrictedNetwork`（`--internal`），並以 label `ymir.network` 記錄模式；
+    - 政策改變時，在使用者的下一次執行前重建（`ExecutionRunner` 持有使用者的執行鎖），寫稽核 `runtime.recreate`；
+    - 沒有設定受限網路時，執行以摘要錯誤失敗，**不會退回成可以對外連線**；
+    - 名稱不合法（`host`、`bridge` 等）時啟動就拒絕。
+  - **Runtime host**：只多接受 `?network=internet|restricted`，其他值回 400，未設定時回 409，network 名稱只來自 runtime host 自己的設定。
+  - **Local runtime**：無法限制，只記錄警告；管理介面顯示「開發模式不強制」。
+  - **管理介面**：
+    - 擴充能力卡片新增「允許對外連線」；
+    - 依 runtime 的支援狀態顯示警告（未設定 / 由 runtime host 決定 / 開發模式）；
+    - 使用者頁可對個人覆寫；個人設定頁顯示結果。
+  - **部署文件**：`deploy/runtime-host/README.md`「受限網路」說明作法：一般與 `--internal` 兩個 network，LiteLLM 與 gateway 同時接上，Agent 以同一個名稱 `litellm` 連線。`runtime-host.env.example` 與 `deploy/litellm/README.md` 同步更新。
+- **驗證**：
+  - `dotnet test --solution`：543 通過，新增：
+    - `ContainerCommandBuilderTests`：兩種 engine × 兩種模式、label、未設定時不退回、拒絕 host / bridge 等名稱；
+    - `ContainerRuntimeManagerNetworkTests`：以模擬的 container CLI 驗證新建、政策改變時重建、舊 container 沒有 label 視為可對外、`network: null` 不重建、未設定時不動 container；
+    - `RuntimeHostProtocolTests`、`RuntimeHostTests`：只接受 enum；
+    - `ExtensionPolicyTests`：預設允許、舊設定相容。
+  - 前端 lint / 108 個 Vitest / build 通過。
+  - **沙箱真實 Podman 實測**（新的 `npm run e2e:network`）：
+    - 管理員關閉 → container 重建到 `ymir-agents`；
+    - Agent 連得到 `litellm`（200）、連不到外網（ENETUNREACH），且仍正常回覆並記得上一輪（Pi session 保留）；
+    - 恢復後重建回 `ymir-agents-net`、外網可連；稽核 `runtime.recreate` 2 筆。
+  - 沙箱是 root Podman：掛載目錄的擁有者問題改用 Docker 模式（`ContainerExecutable=podman`）跑完，與網路行為無關。
+- **未驗證、待使用者環境確認**：rootless Podman（`ymir` 帳號）下兩個 network 與 LiteLLM container 的實際行為，可用 `npm run e2e:network` 驗證。
+- **下一步**：A2 MCP Gateway（獨立服務 `Ymir.McpGateway`、每人短期 token、`deploy/mcp/servers.json`、存取清單、echo 服務）。
 
 <details>
 <summary>💬 回覆（0）</summary>

@@ -2192,6 +2192,7 @@
       "ExtensionPolicyResponse": {
         "required": [
           "defaults",
+          "restrictedNetwork",
           "updatedAt",
           "updatedByName"
         ],
@@ -2199,6 +2200,9 @@
         "properties": {
           "defaults": {
             "$ref": "#/components/schemas/ExtensionValues"
+          },
+          "restrictedNetwork": {
+            "$ref": "#/components/schemas/RestrictedNetworkSupport"
           },
           "updatedAt": {
             "type": [
@@ -2218,7 +2222,8 @@
       "ExtensionValues": {
         "required": [
           "skills",
-          "mcp"
+          "mcp",
+          "internet"
         ],
         "type": "object",
         "properties": {
@@ -2226,6 +2231,9 @@
             "type": "boolean"
           },
           "mcp": {
+            "type": "boolean"
+          },
+          "internet": {
             "type": "boolean"
           }
         }
@@ -2410,6 +2418,7 @@
         "required": [
           "skillsAllowed",
           "mcpAllowed",
+          "internetAllowed",
           "inventoryAvailable",
           "skills",
           "mcpServers"
@@ -2420,6 +2429,9 @@
             "type": "boolean"
           },
           "mcpAllowed": {
+            "type": "boolean"
+          },
+          "internetAllowed": {
             "type": "boolean"
           },
           "inventoryAvailable": {
@@ -2617,6 +2629,14 @@
           }
         }
       },
+      "RestrictedNetworkSupport": {
+        "enum": [
+          "Configured",
+          "NotConfigured",
+          "Unknown",
+          "NotEnforced"
+        ]
+      },
       "RuntimePolicyResponse": {
         "required": [
           "effective",
@@ -2787,6 +2807,10 @@
           },
           "mcp": {
             "type": "boolean"
+          },
+          "internet": {
+            "type": "boolean",
+            "default": true
           }
         }
       },
@@ -2942,6 +2966,9 @@
             "$ref": "#/components/schemas/ExtensionGrantSetting"
           },
           "mcp": {
+            "$ref": "#/components/schemas/ExtensionGrantSetting"
+          },
+          "internet": {
             "$ref": "#/components/schemas/ExtensionGrantSetting"
           }
         }
@@ -3241,6 +3268,7 @@
         "required": [
           "skills",
           "mcp",
+          "internet",
           "effective"
         ],
         "type": "object",
@@ -3249,6 +3277,9 @@
             "$ref": "#/components/schemas/ExtensionGrantSetting"
           },
           "mcp": {
+            "$ref": "#/components/schemas/ExtensionGrantSetting"
+          },
+          "internet": {
             "$ref": "#/components/schemas/ExtensionGrantSetting"
           },
           "effective": {

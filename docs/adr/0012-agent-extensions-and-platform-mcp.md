@@ -73,6 +73,8 @@
      - container 沒在執行，或呼叫端確認該使用者沒有其他執行中的 execution：移除後以新 network 重建（檔案都在掛載目錄，SA §15），寫稽核 `runtime.recreate`；
      - 否則沿用舊的 container，等下一次執行再套用，避免中斷另一個對話正在跑的 Agent。
    - 管理員變更政策不會主動停止 container，下一次執行時生效；管理介面需說明。
+   - 實作（A1b）：`IAgentRuntimeManager.EnsureRuntimeAsync(userId, network, ct)`；`ExecutionRunner` 持有使用者的執行鎖（同一使用者的 execution 依序執行），所以傳入政策的 network 時可以安全地重建。讀取檔案等其他呼叫傳 `null`（沿用既有 container，不重建）。
+   - 部署：建立一般與 `--internal` 兩個 network，LiteLLM 與 gateway 同時接在兩者上，Agent 以同一個名稱連線（`deploy/runtime-host/README.md`「受限網路」）。沙箱（root Podman）已實測端到端。
    - **Runtime host（ADR-0008）**：建立 runtime 的端點只多接受 enum（`network=internet|restricted`）與是否允許重建；network 名稱只來自 runtime host 自己的設定，不接受任何 network 名稱、host 路徑或資源設定，符合 ADR-0008 的紅線。協定變更同步更新 `RuntimeHostProtocolTests` 與 `RuntimeHostTests`。
    - **Local runtime** 沒有隔離（只限 Development），無法強制網路模式：只記 warning，管理介面標示「開發模式不強制」。
    - 部署文件（`deploy/runtime-host/README.md`）提供受限網路的建立方式；rootless Podman 下的行為「未驗證、待使用者環境確認」。

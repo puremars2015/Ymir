@@ -50,7 +50,7 @@ Agent container 只拿得到這把 virtual key，**master key 與 MiniMax key �
 | `VibeMaker__LiteLlm__KeyLifetime` / `RenewBefore` | 有效期（預設 `1.00:00:00`）、提前換發時間（預設 `01:00:00`） |
 | `VibeMaker__LiteLlm__MonthlyBudgetUsd` | 每人每月模型預算（美元，30 天一期；0 或不設表示不限制）。管理介面「系統設定 → 執行環境」的值優先 |
 | `VibeMaker__LiteLlm__MaxBudget` | 舊設定：每把 key 的預算。key 每 24 小時換發，等於每天重置，建議改用 `MonthlyBudgetUsd` |
-| `VibeMaker__Pi__ModelBaseUrl` | **Agent container 內**連 LiteLLM 的位址：`http://host.containers.internal:4000/v1`（Podman）或 `http://host.docker.internal:4000/v1`（Docker） |
+| `VibeMaker__Pi__ModelBaseUrl` | **Agent container 內**連 LiteLLM 的位址：`http://host.containers.internal:4000/v1`（Podman）或 `http://host.docker.internal:4000/v1`（Docker）；要讓管理員可以關閉 Agent 的對外連線時，改成接在 Agent network 上的 `http://litellm:4000/v1`（見 `deploy/runtime-host/README.md`「受限網路」） |
 | `VibeMaker__Pi__ModelId` | 預設模型，例如 `minimax`（對應 `config.yaml` 的 `model_name`） |
 | `VibeMaker__Models__0__Id` / `VibeMaker__Models__0__DisplayName` | 對話中可選的模型清單（`__1__`、`__2__` 依序增加）；Id 必須與 `config.yaml` 的 `model_name` 相同。未設定時只有預設模型 |
 

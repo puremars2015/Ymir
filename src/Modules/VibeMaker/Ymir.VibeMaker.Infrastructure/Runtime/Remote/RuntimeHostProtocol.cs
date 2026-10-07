@@ -33,6 +33,34 @@ internal static partial class RuntimeHostProtocol
 
     public static string RuntimePath(Guid userId) => $"/v1/users/{userId:N}/runtime";
 
+    /// <summary>
+    /// 建立 / 確保 runtime；<paramref name="network"/> 只以 enum 傳送（ADR-0012 A.8），runtime host 不接受 network 名稱。
+    /// </summary>
+    public static string EnsurePath(Guid userId, RuntimeNetworkAccess? network) =>
+        network is { } value ? $"{RuntimePath(userId)}?network={NetworkQueryValue(value)}" : RuntimePath(userId);
+
+    public static string NetworkQueryValue(RuntimeNetworkAccess network) => network == RuntimeNetworkAccess.Restricted ? "restricted" : "internet";
+
+    /// <summary>runtime host 端解析：只接受完全相同的 <c>internet</c> / <c>restricted</c>，其他值一律拒絕。</summary>
+    public static bool TryParseNetwork(string? value, out RuntimeNetworkAccess? network)
+    {
+        switch (value)
+        {
+            case null:
+                network = null;
+                return true;
+            case "internet":
+                network = RuntimeNetworkAccess.Internet;
+                return true;
+            case "restricted":
+                network = RuntimeNetworkAccess.Restricted;
+                return true;
+            default:
+                network = null;
+                return false;
+        }
+    }
+
     public static string StartPath(Guid userId) => $"{RuntimePath(userId)}/start";
 
     public static string StopPath(Guid userId) => $"{RuntimePath(userId)}/stop";

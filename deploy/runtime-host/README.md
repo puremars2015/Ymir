@@ -73,11 +73,45 @@
 | `RuntimeHost__SocketMode` | socket 權限（八進位），預設 `660`；不允許 other 存取 |
 | `RuntimeHost__Tunnel__Mode` | `SystemdUser`：由管理介面設定 Cloudflare Tunnel token（ADR-0010）；`Disabled`（預設）：不開放 |
 | `RuntimeHost__Tunnel__EnvFile` / `Unit` | 預設 `~ymir/.config/ymir/cloudflared.env`、`ymir-cloudflared.service`，一般不需要改 |
-| `VibeMaker__Runtime__*` | Agent container 的設定（Provider、WorkspaceRoot、Image、資源限制、Network、SelinuxRelabel），與原本 API 的設定相同 |
+| `VibeMaker__Runtime__*` | Agent container 的設定（Provider、WorkspaceRoot、Image、資源限制、Network、RestrictedNetwork、SelinuxRelabel），與原本 API 的設定相同 |
 
 - Runtime host 的 `Provider` 只能是 `Podman`、`Docker`（開發 / 驗證）或 `Local`（Development 環境才允許）；設成 `Remote` 會拒絕啟動。
 - 回給 API 的錯誤只有摘要；詳細內容（stderr、podman 錯誤）只寫在 runtime host 的 log。
 - 程序的環境變數（例如 LiteLLM virtual key）只以名稱傳給 `podman exec --env NAME`，值不會出現在程序參數或 log 中。
+
+## 受限網路：讓管理員可以關閉 Agent 的對外連線（ADR-0012 A.8）
+
+管理員可以在「管理 → 系統設定 → Agent 擴充能力」與「使用者」頁關閉 Agent 的對外連線（預設允許）。被關閉的成員，其 Agent container 會改接到一個 `--internal` network：只連得到同一個 network 上的 LiteLLM 與 MCP Gateway，連不到網際網路與內網。**沒有設定受限網路時，被關閉的成員無法執行 Agent**（不會退回成可以對外連線）。
+
+做法：建立兩個 network，讓 LiteLLM（與之後的 MCP Gateway）**同時**接在兩個 network 上，Agent 用同一個名稱（`litellm`）連線，不論哪種模式都不用改模型位址。
+
+1. 以 `ymir` 帳號建立 network（rootless Podman）：
+   ```bash
+   sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) podman network create ymir-agents-net          # 可以對外連線
+   sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) podman network create --internal ymir-agents  # 受限
+   ```
+2. LiteLLM 以 container 接上兩個 network，並以 `litellm` 為名稱（同一個 rootless Podman 帳號）：
+   ```bash
+   sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) podman network connect ymir-agents-net litellm
+   sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) podman network connect ymir-agents litellm
+   ```
+   如果 LiteLLM 原本用 `deploy/litellm` 的 compose 在其他帳號或主機上執行，需要改成在 `ymir` 帳號以 container 執行，或在兩個 network 上放一個只轉送到 LiteLLM 的 proxy container。
+3. `/etc/ymir/runtime-host.env`：
+   ```bash
+   VibeMaker__Runtime__Network=ymir-agents-net
+   VibeMaker__Runtime__RestrictedNetwork=ymir-agents
+   ```
+   API 的 `VibeMaker__Pi__ModelBaseUrl` 設為 `http://litellm:4000/v1`（LiteLLM 的 port）。重啟 runtime host。
+4. 驗證：管理員把某位成員的「對外連線」設為不允許 → 該成員送一則訊息（container 會以受限網路重建，檔案保留，稽核 `runtime.recreate`）→
+   ```bash
+   sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) podman inspect ymir-user-<userId> --format '{{index .Config.Labels "ymir.network"}}'   # restricted
+   sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) podman exec ymir-user-<userId> node -e "fetch('https://example.com').then(()=>console.log('reachable'),e=>console.log('blocked',e.cause?.code))"   # blocked
+   ```
+
+- `RestrictedNetwork` 必須是專用的具名 network；設成 `host`、`bridge`、`slirp4netns`、`none` 等會拒絕啟動。名稱只來自這裡的設定，API 只傳「允許 / 不允許」。
+- `--internal` network 的閘道 IP（host 端）上聽 `0.0.0.0` 的服務也連得到：主機上的服務請只綁需要的介面，或另設防火牆。
+- 管理員變更政策不會中斷執行中的 Agent；在成員的下一次執行前才重建 container。
+- 沙箱（root Podman）已實測：受限時 Agent 連得到 LiteLLM、連不到外網，Pi session 在重建後保留；**rootless Podman 的實際行為未驗證，待使用者環境確認**。
 
 ## Cloudflare Tunnel 由管理介面設定（ADR-0010）
 

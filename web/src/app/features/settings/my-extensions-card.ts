@@ -20,6 +20,9 @@ import { MyExtensions } from '../../core/api/api-types';
             }
           </li>
           <li>
+            對外連線：<strong>{{ d.internetAllowed ? '允許' : '只能連到平台的模型與服務' }}</strong>
+          </li>
+          <li>
             自建 MCP server：<strong>{{ d.mcpAllowed ? '已開放' : '未開放' }}</strong>
             @if (d.inventoryAvailable && d.mcpServers.length > 0) {
               <span class="muted">（{{ d.mcpServers.join('、') }}）</span>

@@ -31,10 +31,16 @@ internal sealed class RemoteRuntimeManager : IAgentRuntimeManager, Health.IRunti
         }
     }
 
-    public async Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, CancellationToken cancellationToken)
+    public async Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, RuntimeNetworkAccess? network, CancellationToken cancellationToken)
     {
-        using var response = await _connection.Http.PostAsync(new Uri(RuntimeHostProtocol.RuntimePath(userId), UriKind.Relative), null, cancellationToken)
+        // 只傳 enum；受限網路的名稱只在 runtime host 自己的設定（ADR-0008、ADR-0012 A.8）。
+        using var response = await _connection.Http.PostAsync(new Uri(RuntimeHostProtocol.EnsurePath(userId, network), UriKind.Relative), null, cancellationToken)
             .ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.Conflict && network == RuntimeNetworkAccess.Restricted)
+        {
+            throw new RuntimeNetworkUnavailableException("Restricted network is not configured on the runtime host.");
+        }
+
         return await ReadRuntimeAsync(response, "ensure", cancellationToken).ConfigureAwait(false);
     }
 
