@@ -10,14 +10,28 @@ public class RuntimeCredentialServiceTests
     private static readonly Guid Alice = Guid.NewGuid();
     private static readonly Guid Bob = Guid.NewGuid();
 
-    private static (RuntimeCredentialService Service, CountingGateway Gateway, ManualTimeProvider Time) Create()
+    private static (RuntimeCredentialService Service, CountingGateway Gateway, ManualTimeProvider Time) Create(bool multipleModels = false)
     {
         var time = new ManualTimeProvider(new DateTimeOffset(2026, 10, 5, 0, 0, 0, TimeSpan.Zero));
         var gateway = new CountingGateway(time);
         var options = new ModelCredentialOptions { KeyLifetime = TimeSpan.FromHours(24), RenewBefore = TimeSpan.FromHours(1), MaxBudget = 3m };
         options.AllowedModels.Add("minimax");
+        if (multipleModels) options.AllowedModels.Add("gpt-x");
         var service = new RuntimeCredentialService(gateway, Options.Create(options), time, NullLogger<RuntimeCredentialService>.Instance);
         return (service, gateway, time);
+    }
+
+    [Fact]
+    public async Task ChangedModelPolicy_RotatesCachedKeyAndRevokesPrevious()
+    {
+        var (service, gateway, _) = Create(multipleModels: true);
+        var ct = TestContext.Current.CancellationToken;
+        var first = await service.GetAsync(Alice, Guid.NewGuid(), ct, allowedModels: ["minimax"]);
+        var second = await service.GetAsync(Alice, Guid.NewGuid(), ct, allowedModels: ["gpt-x"]);
+        Assert.NotEqual(first.KeyId, second.KeyId);
+        Assert.Equal(["gpt-x"], gateway.Issued.Last().AllowedModels);
+        Assert.Equal([first.KeyId], gateway.Revoked);
+        await Assert.ThrowsAsync<ModelCredentialException>(() => service.GetAsync(Alice, Guid.NewGuid(), ct, allowedModels: []));
     }
 
     [Fact]

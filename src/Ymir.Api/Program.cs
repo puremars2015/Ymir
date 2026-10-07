@@ -80,6 +80,7 @@ app.MapAdminOverviewEndpoints();
 app.MapAdminRuntimeEndpoints();
 app.MapExtensionEndpoints();
 app.MapAdminSettingsEndpoints();
+app.MapAdminModelEndpoints();
 app.MapMakeTopicEndpoints();
 app.MapDefaultEndpoints();
 

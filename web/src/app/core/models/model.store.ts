@@ -1,8 +1,9 @@
-import { inject, Injectable, signal } from '@angular/core';
+import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { ApiService } from '../api/api.service';
 import { ModelOption } from '../api/api-types';
 
 const PREFERRED_KEY = 'ymir.preferredModel';
+const DEPTH_KEY = 'ymir.preferredThinking';
 
 /**
  * 可選用的模型與使用者上次選的模型。
@@ -14,17 +15,41 @@ export class ModelStore {
   private loading = false;
 
   readonly models = signal<ModelOption[]>([]);
+  readonly depth = signal<string | null>(readDepth());
   readonly preferred = signal<string | null>(readPreferred());
 
+  constructor() {
+    const refresh = () => this.load();
+    globalThis.window?.addEventListener('focus', refresh);
+    inject(DestroyRef).onDestroy(() => globalThis.window?.removeEventListener('focus', refresh));
+  }
+
   load(): void {
-    if (this.loading || this.models().length) {
+    if (this.loading) {
       return;
     }
     this.loading = true;
     this.api.listModels().subscribe({
-      next: (models) => this.models.set(models),
+      next: (models) => {
+        this.models.set(models);
+        this.loading = false;
+      },
       error: () => (this.loading = false),
     });
+  }
+
+  thinkingFor(modelId: string | null): string | null {
+    return this.models().find((m) => m.id === modelId)?.supportsThinking ? this.depth() : null;
+  }
+
+  rememberDepth(level: string | null): void {
+    if (level !== null && !['low', 'medium', 'high'].includes(level)) return;
+    this.depth.set(level);
+    try {
+      localStorage.setItem(DEPTH_KEY, level ?? 'auto');
+    } catch {
+      /* 偏好保存失敗不影響送出 */
+    }
   }
 
   remember(modelId: string): void {
@@ -40,6 +65,15 @@ export class ModelStore {
 function readPreferred(): string | null {
   try {
     return localStorage.getItem(PREFERRED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function readDepth(): string | null {
+  try {
+    const level = localStorage.getItem(DEPTH_KEY);
+    return level && ['low', 'medium', 'high'].includes(level) ? level : null;
   } catch {
     return null;
   }

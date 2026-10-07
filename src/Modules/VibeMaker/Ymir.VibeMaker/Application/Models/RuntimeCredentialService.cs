@@ -14,15 +14,21 @@ public sealed class RuntimeCredentialService(
     TimeProvider timeProvider,
     ILogger<RuntimeCredentialService> logger)
 {
-    private readonly ConcurrentDictionary<Guid, RuntimeModelCredential> _credentials = new();
+    private sealed record CachedCredential(RuntimeModelCredential Credential, IReadOnlyList<string> Models);
+    private readonly ConcurrentDictionary<Guid, CachedCredential> _credentials = new();
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _locks = new();
 
     /// <exception cref="ModelCredentialException">無法取得 key。</exception>
     /// <param name="monthlyBudget">目前執行政策的每月預算（ADR-0011）；發新 key 時一併套用到模型入口的使用者。</param>
-    public async Task<RuntimeModelCredential> GetAsync(Guid userId, Guid runtimeId, CancellationToken cancellationToken, decimal? monthlyBudget = null)
+    public async Task<RuntimeModelCredential> GetAsync(Guid userId, Guid runtimeId, CancellationToken cancellationToken, decimal? monthlyBudget = null, IReadOnlyList<string>? allowedModels = null)
     {
         var settings = options.Value;
-        if (TryGetValid(userId, settings) is { } cached)
+        var models = (allowedModels ?? settings.AllowedModels.ToList()).ToArray();
+        if (models.Length == 0 || models.Any(m => !settings.AllowedModels.Contains(m)))
+        {
+            throw new ModelCredentialException("No permitted model set is available.");
+        }
+        if (TryGetValid(userId, settings, models) is { } cached)
         {
             return cached;
         }
@@ -32,21 +38,21 @@ public sealed class RuntimeCredentialService(
         await userLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (TryGetValid(userId, settings) is { } current)
+            if (TryGetValid(userId, settings, models) is { } current)
             {
                 return current;
             }
 
             var issued = await gateway.IssueRuntimeCredentialAsync(
-                new RuntimeCredentialRequest(userId, runtimeId, settings.AllowedModels.ToList(), settings.KeyLifetime, settings.MaxBudget, monthlyBudget),
+                new RuntimeCredentialRequest(userId, runtimeId, models, settings.KeyLifetime, settings.MaxBudget, monthlyBudget),
                 cancellationToken).ConfigureAwait(false);
 
             if (_credentials.TryGetValue(userId, out var previous))
             {
-                await RevokeQuietlyAsync(previous, cancellationToken).ConfigureAwait(false);
+                await RevokeQuietlyAsync(previous.Credential, cancellationToken).ConfigureAwait(false);
             }
 
-            _credentials[userId] = issued;
+            _credentials[userId] = new CachedCredential(issued, models);
             logger.LogInformation("Issued model key {KeyId} for user {UserId}, expires {ExpiresAt:O}", issued.KeyId, userId, issued.ExpiresAt);
             return issued;
         }
@@ -61,13 +67,14 @@ public sealed class RuntimeCredentialService(
     {
         if (_credentials.TryRemove(userId, out var credential))
         {
-            await RevokeQuietlyAsync(credential, cancellationToken).ConfigureAwait(false);
+            await RevokeQuietlyAsync(credential.Credential, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    private RuntimeModelCredential? TryGetValid(Guid userId, ModelCredentialOptions settings) =>
-        _credentials.TryGetValue(userId, out var credential) && credential.ExpiresAt - timeProvider.GetUtcNow() > settings.RenewBefore
-            ? credential
+    private RuntimeModelCredential? TryGetValid(Guid userId, ModelCredentialOptions settings, IReadOnlyList<string> models) =>
+        _credentials.TryGetValue(userId, out var credential) && credential.Credential.ExpiresAt - timeProvider.GetUtcNow() > settings.RenewBefore
+            && credential.Models.ToHashSet(StringComparer.Ordinal).SetEquals(models)
+            ? credential.Credential
             : null;
 
     private async Task RevokeQuietlyAsync(RuntimeModelCredential credential, CancellationToken cancellationToken)

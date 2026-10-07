@@ -36,6 +36,15 @@ describe('ApiService', () => {
     second.flush({});
   });
 
+  it('sends the selected model and thinking depth with the same message', () => {
+    api.sendMessage('c1', 'think', 'reasoning-model', null, [], 'request-1', 'high').subscribe();
+    const request = http.expectOne('/api/conversations/c1/messages');
+    expect(request.request.body.modelId).toBe('reasoning-model');
+    expect(request.request.body.thinkingLevel).toBe('high');
+    expect(request.request.body.clientRequestId).toBe('request-1');
+    request.flush({});
+  });
+
   it('uploads an attachment as the raw request body with its file name', () => {
     const file = new File(['png-bytes'], '截圖 1.png', { type: 'image/png' });
     api.uploadAttachment('c1', file).subscribe();

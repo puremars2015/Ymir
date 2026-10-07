@@ -23,6 +23,7 @@ import { OidcSettings, OidcTestResult } from '../../core/api/api-types';
 import { AdminTabs } from './admin-tabs';
 import { ExtensionSettingsCard } from './extension-settings-card';
 import { RuntimeSettingsCard } from './runtime-settings-card';
+import { ModelSettingsCard } from './model-settings-card';
 import { TunnelSettingsCard } from './tunnel-settings-card';
 
 /**
@@ -37,6 +38,7 @@ import { TunnelSettingsCard } from './tunnel-settings-card';
     ExtensionSettingsCard,
     FormsModule,
     RuntimeSettingsCard,
+    ModelSettingsCard,
     TunnelSettingsCard,
   ],
   template: `
@@ -196,6 +198,7 @@ import { TunnelSettingsCard } from './tunnel-settings-card';
 
       <app-tunnel-settings-card />
       <app-runtime-settings-card />
+      <app-model-settings-card />
       <app-extension-settings-card />
     </section>
   `,

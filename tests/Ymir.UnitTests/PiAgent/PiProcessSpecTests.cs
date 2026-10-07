@@ -15,6 +15,17 @@ public class PiProcessSpecTests
     private static readonly ModelCatalog Catalog = new([new ModelDescriptor("minimax", "MiniMax")], "minimax");
 
     [Fact]
+    public void Thinking_IsExplicitForEachRun_SoDefaultCannotInheritSessionEffort()
+    {
+        var harness = new PiAgentHarness(null!, Options.Create(new PiAgentOptions()), Catalog, null!, NullLogger<PiAgentHarness>.Instance);
+        foreach (var level in new string?[] { null, "low", "medium", "high" })
+        {
+            var spec = harness.BuildProcessSpec(Request with { ThinkingLevel = level });
+            Assert.Equal(level ?? "off", spec.Arguments[spec.Arguments.ToList().IndexOf("--thinking") + 1]);
+        }
+    }
+
+    [Fact]
     public void VirtualKey_IsPassedOnlyAsEnvironmentVariable()
     {
         var options = Options.Create(new PiAgentOptions { DevelopmentApiKey = "sk-should-not-be-used" });

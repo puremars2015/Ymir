@@ -677,6 +677,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/settings/models': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetModelAccess'];
+    put: operations['AdminSaveModelAccess'];
+    post?: never;
+    delete: operations['AdminResetModelAccess'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/make-topics': {
     parameters: {
       query?: never;
@@ -724,6 +740,12 @@ export interface components {
       isEnabled: boolean;
       /** Format: date-time */
       updatedAt: string;
+    };
+    AdminModelOptionResponse: {
+      id: string;
+      displayName: string;
+      supportsImages: boolean;
+      enabled: boolean;
     };
     AdminOverviewResponse: {
       users: components['schemas']['UserCountsResponse'];
@@ -917,11 +939,20 @@ export interface components {
       createdAt: string;
       attachments: components['schemas']['AttachmentResponse'][];
     };
+    ModelAccessResponse: {
+      models: components['schemas']['AdminModelOptionResponse'][];
+      defaultModelId: null | string;
+      usesDeployment: boolean;
+      /** Format: date-time */
+      updatedAt: null | string;
+    };
     ModelResponse: {
       id: string;
       displayName: string;
       isDefault: boolean;
       supportsImages: boolean;
+      /** @default false */
+      supportsThinking: boolean;
     };
     MyExtensionsResponse: {
       skillsAllowed: boolean;
@@ -1027,6 +1058,10 @@ export interface components {
       sortOrder: number | string;
       isEnabled: boolean;
     };
+    SaveModelAccessRequest: {
+      enabledModelIds: string[];
+      defaultModelId: string;
+    };
     SaveOidcSettingsRequest: {
       enabled: boolean;
       tenantId: null | string;
@@ -1065,6 +1100,7 @@ export interface components {
       /** Format: uuid */
       makeTopicId?: null | string;
       attachmentIds?: null | string[];
+      thinkingLevel?: null | string;
     };
     SendMessageResponse: {
       /** Format: uuid */
@@ -2457,6 +2493,70 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['TunnelSettingsResponse'];
+        };
+      };
+    };
+  };
+  AdminGetModelAccess: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ModelAccessResponse'];
+        };
+      };
+    };
+  };
+  AdminSaveModelAccess: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveModelAccessRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ModelAccessResponse'];
+        };
+      };
+    };
+  };
+  AdminResetModelAccess: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ModelAccessResponse'];
         };
       };
     };

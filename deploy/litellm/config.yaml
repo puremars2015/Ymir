@@ -1,6 +1,26 @@
-# LiteLLM sample：MiniMax 國際站（minimax.io）訂閱帳號，ADR-0004 / SA §19。
+# LiteLLM sample：MiniMax 國際站 + OpenRouter，ADR-0004 / SA §19。
 # 啟動方式見同目錄 README.md；金鑰只放在 .env（已由 .gitignore 排除）。
 model_list:
+  # OpenRouter：第一個 openrouter/ 是 LiteLLM provider，後面是 OpenRouter 模型 ID。
+  # OpenRouter 金鑰僅由 LiteLLM 使用；Ymir 使用者仍取得限定模型的 virtual key。
+  - model_name: openrouter-sonnet-5.5
+    litellm_params:
+      model: openrouter/anthropic/claude-sonnet-5.5
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  - model_name: openrouter-gpt-6.1-sol
+    litellm_params:
+      model: openrouter/openai/gpt-6.1-sol
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
+  - model_name: openrouter-gpt-6-luna
+    litellm_params:
+      model: openrouter/openai/gpt-6-luna
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
   # MiniMax 國際站的 OpenAI 相容端點。模型名稱依訂閱方案而定，在 MiniMax 後台確認後修改 openai/ 後面的名稱。
   - model_name: minimax
     litellm_params:

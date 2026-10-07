@@ -6,6 +6,8 @@
       class="picker"
       [models]="modelStore.models()"
       [selected]="selectedModel()"
+      [depth]="modelStore.depth()"
+      (depthChanged)="modelStore.rememberDepth($event)"
       (changed)="modelStore.remember($event)"
     />
     <app-composer

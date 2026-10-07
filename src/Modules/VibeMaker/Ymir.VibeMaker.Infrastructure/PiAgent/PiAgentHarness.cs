@@ -58,6 +58,8 @@ internal sealed class PiAgentHarness(
                 "--mode", "rpc",
                 "--provider", _options.ProviderName,
                 "--model", request.ModelId,
+                // 每次明確重設，避免沿用 Pi session 上一次的深度；off 不傳 reasoning_effort，讓供應商採預設。
+                "--thinking", request.ThinkingLevel ?? "off",
                 "--session-dir", PiRuntimeLayout.SessionDirectory,
                 "--session-id", request.SessionId.ToString("D"),
                 .. request.SystemPrompts.SelectMany((_, i) => new[] { "--append-system-prompt", SystemPromptPath(request.ExecutionId, i) }),

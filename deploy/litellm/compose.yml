@@ -7,6 +7,8 @@ services:
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     environment:
       MINIMAX_API_KEY: ${MINIMAX_API_KEY:?請在 deploy/litellm/.env 設定 MINIMAX_API_KEY}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OR_APP_NAME: Ymir
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?請在 deploy/litellm/.env 設定 LITELLM_MASTER_KEY}
       # 加密資料庫內保存的金鑰；設定後不可更改，否則既有的 key 無法解密。
       LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?請在 deploy/litellm/.env 設定 LITELLM_SALT_KEY}

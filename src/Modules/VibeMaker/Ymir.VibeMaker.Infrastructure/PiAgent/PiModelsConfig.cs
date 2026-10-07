@@ -34,6 +34,11 @@ internal static class PiModelsConfig
     private static JsonNode ToModelNode(ModelDescriptor model)
     {
         var node = new JsonObject { ["id"] = model.Id };
+        if (model.SupportsThinking)
+        {
+            node["reasoning"] = true;
+            node["compat"] = new JsonObject { ["supportsReasoningEffort"] = true };
+        }
         if (model.SupportsImages)
         {
             node["input"] = new JsonArray("text", "image");

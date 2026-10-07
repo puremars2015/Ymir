@@ -7,6 +7,16 @@ namespace Ymir.UnitTests.PiAgent;
 public class PiModelsConfigTests
 {
     [Fact]
+    public void Build_EnablesEffortOnlyForConfiguredThinkingModels()
+    {
+        using var document = JsonDocument.Parse(PiModelsConfig.Build(new PiAgentOptions(), [new ModelDescriptor("fixed", "Fixed"), new ModelDescriptor("thinking", "Thinking", SupportsThinking: true)]));
+        var models = document.RootElement.GetProperty("providers").GetProperty("ymir").GetProperty("models").EnumerateArray().ToList();
+        Assert.False(models[0].TryGetProperty("reasoning", out _));
+        Assert.True(models[1].GetProperty("reasoning").GetBoolean());
+        Assert.True(models[1].GetProperty("compat").GetProperty("supportsReasoningEffort").GetBoolean());
+    }
+
+    [Fact]
     public void Build_ReferencesApiKeyByEnvironmentVariable_NeverInline()
     {
         var options = new PiAgentOptions

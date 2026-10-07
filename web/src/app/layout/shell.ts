@@ -96,13 +96,34 @@ export class Shell implements OnInit {
   });
 
   ngOnInit(): void {
+    // 手機鍵盤可能只縮小 visual viewport；不要讓輸入區留在鍵盤後方。
+    const viewport = globalThis.window?.visualViewport;
+    const syncViewport = () => {
+      const style = this.host.nativeElement.style;
+      if (!this.mobile()) {
+        style.removeProperty('--viewport-height');
+        style.removeProperty('--viewport-top');
+      } else if (viewport && Math.abs(viewport.scale - 1) < 0.01) {
+        // 縮放時保留原版面，避免改變高度干擾使用者閱讀。
+        style.setProperty('--viewport-height', `${viewport.height}px`);
+        style.setProperty('--viewport-top', `${viewport.offsetTop}px`);
+      }
+    };
     const onResize = () => {
       this.mobile.set(this.mobileQuery?.matches ?? false);
       this.drawerOpen.set(false);
       this.menu.set(null);
+      syncViewport();
     };
+    syncViewport();
+    viewport?.addEventListener('resize', syncViewport);
+    viewport?.addEventListener('scroll', syncViewport);
     this.mobileQuery?.addEventListener('change', onResize);
-    this.destroyRef.onDestroy(() => this.mobileQuery?.removeEventListener('change', onResize));
+    this.destroyRef.onDestroy(() => {
+      this.mobileQuery?.removeEventListener('change', onResize);
+      viewport?.removeEventListener('resize', syncViewport);
+      viewport?.removeEventListener('scroll', syncViewport);
+    });
     this.store.refresh().subscribe({ error: (e: unknown) => this.error.set(describeApiError(e)) });
     // 抽屜模式下，切換頁面後自動收起
     this.router.events

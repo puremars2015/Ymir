@@ -17,7 +17,8 @@ public sealed record AgentRunRequest(
     string ModelId,
     IReadOnlyList<string> SystemPrompts,
     Extensions.EffectiveExtensions? Extensions = null,
-    IReadOnlyList<AgentAttachment>? Attachments = null)
+    IReadOnlyList<AgentAttachment>? Attachments = null,
+    string? ThinkingLevel = null)
 {
     public IReadOnlyList<AgentAttachment> Attachments { get; init; } = Attachments ?? [];
 

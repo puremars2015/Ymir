@@ -19,7 +19,7 @@ flowchart TD
     API -->|"Docker run / exec"| Agent["每位使用者一個 Agent 容器<br/>Pi Agent RPC"]
     API -->|"管理 virtual key 與用量<br/>127.0.0.1:4000"| LiteLLM["LiteLLM 容器"]
     Agent -->|"OpenAI 相容 API<br/>host.docker.internal:4000/v1"| LiteLLM
-    LiteLLM --> Model["外部模型供應商<br/>目前使用 MiniMax"]
+    LiteLLM --> Model["外部模型供應商<br/>目前提供 MiniMax 與 OpenRouter"]
     LiteLLM --> PG["LiteLLM 專用 PostgreSQL 容器"]
     Agent --- Files["主機持久化目錄<br/>workspace、agent-state"]
 ```
@@ -28,7 +28,7 @@ flowchart TD
 
 | 元件 | 執行位置 | 入口或連線 | 責任 |
 |---|---|---|---|
-| Angular + nginx | `ymir-web` 容器，映像 `localhost/ymir/web:sidebar-20261007` | `127.0.0.1:4200`、`127.0.0.1:5080` → 容器 `80` | 提供 Angular 靜態網頁、SPA 路由及 API 反向代理 |
+| Angular + nginx | `ymir-web` 容器，映像 `localhost/ymir/web:model-access-20261007` | `127.0.0.1:4200`、`127.0.0.1:5080` → 容器 `80` | 提供 Angular 靜態網頁、SPA 路由及 API 反向代理 |
 | Ymir API | Windows 背景程序 `dotnet Ymir.Api.dll` | `127.0.0.1:5081` | 登入、授權、專案、對話、附件、Agent 執行與管理功能 |
 | SQL Server | `ymir-sql` 容器 | `127.0.0.1:14330` → 容器 `1433` | Ymir 業務資料 |
 | Agent runtime | `ymir-user-{userId}` 容器，映像 `localhost/ymir/agent-runtime:deliverables` | API 透過 Docker 管理，無對外服務埠 | 執行 Pi Agent、工具與檔案操作 |
@@ -53,7 +53,7 @@ nginx **1.31.6** 執行在 `ymir-web` 的 Linux 容器內，因此 Windows 程�
 
 應用程式允許單一附件 **50 MiB**（`50 × 1024 × 1024` bytes），nginx 的 `server` 區塊也已設定 `client_max_body_size 50m;`，兩層限制一致。超過此上限的請求會回傳 **413 Request Entity Too Large**。
 
-原先 6,781,783 bytes 的 PDF 因 nginx 預設 `1m` 被擋住；2026-10-07 已修正執行中的設定、重新載入 nginx，並同步更新部署來源 `%LOCALAPPDATA%\Ymir\deploy\web-sidebar-20261007\nginx.conf` 及 `localhost/ymir/web:sidebar-20261007` 映像。以未登入的大小探測請求確認：6,781,783 bytes 已通過 nginx 大小檢查並收到 API 的 401；50 MiB + 1 byte 仍由 nginx 回傳 413。此檢查未建立附件。
+原先 6,781,783 bytes 的 PDF 因 nginx 預設 `1m` 被擋住；2026-10-07 已修正執行中的設定、重新載入 nginx，並同步更新部署來源 `%LOCALAPPDATA%\Ymir\deploy\web-model-access-20261007\nginx.conf` 及 `localhost/ymir/web:model-access-20261007` 映像。以未登入的大小探測請求確認：6,781,783 bytes 已通過 nginx 大小檢查並收到 API 的 401；50 MiB + 1 byte 仍由 nginx 回傳 413。此檢查未建立附件。
 
 ## 應用程式分層
 
@@ -131,9 +131,35 @@ flowchart LR
 
 RuntimeHost 以主機上的專用帳號管理每位使用者的 Rootless Podman 容器；API 容器不掛載 Docker／Podman socket 或使用者 workspace。Windows Docker 的容器化 API 範本則透過 `host.docker.internal:5090` 呼叫主機 RuntimeHost。這些是程式碼支援的部署方式，目前本機未使用此拓撲。
 
+## 模型供應商與 OpenRouter
+
+LiteLLM 統一代理 MiniMax 與 OpenRouter，對話使用原有模型選單。MiniMax-M2.7 保留為預設模型，另提供 Claude Sonnet 5.5、GPT-6.1 Sol 與 GPT-6 Luna（OpenRouter），三者皆支援圖片輸入及 Agent 工具呼叫。
+
+OpenRouter API key 僅注入 LiteLLM，使用者與 Agent 使用限定模型的短效 virtual key；用量及預算沿用既有管理流程。路由、Models 與明確設定的 AllowedModels 必須使用相同 alias，更新後於無執行中工作時重啟 API，使模型選單及新發 key 同步。部署設定及新增模型方式見 [LiteLLM 部署說明](deploy/litellm/README.md)。
+
+## 管理員開放模型
+
+「管理 → 系統設定 → 開放模型」可勾選已接入的模型及指定預設，至少保留一個，並可還原部署設定。開放清單以 `vibemaker.model_access` 保存於既有 `platform.system_settings`，重啟後保留、不需要新 migration，管理員修改寫入稽核。
+
+`GET/PUT/DELETE /api/admin/settings/models` 受 Admin／XSRF 保護；使用者的 `/api/models`、送出訊息、排隊工作啟動及 LiteLLM 新 virtual key 一致採用生效清單。已開始的工作繼續完成，下次執行模型集合改變時换發金鑰；尚未開始而模型被關閉的工作明確失敗。模型頁面載入與視窗回到前景時重新查詢。詳見 [ADR-0016](docs/adr/0016-admin-model-access.md)。
+
+## 模型與思考設定
+
+對話輸入區以滑桿圖示開啟設定面板，包含「選擇模型」與「思考深度」，圖示旁顯示目前選擇。模型文字只顯示名稱，保留 OpenRouter 風格的文字／圖片能力徽章。新對話、既有對話與專案共用面板，支援鍵盤選擇、Tab 移動到深度、Escape／點擊外部關閉及手機鍵盤空間調整。
+
+深度提供自動、輕量（low）、標準（medium）、深入（high）。部署的 `VibeMaker:Models:*:SupportsThinking=true` 宣告模型接受這三種深度；目前三個 OpenRouter 模型可調整，MiniMax 維持模型預設。前端記住個人偏好，送出時捕捉選擇；後端驗證模型能力並以 migration 保存 execution 的 `thinking_level`，排隊工作及冪等重送保留原值。
+
+Pi 1.0.0 透過 `--thinking` 與 models.json 的 reasoning 能力設定，將 `reasoning_effort` 經 LiteLLM 轉給供應商；自動不傳深度參數，也不繼承 session 上一次的選擇。詳見 [ADR-0017](docs/adr/0017-execution-thinking-depth.md)。驗證使用 `npm run e2e:model-picker -- <截圖目錄> <baseUrl>`、Agent 映像內的 `runtime/agent/test-thinking.mjs` 及 LiteLLM 的 `deploy/litellm/test-openrouter.py`，均使用本機假模型。
+
 ## 側欄導覽
 
 側欄採固定圖示與一致列高，專案、聊天群組以標題及分隔線區分。頂部漢堡按鈕可收合／展開側欄；桌面記住收合狀態，手機顯示抽屜並支援 Escape、遮罩與導覽後關閉。
+
+## 手機對話輸入區
+
+新對話與既有對話的輸入框位於可見畫面底部，預留 8px 或手機底部安全區；手機隱藏冗長的鍵盤操作說明，模型選擇、附件與送出仍可使用。對話訊息獨立捲動，輸入區不隨訊息移動。Shell 使用動態 viewport 高度，並監聽 VisualViewport 的高度與位移，配合鍵盤開關；放大閱讀時不重新縮排，桌面維持既有配置。
+
+版面檢查：`npm run e2e:mobile-composer -- <截圖目錄> <baseUrl>` 使用唯讀 API fixtures，驗證新舊對話、橫直向、長對話、多行輸入及附件、模擬鍵盤縮放／位移／收起、縮放閱讀與桌面還原。手機實機 Safari／Chrome 的原生鍵盤尚待驗證。
 
 ## 成果、專案檔案與工具暫存
 

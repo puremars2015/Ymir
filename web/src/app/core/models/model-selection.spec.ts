@@ -2,8 +2,20 @@ import { ModelOption } from '../api/api-types';
 import { isSystemPromptTooLong, resolveModel, SYSTEM_PROMPT_MAX_LENGTH } from './model-selection';
 
 const models: ModelOption[] = [
-  { id: 'minimax', displayName: 'MiniMax', isDefault: true, supportsImages: false },
-  { id: 'gpt-x', displayName: 'GPT X', isDefault: false, supportsImages: false },
+  {
+    id: 'minimax',
+    displayName: 'MiniMax',
+    isDefault: true,
+    supportsImages: false,
+    supportsThinking: false,
+  },
+  {
+    id: 'gpt-x',
+    displayName: 'GPT X',
+    isDefault: false,
+    supportsImages: false,
+    supportsThinking: false,
+  },
 ];
 
 describe('resolveModel', () => {
