@@ -6,6 +6,29 @@ namespace Ymir.UnitTests.Models;
 
 public class ModelCatalogTests
 {
+    [Fact]
+    public void ThinkingCapability_UsesExactConfiguredLevelsAndRejectsUnsupportedAdapters()
+    {
+        var catalog = FromConfig(("VibeMaker:Models:0:Id", "luna"),
+            ("VibeMaker:Pi:ModelId", "luna"),
+            ("VibeMaker:Models:0:Thinking:Parameter", "reasoning_effort"),
+            ("VibeMaker:Models:0:Thinking:Levels:0", "none"),
+            ("VibeMaker:Models:0:Thinking:Levels:1", "max"));
+        var model = Assert.Single(catalog.Models);
+        Assert.True(model.AcceptsThinking("none"));
+        Assert.True(model.AcceptsThinking("max"));
+        Assert.True(model.AcceptsThinking(null));
+        Assert.False(model.AcceptsThinking("low"));
+        Assert.Throws<InvalidOperationException>(() => FromConfig(
+            ("VibeMaker:Models:0:Id", "budget"),
+            ("VibeMaker:Models:0:Thinking:Parameter", "thinking.budget_tokens"),
+            ("VibeMaker:Models:0:Thinking:Levels:0", "high")));
+        Assert.Throws<InvalidOperationException>(() => FromConfig(
+            ("VibeMaker:Models:0:Id", "mandatory"),
+            ("VibeMaker:Models:0:Thinking:Parameter", "reasoning_effort"),
+            ("VibeMaker:Models:0:Thinking:Required", "true"),
+            ("VibeMaker:Models:0:Thinking:Levels:0", "none")));
+    }
     private static ModelCatalog FromConfig(params (string Key, string Value)[] settings) =>
         VibeMakerInfrastructureExtensions.BuildModelCatalog(new ConfigurationBuilder()
             .AddInMemoryCollection(settings.Select(s => KeyValuePair.Create(s.Key, (string?)s.Value)))

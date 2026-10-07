@@ -56,9 +56,9 @@ public sealed class AgentExecution
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(userMessage);
-        if (thinkingLevel is not (null or "low" or "medium" or "high"))
+        if (thinkingLevel is not (null or "none" or "minimal" or "low" or "medium" or "high" or "xhigh" or "max"))
         {
-            throw new DomainValidationException("思考深度只能是 low、medium 或 high。");
+            throw new DomainValidationException("無效的思考深度。");
         }
         var execution = new AgentExecution
         {

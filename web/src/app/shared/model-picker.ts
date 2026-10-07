@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { ModelOption } from '../core/api/api-types';
+import { effortLabels, effectiveThinking, thinkingLevels } from '../core/models/thinking-options';
 
 /** 由圖示開啟模型與思考設定；保留 listbox 的鍵盤操作。 */
 @Component({
@@ -41,7 +42,7 @@ import { ModelOption } from '../core/api/api-types';
       </button>
       <span class="selection-summary">
         <span class="model-name">{{ name(model) }}</span>
-        @if (model.supportsThinking) {
+        @if (levels().length > 0) {
           <span class="depth-summary">· {{ depthLabel() }}</span>
         }
       </span>
@@ -100,30 +101,28 @@ import { ModelOption } from '../core/api/api-types';
               </button>
             }
           </div>
-          <fieldset class="thinking" [disabled]="!model.supportsThinking">
-            <legend>思考深度</legend>
-            <div class="depth-options" role="radiogroup" aria-label="思考深度">
-              @for (level of levels; track level.value; let index = $index) {
-                <button
-                  type="button"
-                  role="radio"
-                  [attr.aria-checked]="effectiveDepth() === level.value"
-                  [attr.tabindex]="effectiveDepth() === level.value ? 0 : -1"
-                  [class.selected]="effectiveDepth() === level.value"
-                  (click)="depthChanged.emit(level.value)"
-                  (keydown)="onDepthKey($event, index)"
-                >
-                  {{ level.label }}
-                </button>
-              }
-            </div>
-          </fieldset>
+          @if (levels().length > 0) {
+            <fieldset class="thinking">
+              <legend>思考深度</legend>
+              <div class="depth-options" role="radiogroup" aria-label="思考深度">
+                @for (level of levels(); track level.value; let index = $index) {
+                  <button
+                    type="button"
+                    role="radio"
+                    [attr.aria-checked]="effectiveDepth() === level.value"
+                    [attr.tabindex]="effectiveDepth() === level.value ? 0 : -1"
+                    [class.selected]="effectiveDepth() === level.value"
+                    (click)="depthChanged.emit(level.value)"
+                    (keydown)="onDepthKey($event, index)"
+                  >
+                    {{ level.label }}
+                  </button>
+                }
+              </div>
+            </fieldset>
+          }
           <p class="depth-hint">
-            {{
-              model.supportsThinking
-                ? '自動使用模型預設；較深的思考通常需要更多時間。'
-                : '此模型未提供思考深度調整。'
-            }}
+            {{ thinkingHint() }}
           </p>
         </div>
       }
@@ -157,18 +156,27 @@ export class ModelPicker {
   readonly changed = output<string>();
   readonly depth = input<string | null>(null);
   readonly depthChanged = output<string | null>();
-  protected readonly levels = [
-    { value: null, label: '自動' },
-    { value: 'low', label: '輕量' },
-    { value: 'medium', label: '標準' },
-    { value: 'high', label: '深入' },
-  ];
+  protected readonly levels = computed(() => {
+    const values = thinkingLevels(this.current());
+    return values.length
+      ? [
+          { value: null as string | null, label: '自動' },
+          ...values.map((value) => ({ value, label: effortLabels[value] ?? value })),
+        ]
+      : [];
+  });
   protected readonly effectiveDepth = computed(() =>
-    this.current()?.supportsThinking ? this.depth() : null,
+    effectiveThinking(this.current(), this.depth()),
   );
   protected readonly depthLabel = computed(
-    () => this.levels.find((l) => l.value === this.effectiveDepth())?.label ?? '自動',
+    () => this.levels().find((l) => l.value === this.effectiveDepth())?.label ?? '自動',
   );
+  protected readonly thinkingHint = computed(() => {
+    if (!this.levels().length) return '此模型自行決定思考方式，沒有可調整的深度。';
+    const capability = this.current()?.thinking;
+    const defaultLevel = capability?.defaultLevel;
+    return `自動使用模型預設${defaultLevel ? '（' + (effortLabels[defaultLevel] ?? defaultLevel) + '）' : ''}。${capability?.required ? '此模型必須保留思考。' : ''}較深的思考通常需要更多時間。`;
+  });
   protected readonly current = computed(
     () =>
       this.models().find((m) => m.id === this.selected()) ??
@@ -243,23 +251,23 @@ export class ModelPicker {
     switch (event.key) {
       case 'ArrowRight':
       case 'ArrowDown':
-        next = (index + 1) % this.levels.length;
+        next = (index + 1) % this.levels().length;
         break;
       case 'ArrowLeft':
       case 'ArrowUp':
-        next = (index + this.levels.length - 1) % this.levels.length;
+        next = (index + this.levels().length - 1) % this.levels().length;
         break;
       case 'Home':
         next = 0;
         break;
       case 'End':
-        next = this.levels.length - 1;
+        next = this.levels().length - 1;
         break;
       default:
         return;
     }
     event.preventDefault();
-    this.depthChanged.emit(this.levels[next].value);
+    this.depthChanged.emit(this.levels()[next].value);
     const buttons =
       this.host.nativeElement.querySelectorAll<HTMLButtonElement>('.depth-options button');
     buttons[next]?.focus();

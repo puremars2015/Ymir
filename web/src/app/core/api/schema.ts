@@ -986,6 +986,7 @@ export interface components {
       supportsImages: boolean;
       /** @default false */
       supportsThinking: boolean;
+      thinking?: null | components['schemas']['ThinkingCapabilityResponse'];
     };
     MyExtensionsResponse: {
       skillsAllowed: boolean;
@@ -1182,6 +1183,12 @@ export interface components {
     Stream: string;
     TestOidcSettingsRequest: {
       tenantId: null | string;
+    };
+    ThinkingCapabilityResponse: {
+      parameter: string;
+      levels: string[];
+      defaultLevel: null | string;
+      required: boolean;
     };
     TunnelSettingsResponse: {
       publicEdgeEnabled: boolean;

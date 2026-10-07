@@ -80,13 +80,13 @@ try:
         assert requests[-2]["tools"] == [tool]
         print(f"PASS {alias}: upstream model ID, credentials, text, tool calls and streaming")
     for alias in expected:
-        for effort in ("low", "medium", "high"):
-            router.completion(model=alias, messages=messages, reasoning_effort=effort)
+        for effort in ("low", "medium", "high", "xhigh", "max") + (("none",) if alias == "openrouter-gpt-6-luna" else ()):
+            router.completion(model=alias, messages=messages, reasoning={"effort": effort})
             assert requests[-1].get("reasoning", {}).get("effort", requests[-1].get("reasoning_effort")) == effort
         router.completion(model=alias, messages=messages)
         assert "reasoning" not in requests[-1] and "reasoning_effort" not in requests[-1]
-        print(f"PASS {alias}: reasoning efforts low/medium/high and provider default")
-    assert len(requests) == 21
+        print(f"PASS {alias}: model-specific reasoning efforts and provider default")
+    assert len(requests) == 28
 finally:
     server.shutdown()
     server.server_close()

@@ -75,6 +75,19 @@
 ---
 
 ## 💬 留言區
+### #023 · 依模型 API 能力提供思考選項
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 23:41 · `✅完成與部署`
+
+依使用者要求新增模型 Thinking 能力契約（Parameter／Levels／DefaultLevel／Required），前端依精確清單顯示，MiniMax 不顯示深度控制；依官方 OpenRouter 目錄，Luna 可選 none／low／medium／high／xhigh／max，Sol／Sonnet 為必須思考且排除 none。未知／不適用的保存偏好採模型預設，不強制改成另一值。提交與執行開始均驗證精確值；原 execution 欄位足以保存新 effort，無 migration。舊 SupportsThinking=true 相容低／中／高，新部署採明確配置。ADR-0018、README、部署環境範例、OpenAPI 與前端型別同步。
+
+实际传輸驗證抓到并修正：Pi 的别名 xhigh 被降为 high，需要显式 thinkingLevelMap；off→null 會排除 off 而改用 minimal，自動改为本次模型不受 Pi effort 管理且不送參數，none 才明確 off→none。LiteLLM 1.103.2 的 reasoning_effort 转換未完整保留新值，OpenRouter 部署採 reasoning.effort，經假上游驗證精確值。無 adapter 的 token-budget／其他開關配置會拒絕啟動，不冒充通用深度，未宣稱已支援所有廠商格式。
+
+驗證：後端單元 406 通過／5 個平台相關略過，模型存取與 OpenAPI 整合 3 通過；前端 lint、139 測試、build 通過；dotnet format verify 與 git diff --check 通過。Pinned Pi 兩種傳輸格式共 38 個本機假請求，LiteLLM 28 個假上游請求，驗證精確 effort、none／自動及同 session 重設，全部通過；新版預覽與部署入口兩次 e2e 驗證各模型選项、點擊／鍵盤／偏好、訊息參數與手機佈局通過。首輪 SQL 測試因 localhost 連線逾時，改用 127.0.0.1 後通過。
+
+部署確認無執行中工作，API 更新至 api-thinking-capabilities-20261007，前端映像 localhost/ymir/web:thinking-capabilities-20261007；launcher 三個 OpenRouter 模型已配置實際 Levels、預設與 Required，保持金鑰、管理員開放清單、workspace／agent-state 和入口 IP。API health、本機與公開入口 200，提供 main-WOD4GX4O.js；未發送付費模型請求，原瀏覽器需重新整理取新版本。
+
+---
 ### #022 · 思考深度改用直接點擊按鈕
 
 > 👤 **Codex（AI）** · 🕒 2026-10-07 23:25 · `✅修正與部署；原現場原因未重現`

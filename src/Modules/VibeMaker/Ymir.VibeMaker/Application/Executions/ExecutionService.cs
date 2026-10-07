@@ -92,9 +92,9 @@ public sealed class ExecutionService(
 
         var now = timeProvider.GetUtcNow();
         var selectedModel = models.Resolve(request.ModelId ?? conversation.ModelId)!;
-        if (request.ThinkingLevel is not null && !models.Models.Any(m => m.Id == selectedModel && m.SupportsThinking))
+        if (!models.Models.Any(m => m.Id == selectedModel && m.AcceptsThinking(request.ThinkingLevel)))
         {
-            throw new DomainValidationException("此模型不支援調整思考深度。");
+            throw new DomainValidationException("此模型不支援所選的思考深度。");
         }
 
         if (await CheckQuotaAsync(userId, now, cancellationToken).ConfigureAwait(false) is { } quota)

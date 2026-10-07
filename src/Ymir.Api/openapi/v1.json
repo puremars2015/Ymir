@@ -2838,6 +2838,16 @@
           "supportsThinking": {
             "type": "boolean",
             "default": false
+          },
+          "thinking": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ThinkingCapabilityResponse"
+              }
+            ]
           }
         }
       },
@@ -3656,6 +3666,35 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "ThinkingCapabilityResponse": {
+        "required": [
+          "parameter",
+          "levels",
+          "defaultLevel",
+          "required"
+        ],
+        "type": "object",
+        "properties": {
+          "parameter": {
+            "type": "string"
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultLevel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "required": {
+            "type": "boolean"
           }
         }
       },

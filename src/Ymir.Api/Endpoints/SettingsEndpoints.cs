@@ -14,7 +14,8 @@ internal static class SettingsEndpoints
         endpoints.MapGet("/api/models", async (ModelAccessService policy, CancellationToken ct) =>
             {
                 var state = await policy.GetAsync(ct);
-                return state.Models.Select(m => new ModelResponse(m.Id, m.DisplayName, m.Id == state.DefaultModelId, m.SupportsImages, m.SupportsThinking)).ToList();
+                return state.Models.Select(m => new ModelResponse(m.Id, m.DisplayName, m.Id == state.DefaultModelId, m.SupportsImages, m.EffectiveThinking is not null,
+                    m.EffectiveThinking is { } thinking ? new ThinkingCapabilityResponse(thinking.Parameter, thinking.Levels, thinking.DefaultLevel, thinking.Required) : null)).ToList();
             })
             .WithName("ListModels")
             .WithTags("Models");

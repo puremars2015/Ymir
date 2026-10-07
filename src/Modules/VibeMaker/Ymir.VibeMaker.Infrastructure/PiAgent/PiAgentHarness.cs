@@ -59,7 +59,7 @@ internal sealed class PiAgentHarness(
                 "--provider", _options.ProviderName,
                 "--model", request.ModelId,
                 // 每次明確重設，避免沿用 Pi session 上一次的深度；off 不傳 reasoning_effort，讓供應商採預設。
-                "--thinking", request.ThinkingLevel ?? "off",
+                "--thinking", request.ThinkingLevel is null or "none" ? "off" : request.ThinkingLevel,
                 "--session-dir", PiRuntimeLayout.SessionDirectory,
                 "--session-id", request.SessionId.ToString("D"),
                 .. request.SystemPrompts.SelectMany((_, i) => new[] { "--append-system-prompt", SystemPromptPath(request.ExecutionId, i) }),
@@ -86,7 +86,7 @@ internal sealed class PiAgentHarness(
 
         try
         {
-            await EnsureConfigProvisionedAsync(request.RuntimeId, cancellationToken).ConfigureAwait(false);
+            await EnsureConfigProvisionedAsync(request, cancellationToken).ConfigureAwait(false);
             await WriteExtensionConfigAsync(request, cancellationToken).ConfigureAwait(false);
             await WriteSystemPromptsAsync(request, cancellationToken).ConfigureAwait(false);
 
@@ -381,9 +381,10 @@ internal sealed class PiAgentHarness(
         }
     }
 
-    private async Task EnsureConfigProvisionedAsync(Guid runtimeId, CancellationToken cancellationToken)
+    private async Task EnsureConfigProvisionedAsync(AgentRunRequest request, CancellationToken cancellationToken)
     {
-        var modelsJson = PiModelsConfig.Build(_options, models.Models);
+        var runtimeId = request.RuntimeId;
+        var modelsJson = PiModelsConfig.Build(_options, models.Models, request.ThinkingLevel == "none" ? request.ModelId : null, request.ThinkingLevel is null ? request.ModelId : null);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(modelsJson)));
         if (_provisionedConfigHashes.TryGetValue(runtimeId, out var existing) && existing == hash)
         {

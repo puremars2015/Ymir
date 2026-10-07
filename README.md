@@ -147,9 +147,9 @@ OpenRouter API key 僅注入 LiteLLM，使用者與 Agent 使用限定模型的�
 
 對話輸入區以滑桿圖示開啟設定面板，包含「選擇模型」與「思考深度」，圖示旁顯示目前選擇。模型文字只顯示名稱，保留 OpenRouter 風格的文字／圖片能力徽章。新對話、既有對話與專案共用面板，支援鍵盤選擇、Tab 移動到深度、Escape／點擊外部關閉及手機鍵盤空間調整。
 
-深度提供自動、輕量（low）、標準（medium）、深入（high）。部署的 `VibeMaker:Models:*:SupportsThinking=true` 宣告模型接受這三種深度；目前三個 OpenRouter 模型可調整，MiniMax 維持模型預設。前端記住個人偏好，送出時捕捉選擇；後端驗證模型能力並以 migration 保存 execution 的 `thinking_level`，排隊工作及冪等重送保留原值。
+深度依各模型的 `Thinking` 能力顯示，包含傳輸 Parameter、精確 Levels、DefaultLevel 與 Required；不固定套用相同選單。MiniMax M2.7 不顯示深度控制；GPT-6 Luna 可選關閉／輕量／標準／深入／更深入／最高，Sol 與 Sonnet 不提供關閉。自動採模型預設，不等於關閉。前端不向不支援的模型傳送保存偏好，後端在提交與執行開始驗證精確值；execution 保存所選值，排隊及冪等重送保留原值。
 
-Pi 1.0.0 透過 `--thinking` 與 models.json 的 reasoning 能力設定，將 `reasoning_effort` 經 LiteLLM 轉給供應商；自動不傳深度參數，也不繼承 session 上一次的選擇。詳見 [ADR-0017](docs/adr/0017-execution-thinking-depth.md)。驗證使用 `npm run e2e:model-picker -- <截圖目錄> <baseUrl>`、Agent 映像內的 `runtime/agent/test-thinking.mjs` 及 LiteLLM 的 `deploy/litellm/test-openrouter.py`，均使用本機假模型。
+Pi 1.0.0 透過 `--thinking` 與每次執行的 models.json 明確對應傳輸值；OpenRouter 路由使用 `reasoning.effort` 經 LiteLLM 轉給供應商，其他已驗證的 OpenAI 相容路由可配置 `reasoning_effort`。自動不傳深度參數，明確關閉傳 none，不繼承 session 舊設定，也不將 xhigh／max 降成 high。token 預算或其他開關需新增 adapter 才能開放，不冒充 effort。詳見 [ADR-0018](docs/adr/0018-model-specific-thinking-capabilities.md)。驗證使用 `npm run e2e:model-picker -- <截圖目錄> <baseUrl>`、Agent 映像內的 `runtime/agent/test-thinking.mjs` 及 LiteLLM 的 `deploy/litellm/test-openrouter.py`，均使用本機假模型。
 
 ## 側欄導覽
 

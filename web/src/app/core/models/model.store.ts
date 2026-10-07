@@ -1,6 +1,7 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { ApiService } from '../api/api.service';
 import { ModelOption } from '../api/api-types';
+import { effortLabels, effectiveThinking } from './thinking-options';
 
 const PREFERRED_KEY = 'ymir.preferredModel';
 const DEPTH_KEY = 'ymir.preferredThinking';
@@ -39,11 +40,14 @@ export class ModelStore {
   }
 
   thinkingFor(modelId: string | null): string | null {
-    return this.models().find((m) => m.id === modelId)?.supportsThinking ? this.depth() : null;
+    return effectiveThinking(
+      this.models().find((m) => m.id === modelId),
+      this.depth(),
+    );
   }
 
   rememberDepth(level: string | null): void {
-    if (level !== null && !['low', 'medium', 'high'].includes(level)) return;
+    if (level !== null && !Object.hasOwn(effortLabels, level)) return;
     this.depth.set(level);
     try {
       localStorage.setItem(DEPTH_KEY, level ?? 'auto');
@@ -73,7 +77,7 @@ function readPreferred(): string | null {
 function readDepth(): string | null {
   try {
     const level = localStorage.getItem(DEPTH_KEY);
-    return level && ['low', 'medium', 'high'].includes(level) ? level : null;
+    return level && Object.hasOwn(effortLabels, level) ? level : null;
   } catch {
     return null;
   }

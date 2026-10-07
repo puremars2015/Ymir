@@ -170,9 +170,9 @@ public static class VibeMakerInfrastructureExtensions
     {
         var defaultModel = configuration.GetSection(PiAgentOptions.SectionName).GetValue(nameof(PiAgentOptions.ModelId), new PiAgentOptions().ModelId)!;
         var models = configuration.GetSection("VibeMaker:Models").GetChildren()
-            .Select(section => (Id: section["Id"]?.Trim(), DisplayName: section["DisplayName"]?.Trim(), SupportsImages: section.GetValue<bool>("SupportsImages"), SupportsThinking: section.GetValue<bool>("SupportsThinking")))
+            .Select(section => (Id: section["Id"]?.Trim(), DisplayName: section["DisplayName"]?.Trim(), SupportsImages: section.GetValue<bool>("SupportsImages"), SupportsThinking: section.GetValue<bool>("SupportsThinking"), Thinking: ReadThinking(section)))
             .Where(m => !string.IsNullOrEmpty(m.Id))
-            .Select(m => new ModelDescriptor(m.Id!, string.IsNullOrEmpty(m.DisplayName) ? m.Id! : m.DisplayName!, m.SupportsImages, m.SupportsThinking))
+            .Select(m => new ModelDescriptor(m.Id!, string.IsNullOrEmpty(m.DisplayName) ? m.Id! : m.DisplayName!, m.SupportsImages, m.Thinking is not null || m.SupportsThinking, m.Thinking))
             .DistinctBy(m => m.Id)
             .ToList();
         if (!models.Any(m => m.Id == defaultModel))
@@ -181,6 +181,25 @@ public static class VibeMakerInfrastructureExtensions
         }
 
         return new ModelCatalog(models, defaultModel);
+    }
+
+    private static ThinkingCapability? ReadThinking(IConfigurationSection model)
+    {
+        var section = model.GetSection("Thinking");
+        if (!section.Exists()) return null;
+        var parameter = section["Parameter"];
+        var levels = section.GetSection("Levels").Get<string[]>() ?? [];
+        var defaultLevel = section["DefaultLevel"];
+        var required = section.GetValue<bool>("Required");
+        if (parameter is not ("reasoning_effort" or "reasoning.effort") || levels.Length == 0
+            || levels.Any(level => !ThinkingCapability.IsEffort(level))
+            || levels.Distinct(StringComparer.Ordinal).Count() != levels.Length
+            || (required && levels.Contains("none", StringComparer.Ordinal))
+            || (defaultLevel is not null && !levels.Contains(defaultLevel, StringComparer.Ordinal)))
+        {
+            throw new InvalidOperationException($"Invalid thinking capability for model '{model["Id"]}'. Only verified effort adapters and levels are supported.");
+        }
+        return new ThinkingCapability(parameter, levels, defaultLevel, required);
     }
 
     private static void AddModelGateway(IServiceCollection services, IConfiguration configuration, bool isDevelopment)

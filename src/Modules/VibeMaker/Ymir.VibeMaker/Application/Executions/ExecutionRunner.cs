@@ -95,12 +95,12 @@ public sealed class ExecutionRunner(
                 return;
             }
             selectedModel = modelPolicy.Resolve(execution.ModelId)!;
-            if (execution.ThinkingLevel is not null && !modelPolicy.Models.Any(m => m.Id == selectedModel && m.SupportsThinking))
+            if (!modelPolicy.Models.Any(m => m.Id == selectedModel && m.AcceptsThinking(execution.ThinkingLevel)))
             {
                 await FinishAsync(execution, new AgentFailed(ExecutionErrorCodes.ModelNotAvailable, "此模型已不支援選擇的思考深度，請重新選擇。"), stoppingToken).ConfigureAwait(false);
                 return;
             }
-            await AppendAsync(executionId, new StatusEvent("正在準備 Runtime"), stoppingToken).ConfigureAwait(false);
+            await AppendAsync(executionId, new StatusEvent("正在準備回覆......"), stoppingToken).ConfigureAwait(false);
             // 擴充能力由伺服器在每次執行時決定（ADR-0012 A.3）；對外連線決定 container 的 network（A.8）。
             // 這裡持有使用者的執行鎖，沒有其他 Agent 在這個 runtime 執行，network 不符時可以安全地重建。
             extensions = await extensionPolicy.ResolveAsync(execution.UserId, stoppingToken).ConfigureAwait(false);

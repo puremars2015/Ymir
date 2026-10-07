@@ -62,6 +62,12 @@ await context.route('**/api/**', async (route) => {
               isDefault: false,
               supportsImages: true,
               supportsThinking: true,
+              thinking: {
+                parameter: 'reasoning_effort',
+                levels: ['low', 'medium', 'high', 'xhigh', 'max'],
+                defaultLevel: 'high',
+                required: true,
+              },
             },
             {
               id: 'openrouter-gpt-6.1-sol',
@@ -69,6 +75,12 @@ await context.route('**/api/**', async (route) => {
               isDefault: false,
               supportsImages: true,
               supportsThinking: true,
+              thinking: {
+                parameter: 'reasoning_effort',
+                levels: ['low', 'medium', 'high', 'xhigh', 'max'],
+                defaultLevel: 'medium',
+                required: true,
+              },
             },
             {
               id: 'openrouter-gpt-6-luna',
@@ -76,6 +88,12 @@ await context.route('**/api/**', async (route) => {
               isDefault: false,
               supportsImages: true,
               supportsThinking: true,
+              thinking: {
+                parameter: 'reasoning_effort',
+                levels: ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+                defaultLevel: 'medium',
+                required: false,
+              },
             },
           ]
         : path === '/api/projects'
@@ -137,7 +155,7 @@ try {
   await panel.waitFor();
   assert.equal(await page.getByRole('option').count(), 4);
   assert.equal((await list.innerText()).includes('OpenRouter'), false);
-  assert.ok(await page.getByRole('radio', { name: '深入', exact: true }).isDisabled());
+  assert.equal(await page.getByRole('radio').count(), 0);
   const sonnet = page.getByRole('option', { name: 'Claude Sonnet 5.5', exact: true });
   assert.equal(await sonnet.getByRole('img').count(), 2);
   await sonnet.click();
@@ -149,7 +167,19 @@ try {
   for (const modelName of ['GPT-6 Luna', 'GPT-6.1 Sol', 'Claude Sonnet 5.5']) {
     await page.getByRole('option', { name: modelName, exact: true }).click();
     await selected(modelName);
-    for (const depthName of ['輕量', '標準', '深入', '自動']) {
+    assert.equal(
+      await page.getByRole('radio', { name: '關閉', exact: true }).count(),
+      modelName === 'GPT-6 Luna' ? 1 : 0,
+    );
+    for (const depthName of [
+      ...(modelName === 'GPT-6 Luna' ? ['關閉'] : []),
+      '輕量',
+      '標準',
+      '深入',
+      '更深入',
+      '最高',
+      '自動',
+    ]) {
       await page
         .getByRole('radio', { name: depthName, exact: true })
         .click({ position: { x: 8, y: 8 } });

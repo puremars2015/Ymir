@@ -7,6 +7,23 @@ namespace Ymir.UnitTests.PiAgent;
 public class PiModelsConfigTests
 {
     [Fact]
+    public void DefaultAndExplicitNone_AreDifferent_ForBothWireFormats()
+    {
+        foreach (var parameter in new[] { "reasoning_effort", "reasoning.effort" })
+        {
+            var model = new ModelDescriptor("luna", "Luna", Thinking: new ThinkingCapability(parameter, ["none", "max"]));
+            foreach (var disabled in new string?[] { null, "luna" })
+            {
+                using var document = JsonDocument.Parse(PiModelsConfig.Build(new PiAgentOptions(), [model], disabled, disabled is null ? "luna" : null));
+                var node = document.RootElement.GetProperty("providers").GetProperty("ymir").GetProperty("models")[0];
+                Assert.Equal(disabled is not null, node.GetProperty("reasoning").GetBoolean());
+                if (disabled is not null) Assert.Equal("none", node.GetProperty("thinkingLevelMap").GetProperty("off").GetString());
+                else Assert.False(node.GetProperty("thinkingLevelMap").TryGetProperty("off", out _));
+                Assert.Equal(parameter == "reasoning_effort" ? "openai" : "openrouter", node.GetProperty("compat").GetProperty("thinkingFormat").GetString());
+            }
+        }
+    }
+    [Fact]
     public void Build_EnablesEffortOnlyForConfiguredThinkingModels()
     {
         using var document = JsonDocument.Parse(PiModelsConfig.Build(new PiAgentOptions(), [new ModelDescriptor("fixed", "Fixed"), new ModelDescriptor("thinking", "Thinking", SupportsThinking: true)]));

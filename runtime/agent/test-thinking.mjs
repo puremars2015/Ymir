@@ -29,9 +29,13 @@ await writeFile(join(root, 'models.json'), JSON.stringify({ providers: { ymir: {
   models: models.map(id => ({ id, reasoning: true, compat: { supportsReasoningEffort: true } })),
 } } }));
 
-async function run(model, thinking, session) {
+async function run(model, thinking, session, format = 'openai') {
+  await writeFile(join(root, 'models.json'), JSON.stringify({ providers: { ymir: {
+    baseUrl: `http://127.0.0.1:${server.address().port}/v1`, api: 'openai-completions', apiKey: 'fake-key',
+    models: models.map(id => ({ id, reasoning: !(id === model && thinking === 'off'), thinkingLevelMap: { ...(id === model && thinking === 'none' ? { off: 'none' } : {}), low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' }, compat: { supportsReasoningEffort: true, thinkingFormat: format } })),
+  } } }));
   const child = spawn('pi', ['--mode', 'rpc', '--provider', 'ymir', '--model', model,
-    '--thinking', thinking, '--session-dir', join(root, 'sessions'), '--session-id', session,
+    '--thinking', thinking === 'none' ? 'off' : thinking, '--session-dir', join(root, 'sessions'), '--session-id', session,
     '-ne', '--no-skills'], {
     cwd: root, env: { ...process.env, PI_CODING_AGENT_DIR: root, PI_OFFLINE: '1', PI_TELEMETRY: '0' },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -58,18 +62,21 @@ async function run(model, thinking, session) {
 }
 
 try {
+  for (const format of ['openai', 'openrouter']) {
   for (const model of models) {
     const session = randomUUID();
     // Auto follows an explicit high effort in the same session: it must reset the previous choice.
-    for (const level of ['low', 'medium', 'high', 'off']) {
+    for (const level of ['low', 'medium', 'high', 'xhigh', 'max', ...(model === 'openrouter-gpt-6-luna' ? ['none'] : []), 'off']) {
       const before = requests.length;
-      await run(model, level, session);
+      await run(model, level, session, format);
       assert.equal(requests.length, before + 1);
       assert.equal(requests.at(-1).model, model);
-      assert.equal(requests.at(-1).reasoning_effort, level === 'off' ? undefined : level);
-      assert.equal(requests.at(-1).reasoning, undefined);
+      const expected = level === 'off' ? undefined : level;
+      assert.equal(requests.at(-1).reasoning_effort, format === 'openai' ? expected : undefined);
+      assert.deepEqual(requests.at(-1).reasoning, format === 'openrouter' && expected ? { effort: expected } : undefined);
     }
-    console.log(`PASS Pi RPC ${model}: low/medium/high and automatic reset in the same session`);
+    console.log(`PASS Pi RPC ${model} (${format}): configured efforts and automatic reset in the same session`);
+  }
   }
 } finally {
   server.closeAllConnections();

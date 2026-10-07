@@ -13,7 +13,7 @@ internal static class PiModelsConfig
         Build(options, modelIds.Select(id => new ModelDescriptor(id, id)));
 
     /// <summary>支援視覺的模型宣告 <c>input: ["text", "image"]</c>：Pi 才會把附加的圖片（與 read 工具讀到的圖片）送給模型，並自動縮圖。</summary>
-    public static string Build(PiAgentOptions options, IEnumerable<ModelDescriptor> models)
+    public static string Build(PiAgentOptions options, IEnumerable<ModelDescriptor> models, string? disabledThinkingModelId = null, string? defaultThinkingModelId = null)
     {
         var config = new JsonObject
         {
@@ -24,20 +24,29 @@ internal static class PiModelsConfig
                     ["baseUrl"] = options.ModelBaseUrl.ToString().TrimEnd('/'),
                     ["api"] = "openai-completions",
                     ["apiKey"] = "${" + PiRuntimeLayout.ApiKeyEnvironmentVariable + "}",
-                    ["models"] = new JsonArray(models.Select(ToModelNode).ToArray()),
+                    ["models"] = new JsonArray(models.Select(model => ToModelNode(model, disabledThinkingModelId, defaultThinkingModelId)).ToArray()),
                 },
             },
         };
         return config.ToJsonString(s_indented);
     }
 
-    private static JsonNode ToModelNode(ModelDescriptor model)
+    private static JsonObject ToModelNode(ModelDescriptor model, string? disabledThinkingModelId, string? defaultThinkingModelId)
     {
         var node = new JsonObject { ["id"] = model.Id };
-        if (model.SupportsThinking)
+        if (model.EffectiveThinking is { } thinking)
         {
-            node["reasoning"] = true;
-            node["compat"] = new JsonObject { ["supportsReasoningEffort"] = true };
+            node["reasoning"] = model.Id != defaultThinkingModelId;
+            node["compat"] = new JsonObject
+            {
+                ["supportsReasoningEffort"] = true,
+                ["thinkingFormat"] = thinking.Parameter == "reasoning.effort" ? "openrouter" : "openai",
+            };
+            // Pi 的 off 與「模型預設」分開：只有明確 none 的這次執行送出 none。
+            var levelMap = new JsonObject();
+            if (model.Id == disabledThinkingModelId) levelMap["off"] = "none";
+            foreach (var level in thinking.Levels.Where(level => level != "none")) levelMap[level] = level;
+            node["thinkingLevelMap"] = levelMap;
         }
         if (model.SupportsImages)
         {

@@ -18,10 +18,10 @@ public class PiProcessSpecTests
     public void Thinking_IsExplicitForEachRun_SoDefaultCannotInheritSessionEffort()
     {
         var harness = new PiAgentHarness(null!, Options.Create(new PiAgentOptions()), Catalog, null!, NullLogger<PiAgentHarness>.Instance);
-        foreach (var level in new string?[] { null, "low", "medium", "high" })
+        foreach (var level in new string?[] { null, "none", "minimal", "low", "medium", "high", "xhigh", "max" })
         {
             var spec = harness.BuildProcessSpec(Request with { ThinkingLevel = level });
-            Assert.Equal(level ?? "off", spec.Arguments[spec.Arguments.ToList().IndexOf("--thinking") + 1]);
+            Assert.Equal(level is null or "none" ? "off" : level, spec.Arguments[spec.Arguments.ToList().IndexOf("--thinking") + 1]);
         }
     }
 

@@ -24,6 +24,13 @@ public sealed class ModelAccessApiFactory : ApiFactory
         builder.UseSetting("VibeMaker:Models:0:Id", "one"); builder.UseSetting("VibeMaker:Models:0:DisplayName", "One");
         builder.UseSetting("VibeMaker:Models:1:Id", "two"); builder.UseSetting("VibeMaker:Models:1:DisplayName", "Two");
         builder.UseSetting("VibeMaker:Models:1:SupportsThinking", "true");
+        builder.UseSetting("VibeMaker:Models:1:Thinking:Parameter", "reasoning_effort");
+        builder.UseSetting("VibeMaker:Models:1:Thinking:Levels:0", "low");
+        builder.UseSetting("VibeMaker:Models:1:Thinking:Levels:1", "high");
+        builder.UseSetting("VibeMaker:Models:1:Thinking:Levels:2", "xhigh");
+        builder.UseSetting("VibeMaker:Models:1:Thinking:Levels:3", "max");
+        builder.UseSetting("VibeMaker:Models:1:Thinking:DefaultLevel", "high");
+        builder.UseSetting("VibeMaker:Models:1:Thinking:Required", "true");
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<IExecutionDispatcher>();
@@ -47,9 +54,10 @@ public class ModelAccessTests(ModelAccessApiFactory factory) : IClassFixture<Mod
         using var member = await factory.LoginAsync("thinking-member");
         var models = await member.GetFromJsonAsync<List<ModelResponse>>("/api/models", ct);
         Assert.True(models!.Single(m => m.Id == "two").SupportsThinking);
+        Assert.Equal(["low", "high", "xhigh", "max"], models!.Single(m => m.Id == "two").Thinking!.Levels);
         Assert.False(models!.Single(m => m.Id == "one").SupportsThinking);
         var conversation = await member.CreateConversationAsync(null, "thinking depth");
-        foreach (var (model, level) in new[] { ("one", "high"), ("two", "invalid"), ("two", "HIGH"), ("two", "") })
+        foreach (var (model, level) in new[] { ("one", "high"), ("two", "invalid"), ("two", "HIGH"), ("two", ""), ("two", "none"), ("two", "medium") })
         {
             using var rejected = await member.PostAsJsonAsync($"/api/conversations/{conversation.Id}/messages", new SendMessageRequest("hello", Guid.NewGuid(), model, ThinkingLevel: level), ct);
             Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
