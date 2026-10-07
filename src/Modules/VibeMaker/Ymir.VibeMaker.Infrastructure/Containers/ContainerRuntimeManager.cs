@@ -15,22 +15,41 @@ namespace Ymir.VibeMaker.Infrastructure.Containers;
 /// </summary>
 internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, ILogger<ContainerRuntimeManager> logger) : IAgentRuntimeManager, Health.IRuntimeAvailability
 {
-    private readonly RuntimeOptions _options = options.Value;
+    private readonly RuntimeOptions _options = ValidOptions(options.Value);
     private readonly ConcurrentDictionary<Guid, RuntimeInfo> _runtimesByUser = new();
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _userLocks = new();
 
-    public async Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, CancellationToken cancellationToken)
+    public RestrictedNetworkSupport RestrictedNetwork =>
+        _options.RestrictedNetwork is null ? RestrictedNetworkSupport.NotConfigured : RestrictedNetworkSupport.Configured;
+
+    public async Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, RuntimeNetworkAccess? network, CancellationToken cancellationToken)
     {
+        if (network == RuntimeNetworkAccess.Restricted && _options.RestrictedNetwork is null)
+        {
+            // 不退回成可以對外連線（ADR-0012 A.8）；既有 container 也不動。
+            throw new RuntimeNetworkUnavailableException("Restricted network is not configured (VibeMaker:Runtime:RestrictedNetwork).");
+        }
+
         // 同一使用者序列化，避免兩個 request 同時建立兩個 container（SA §14）。
         var userLock = _userLocks.GetOrAdd(userId, _ => new SemaphoreSlim(1, 1));
         await userLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             var runtimeId = _runtimesByUser.TryGetValue(userId, out var known) ? known.RuntimeId : Guid.NewGuid();
-            var state = await InspectAsync(userId, cancellationToken).ConfigureAwait(false);
+            var inspected = await InspectAsync(userId, cancellationToken).ConfigureAwait(false);
+            var state = inspected?.State;
+            var recreate = network is { } desired && inspected is { } existing && ContainerCommandBuilder.NetworkOfLabel(existing.NetworkLabel) != desired;
+            if (recreate)
+            {
+                // Network 只能在建立時決定：移除 container 後重建，使用者目錄是掛載的，檔案與 Pi session 都保留（SA §15）。
+                await RunContainerCliAsync(ContainerCommandBuilder.BuildRemoveArguments(userId), cancellationToken).ConfigureAwait(false);
+                logger.LogInformation("Removed runtime container for user {UserId} to apply network policy {Network}", userId, network);
+                state = null;
+            }
+
             var transition = state switch
             {
-                null => RuntimeTransition.Created,
+                null => recreate ? RuntimeTransition.Recreated : RuntimeTransition.Created,
                 "running" => RuntimeTransition.None,
                 _ => RuntimeTransition.Started,
             };
@@ -45,9 +64,11 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
                             .ConfigureAwait(false);
                     }
 
-                    await RunContainerCliAsync(ContainerCommandBuilder.BuildRunArguments(_options, userId, runtimeId, directories), cancellationToken)
+                    await RunContainerCliAsync(
+                            ContainerCommandBuilder.BuildRunArguments(_options, userId, runtimeId, directories, network ?? RuntimeNetworkAccess.Internet),
+                            cancellationToken)
                         .ConfigureAwait(false);
-                    logger.LogInformation("Created runtime container for user {UserId}", userId);
+                    logger.LogInformation("Created runtime container for user {UserId} ({Network})", userId, network ?? RuntimeNetworkAccess.Internet);
                     break;
                 case "running":
                     break;
@@ -92,8 +113,8 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
     public async Task<RuntimeInfo> GetStatusAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
         var runtime = Find(runtimeId);
-        var state = await InspectAsync(runtime.UserId, cancellationToken).ConfigureAwait(false);
-        return runtime with { Status = StatusOf(state) };
+        var inspected = await InspectAsync(runtime.UserId, cancellationToken).ConfigureAwait(false);
+        return runtime with { Status = StatusOf(inspected?.State) };
     }
 
     private static RuntimeStatus StatusOf(string? state) => state switch
@@ -106,7 +127,7 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
     };
 
     public async Task<RuntimeStatus> GetStatusForUserAsync(Guid userId, CancellationToken cancellationToken) =>
-        StatusOf(await InspectAsync(userId, cancellationToken).ConfigureAwait(false));
+        StatusOf((await InspectAsync(userId, cancellationToken).ConfigureAwait(false))?.State);
 
     public async Task<bool> StopForUserAsync(Guid userId, CancellationToken cancellationToken)
     {
@@ -115,7 +136,7 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
         await userLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            var state = await InspectAsync(userId, cancellationToken).ConfigureAwait(false);
+            var state = (await InspectAsync(userId, cancellationToken).ConfigureAwait(false))?.State;
             if (state is null)
             {
                 _runtimesByUser.TryRemove(userId, out _);
@@ -163,11 +184,20 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
         return exitCode == 0 ? null : $"{ProviderName()} 無法使用";
     }
 
-    private async Task<string?> InspectAsync(Guid userId, CancellationToken cancellationToken)
+    /// <summary>container 不存在時回傳 null。</summary>
+    private async Task<(string State, string? NetworkLabel)?> InspectAsync(Guid userId, CancellationToken cancellationToken)
     {
         var (exitCode, output, _) = await ExecuteContainerCliAsync(ContainerCommandBuilder.BuildInspectStatusArguments(userId), cancellationToken)
             .ConfigureAwait(false);
-        return exitCode == 0 ? output.Trim() : null;
+        return exitCode == 0 ? ParseInspect(output) : null;
+    }
+
+    internal static (string State, string? NetworkLabel) ParseInspect(string output)
+    {
+        var parts = output.Trim().Split('|', 2);
+        // Go template 對不存在的 label 輸出空字串或 "<no value>"，都視為沒有 label。
+        var label = parts.Length > 1 && parts[1] is { Length: > 0 } value && value != "<no value>" ? value : null;
+        return (parts[0], label);
     }
 
     private async Task RunContainerCliAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
@@ -191,6 +221,13 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
             var exitCode = await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
             return (exitCode, output, process.GetStandardErrorTail());
         }
+    }
+
+    private static RuntimeOptions ValidOptions(RuntimeOptions options)
+    {
+        // 受限網路名稱設定錯誤（例如 host）時啟動就拒絕，而不是等到第一次執行（ADR-0012 A.8）。
+        options.ValidateRestrictedNetwork();
+        return options;
     }
 
     private string ProviderName() => _options.Provider == RuntimeProvider.Docker ? "DOCKER" : "PODMAN";

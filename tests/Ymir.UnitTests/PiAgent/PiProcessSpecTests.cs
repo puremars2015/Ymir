@@ -42,6 +42,18 @@ public class PiProcessSpecTests
     }
 
     [Fact]
+    public void ExtensionsDefaultToNone_SoAgentWrittenExtensionsAreNeverLoaded()
+    {
+        var harness = new PiAgentHarness(null!, Options.Create(new PiAgentOptions()), Catalog, null!, NullLogger<PiAgentHarness>.Instance);
+
+        var spec = harness.BuildProcessSpec(Request);
+
+        // ADR-0012 A.3：沒有指定擴充能力時一律關閉（Spike 結果：否則 agent dir 的 extension 與 skill 會被載入）。
+        Assert.Contains("--no-extensions", spec.Arguments);
+        Assert.Contains("--no-skills", spec.Arguments);
+    }
+
+    [Fact]
     public void RunRequest_ToString_DoesNotLeakKeyOrPrompt()
     {
         var text = Request.ToString();

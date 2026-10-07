@@ -29,6 +29,7 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
     public DbSet<MakeTopic> MakeTopics => Set<MakeTopic>();
 
     public DbSet<MessageAttachment> MessageAttachments => Set<MessageAttachment>();
+    public DbSet<UserExtensionGrant> UserExtensionGrants => Set<UserExtensionGrant>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -156,6 +157,16 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             attachment.HasOne<Message>().WithMany().HasForeignKey(a => a.MessageId).OnDelete(DeleteBehavior.Restrict);
             attachment.HasIndex(a => new { a.ConversationId, a.MessageId });
             attachment.HasIndex(a => a.MessageId);
+        });
+
+        modelBuilder.Entity<UserExtensionGrant>(grant =>
+        {
+            // ADR-0012 A.2：每位成員每種能力最多一筆覆寫；跨模組只存 user_id，不建 FK（ADR-0001）。
+            grant.ToTable("user_extension_grants");
+            grant.HasKey(g => new { g.UserId, g.Capability });
+            grant.Property(g => g.Capability).HasConversion<UpperSnakeCaseEnumConverter<ExtensionCapability>>().HasMaxLength(30);
+            grant.Property(g => g.Effect).HasConversion<UpperSnakeCaseEnumConverter<ExtensionGrantEffect>>().HasMaxLength(30);
+            grant.Property(g => g.UpdatedBy).HasMaxLength(UserExtensionGrant.UpdatedByMaxLength).IsRequired();
         });
 
         modelBuilder.ApplySnakeCaseNames();

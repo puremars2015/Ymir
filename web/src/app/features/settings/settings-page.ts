@@ -10,12 +10,13 @@ import { FormsModule } from '@angular/forms';
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { newPasswordProblem, PASSWORD_MIN_LENGTH } from '../../core/auth/auth-rules';
+import { MyExtensionsCard } from './my-extensions-card';
 import { isSystemPromptTooLong, SYSTEM_PROMPT_MAX_LENGTH } from '../../core/models/model-selection';
 
 /** 個人設定：個人 global system prompt，套用到自己所有的對話（專案的 prompt 會接在後面）。 */
 @Component({
   selector: 'app-settings-page',
-  imports: [FormsModule],
+  imports: [FormsModule, MyExtensionsCard],
   template: `
     <section class="settings">
       <h1>個人設定</h1>
@@ -101,6 +102,8 @@ import { isSystemPromptTooLong, SYSTEM_PROMPT_MAX_LENGTH } from '../../core/mode
       } @else if (auth.user()?.authMethod === 'Oidc') {
         <p class="muted password">企業帳號的密碼請到公司的帳號系統變更。</p>
       }
+
+      <app-my-extensions-card />
     </section>
   `,
   styles: `

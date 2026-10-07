@@ -36,6 +36,7 @@ public static class VibeMakerInfrastructureExtensions
         services.AddSingleton<Files.RuntimeWorkspaceFileReader>();
         services.AddSingleton<Application.Files.IWorkspaceFileReader>(sp => sp.GetRequiredService<Files.RuntimeWorkspaceFileReader>());
         services.AddSingleton<Application.Files.IWorkspaceFileWriter, Files.RuntimeWorkspaceFileWriter>();
+        services.AddSingleton<Application.Extensions.IExtensionInventory, PiAgent.PiExtensionInventory>();
         services.AddHostedService<ExecutionWorker>();
         services.AddHostedService<RuntimeLifecycleWorker>();
         services.AddHttpClient(nameof(Health.LiteLlmHealthCheck));

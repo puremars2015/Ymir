@@ -21,6 +21,7 @@ import {
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { OidcSettings, OidcTestResult } from '../../core/api/api-types';
 import { AdminTabs } from './admin-tabs';
+import { ExtensionSettingsCard } from './extension-settings-card';
 import { RuntimeSettingsCard } from './runtime-settings-card';
 import { TunnelSettingsCard } from './tunnel-settings-card';
 
@@ -30,7 +31,14 @@ import { TunnelSettingsCard } from './tunnel-settings-card';
  */
 @Component({
   selector: 'app-settings-page',
-  imports: [AdminTabs, DatePipe, FormsModule, RuntimeSettingsCard, TunnelSettingsCard],
+  imports: [
+    AdminTabs,
+    DatePipe,
+    ExtensionSettingsCard,
+    FormsModule,
+    RuntimeSettingsCard,
+    TunnelSettingsCard,
+  ],
   template: `
     <section class="admin">
       <app-admin-tabs />
@@ -188,6 +196,7 @@ import { TunnelSettingsCard } from './tunnel-settings-card';
 
       <app-tunnel-settings-card />
       <app-runtime-settings-card />
+      <app-extension-settings-card />
     </section>
   `,
   styles: `

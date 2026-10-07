@@ -135,6 +135,9 @@ Walking Skeleton 打通：Dev 登入（Cookie + XSRF）→ Workspace / 對話 �
 | 3 | Chat 體驗 + 檔案瀏覽 | 完整 Chat UI、歷史訊息、SSE 續傳、唯讀檔案樹 / 檢視 / zip 下載 |
 | 4 | Runtime 完整生命週期 | idle stop、resume/recreate、quota、reconciliation、Admin runtime 管理、LiteLLM virtual key |
 | 5 | 驗收與強化 | Audit、OTel 指標、安全檢查、Playwright E2E 覆蓋 SA 12 項驗收條件 + 新增項 |
+| 6 | Agent 擴充、RAG、網站託管 | [ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md) 擴充政策與 MCP Gateway；[RAG](rag-knowledge-base-plan.md) 與[網站託管](frontend-site-hosting-plan.md)完成 ADR 及第一階段（看板：[Sprint 6](../progress/board-sprint-6.md)） |
+
+> Sprint 2～5 的進度都記錄在 [Sprint 2 看板](../progress/board-sprint-2.md)。
 
 ### 新增驗收條件（補充 SA §21）
 
