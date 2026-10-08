@@ -89,7 +89,7 @@
 
 解決模型與 Agent request、DI、API 契約及文件衝突，重新產生 OpenAPI 與前端型別。修正知識庫未套用個別模型權限、知識庫索引換金鑰可能撤銷執行中 Agent 的整合問題；三種用途的金鑰分別快取，停用帳號時全部撤銷。Windows MCP 測試改用容器可達的本機假服務，OneDrive 測試改用跨平台可建立但不符合同步規則的長檔名。
 
-已驗證：Release build 0 警告／0 錯誤；後端單元測試 493 通過、5 項既有 Windows 平台略過；前端 lint、164 測試、build；OpenAPI 快照 1、知識庫 11、模型權限 4、授權矩陣 4、MCP 6、網站 6、/make 10 項整合測試通過。OneDrive 先前 15 項中 14 通過，修正 Windows 測試檔名後重跑中；完整 Linux CI 待此分支推送後驗證。測試使用 Fake LLM，不呼叫付費模型。
+已驗證：Release build 0 警告／0 錯誤；後端單元測試 493 通過、5 項既有 Windows 平台略過；前端 lint、164 測試、build；OpenAPI 快照 1、知識庫 11、模型權限 4、授權矩陣 4、MCP 6、網站 6、/make 10 項整合測試通過。OneDrive 連線測試先前 9 項通過，同步 6 項在修正 Windows 測試檔名後重跑全部通過；完整 Linux CI 檢查中（前端與 Agent 映像已通過）。測試使用 Fake LLM，不呼叫付費模型。
 
 ---
 
