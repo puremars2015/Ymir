@@ -1,0 +1,32 @@
+# Ymir MCP Gateway（ADR-0012 B）：Agent 連平台服務的唯一入口。安裝步驟見同目錄 README.md。
+# 複製到 /etc/systemd/system/ymir-mcp-gateway.service。
+[Unit]
+Description=Ymir MCP Gateway (platform MCP services for agents)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 專用帳號；不得與 rootless Podman 帳號 ymir 或 API 共用，也不得加入 docker / podman socket 的 group。
+User=ymir-mcp
+Group=ymir-mcp
+WorkingDirectory=/opt/ymir/mcp-gateway
+# 簽章金鑰、資料庫連線與後端憑證；權限 600，擁有者 root（systemd 以 root 讀取後再切換使用者）。
+EnvironmentFile=/etc/ymir/mcp-gateway.env
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+ExecStart=/usr/bin/dotnet /opt/ymir/mcp-gateway/Ymir.McpGateway.dll
+Restart=on-failure
+RestartSec=5
+
+# 沙箱：gateway 只需要網路與讀取自己的檔案；不掛載 container runtime socket 或使用者 workspace。
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ReadOnlyPaths=/opt/ymir
+InaccessiblePaths=/srv/ymir/workspaces /run/podman /var/run/docker.sock
+
+[Install]
+WantedBy=multi-user.target

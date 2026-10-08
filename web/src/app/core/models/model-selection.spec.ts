@@ -7,6 +7,7 @@ const models: ModelOption[] = [
     displayName: 'MiniMax',
     isDefault: true,
     supportsImages: false,
+    allowKnowledgeBase: false,
     supportsThinking: false,
   },
   {
@@ -14,6 +15,7 @@ const models: ModelOption[] = [
     displayName: 'GPT X',
     isDefault: false,
     supportsImages: false,
+    allowKnowledgeBase: false,
     supportsThinking: false,
   },
 ];

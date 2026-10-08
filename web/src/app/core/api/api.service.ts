@@ -17,6 +17,20 @@ import {
   ExtensionValues,
   MyExtensions,
   OneDriveStatus,
+  ConversationOneDrive,
+  KnowledgeAnswer,
+  PublishSiteRequest,
+  SharedSite,
+  SiteAccessMode,
+  SiteTicket,
+  UserSearchResult,
+  Site,
+  Sites,
+  KnowledgeBase,
+  KnowledgeDocument,
+  McpServerAccess,
+  PlatformMcpServers,
+  SaveMcpServerAccessRequest,
   SaveUserExtensionsRequest,
   UserExtensions,
   AdminUsage,
@@ -201,6 +215,19 @@ export class ApiService {
     return this.http.delete<OneDriveStatus>('/api/connectors/onedrive');
   }
 
+  /** 對話（工作目錄）的雲端保存狀態（ADR-0013 §4）。 */
+  getConversationOneDrive(conversationId: string): Observable<ConversationOneDrive> {
+    return this.http.get<ConversationOneDrive>(`/api/conversations/${conversationId}/onedrive`);
+  }
+
+  /** 手動同步 / 重試：排入背景同步。 */
+  syncConversationOneDrive(conversationId: string): Observable<ConversationOneDrive> {
+    return this.http.post<ConversationOneDrive>(
+      `/api/conversations/${conversationId}/onedrive/sync`,
+      null,
+    );
+  }
+
   /** 目前使用者的擴充能力與自建擴充（只回自己的資料）。 */
   getMyExtensions(): Observable<MyExtensions> {
     return this.http.get<MyExtensions>('/api/extensions');
@@ -229,6 +256,21 @@ export class ApiService {
 
   fetchFileBlob(url: string): Observable<Blob> {
     return this.http.get(url, { responseType: 'blob' });
+  }
+
+  /** 平台 MCP 服務與存取清單（ADR-0012 B.4）；不含後端位址。 */
+  adminListMcpServers(): Observable<PlatformMcpServers> {
+    return this.http.get<PlatformMcpServers>('/api/admin/mcp-servers');
+  }
+
+  adminSaveMcpServerAccess(
+    name: string,
+    request: SaveMcpServerAccessRequest,
+  ): Observable<McpServerAccess> {
+    return this.http.put<McpServerAccess>(
+      `/api/admin/mcp-servers/${encodeURIComponent(name)}/access`,
+      request,
+    );
   }
 
   adminListUsers(search: string): Observable<AdminUser[]> {
@@ -350,6 +392,87 @@ export class ApiService {
       params: { fileName: file.name },
       headers: { 'Content-Type': 'application/octet-stream' },
     });
+  }
+
+  /** 專案知識庫（ADR-0014）。 */
+  getKnowledgeBase(projectId: string): Observable<KnowledgeBase> {
+    return this.http.get<KnowledgeBase>(`/api/projects/${projectId}/knowledge`);
+  }
+
+  uploadKnowledgeDocument(projectId: string, file: File): Observable<KnowledgeDocument> {
+    return this.http.post<KnowledgeDocument>(
+      `/api/projects/${projectId}/knowledge/documents`,
+      file,
+      {
+        params: { fileName: file.name },
+        headers: { 'Content-Type': 'application/octet-stream' },
+      },
+    );
+  }
+
+  removeKnowledgeDocument(projectId: string, documentId: string): Observable<void> {
+    return this.http.delete<void>(`/api/projects/${projectId}/knowledge/documents/${documentId}`);
+  }
+
+  retryKnowledgeDocument(projectId: string, documentId: string): Observable<KnowledgeDocument> {
+    return this.http.post<KnowledgeDocument>(
+      `/api/projects/${projectId}/knowledge/documents/${documentId}/retry`,
+      null,
+    );
+  }
+
+  /** 知識庫問答（ADR-0014 §8）：回答與引用；資料不足或模型未獲允許時沒有回答。 */
+  askKnowledge(
+    projectId: string,
+    question: string,
+    modelId: string | null,
+  ): Observable<KnowledgeAnswer> {
+    return this.http.post<KnowledgeAnswer>(`/api/projects/${projectId}/knowledge/ask`, {
+      question,
+      modelId,
+    });
+  }
+
+  /** 網站託管（ADR-0016）。 */
+  listSites(): Observable<Sites> {
+    return this.http.get<Sites>('/api/sites');
+  }
+
+  publishSite(conversationId: string, request: PublishSiteRequest): Observable<Site> {
+    return this.http.post<Site>(`/api/conversations/${conversationId}/sites`, request);
+  }
+
+  republishSite(siteId: string): Observable<Site> {
+    return this.http.post<Site>(`/api/sites/${siteId}/publish`, {
+      conversationId: null,
+      sourcePath: null,
+      spaMode: null,
+    });
+  }
+
+  unpublishSite(siteId: string): Observable<Site> {
+    return this.http.post<Site>(`/api/sites/${siteId}/unpublish`, null);
+  }
+
+  deleteSite(siteId: string): Observable<void> {
+    return this.http.delete<void>(`/api/sites/${siteId}`);
+  }
+
+  setSiteAccess(siteId: string, mode: SiteAccessMode, userIds: string[]): Observable<Site> {
+    return this.http.put<Site>(`/api/sites/${siteId}/access`, { mode, userIds });
+  }
+
+  sitesSharedWithMe(): Observable<SharedSite[]> {
+    return this.http.get<SharedSite[]>('/api/sites/shared-with-me');
+  }
+
+  /** 私人網站的登入票據（ADR-0016 §4）：回傳 SiteHost 的兌換網址。 */
+  issueSiteTicket(siteId: string, path: string): Observable<SiteTicket> {
+    return this.http.post<SiteTicket>(`/api/sites/${siteId}/ticket`, { path });
+  }
+
+  searchUsers(query: string): Observable<UserSearchResult[]> {
+    return this.http.get<UserSearchResult[]>('/api/users/search', { params: { q: query } });
   }
 
   cancelExecution(executionId: string): Observable<CancelExecutionResponse> {

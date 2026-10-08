@@ -14,7 +14,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ymir.Api\Ymir.Api.csproj" />
     <ProjectReference Include="..\..\src\Ymir.RuntimeHost\Ymir.RuntimeHost.csproj" />
+    <ProjectReference Include="..\..\src\Ymir.McpGateway\Ymir.McpGateway.csproj" />
+    <ProjectReference Include="..\..\src\Ymir.SiteHost\Ymir.SiteHost.csproj" />
     <ProjectReference Include="..\Ymir.Testing.FakeLlm\Ymir.Testing.FakeLlm.csproj" />
     <ProjectReference Include="..\Ymir.Testing.FakeOidc\Ymir.Testing.FakeOidc.csproj" />
+    <ProjectReference Include="..\Ymir.Testing.FakeMcp\Ymir.Testing.FakeMcp.csproj" />
   </ItemGroup>
 </Project>

@@ -8,11 +8,13 @@ describe('per-model thinking capability', () => {
     isDefault: true,
     supportsImages: false,
     supportsThinking: false,
+    allowKnowledgeBase: false,
   };
   const luna: ModelOption = {
     ...fixed,
     id: 'luna',
     supportsThinking: true,
+    allowKnowledgeBase: false,
     thinking: {
       parameter: 'reasoning_effort',
       levels: ['none', 'low', 'medium', 'high', 'xhigh', 'max'],

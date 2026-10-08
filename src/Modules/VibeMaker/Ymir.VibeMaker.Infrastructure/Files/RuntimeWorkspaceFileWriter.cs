@@ -6,7 +6,7 @@ using Ymir.VibeMaker.Application.Runtime;
 namespace Ymir.VibeMaker.Infrastructure.Files;
 
 /// <summary>
-/// 在使用者的 runtime 內以 <c>bash</c> 寫入檔案（使用者上傳的附件，ADR-0007、ADR-0008）。
+/// 在使用者的 runtime 內以 <c>bash</c> 寫入檔案（使用者上傳的附件、OneDrive 同步下載的檔案，ADR-0007、ADR-0008、ADR-0013）。
 /// <list type="bullet">
 /// <item>相對路徑由伺服器產生並通過 <see cref="WorkspacePathRules.IsSafeRelativePath"/>，以位置參數傳入（不組進 shell 字串）。</item>
 /// <item>目標目錄以 <c>realpath</c> 解析後必須仍在工作目錄內，避免 Agent 事先把 <c>uploads</c> 換成指向外面的 symlink。</item>
@@ -17,10 +17,11 @@ internal sealed partial class RuntimeWorkspaceFileWriter(IAgentRuntimeManager ru
 {
     internal const string WriteScript = """
         base=$(realpath -e .) || exit 3
-        dir=${1%/*}; name=${1##*/}
+        case "$1" in */*) dir=${1%/*} ;; *) dir=. ;; esac
+        name=${1##*/}
         mkdir -p -- "$dir" || exit 3
         d=$(realpath -e -- "$dir") || exit 3
-        case "$d" in "$base"/*) ;; *) exit 4 ;; esac
+        case "$d" in "$base"|"$base"/*) ;; *) exit 4 ;; esac
         tmp="$d/.ymir-upload-$$-$RANDOM"
         head -c "$2" > "$tmp" || { rm -f -- "$tmp"; exit 5; }
         s=$(stat -c %s -- "$tmp") || { rm -f -- "$tmp"; exit 5; }
@@ -31,8 +32,8 @@ internal sealed partial class RuntimeWorkspaceFileWriter(IAgentRuntimeManager ru
     public async Task<bool> WriteAsync(Guid userId, string workingDirectory, string relativePath, Stream content, long size, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(content);
-        // 必須有目錄（例如 uploads/x），檔案不得直接寫在工作目錄根部以外的地方。
-        if (!WorkspacePathRules.IsSafeRelativePath(relativePath) || !relativePath.Contains('/', StringComparison.Ordinal) || size < 0)
+        // 工作目錄根部的檔案（OneDrive 同步，ADR-0013）也可以寫入；目錄解析後仍必須在工作目錄內。
+        if (!WorkspacePathRules.IsSafeRelativePath(relativePath) || size < 0)
         {
             return false;
         }

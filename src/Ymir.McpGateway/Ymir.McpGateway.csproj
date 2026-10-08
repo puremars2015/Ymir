@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <ItemGroup>
+    <ProjectReference Include="..\Modules\VibeMaker\Ymir.VibeMaker\Ymir.VibeMaker.csproj" />
+    <ProjectReference Include="..\Platform\Ymir.Platform.Infrastructure\Ymir.Platform.Infrastructure.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ymir.UnitTests" />
+    <InternalsVisibleTo Include="Ymir.IntegrationTests" />
+  </ItemGroup>
+</Project>

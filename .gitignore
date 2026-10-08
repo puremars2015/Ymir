@@ -83,3 +83,7 @@ deploy/api/data/
 .vs/
 .idea/
 *.user
+
+# Python 工具快取
+__pycache__/
+*.pyc

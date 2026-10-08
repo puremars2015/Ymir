@@ -346,6 +346,89 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                     b.ToTable("execution_events", "vibemaker");
                 });
 
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.KnowledgeDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ChunkCount")
+                        .HasColumnType("int")
+                        .HasColumnName("chunk_count");
+
+                    b.Property<string>("ContentHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("content_hash");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<int?>("Dimensions")
+                        .HasColumnType("int")
+                        .HasColumnName("dimensions");
+
+                    b.Property<string>("EmbeddingModel")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("embedding_model");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("error");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("file_name");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("project_id");
+
+                    b.Property<long>("Size")
+                        .HasColumnType("bigint")
+                        .HasColumnName("size");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("int")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_knowledge_documents");
+
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_knowledge_documents_status");
+
+                    b.HasIndex("ProjectId", "FileName")
+                        .IsUnique()
+                        .HasDatabaseName("ix_knowledge_documents_project_id_file_name")
+                        .HasFilter("[status] = 'READY'");
+
+                    b.HasIndex("ProjectId", "Status")
+                        .HasDatabaseName("ix_knowledge_documents_project_id_status");
+
+                    b.ToTable("knowledge_documents", "vibemaker");
+                });
+
             modelBuilder.Entity("Ymir.VibeMaker.Domain.MakeTopic", b =>
                 {
                     b.Property<Guid>("Id")
@@ -392,6 +475,38 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_make_topics_is_enabled_sort_order");
 
                     b.ToTable("make_topics", "vibemaker");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.McpServerAccess", b =>
+                {
+                    b.Property<string>("ServerName")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)")
+                        .HasColumnName("server_name");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("bit")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Mode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("mode");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UserIdList")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("user_id_list");
+
+                    b.HasKey("ServerName")
+                        .HasName("pk_mcp_server_access");
+
+                    b.ToTable("mcp_server_access", "vibemaker");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.Message", b =>
@@ -563,6 +678,139 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                     b.ToTable("onedrive_connections", "vibemaker");
                 });
 
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveSyncItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ETag")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("e_tag");
+
+                    b.Property<string>("ItemId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("item_id");
+
+                    b.Property<DateTimeOffset?>("LocalModifiedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("local_modified_at");
+
+                    b.Property<long?>("LocalSize")
+                        .HasColumnType("bigint")
+                        .HasColumnName("local_size");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)")
+                        .HasColumnName("path");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("scope_id");
+
+                    b.Property<DateTimeOffset>("SyncedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("synced_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_onedrive_sync_items");
+
+                    b.HasIndex("ScopeId")
+                        .HasDatabaseName("ix_onedrive_sync_items_scope_id");
+
+                    b.ToTable("onedrive_sync_items", "vibemaker");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveSyncScope", b =>
+                {
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("scope_id");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int")
+                        .HasColumnName("attempts");
+
+                    b.Property<int>("ConflictCount")
+                        .HasColumnType("int")
+                        .HasColumnName("conflict_count");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<string>("DriveId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("drive_id");
+
+                    b.Property<string>("FolderItemId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("folder_item_id");
+
+                    b.Property<string>("FolderPath")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("folder_path");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("last_error");
+
+                    b.Property<DateTimeOffset?>("LastSyncedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("last_synced_at");
+
+                    b.Property<DateTimeOffset?>("NextAttemptAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("next_attempt_at");
+
+                    b.Property<string>("RootItemId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("root_item_id");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("state");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.Property<bool>("UploadPending")
+                        .HasColumnType("bit")
+                        .HasColumnName("upload_pending");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("ScopeId")
+                        .HasName("pk_onedrive_sync_scopes");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_onedrive_sync_scopes_user_id");
+
+                    b.HasIndex("UploadPending", "NextAttemptAt")
+                        .HasDatabaseName("ix_onedrive_sync_scopes_upload_pending_next_attempt_at");
+
+                    b.ToTable("onedrive_sync_scopes", "vibemaker");
+                });
+
             modelBuilder.Entity("Ymir.VibeMaker.Domain.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -605,6 +853,198 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_projects_user_id");
 
                     b.ToTable("projects", "vibemaker");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.Site", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AccessMode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("access_mode");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CurrentVersionId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("current_version_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("published_at");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)")
+                        .HasColumnName("slug");
+
+                    b.Property<string>("SourcePath")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)")
+                        .HasColumnName("source_path");
+
+                    b.Property<bool>("SpaMode")
+                        .HasColumnType("bit")
+                        .HasColumnName("spa_mode");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_sites");
+
+                    b.HasIndex("Slug")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sites_slug");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_sites_user_id");
+
+                    b.ToTable("sites", "vibemaker");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.SiteShare", b =>
+                {
+                    b.Property<Guid>("SiteId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("site_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.HasKey("SiteId", "UserId")
+                        .HasName("pk_site_shares");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_site_shares_user_id");
+
+                    b.ToTable("site_shares", "vibemaker");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.SiteTicket", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("expires_at");
+
+                    b.Property<Guid>("SiteId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("site_id");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("token_hash");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("used_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_site_tickets");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_site_tickets_expires_at");
+
+                    b.HasIndex("SiteId")
+                        .HasDatabaseName("ix_site_tickets_site_id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_site_tickets_token_hash");
+
+                    b.ToTable("site_tickets", "vibemaker");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.SiteVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("error");
+
+                    b.Property<int>("FileCount")
+                        .HasColumnType("int")
+                        .HasColumnName("file_count");
+
+                    b.Property<Guid>("SiteId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("site_id");
+
+                    b.Property<string>("SourcePath")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)")
+                        .HasColumnName("source_path");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("status");
+
+                    b.Property<long>("TotalBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("total_bytes");
+
+                    b.HasKey("Id")
+                        .HasName("pk_site_versions");
+
+                    b.HasIndex("SiteId")
+                        .HasDatabaseName("ix_site_versions_site_id");
+
+                    b.ToTable("site_versions", "vibemaker");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.UserExtensionGrant", b =>
@@ -741,6 +1181,46 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasForeignKey("MessageId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_message_attachments_messages_message_id");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveSyncItem", b =>
+                {
+                    b.HasOne("Ymir.VibeMaker.Domain.OneDriveSyncScope", null)
+                        .WithMany()
+                        .HasForeignKey("ScopeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_onedrive_sync_items_onedrive_sync_scopes_scope_id");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.SiteShare", b =>
+                {
+                    b.HasOne("Ymir.VibeMaker.Domain.Site", null)
+                        .WithMany()
+                        .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_site_shares_sites_site_id");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.SiteTicket", b =>
+                {
+                    b.HasOne("Ymir.VibeMaker.Domain.Site", null)
+                        .WithMany()
+                        .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_site_tickets_sites_site_id");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.SiteVersion", b =>
+                {
+                    b.HasOne("Ymir.VibeMaker.Domain.Site", null)
+                        .WithMany()
+                        .HasForeignKey("SiteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_site_versions_sites_site_id");
                 });
 #pragma warning restore 612, 618
         }

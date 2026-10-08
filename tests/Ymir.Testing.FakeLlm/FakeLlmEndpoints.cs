@@ -20,6 +20,7 @@ public static class FakeLlmEndpoints
         }));
 
         endpoints.MapPost("/v1/chat/completions", HandleChatCompletionsAsync);
+        endpoints.MapPost("/v1/embeddings", HandleEmbeddingsAsync);
         // 同 LiteLLM：不需要金鑰的存活檢查
         endpoints.MapGet("/health/liveliness", () => Results.Text("I'm alive!"));
         endpoints.MapPost("/key/generate", HandleGenerateKeyAsync);
@@ -196,6 +197,34 @@ public static class FakeLlmEndpoints
         var request = await ReadObjectAsync(context);
         var deleted = (request["keys"] as JsonArray ?? []).Select(k => k?.GetValue<string>()).Where(k => k is not null && state.Revoke(k)).ToList();
         await context.Response.WriteAsJsonAsync(new { deleted_keys = deleted });
+    }
+
+    /// <summary>
+    /// OpenAI 相容的 embeddings（RAG 測試用，ADR-0014）：以字元 bigram 雜湊到 <see cref="FakeEmbedding.Dimensions"/> 維並正規化，
+    /// 結果固定、共享詞彙的文字相似度較高，可以驗證檢索與引用。
+    /// </summary>
+    private static async Task HandleEmbeddingsAsync(HttpContext context)
+    {
+        var request = await ReadObjectAsync(context);
+        var input = request["input"];
+        IReadOnlyList<string> texts = input switch
+        {
+            JsonArray array => [.. array.Select(i => i?.GetValue<string>() ?? string.Empty)],
+            JsonValue value => [value.GetValue<string>()],
+            _ => [],
+        };
+        context.RequestServices.GetRequiredService<FakeLlmState>().RecordEmbeddings(texts.Count);
+        await context.Response.WriteAsJsonAsync(new JsonObject
+        {
+            ["object"] = "list",
+            ["model"] = request["model"]?.GetValue<string>() ?? "fake-embedding",
+            ["data"] = new JsonArray([.. texts.Select((text, index) => (JsonNode)new JsonObject
+            {
+                ["object"] = "embedding",
+                ["index"] = index,
+                ["embedding"] = new JsonArray([.. FakeEmbedding.Embed(text).Select(v => (JsonNode)JsonValue.Create(v))]),
+            })]),
+        });
     }
 
     private static async Task HandleChatCompletionsAsync(HttpContext context)

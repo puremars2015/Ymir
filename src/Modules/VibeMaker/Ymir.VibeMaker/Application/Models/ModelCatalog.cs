@@ -2,7 +2,7 @@ namespace Ymir.VibeMaker.Application.Models;
 
 /// <param name="Id">LiteLLM 的 model_name，也是傳給 Pi <c>--model</c> 的值。</param>
 /// <param name="SupportsImages">模型能直接看圖片（視覺輸入）；是的話使用者附加的圖片會一併附給模型，否則 Agent 只能用工具處理檔案。</param>
-public sealed record ModelDescriptor(string Id, string DisplayName, bool SupportsImages = false, bool SupportsThinking = false, ThinkingCapability? Thinking = null)
+public sealed record ModelDescriptor(string Id, string DisplayName, bool SupportsImages = false, bool SupportsThinking = false, ThinkingCapability? Thinking = null, bool AllowKnowledgeBase = false)
 {
     public ThinkingCapability? EffectiveThinking => Thinking ?? (SupportsThinking ? ThinkingCapability.Legacy : null);
     public bool AcceptsThinking(string? level) => level is null || EffectiveThinking?.Levels.Contains(level, StringComparer.Ordinal) == true;
@@ -40,6 +40,9 @@ public sealed class ModelCatalog
     public bool IsAvailable(string? modelId) => modelId is not null && Models.Any(m => m.Id == modelId);
 
     public bool SupportsImages(string? modelId) => Models.Any(m => m.Id == modelId && m.SupportsImages);
+
+    /// <summary>可用於知識庫問答的模型（ADR-0014 §8）。</summary>
+    public bool AllowsKnowledgeBase(string? modelId) => Models.Any(m => m.Id == modelId && m.AllowKnowledgeBase);
 
     /// <summary>選用的模型若已不在清單（例如設定被移除），退回預設模型，而不是讓執行失敗。</summary>
     public string Resolve(string? modelId) => IsAvailable(modelId) ? modelId! : DefaultModelId;

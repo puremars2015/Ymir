@@ -16,6 +16,13 @@ export const routes: Routes = [
     title: '變更密碼 · Vibe Maker',
   },
   {
+    // 私人網站的登入轉接（ADR-0016 §4）：未登入時 authGuard 先導向登入，登入後回到這裡。
+    path: 'site-access',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/sites/site-access-page').then((m) => m.SiteAccessPage),
+    title: '開啟網站 · Vibe Maker',
+  },
+  {
     // 登入後直接進入主畫面（ChatGPT 式版面：側邊欄 + 對話）
     path: '',
     canActivate: [authGuard],
@@ -30,6 +37,11 @@ export const routes: Routes = [
         path: 'projects/:projectId',
         loadComponent: () => import('./features/projects/project-page').then((m) => m.ProjectPage),
         title: '專案 · Vibe Maker',
+      },
+      {
+        path: 'sites',
+        loadComponent: () => import('./features/sites/sites-page').then((m) => m.SitesPage),
+        title: '我的網站 · Vibe Maker',
       },
       {
         path: 'settings',

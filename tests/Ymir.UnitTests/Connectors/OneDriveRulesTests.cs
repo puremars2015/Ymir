@@ -78,4 +78,71 @@ public class OneDriveRulesTests
         Assert.Contains("offline_access", Uri.UnescapeDataString(uri), StringComparison.Ordinal);
         Assert.DoesNotContain("secret", uri, StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("季報: 草稿", "季報_ 草稿-01234567")]
+    [InlineData("  ", "未命名-01234567")]
+    [InlineData("a/b\\c*?.", "a_b_c__-01234567")]
+    public void FolderName_ReplacesCharactersOneDriveRejects_AndAppendsTheId(string name, string expected)
+    {
+        Assert.Equal(expected, OneDrivePaths.FolderName(name, Guid.Parse("01234567-89ab-cdef-0123-456789abcdef")));
+    }
+
+    [Fact]
+    public void FolderName_IsTruncated()
+    {
+        var name = OneDrivePaths.FolderName(new string('x', 300), Guid.Empty);
+
+        Assert.Equal(60 + 9, name.Length);
+        Assert.True(OneDrivePaths.IsValidName(name));
+    }
+
+    [Theory]
+    [InlineData("plan.md", "plan (OneDrive 衝突 20261007-093005).md")]
+    [InlineData("src/app.min.js", "src/app.min (OneDrive 衝突 20261007-093005).js")]
+    [InlineData("docs/README", "docs/README (OneDrive 衝突 20261007-093005)")]
+    [InlineData(".gitignore", ".gitignore (OneDrive 衝突 20261007-093005)")]
+    public void ConflictPath_KeepsTheDirectoryAndExtension(string path, string expected)
+    {
+        Assert.Equal(expected, OneDrivePaths.ConflictPath(path, new DateTimeOffset(2026, 10, 7, 9, 30, 5, TimeSpan.Zero)));
+    }
+
+    [Theory]
+    [InlineData("notes.txt", true)]
+    [InlineData("src/中文/資料 1.bin", true)]
+    [InlineData("bad:name.txt", false)]
+    [InlineData("dir./a.txt", false)]
+    [InlineData("trailing /a.txt", false)]
+    [InlineData(".env", false)]
+    [InlineData("node_modules/x.js", false)]
+    [InlineData("../escape.txt", false)]
+    public void SyncablePaths_FollowWorkspaceAndOneDriveRules(string path, bool expected)
+    {
+        Assert.Equal(expected, OneDrivePaths.IsSyncablePath(path));
+    }
+
+    [Fact]
+    public void FailedSyncJobs_BackOff_ThenStop()
+    {
+        var now = DateTimeOffset.UnixEpoch;
+        var scope = Ymir.VibeMaker.Domain.OneDriveSyncScope.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        scope.Enqueue(scope.ConversationId, now);
+
+        scope.AttemptFailed("x", retry: true, now);
+        Assert.Equal(now.AddMinutes(1), scope.NextAttemptAt);
+        Assert.True(scope.UploadPending);
+        for (var i = 1; i < Ymir.VibeMaker.Domain.OneDriveSyncScope.MaxAttempts; i++)
+        {
+            scope.AttemptFailed("x", retry: true, now);
+        }
+
+        Assert.False(scope.UploadPending);
+        Assert.Equal(Ymir.VibeMaker.Domain.OneDriveSyncState.Failed, scope.State);
+
+        // 手動重試重新開始計算；授權失效則不再自動重試。
+        scope.Enqueue(scope.ConversationId, now);
+        Assert.Equal(0, scope.Attempts);
+        scope.AttemptFailed("請重新連結", retry: false, now);
+        Assert.False(scope.UploadPending);
+    }
 }

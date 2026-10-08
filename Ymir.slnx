@@ -3,7 +3,9 @@
     <Project Path="src/Ymir.Api/Ymir.Api.csproj" />
     <Project Path="src/Ymir.AppHost/Ymir.AppHost.csproj" />
     <Project Path="src/Ymir.Edge/Ymir.Edge.csproj" />
+    <Project Path="src/Ymir.McpGateway/Ymir.McpGateway.csproj" />
     <Project Path="src/Ymir.RuntimeHost/Ymir.RuntimeHost.csproj" />
+    <Project Path="src/Ymir.SiteHost/Ymir.SiteHost.csproj" />
     <Project Path="src/Ymir.ServiceDefaults/Ymir.ServiceDefaults.csproj" />
   </Folder>
   <Folder Name="/src/Platform/">
@@ -18,6 +20,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Ymir.IntegrationTests/Ymir.IntegrationTests.csproj" />
     <Project Path="tests/Ymir.Testing.FakeLlm/Ymir.Testing.FakeLlm.csproj" />
+    <Project Path="tests/Ymir.Testing.FakeMcp/Ymir.Testing.FakeMcp.csproj" />
     <Project Path="tests/Ymir.Testing.FakeOidc/Ymir.Testing.FakeOidc.csproj" />
     <Project Path="tests/Ymir.UnitTests/Ymir.UnitTests.csproj" />
   </Folder>

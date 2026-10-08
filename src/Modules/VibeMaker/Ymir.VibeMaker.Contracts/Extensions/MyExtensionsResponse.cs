@@ -8,6 +8,7 @@ namespace Ymir.VibeMaker.Contracts.Extensions;
 /// <param name="InventoryAvailable">是否讀到了自建擴充清單；還沒有執行環境時為 false（第一次送訊息後才會建立）。</param>
 /// <param name="Skills">自建 skill 的名稱（目錄名稱）。</param>
 /// <param name="McpServers">自建 MCP server 的名稱。</param>
+/// <param name="PlatformMcpServers">管理員開放給我的平台 MCP 服務（ADR-0012 B.5），只有名稱與說明。</param>
 public sealed record MyExtensionsResponse(
     bool SkillsAllowed,
     bool McpAllowed,
@@ -15,4 +16,8 @@ public sealed record MyExtensionsResponse(
     bool OneDriveAllowed,
     bool InventoryAvailable,
     IReadOnlyList<string> Skills,
-    IReadOnlyList<string> McpServers);
+    IReadOnlyList<string> McpServers,
+    IReadOnlyList<PlatformMcpServerSummary> PlatformMcpServers);
+
+/// <summary>平台 MCP 服務的摘要；不含後端位址或任何憑證。</summary>
+public sealed record PlatformMcpServerSummary(string Name, string Description);

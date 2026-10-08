@@ -46,6 +46,18 @@ public static class VibeMakerInfrastructureExtensions
         services.AddHttpClient<Application.Connectors.OneDrive.IOneDriveOAuthClient, Connectors.OneDrive.OneDriveOAuthClient>(Connectors.OneDrive.OneDriveOAuthClient.HttpClientName);
         services.AddHttpClient<Application.Connectors.OneDrive.IOneDriveClient, Connectors.OneDrive.GraphOneDriveClient>(Connectors.OneDrive.GraphOneDriveClient.HttpClientName);
         services.AddSingleton<Application.Connectors.OneDrive.IOneDriveTokenProtector, Connectors.OneDrive.DataProtectionOneDriveTokenProtector>();
+        services.Configure<Application.Connectors.OneDrive.OneDriveSyncOptions>(configuration.GetSection(Connectors.OneDrive.OneDriveOptions.SectionName));
+        services.AddHostedService<Connectors.OneDrive.OneDriveSyncWorker>();
+
+        AddKnowledgeBase(services, configuration, isDevelopment);
+
+        // 網站託管（ADR-0016）：沒有設定 Ymir:Sites:BaseUrl / Root 時停用。
+        services.Configure<Application.Sites.SiteOptions>(configuration.GetSection(Application.Sites.SiteOptions.SectionName));
+        services.AddSingleton<Application.Sites.ISiteStorage, Sites.FileSystemSiteStorage>();
+
+        // 平台 MCP（ADR-0012 B）：設定 gateway 位址時才啟用；目錄與簽章金鑰不合法時拒絕啟動。
+        services.Configure<Application.PlatformMcp.McpOptions>(configuration.GetSection(Application.PlatformMcp.McpOptions.SectionName));
+        services.AddSingleton(PlatformMcpCatalogLoader.Load(configuration));
         services.AddHealthChecks()
             .AddCheck<Health.DatabaseHealthCheck>("database", tags: [Health.VibeMakerHealthChecks.ReadyTag], timeout: Health.VibeMakerHealthChecks.Timeout)
             .AddCheck<Health.RuntimeHealthCheck>("runtime", tags: [Health.VibeMakerHealthChecks.ReadyTag], timeout: Health.VibeMakerHealthChecks.Timeout)
@@ -170,9 +182,9 @@ public static class VibeMakerInfrastructureExtensions
     {
         var defaultModel = configuration.GetSection(PiAgentOptions.SectionName).GetValue(nameof(PiAgentOptions.ModelId), new PiAgentOptions().ModelId)!;
         var models = configuration.GetSection("VibeMaker:Models").GetChildren()
-            .Select(section => (Id: section["Id"]?.Trim(), DisplayName: section["DisplayName"]?.Trim(), SupportsImages: section.GetValue<bool>("SupportsImages"), SupportsThinking: section.GetValue<bool>("SupportsThinking"), Thinking: ReadThinking(section)))
+            .Select(section => (Id: section["Id"]?.Trim(), DisplayName: section["DisplayName"]?.Trim(), SupportsImages: section.GetValue<bool>("SupportsImages"), SupportsThinking: section.GetValue<bool>("SupportsThinking"), Thinking: ReadThinking(section), AllowKnowledgeBase: section.GetValue<bool>("AllowKnowledgeBase")))
             .Where(m => !string.IsNullOrEmpty(m.Id))
-            .Select(m => new ModelDescriptor(m.Id!, string.IsNullOrEmpty(m.DisplayName) ? m.Id! : m.DisplayName!, m.SupportsImages, m.Thinking is not null || m.SupportsThinking, m.Thinking))
+            .Select(m => new ModelDescriptor(m.Id!, string.IsNullOrEmpty(m.DisplayName) ? m.Id! : m.DisplayName!, m.SupportsImages, m.Thinking is not null || m.SupportsThinking, m.Thinking, m.AllowKnowledgeBase))
             .DistinctBy(m => m.Id)
             .ToList();
         if (!models.Any(m => m.Id == defaultModel))
@@ -181,6 +193,33 @@ public static class VibeMakerInfrastructureExtensions
         }
 
         return new ModelCatalog(models, defaultModel);
+    }
+
+    /// <summary>RAG 知識庫（ADR-0014）：沒有設定 <c>VibeMaker:Rag:EmbeddingModel</c> 時停用（worker 不做事、上傳回 409）。</summary>
+    private static void AddKnowledgeBase(IServiceCollection services, IConfiguration configuration, bool isDevelopment)
+    {
+        var rag = configuration.GetSection(Application.Knowledge.KnowledgeOptions.SectionName);
+        services.Configure<Application.Knowledge.KnowledgeOptions>(rag);
+        var options = rag.Get<Application.Knowledge.KnowledgeOptions>() ?? new Application.Knowledge.KnowledgeOptions();
+        var root = configuration.GetSection(Knowledge.KnowledgeStorageOptions.SectionName).Get<Knowledge.KnowledgeStorageOptions>()?.Root;
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            root = options.IsEnabled && !isDevelopment
+                ? throw new InvalidOperationException("Ymir:Knowledge:Root is required when VibeMaker:Rag:EmbeddingModel is set (a persistent volume owned by the API, ADR-0014).")
+                : Path.Combine(Path.GetTempPath(), "ymir-knowledge");
+        }
+
+        var baseUrl = options.BaseUrl
+            ?? configuration.GetSection(LiteLlm.LiteLlmOptions.SectionName).Get<LiteLlm.LiteLlmOptions>()?.BaseUrl
+            ?? (configuration.GetSection(PiAgentOptions.SectionName).Get<PiAgentOptions>() ?? new PiAgentOptions()).ModelBaseUrl;
+        services.AddSingleton(new Knowledge.KnowledgePaths(root));
+        services.AddSingleton(new Knowledge.KnowledgeEndpoint(baseUrl));
+        services.AddSingleton<Application.Knowledge.IKnowledgeFileStore, Knowledge.FileSystemKnowledgeStore>();
+        services.AddSingleton<Application.Knowledge.IVectorStore, Knowledge.SqliteVectorStore>();
+        services.AddSingleton<Application.Knowledge.IDocumentTextExtractor, Knowledge.DocumentTextExtractor>();
+        services.AddHttpClient<Application.Knowledge.IEmbeddingClient, Knowledge.LiteLlmEmbeddingClient>(Knowledge.LiteLlmEmbeddingClient.HttpClientName);
+        services.AddHttpClient<Application.Knowledge.IKnowledgeAnswerClient, Knowledge.LiteLlmAnswerClient>(Knowledge.LiteLlmAnswerClient.HttpClientName);
+        services.AddHostedService<Knowledge.KnowledgeIndexWorker>();
     }
 
     private static ThinkingCapability? ReadThinking(IConfigurationSection model)
@@ -219,6 +258,13 @@ public static class VibeMakerInfrastructureExtensions
                     options.AllowedModels.Add(model.Id);
                 }
             }
+
+            // 知識庫的 embedding 模型（ADR-0014 §3）也以使用者的 virtual key 呼叫。
+            if (configuration.GetValue<string>($"{Application.Knowledge.KnowledgeOptions.SectionName}:EmbeddingModel") is { Length: > 0 } embedding
+                && !options.AllowedModels.Contains(embedding))
+            {
+                options.AllowedModels.Add(embedding);
+            }
         });
         services.TryAddSingleton(TimeProvider.System);
 
@@ -251,3 +297,23 @@ public enum HarnessKind
     /// <summary>固定腳本的假 Agent，不需要 runtime 與 LLM。</summary>
     Scripted = 1,
 }
+
+/// <summary>啟動時載入平台 MCP 服務目錄（ADR-0012 B.1）。</summary>
+internal static class PlatformMcpCatalogLoader
+{
+    public static Application.PlatformMcp.McpCatalog Load(IConfiguration configuration)
+    {
+        var options = configuration.GetSection(Application.PlatformMcp.McpOptions.SectionName).Get<Application.PlatformMcp.McpOptions>()
+            ?? new Application.PlatformMcp.McpOptions();
+        if (!options.IsEnabled)
+        {
+            return Application.PlatformMcp.McpCatalog.Empty;
+        }
+
+        Application.PlatformMcp.McpGatewayToken.EnsureKeyIsStrong(options.TokenSigningKey, "Ymir:Mcp:TokenSigningKey");
+        return string.IsNullOrWhiteSpace(options.CatalogPath)
+            ? throw new InvalidOperationException("Ymir:Mcp:CatalogPath is required when Ymir:Mcp:GatewayUrl is set.")
+            : Application.PlatformMcp.McpCatalog.Load(options.CatalogPath);
+    }
+}
+

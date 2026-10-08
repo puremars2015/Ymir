@@ -36,6 +36,22 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<OneDriveConnection> OneDriveConnections => Set<OneDriveConnection>();
 
+    public DbSet<OneDriveSyncScope> OneDriveSyncScopes => Set<OneDriveSyncScope>();
+
+    public DbSet<OneDriveSyncItem> OneDriveSyncItems => Set<OneDriveSyncItem>();
+
+    public DbSet<McpServerAccess> McpServerAccess => Set<McpServerAccess>();
+
+    public DbSet<KnowledgeDocument> KnowledgeDocuments => Set<KnowledgeDocument>();
+
+    public DbSet<Site> Sites => Set<Site>();
+
+    public DbSet<SiteVersion> SiteVersions => Set<SiteVersion>();
+
+    public DbSet<SiteShare> SiteShares => Set<SiteShare>();
+
+    public DbSet<SiteTicket> SiteTickets => Set<SiteTicket>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -198,6 +214,109 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             connection.Property(c => c.ProtectedRefreshToken).IsRequired();
             connection.Property(c => c.Status).HasConversion<UpperSnakeCaseEnumConverter<OneDriveConnectionStatus>>().HasMaxLength(30);
             connection.Property(c => c.LastError).HasMaxLength(OneDriveConnection.ErrorMaxLength);
+        });
+
+        modelBuilder.Entity<OneDriveSyncScope>(scope =>
+        {
+            // ADR-0013 §4：一個工作目錄（專案或未分組對話）一筆；upload_pending 是持久化的同步工作佇列。
+            scope.ToTable("onedrive_sync_scopes");
+            scope.HasKey(s => s.ScopeId);
+            scope.Property(s => s.ScopeId).ValueGeneratedNever();
+            scope.Property(s => s.DriveId).HasMaxLength(OneDriveConnection.DriveIdMaxLength).IsRequired();
+            scope.Property(s => s.RootItemId).HasMaxLength(OneDriveConnection.ItemIdMaxLength).IsRequired();
+            scope.Property(s => s.FolderItemId).HasMaxLength(OneDriveConnection.ItemIdMaxLength).IsRequired();
+            scope.Property(s => s.FolderPath).HasMaxLength(OneDriveSyncScope.FolderNameMaxLength).IsRequired();
+            scope.Property(s => s.State).HasConversion<UpperSnakeCaseEnumConverter<OneDriveSyncState>>().HasMaxLength(30);
+            scope.Property(s => s.LastError).HasMaxLength(OneDriveConnection.ErrorMaxLength);
+            scope.HasIndex(s => s.UserId);
+            scope.HasIndex(s => new { s.UploadPending, s.NextAttemptAt });
+        });
+
+        modelBuilder.Entity<OneDriveSyncItem>(item =>
+        {
+            item.ToTable("onedrive_sync_items");
+            item.HasKey(i => i.Id);
+            item.Property(i => i.Id).ValueGeneratedNever();
+            item.Property(i => i.Path).HasMaxLength(OneDriveSyncItem.PathMaxLength).IsRequired();
+            item.Property(i => i.ItemId).HasMaxLength(OneDriveConnection.ItemIdMaxLength).IsRequired();
+            item.Property(i => i.ETag).HasMaxLength(OneDriveConnection.ItemIdMaxLength);
+            item.HasIndex(i => i.ScopeId);
+            item.HasOne<OneDriveSyncScope>().WithMany().HasForeignKey(i => i.ScopeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<McpServerAccess>(access =>
+        {
+            // ADR-0012 B.4：平台 MCP 服務的存取清單；服務本身只在版控的目錄中定義。
+            access.ToTable("mcp_server_access");
+            access.HasKey(a => a.ServerName);
+            access.Property(a => a.ServerName).HasMaxLength(40);
+            access.Property(a => a.Mode).HasConversion<UpperSnakeCaseEnumConverter<McpAccessMode>>().HasMaxLength(30);
+            access.Property(a => a.UserIdList).IsRequired();
+            access.Ignore(a => a.UserIds);
+        });
+
+        modelBuilder.Entity<KnowledgeDocument>(document =>
+        {
+            // ADR-0014：專案知識庫的文件版本；原始檔與向量在 API 自己的知識庫 volume。
+            document.ToTable("knowledge_documents");
+            document.HasKey(d => d.Id);
+            document.Property(d => d.Id).ValueGeneratedNever();
+            document.Property(d => d.FileName).HasMaxLength(KnowledgeDocument.FileNameMaxLength).IsRequired();
+            document.Property(d => d.ContentHash).HasMaxLength(64).IsRequired();
+            document.Property(d => d.Status).HasConversion<UpperSnakeCaseEnumConverter<KnowledgeDocumentStatus>>().HasMaxLength(30);
+            document.Property(d => d.EmbeddingModel).HasMaxLength(200);
+            document.Property(d => d.Error).HasMaxLength(KnowledgeDocument.ErrorMaxLength);
+            document.HasIndex(d => new { d.ProjectId, d.Status });
+            document.HasIndex(d => d.Status);
+            // 同專案同檔名最多一份可查詢的版本（新版本成功後才切換，ADR-0014 §7）。
+            document.HasIndex(d => new { d.ProjectId, d.FileName }).IsUnique().HasFilter("[status] = 'READY'");
+        });
+
+        modelBuilder.Entity<Site>(site =>
+        {
+            // ADR-0016：發布的網站；網址代碼由平台產生且唯一。
+            site.ToTable("sites");
+            site.HasKey(s => s.Id);
+            site.Property(s => s.Id).ValueGeneratedNever();
+            site.Property(s => s.Slug).HasMaxLength(Site.SlugLength).IsRequired();
+            site.Property(s => s.Name).HasMaxLength(Site.NameMaxLength).IsRequired();
+            site.Property(s => s.SourcePath).HasMaxLength(Site.SourcePathMaxLength).IsRequired();
+            site.Property(s => s.AccessMode).HasConversion<UpperSnakeCaseEnumConverter<SiteAccessMode>>().HasMaxLength(30);
+            site.Property(s => s.Status).HasConversion<UpperSnakeCaseEnumConverter<SiteStatus>>().HasMaxLength(30);
+            site.HasIndex(s => s.Slug).IsUnique();
+            site.HasIndex(s => s.UserId);
+        });
+
+        modelBuilder.Entity<SiteVersion>(version =>
+        {
+            version.ToTable("site_versions");
+            version.HasKey(v => v.Id);
+            version.Property(v => v.Id).ValueGeneratedNever();
+            version.Property(v => v.SourcePath).HasMaxLength(Site.SourcePathMaxLength).IsRequired();
+            version.Property(v => v.Status).HasConversion<UpperSnakeCaseEnumConverter<SiteVersionStatus>>().HasMaxLength(30);
+            version.Property(v => v.Error).HasMaxLength(SiteVersion.ErrorMaxLength);
+            version.HasIndex(v => v.SiteId);
+            version.HasOne<Site>().WithMany().HasForeignKey(v => v.SiteId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SiteShare>(share =>
+        {
+            share.ToTable("site_shares");
+            share.HasKey(s => new { s.SiteId, s.UserId });
+            share.HasIndex(s => s.UserId);
+            share.HasOne<Site>().WithMany().HasForeignKey(s => s.SiteId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SiteTicket>(ticket =>
+        {
+            // ADR-0016 §4：只存雜湊；SiteHost 以條件更新兌換（只能用一次）。
+            ticket.ToTable("site_tickets");
+            ticket.HasKey(t => t.Id);
+            ticket.Property(t => t.Id).ValueGeneratedNever();
+            ticket.Property(t => t.TokenHash).HasMaxLength(64).IsRequired();
+            ticket.HasIndex(t => t.TokenHash).IsUnique();
+            ticket.HasIndex(t => t.ExpiresAt);
+            ticket.HasOne<Site>().WithMany().HasForeignKey(t => t.SiteId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.ApplySnakeCaseNames();

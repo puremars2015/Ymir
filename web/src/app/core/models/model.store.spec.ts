@@ -41,6 +41,7 @@ describe('thinking preference', () => {
         displayName: 'Fixed',
         supportsImages: false,
         supportsThinking: false,
+        allowKnowledgeBase: false,
         isDefault: true,
       },
       {
@@ -48,6 +49,7 @@ describe('thinking preference', () => {
         displayName: 'Thinking',
         supportsImages: false,
         supportsThinking: true,
+        allowKnowledgeBase: false,
         isDefault: false,
       },
     ]);

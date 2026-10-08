@@ -4,6 +4,7 @@ using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Users;
 using Ymir.VibeMaker.Application.Extensions;
+using Ymir.VibeMaker.Application.PlatformMcp;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Extensions;
 using Ymir.VibeMaker.Domain;
@@ -33,11 +34,21 @@ internal static class ExtensionEndpoints
         ICurrentUser currentUser,
         ExtensionPolicyService policy,
         IExtensionInventory inventory,
+        PlatformMcpService platformMcp,
         CancellationToken cancellationToken)
     {
         var effective = await policy.ResolveAsync(currentUser.UserId, cancellationToken);
         var items = await inventory.ListAsync(currentUser.UserId, cancellationToken);
-        return new MyExtensionsResponse(effective.Skills, effective.Mcp, effective.Internet, effective.OneDrive, items is not null, items?.Skills ?? [], items?.McpServers ?? []);
+        var platform = await platformMcp.ResolveAsync(currentUser.UserId, cancellationToken);
+        return new MyExtensionsResponse(
+            effective.Skills,
+            effective.Mcp,
+            effective.Internet,
+            effective.OneDrive,
+            items is not null,
+            items?.Skills ?? [],
+            items?.McpServers ?? [],
+            [.. platform.Select(s => new PlatformMcpServerSummary(s.Name, s.Description))]);
     }
 
     private static async Task<ExtensionPolicyResponse> GetPolicyAsync(

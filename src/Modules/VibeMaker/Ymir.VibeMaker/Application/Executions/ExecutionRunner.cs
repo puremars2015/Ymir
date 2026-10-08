@@ -2,10 +2,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Ymir.Platform.Auditing;
 using Ymir.VibeMaker.Application.Agents;
+using Ymir.VibeMaker.Application.Connectors.OneDrive;
 using Ymir.VibeMaker.Application.Extensions;
 using Ymir.VibeMaker.Application.Files;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
+using Ymir.VibeMaker.Application.PlatformMcp;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
 using Ymir.VibeMaker.Domain;
@@ -28,6 +30,8 @@ public sealed class ExecutionRunner(
     UserExecutionLocks userLocks,
     RuntimePolicyService policies,
     IExtensionPolicy extensionPolicy,
+    OneDriveSyncService oneDrive,
+    PlatformMcpService platformMcp,
     IAuditLog auditLog,
     VibeMakerTelemetry telemetry,
     TimeProvider timeProvider,
@@ -162,10 +166,12 @@ public sealed class ExecutionRunner(
             .ConfigureAwait(false);
 
         AgentEvent? terminal = null;
+        var oneDriveActive = false;
         try
         {
             var workingDirectory = await GetWorkingDirectoryAsync(execution, stoppingToken).ConfigureAwait(false);
             await PrepareDeliveryAsync(runtime.RuntimeId, execution.Id, workingDirectory, runToken).ConfigureAwait(false);
+            oneDriveActive = extensions.OneDrive && await SyncFromOneDriveAsync(execution, runToken, stoppingToken).ConfigureAwait(false);
             var request = new AgentRunRequest(
                 executionId,
                 runtime.RuntimeId,
@@ -177,7 +183,9 @@ public sealed class ExecutionRunner(
                 await GetSystemPromptsAsync(execution, stoppingToken).ConfigureAwait(false),
                 extensions,
                 await GetAttachmentsAsync(execution, stoppingToken).ConfigureAwait(false),
-                execution.ThinkingLevel);
+                execution.ThinkingLevel,
+                // 平台 MCP（ADR-0012 B）：目錄 ∩ 存取清單，token 期限涵蓋這次執行。
+                await platformMcp.PrepareRunAsync(execution.UserId, policy.ExecutionTimeout, runToken).ConfigureAwait(false));
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
             {
                 if (agentEvent is AgentCompleted or AgentFailed or AgentCancelled)
@@ -205,14 +213,58 @@ public sealed class ExecutionRunner(
 
         // harness 保證以終止事件結束；逾時造成的取消轉為 AGENT_TIMEOUT（SA §13）。
         terminal ??= new AgentFailed(ExecutionErrorCodes.AgentRuntimeError, "Agent 沒有回傳結果。");
+        string? partialText = null;
         if (terminal is AgentCancelled cancelled && timeout.IsCancellationRequested)
         {
             terminal = new AgentFailed(ExecutionErrorCodes.AgentTimeout, "執行超過時間限制。");
-            await FinishAsync(execution, terminal, stoppingToken, cancelled.PartialText).ConfigureAwait(false);
-            return;
+            partialText = cancelled.PartialText;
         }
 
-        await FinishAsync(execution, terminal, stoppingToken).ConfigureAwait(false);
+        await FinishAsync(execution, terminal, stoppingToken, partialText).ConfigureAwait(false);
+        if (oneDriveActive)
+        {
+            await EnqueueOneDriveUploadAsync(execution, stoppingToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// 執行前從 OneDrive 下載（ADR-0013 §4）：這裡持有使用者的執行鎖，Agent 還沒啟動。
+    /// 同步失敗不阻擋執行，只送出狀態事件（摘要），Agent 使用本機檔案。回傳是否啟用同步。
+    /// </summary>
+    private async Task<bool> SyncFromOneDriveAsync(AgentExecution execution, CancellationToken runToken, CancellationToken stoppingToken)
+    {
+        if (!await oneDrive.IsReadyAsync(execution.UserId, runToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        await AppendAsync(execution.Id, new StatusEvent("正在從 OneDrive 同步"), stoppingToken).ConfigureAwait(false);
+        var result = await oneDrive.DownloadBeforeRunAsync(execution.UserId, execution.ConversationId, runToken).ConfigureAwait(false);
+        if (result.Warning is { } warning)
+        {
+            await AppendAsync(execution.Id, new StatusEvent($"OneDrive 同步失敗，使用本機檔案：{warning}"), stoppingToken).ConfigureAwait(false);
+        }
+        else if (result.Conflicts > 0)
+        {
+            await AppendAsync(execution.Id, new StatusEvent($"OneDrive 與本機都修改了 {result.Conflicts} 個檔案，已另存衝突副本。"), stoppingToken).ConfigureAwait(false);
+        }
+
+        return result.Active;
+    }
+
+    /// <summary>執行結束後排入 OneDrive 上傳工作（背景 worker 處理）；失敗只記錄 log，不影響已完成的 execution。</summary>
+    private async Task EnqueueOneDriveUploadAsync(AgentExecution execution, CancellationToken stoppingToken)
+    {
+        try
+        {
+            await oneDrive.EnqueueAfterRunAsync(execution.UserId, execution.ConversationId, stoppingToken).ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // execution 已經結束；排入同步工作失敗不能改變它的結果。
+        catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+#pragma warning restore CA1031
+        {
+            logger.LogError(ex, "Failed to enqueue OneDrive sync for execution {ExecutionId}", execution.Id);
+        }
     }
 
     /// <summary>保存 ASSISTANT 訊息、推進狀態並寫入終止事件。</summary>

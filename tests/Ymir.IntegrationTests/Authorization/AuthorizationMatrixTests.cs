@@ -12,6 +12,7 @@ using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Contracts.Conversations;
 using Ymir.VibeMaker.Contracts.Make;
 using Ymir.VibeMaker.Contracts.Projects;
+using Ymir.VibeMaker.Domain;
 
 namespace Ymir.IntegrationTests.Authorization;
 
@@ -42,6 +43,37 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["GET /api/conversations/{conversationId:guid}/files/"] = r => Get($"/api/conversations/{r.ConversationId}/files"),
         ["GET /api/conversations/{conversationId:guid}/files/download"] = r => Get($"/api/conversations/{r.ConversationId}/files/download?path=hello.txt"),
         ["GET /api/conversations/{conversationId:guid}/files/archive"] = r => Get($"/api/conversations/{r.ConversationId}/files/archive"),
+        ["GET /api/conversations/{conversationId:guid}/onedrive/"] = r => Get($"/api/conversations/{r.ConversationId}/onedrive"),
+        ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/onedrive/sync"),
+        ["GET /api/projects/{projectId:guid}/knowledge/"] = r => Get($"/api/projects/{r.ProjectId}/knowledge"),
+        ["POST /api/projects/{projectId:guid}/knowledge/documents"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{r.ProjectId}/knowledge/documents?fileName=intrusion.txt")
+        {
+            Content = new ByteArrayContent("intrusion"u8.ToArray()),
+        },
+        ["DELETE /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}"] = r => new HttpRequestMessage(HttpMethod.Delete, $"/api/projects/{r.ProjectId}/knowledge/documents/{r.ExecutionId}"),
+        ["POST /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}/retry"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{r.ProjectId}/knowledge/documents/{r.ExecutionId}/retry"),
+        ["POST /api/projects/{projectId:guid}/knowledge/ask"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{r.ProjectId}/knowledge/ask")
+        {
+            Content = JsonContent.Create(new AskKnowledgeRequest("secret?", null)),
+        },
+        ["POST /api/conversations/{conversationId:guid}/sites"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/sites")
+        {
+            Content = JsonContent.Create(new PublishSiteRequest("intrusion", "dist")),
+        },
+        ["POST /api/sites/{siteId:guid}/publish"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/sites/{r.ExecutionId}/publish")
+        {
+            Content = JsonContent.Create(new RepublishSiteRequest(null, null, null)),
+        },
+        ["POST /api/sites/{siteId:guid}/unpublish"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/sites/{r.ExecutionId}/unpublish"),
+        ["DELETE /api/sites/{siteId:guid}"] = r => new HttpRequestMessage(HttpMethod.Delete, $"/api/sites/{r.ExecutionId}"),
+        ["PUT /api/sites/{siteId:guid}/access"] = r => new HttpRequestMessage(HttpMethod.Put, $"/api/sites/{r.ExecutionId}/access")
+        {
+            Content = JsonContent.Create(new SiteAccessRequest(SiteAccessMode.Public, null)),
+        },
+        ["POST /api/sites/{siteId:guid}/ticket"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/sites/{r.ExecutionId}/ticket")
+        {
+            Content = JsonContent.Create(new SiteTicketRequest("/")),
+        },
         ["POST /api/conversations/{conversationId:guid}/attachments"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/attachments?fileName=intrusion.txt")
         {
             Content = new ByteArrayContent("intrusion"u8.ToArray()),
@@ -58,6 +90,27 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         },
         ["GET /api/executions/{executionId:guid}/events"] = r => Get($"/api/executions/{r.ExecutionId}/events"),
         ["POST /api/executions/{executionId:guid}/cancel"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/executions/{r.ExecutionId}/cancel"),
+    };
+
+    /// <summary>
+    /// 擁有者呼叫時預期的非成功狀態：通過擁有者檢查之後才會得到的業務錯誤（例如沒有連結 OneDrive 時同步回 409），
+    /// 與別人呼叫時的 404 不同，仍能證明請求本身正確。
+    /// </summary>
+    private static readonly Dictionary<string, HttpStatusCode> OwnerStatusOverrides = new()
+    {
+        ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = HttpStatusCode.Conflict,
+        // 這個 fixture 沒有設定 Embedding 模型（知識庫停用）；文件 id 不存在。擁有者的成功路徑在 KnowledgeBaseTests。
+        ["POST /api/projects/{projectId:guid}/knowledge/documents"] = HttpStatusCode.Conflict,
+        ["DELETE /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}"] = HttpStatusCode.NotFound,
+        ["POST /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}/retry"] = HttpStatusCode.NotFound,
+        ["POST /api/projects/{projectId:guid}/knowledge/ask"] = HttpStatusCode.Conflict,
+        // 這個 fixture 沒有設定網站託管；網站 id 不存在。擁有者的成功路徑在 SiteHostingTests。
+        ["POST /api/conversations/{conversationId:guid}/sites"] = HttpStatusCode.Conflict,
+        ["POST /api/sites/{siteId:guid}/publish"] = HttpStatusCode.NotFound,
+        ["POST /api/sites/{siteId:guid}/unpublish"] = HttpStatusCode.NotFound,
+        ["DELETE /api/sites/{siteId:guid}"] = HttpStatusCode.NotFound,
+        ["PUT /api/sites/{siteId:guid}/access"] = HttpStatusCode.NotFound,
+        ["POST /api/sites/{siteId:guid}/ticket"] = HttpStatusCode.NotFound,
     };
 
     /// <summary>
@@ -80,6 +133,11 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["PUT /api/admin/settings/models/"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/models") { Content = JsonContent.Create(new Ymir.VibeMaker.Contracts.Models.SaveModelAccessRequest(["fake-model"], "fake-model")) },
         ["DELETE /api/admin/settings/models/"] = () => new HttpRequestMessage(HttpMethod.Delete, "/api/admin/settings/models"),
         ["GET /api/admin/users/"] = () => Get("/api/admin/users"),
+        ["GET /api/admin/mcp-servers/"] = () => Get("/api/admin/mcp-servers"),
+        ["PUT /api/admin/mcp-servers/{name}/access"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/mcp-servers/echo/access")
+        {
+            Content = JsonContent.Create(new SaveMcpServerAccessRequest(true, Ymir.VibeMaker.Domain.McpAccessMode.Everyone, [])),
+        },
         ["POST /api/admin/users/"] = () => new HttpRequestMessage(HttpMethod.Post, "/api/admin/users")
         {
             Content = JsonContent.Create(new CreateLocalUserRequest("intruder-made", "Intruder", null, UserRole.Admin, "intruder-password-123")),
@@ -146,6 +204,9 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     private static readonly HashSet<string> NotResourceScoped =
     [
         "GET /api/me",
+        "GET /api/sites/",
+        "GET /api/sites/shared-with-me",
+        "GET /api/users/search",
         "POST /api/me/password",
         "POST /api/auth/logout",
         "GET /api/auth/providers",
@@ -233,7 +294,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
 
             using var ownerRequest = createRequest(resources);
             using var ownerResponse = await owner.SendAsync(ownerRequest, ct);
-            if (!ownerResponse.IsSuccessStatusCode)
+            if (!ownerResponse.IsSuccessStatusCode && OwnerStatusOverrides.GetValueOrDefault(endpoint) != ownerResponse.StatusCode)
             {
                 failures.Add($"{endpoint} (owner) → {(int)ownerResponse.StatusCode}");
             }

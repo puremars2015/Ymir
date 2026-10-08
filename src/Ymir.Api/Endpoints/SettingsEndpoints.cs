@@ -16,7 +16,7 @@ internal static class SettingsEndpoints
             {
                 var state = await policy.GetForUserAsync(user.UserId, ct);
                 return state.Models.Select(m => new ModelResponse(m.Id, m.DisplayName, m.Id == state.DefaultModelId, m.SupportsImages, m.EffectiveThinking is not null,
-                    m.EffectiveThinking is { } thinking ? new ThinkingCapabilityResponse(thinking.Parameter, thinking.Levels, thinking.DefaultLevel, thinking.Required) : null)).ToList();
+                    m.EffectiveThinking is { } thinking ? new ThinkingCapabilityResponse(thinking.Parameter, thinking.Levels, thinking.DefaultLevel, thinking.Required) : null, m.AllowKnowledgeBase)).ToList();
             })
             .WithName("ListModels")
             .WithTags("Models");

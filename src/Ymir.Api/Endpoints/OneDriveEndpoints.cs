@@ -2,12 +2,14 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.WebUtilities;
 using Ymir.Api.Auth;
 using Ymir.Api.Problems;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Users;
 using Ymir.VibeMaker.Application.Connectors.OneDrive;
+using Ymir.VibeMaker.Domain;
 
 namespace Ymir.Api.Endpoints;
 
@@ -31,7 +33,44 @@ internal static class OneDriveEndpoints
         group.MapGet("/callback", CallbackAsync).WithName("OneDriveCallback").ExcludeFromDescription();
         group.MapPut("/root", SetRootAsync).WithName("SetOneDriveRoot").RequireAntiforgeryHeader();
         group.MapDelete("/", DisconnectAsync).WithName("DisconnectOneDrive").RequireAntiforgeryHeader();
+
+        // 對話（工作目錄）的雲端保存狀態與手動同步（ADR-0013 §4）：只能存取自己的對話（SA §12）。
+        var conversations = endpoints.MapGroup("/api/conversations/{conversationId:guid}/onedrive").WithTags("Conversations").RequireAntiforgeryHeader();
+        conversations.MapGet("/", GetConversationStatusAsync).WithName("GetConversationOneDriveStatus");
+        conversations.MapPost("/sync", SyncConversationAsync).WithName("SyncConversationOneDrive");
         return endpoints;
+    }
+
+    private static async Task<Results<Ok<ConversationOneDriveResponse>, NotFound>> GetConversationStatusAsync(
+        Guid conversationId,
+        ICurrentUser currentUser,
+        OneDriveSyncService sync,
+        CancellationToken cancellationToken) =>
+        await sync.GetStatusAsync(currentUser.UserId, conversationId, cancellationToken) is { } status
+            ? TypedResults.Ok(ConversationOneDriveResponse.From(status))
+            : TypedResults.NotFound();
+
+    private static async Task<IResult> SyncConversationAsync(
+        Guid conversationId,
+        ICurrentUser currentUser,
+        OneDriveSyncService sync,
+        CancellationToken cancellationToken)
+    {
+        var status = await sync.RequestSyncAsync(currentUser.UserId, conversationId, cancellationToken);
+        if (status is null)
+        {
+            return TypedResults.NotFound();
+        }
+
+        return status.Availability == OneDriveAvailability.Ready
+            ? TypedResults.Accepted((string?)null, ConversationOneDriveResponse.From(status))
+            : ApiProblem.Create(StatusCodes.Status409Conflict, "ONEDRIVE_NOT_READY", status.Availability switch
+            {
+                OneDriveAvailability.NotAllowed => "管理員尚未開放 OneDrive 連結。",
+                OneDriveAvailability.NeedsReauth => "OneDrive 授權已失效，請到設定頁重新連結。",
+                OneDriveAvailability.NoRoot => "請先到設定頁選擇 OneDrive 同步資料夾。",
+                _ => "請先到設定頁連結 OneDrive。",
+            });
     }
 
     private static async Task<OneDriveStatusResponse> GetStatusAsync(ICurrentUser currentUser, OneDriveConnectionService onedrive, CancellationToken cancellationToken) =>
@@ -207,4 +246,23 @@ public sealed record OneDriveStatusResponse(
 {
     internal static OneDriveStatusResponse From(OneDriveStatus status) =>
         new(status.Allowed, status.Available, status.State, status.Account, status.RootPath, status.ConnectedAt, status.LastError);
+}
+
+/// <summary>對話的雲端保存狀態（ADR-0013 §4）；沒有 token、item id 或 host 路徑。</summary>
+/// <param name="Availability">OneDrive 是否可用；不是 <c>Ready</c> 時不同步。</param>
+/// <param name="FolderPath">相對於同步根資料夾的位置；尚未同步過時為 null。</param>
+/// <param name="State">尚未同步過時為 null。</param>
+/// <param name="ConflictCount">最近一輪同步另存的衝突副本數。</param>
+/// <param name="LastError">失敗原因或略過檔案的摘要。</param>
+public sealed record ConversationOneDriveResponse(
+    OneDriveAvailability Availability,
+    string? RootPath,
+    string? FolderPath,
+    OneDriveSyncState? State,
+    DateTimeOffset? LastSyncedAt,
+    int ConflictCount,
+    string? LastError)
+{
+    internal static ConversationOneDriveResponse From(ConversationOneDriveStatus status) =>
+        new(status.Availability, status.RootPath, status.FolderPath, status.State, status.LastSyncedAt, status.ConflictCount, status.LastError);
 }

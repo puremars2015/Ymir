@@ -57,6 +57,24 @@ export type MyExtensions = Schemas['MyExtensionsResponse'];
 export type RestrictedNetworkSupport = Schemas['RestrictedNetworkSupport'];
 export type OneDriveStatus = Schemas['OneDriveStatusResponse'];
 export type OneDriveLinkState = Schemas['OneDriveLinkState'];
+export type ConversationOneDrive = Schemas['ConversationOneDriveResponse'];
+export type PlatformMcpServers = Schemas['PlatformMcpServersResponse'];
+export type McpServerAccess = Schemas['McpServerAccessResponse'];
+export type McpAccessMode = Schemas['McpAccessMode'];
+export type SaveMcpServerAccessRequest = Schemas['SaveMcpServerAccessRequest'];
+export type KnowledgeBase = Schemas['KnowledgeBaseResponse'];
+export type KnowledgeDocument = Schemas['KnowledgeDocumentResponse'];
+export type KnowledgeDocumentStatus = Schemas['KnowledgeDocumentStatus'];
+export type KnowledgeAnswer = Schemas['KnowledgeAnswerResponse'];
+export type KnowledgeCitation = Schemas['KnowledgeCitationResponse'];
+export type Site = Schemas['SiteResponse'];
+export type Sites = Schemas['SitesResponse'];
+export type SiteAccessMode = Schemas['SiteAccessMode'];
+export type PublishSiteRequest = Schemas['PublishSiteRequest'];
+export type SiteShare = Schemas['SiteShareResponse'];
+export type SharedSite = Schemas['SharedSiteResponse'];
+export type UserSearchResult = Schemas['UserSearchResult'];
+export type SiteTicket = Schemas['SiteTicketResponse'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-08 03:00 ・ 狀態：**🚧 進行中（插單：OneDrive 同步 O2）**
+> 最後更新：2026-10-08 11:30 ・ 狀態：**✅ 本輪計畫完成（A2、R0～R2、H0～H2 都在開發分支，使用者要求先不合併回 main；P0 維持僅計畫）**
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -30,6 +30,7 @@
 
 | # | 工作項目 | 狀態 | 前置 / 待決定 |
 |---|---|---|---|
+| I1 | main 與擴充能力整合測試分支 | 🔬 | `claude/inspiring-einstein-2pwxx6`；不合併 main，見 #028 |
 | W9 | 對話工具執行提示簡化 | ✅ | 工具／終端只顯示「正在工作中......」、清除完成／失敗／取消狀態；見 #027 |
 | L3 | 個別使用者模型權限 | ✅ | 系統預設＋逐模型允許／禁止、選單／execution／virtual key 一致；ADR-0019，見 #026 |
 | M2 | `/help` 系統用途與指令說明 | ✅ | Agent 說明功能、兩個指令與開放主題，斜線提示；見 #025 |
@@ -49,16 +50,16 @@
 | A0 | ADR-0012 spike：實測 Pi 1.0.0 在 RPC 模式的 `--no-skills` / `--skill`、能否不讀使用者層 `mcp.json`、平台 MCP 設定能否放在 Agent 不可寫的位置，以及 rootless Podman 能否限制 egress；結果寫回 ADR-0012 | ✅ | — |
 | A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`）+ 每人覆寫資料表 `vibemaker.user_extension_grants`<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | ✅ | — |
 | A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• `internet` 能力加入擴充政策（全域 + 每人）<br>• 受限網路部署文件 | ✅ | — |
-| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ⏳ | **暫停**：插單 OneDrive 完成後繼續 |
+| A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ✅ | 見 #013 |
 | O0 | **插單** OneDrive connector ADR（[ADR-0013](../adr/0013-onedrive-connector.md)） | ✅ | — |
 | O1 | OneDrive 連結 / 解除連結：<br>• `onedrive` 能力<br>• 授權碼 + PKCE 連結流程、refresh token 加密保存<br>• 根資料夾、設定頁<br>• FakeGraph 測試替身 | ✅ | — |
-| O2 | OneDrive 同步：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | 🚧 | — |
-| R0 | RAG ADR（ADR-0014）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite（sqlite-vec）部署、權限 | ⏳ | **❓待決定**：Embedding 模型與硬體、文件格式與容量、外部回答模型的資料政策 |
-| R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ⏳ | R0 經使用者確認 |
-| R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ⏳ | R1 |
-| H0 | 網站託管 ADR（ADR-0015）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ⏳ | **❓待決定**：網域與 DNS / Tunnel、公司模式的帳號範圍、配額 |
-| H1 | 公開網站發布：網站與版本、產物檢查、Nginx 託管、原子切換、取消發布 | ⏳ | H0 經使用者確認 |
-| H2 | 身分與分享：公司模式、指定使用者、分享給我的網站 | ⏳ | H1 |
+| O2 | OneDrive 同步：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | ✅ | — |
+| R0 | RAG ADR（ADR-0014）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite 部署、權限 | ✅ | 使用者 2026-10-08 決定：Embedding 經 LiteLLM；回答模型由管理員標記可用於知識庫 |
+| R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ✅ | 見 #015 |
+| R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ✅ | 見 #016 |
+| H0 | 網站託管 ADR（[ADR-0016](../adr/0016-site-hosting.md)；0015 已用於明確交付成果）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ✅ | 使用者 2026-10-08 決定：網域為設定值 `<代碼>.<BaseDomain>`（真實 DNS / Tunnel 待使用者環境）；可見範圍由網站擁有者選擇，Ymir 管理員一律可看 |
+| H1 | 公開網站發布：網站與版本、產物檢查、SiteHost 託管（ADR-0016 不用 Nginx）、原子切換、取消發布 | ✅ | 見 #018 |
+| H2 | 身分與分享：公司模式、指定使用者、分享給我的網站 | ✅ | 見 #019 |
 | C1 | 對話附加檔案 / 圖片 / 影片給 Agent（使用者回報） | ✅ | 見 [#006](#006--對話可以附加檔案圖片影片給-agent)；真實視覺模型**待使用者環境確認** |
 
 **從 Sprint 2 移交、待使用者環境確認**（見 [Sprint 2 看板 #037](board-sprint-2.md)）：
@@ -79,6 +80,42 @@
 ---
 
 ## 💬 留言區
+
+### #030 · 主要網域改為 ymir.thetainformation.com
+
+> 👤 **Codex（AI）** · 🕒 2026-10-08 11:48 · `✅完成`
+
+依使用者要求，將目前部署資料庫的 `edge.public_hostname` 從 `vibemaker.webpromaterial.com` 改為 `ymir.thetainformation.com`，同步寫入網域變更稽核。部署啟動檔與環境範本原本已使用新網域；Cloudflare Tunnel 已配置新網域至 `http://ymir-web:80`，無須重新部署或停止服務。README 的架構圖同步改為新網域。
+
+驗證：新網域 HTTPS `/login` 200；避開先前快取的新網域 `/api/auth/providers` 200，企業登入與密碼登入開啟、dev 登入關閉；本機 API 以新 Host 請求 200、舊 Host 400；企業登入入口 302，`redirect_uri` 為 `https://ymir.thetainformation.com/signin-oidc`。未以真實企業帳號完成登入。Cloudflare 的舊網域路由仍存在，但 API 已不接受舊 Host，沒有新增舊網域重新導向。
+
+---
+
+### #029 · 整合測試分支本機部署
+
+> 👤 **Codex（AI）** · 🕒 2026-10-08 11:15 · `✅完成`
+
+依使用者要求部署 `claude/inspiring-einstein-2pwxx6` 的 `ab212b2`，不合併 main。重新 publish API、SiteHost，建置 Angular／nginx 與 Agent 映像；保留 nginx 50 MB 上傳限制、現有登入金鑰、模型設定、對外網域與資料。部署前確認 0 個 Queued／Running execution，SQL Server COPY_ONLY／CHECKSUM 備份後套用完整 VibeMaker idempotent migration（sqlcmd 使用 QUOTED_IDENTIFIER ON）。本機備份位於 `%LOCALAPPDATA%/Ymir/deploy/ymir-before-inspiring-ab212b2.bak`。
+
+API、nginx、SiteHost 已啟動；2 個正式使用者容器已移除以便下次使用重建新版，workspace／agent-state 保留。SiteHost 使用本機 `*.sites.localhost:5300`，未新增對外 DNS／Tunnel；知識庫未配置 EmbeddingModel、MCP 目錄為空且 Gateway 未啟動，因此兩者維持停用；OneDrive 沿用既有設定，需要實際帳號授權。
+
+驗證：API health、本機 4200／5080、SiteHost health 與現有對外網域首頁均 200；本機與對外 models 匿名請求均 401；nginx 設定有效、50m 上限保留；新版 Agent uid=1000，Pi 1.0.0、pdftotext、python-pptx 與公告模板 smoke test 通過。16 個 VibeMaker migration 已套用，28 個對話與 124 個訊息保留。未以付費模型執行測試，也未以真實 OneDrive／MCP／Embedding 後端驗證。分支程式碼先前 Linux CI 764 項後端測試、164 項前端測試與映像檢查全數通過。
+
+---
+
+
+### #028 · main 與擴充能力整合至測試分支
+
+> 👤 **Codex（AI）** · 🕒 2026-10-08 10:15 · `🔬驗證`
+
+依使用者要求，將 main（15e02a8）整合到 `claude/inspiring-einstein-2pwxx6`，保留 MCP Gateway、OneDrive 同步、RAG 與公開／私人網站託管，並納入個別模型權限、思考深度、文件 /make、/help 與簡化工作提示。另兩個 Claude 工作分支已包含在此分支歷史內。此次不合併回 main，也不替換現有部署。
+
+解決模型與 Agent request、DI、API 契約及文件衝突，重新產生 OpenAPI 與前端型別。修正知識庫未套用個別模型權限、知識庫索引換金鑰可能撤銷執行中 Agent 的整合問題；三種用途的金鑰分別快取，停用帳號時全部撤銷。Windows MCP 測試改用容器可達的本機假服務，OneDrive 測試改用跨平台可建立但不符合同步規則的長檔名。
+
+已驗證：Release build 0 警告／0 錯誤；後端單元測試 493 通過、5 項既有 Windows 平台略過；前端 lint、164 測試、build；OpenAPI 快照 1、知識庫 11、模型權限 4、授權矩陣 4、MCP 6、網站 6、/make 10 項整合測試通過。OneDrive 連線測試先前 9 項通過，同步 6 項在修正 Windows 測試檔名後重跑全部通過；完整 Linux CI 檢查中（前端與 Agent 映像已通過）。測試使用 Fake LLM，不呼叫付費模型。
+
+---
+
 ### #027 · 對話工具與終端機執行提示簡化
 
 > 👤 **Codex（AI）** · 🕒 2026-10-08 01:16 · `✅完成`
@@ -285,6 +322,235 @@ README 已更新，本機前端映像為 `localhost/ymir/web:model-picker-202610
 
 ---
 
+### #019 · H2 完成：私人網站的票據登入、分享與管理員可見（本輪計畫收尾）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 11:30 · `✅完成`
+
+- **做了什麼**（ADR-0016 §3、§4）：
+  - **存取模式**：公開 / 所有 Ymir 使用者 / 指定使用者（`vibemaker.site_shares`）。
+    - 擁有者與 Ymir 管理員一律可以看。
+    - API 與 SiteHost 共用 `SiteAccessRules.CanView`。
+  - **私人網站登入**：
+    1. SiteHost 導向平台的 `/site-access`（未登入時先走 Ymir 登入）；
+    2. 前端 `POST /api/sites/{id}/ticket` 取得票據：60 秒、一次性、資料庫只存 SHA-256；
+    3. SiteHost 的 `/.ymir/auth` 以條件更新兌換，設定 `ymir_site` cookie：只限該 hostname、綁定網站、HttpOnly、8 小時。
+    - 導回路徑只接受站內相對路徑。
+    - 平台 cookie 不會送到網站網域。
+  - **每個請求的授權**：重新檢查帳號狀態、管理員角色與分享名單（快取 ≤ 30 秒）。網站查詢快取 10 秒。
+  - **API**（加入授權矩陣與 OpenAPI；存取變更寫稽核 `site.access.update`）：
+    - `PUT /api/sites/{id}/access`；
+    - `GET /api/sites/shared-with-me`；
+    - `GET /api/users/search`：只回未停用帳號的 id / 名稱 / 帳號，不含自己；
+    - 票據端點。
+  - **前端**：
+    - 「我的網站」的存取設定與分享選擇器；
+    - 「分享給我的網站」；
+    - `/site-access` 轉接頁：沒有權限時顯示摘要。
+  - **修正**：SiteHost 原本用 `app.Run`，會在端點之前攔下 `/.ymir/*`。改成 `MapFallback("{**path}")`。
+- **驗證**：
+  - `dotnet build`（0 警告）、`dotnet format --verify-no-changes`。
+  - `dotnet test --solution`：722 / 722 通過，新增：
+    - `SiteHostingTests` 2 個：私人網站導向登入、票據 / cookie、分享、AllUsers、撤權、管理員、別人改不了設定；票據重放、跨站兌換、cookie 綁定網站、停用帳號、分享名單拒絕停用帳號。
+    - `SiteRulesTests` 15 個：CanView、SafeReturnPath、票據雜湊。
+  - 前端 lint、141 個測試、build 通過。
+  - **e2e:sites**（`*.localhost`，SiteHost 在 5300）全部通過，截圖 5 張：
+    - 發布 → 匿名看公開網站；
+    - 改成指定使用者 → 匿名被導向登入；
+    - 被分享者經票據進站，「分享給我的網站」看得到；
+    - 其他使用者被拒；
+    - 管理員可看；
+    - 撤權後 cookie 失效。
+- **發現**：公開網站回應帶 `Cache-Control: public, max-age=60`，所以公開改私人後，**已經看過**的瀏覽器最多 60 秒內還會顯示快取內容。私人網站一律 `private, no-store`。
+- **未驗證、待使用者環境確認**：
+  - 真實網域、萬用字元 DNS / TLS、Tunnel 路由；
+  - 正式主機 SiteHost 的 Data Protection 金鑰目錄權限。
+- **本輪總結**：A2 → R0 → R1 → R2 → H0 → H1 → H2 都已完成，都在 `claude/inspiring-einstein-2pwxx6`。依使用者指示**未合併回 main**；PR #47 保持開啟。P0 維持「僅計畫」。
+
+---
+### #018 · H1 完成：公開網站發布（SiteHost）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 10:30 · `✅完成`
+
+- **做了什麼**（ADR-0016 H1）：
+  - **發布**：檔案面板新增「🌐 發布網站」，會列出含 `index.html` 的目錄，可選 SPA 模式。
+    - `SiteService` 先檢查擁有者，再經 runtime 內的 reader 把檔案複製到網站 volume 的新版本目錄。
+    - 完整寫好才切換版本；保留最近 3 版；失敗不影響目前版本；第一次發布就失敗時不留下網站。
+  - **`src/Ymir.SiteHost`**（唯讀）：依 `{代碼}.{BaseHost}` 找網站，只提供版本目錄內的檔案。
+    - 路徑逐段檢查，並確認解析後仍在版本目錄內。
+    - SPA 模式只對沒有副檔名的路徑回 index.html，不存在的資源仍是 404。
+    - 隱藏檔不會發布，也不會被提供。
+    - 標頭 `nosniff`；未知或未發布的網站一律回同樣的 404。
+  - **「我的網站」頁**（側邊欄「網站」）：網址、重新發布、取消發布、刪除。
+  - **API**：已加入授權矩陣與 OpenAPI；狀態變更寫稽核 `site.publish` / `site.unpublish` / `site.delete`。
+  - **部署**：`deploy/sites/`（systemd unit、env 範本、萬用字元網域與 Tunnel 說明）。
+- **驗證**：
+  - `dotnet build`（0 警告）、`dotnet format --verify-no-changes`。
+  - `dotnet test --solution`：705 / 705 通過，新增：
+    - `SiteHostingTests` 4 個：提供檔案與 SPA、重新發布與保留版本、取消發布與刪除、擁有者與限制。
+    - `SiteRulesTests` 15 個。
+  - 前端 lint、139 個測試、build 都通過。
+  - 網站的 e2e（公開 + 私人）在 H2 一起做。
+- **未驗證、待使用者環境確認**：真實網域、萬用字元 DNS / TLS、Tunnel 路由、正式 volume 權限。
+- **下一步**：H2（私人網站：票據登入、分享、管理員可見）。
+
+---
+### #017 · H0 完成：ADR-0016 網站託管
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 09:30 · `✅完成`
+
+- **做了什麼**：新增 [ADR-0016](../adr/0016-site-hosting.md)，並更新 ADR 索引、計畫狀態，以及 CLAUDE.md 的 ADR 範圍。
+  - **SiteHost**：新增獨立服務 `Ymir.SiteHost`。它依 Host 找網站、檢查權限、提供靜態檔案；只讀，不執行使用者程式。
+  - **發布**：API 經 `IWorkspaceFileReader` 把選定的目錄複製成版本，完整寫好後才切換；保留最近 3 個版本。
+  - **存取模式**：公開 / 所有 Ymir 使用者 / 指定使用者；擁有者與 Ymir 管理員一律可以看。
+  - **私人網站登入**：前端 `/site-access` 頁取得 60 秒一次性票據 → SiteHost 兌換成只限該 hostname 的 cookie → 每個請求重新檢查權限（最多快取 30 秒）。
+  - **限制**：單站 50 MB、2,000 個檔案、每人 20 個網站。另有 SPA 路由、路徑檢查、快取標頭的規則。
+- **驗證**：文件變更，無程式。
+- **下一步**：H1 公開網站發布。
+
+---
+### #016 · R2 完成：根據專案文件問答並附引用
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 09:00 · `✅完成`
+
+- **做了什麼**（ADR-0014 §8）：
+  - `POST /api/projects/{id}/knowledge/ask`：
+    1. 問題向量化；
+    2. 只在該專案、相同 embedding 模型的可查詢版本中檢索；
+    3. 低於門檻的段落不列為引用；沒有段落時回「資料不足」，**不呼叫模型**。
+  - **回答模型**：只有管理員標記 `VibeMaker__Models__N__AllowKnowledgeBase=true` 的模型會收到片段。其他模型只回相關段落（`modelAllowed=false`），片段不會外送。
+    - 這點與 ADR 原本寫的「回 403」不同，實作改為仍回傳段落，ADR 已同步修正。
+  - **Prompt**：片段放在 `<knowledge>` 資料區塊，system prompt 要求把片段當資料、以 `[n]` 標註來源。
+  - **引用內容**：檔名、版本、段落、頁碼、摘錄；不含伺服器路徑。
+  - **前端**：知識庫卡加問答區，模型選單只列可用模型，回答以文字綁定顯示，引用可以展開。
+  - **Fake LLM**：遇到 `<knowledge>` 就回第一個片段並附 `[1]`。
+- **驗證**：
+  - `dotnet build`（0 警告）、`dotnet format --verify-no-changes`。
+  - `dotnet test --solution`：686 / 686 通過，新增：
+    - `KnowledgeAskTests` 4 個：引用、資料不足不呼叫模型、未允許的模型只回段落、他人 404 與無效問題。
+    - prompt 資料區塊的單元測試。
+  - 前端 lint、137 個測試、build 都通過。
+  - `e2e:knowledge`：建立專案 → 上傳 2 份文件 → 索引完成 → 提問得到 `[1]` 與「請假規則.txt」引用 → 無關問題顯示資料不足，全部通過。
+  - e2e 備註：Playwright 以「檔案路徑」上傳時，瀏覽器讀不到 scratchpad 目錄的檔案，改用 buffer 上傳（附件的 e2e 也是這樣做）。
+- **未驗證、待使用者環境確認**：真實模型的回答與引用品質、LiteLLM 的預算在知識庫問答上的套用。
+- **下一步**：H0（ADR-0016 網站託管）。
+
+---
+### #015 · R1 完成：專案知識庫的文件索引
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 08:00 · `✅完成`
+
+- **做了什麼**（ADR-0014 R1）：
+  - **上傳**：專案頁新增「知識庫」卡，可上傳、看狀態（自動更新）、重試、移除。
+  - **API**：`/api/projects/{id}/knowledge/*`，驗證擁有者，已加入授權矩陣。
+  - **背景索引** `KnowledgeIndexWorker`：
+    1. 擷取文字：TXT / Markdown / 文字型 PDF（含頁碼）/ DOCX（禁止 DTD）；
+    2. 切段：依句尾、有重疊、不跨頁；
+    3. 經 LiteLLM `/v1/embeddings` 向量化（使用者的 virtual key；embedding 模型自動加入 key 的允許模型）；
+    4. 寫入每專案一份 SQLite。
+  - **版本切換**：新版本完整寫入才切換（同檔名只有一份 Ready），失敗保留舊版本，重啟時重做、不會產生重複段落。
+  - **儲存位置**：原始檔與 SQLite 放在 API 自己的 volume `Ymir:Knowledge:Root`，不在 Agent workspace。
+  - **Fake LLM**：新增 `/v1/embeddings`（固定的字元 bigram 向量）。
+- **驗證**：
+  - `dotnet build`（0 警告）、`dotnet format --verify-no-changes`。
+  - `dotnet test --solution`：681 / 681 通過，新增：
+    - `KnowledgeBaseTests` 5 個：各格式索引、無效檔案摘要、新版本取代與移除後不再召回、專案與使用者隔離、重啟重做。
+    - `KnowledgeDisabledTests` 1 個。
+    - `KnowledgeRulesTests` 11 個。
+  - 前端 lint、136 個測試、build 都通過。
+  - 知識庫的 e2e 在 R2（問答）完成後一起做。
+- **未驗證、待使用者環境確認**：真實 Embedding 模型的品質與速度、正式 volume 的備份。
+- **下一步**：R2 問答。
+
+---
+### #014 · R0 完成：ADR-0014 RAG 知識庫
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 06:40 · `✅完成`
+
+- **做了什麼**：新增 [ADR-0014](../adr/0014-rag-knowledge-base.md)，並更新 ADR 索引、計畫文件狀態，以及 CLAUDE.md 的 ADR 範圍。
+  - 知識庫屬於專案，首版只有擁有者可用。
+  - 文件與每個專案一份的 SQLite 放在 API 自己的持久 volume（`Ymir:Knowledge:Root/<userId>/<projectId>/`），不掛給 Agent。
+  - Embedding 經 LiteLLM、使用者的 virtual key。回答模型需要管理員標記 `AllowKnowledgeBase`。
+  - 支援格式：TXT、Markdown、文字型 PDF（PdfPig）、DOCX。
+  - 版本化索引：新版本成功才切換，失敗保留舊版本，重啟後重做。
+- **Spike（沙箱）**：
+  - 2 萬段 × 1024 維向量存進 SQLite：寫入約 1.2 秒、檔案 156 MB；暴力餘弦搜尋約 250 ms（純量迴圈）。
+  - PdfPig 0.1.16 可以載入。
+  - `sqlite-vec` 沒有官方 NuGet，首版不採用，之後可在 `IVectorStore` 下替換。
+- **未驗證、待使用者環境確認**：真實 Embedding 模型的繁中檢索品質與速度、LiteLLM 的 embedding 路由。
+- **下一步**：R1 最小索引。
+
+---
+### #013 · A2 完成：平台 MCP Gateway；接下來依序完成 RAG 與網站託管
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 06:00 · `✅完成`
+
+- **使用者指示（2026-10-08）**：
+  - 依序完成剩下的計畫：A2 → R0 → R1 → R2 → H0 → H1 → H2；P0 維持「僅計畫」。
+  - **做完先不要 merge 回 main**，留在 `claude/inspiring-einstein-2pwxx6`；PR #47 保持開啟、不合併。
+- **使用者決定**：
+
+  | 項目 | 決定 |
+  |---|---|
+  | RAG Embedding | 經 LiteLLM `/v1/embeddings` |
+  | RAG 回答模型 | 由管理員標記哪些模型可用於知識庫 |
+  | 網站網域 | 設定值 `<代碼>.<BaseDomain>` |
+  | 網站可見範圍 | 由擁有者選擇，Ymir 管理員一律可看 |
+
+- **ADR 編號**：ADR-0015 已用於明確交付成果，所以網站託管改為 ADR-0016。
+- **A2 做了什麼**（ADR-0012 階段 2，附註已寫入 ADR）：
+  - **`src/Ymir.McpGateway`**：獨立服務。
+    - 驗證 API 簽發的每人短期 token（HMAC；內容是使用者、允許的服務、期限，最長 1 小時）。
+    - `/mcp/{服務}` 轉送到 `deploy/mcp/servers.json` 中的後端，並換成 gateway 自己保管的後端憑證。
+    - 每人 rate limit、逾時。
+    - 稽核：`mcp.tool.call` 只記工具名稱；另有 `mcp.access.denied`。
+  - **存取清單** `vibemaker.mcp_server_access`：
+    - 管理端點 `GET /api/admin/mcp-servers`、`PUT .../{name}/access`；
+    - 「系統設定 → 平台 MCP 服務」卡；
+    - 個人設定顯示可用的平台服務。
+  - **執行時**：
+    - `mcp.json` 寫入 gateway 位址與 `Authorization: Bearer ${YMIR_MCP_TOKEN}`，檔案裡沒有 token 值，平台項目優先；
+    - token 經 `exec --env` 傳入；
+    - 使用者沒有 `mcp` 能力時也載入 `builtin:mcp`，但只合併平台項目。
+  - **部署**：`deploy/mcp/`（目錄、範例、env 範本、systemd unit、README）；CLAUDE.md 已更新。
+- **驗證**：
+  - `dotnet build`（0 警告）、`dotnet format --verify-no-changes`。
+  - `dotnet test --solution`：664 / 664 通過，新增：
+    - `McpGatewayTests` 6 個：真實 Pi 經 gateway 呼叫 echo；偽造 / 過期 token；未授權服務；rate limit；存取清單；後端只收到 gateway 憑證；`mcp.json` 不含 token。
+    - `PlatformMcpTests` 13 個。
+  - 前端 lint、133 個測試、build 都通過。
+  - `e2e:mcp`（Fake MCP + gateway + Pi + Fake LLM）：管理員開放 → 成員看到 → Agent 回覆「echo: ping from agent」，全部通過。
+- **未驗證、待使用者環境確認**：真實後端服務（EIP / MES）；正式主機上受限網路（`--internal`）連到 gateway 的路由。
+- **其他**：PR #47 上「Agent runtime image」是 Docker Hub 回 500 造成的失敗，已重跑一次。
+- **下一步**：R0（ADR-0014 RAG）。
+
+---
+### #012 · O2 完成：OneDrive 同步
+
+> 👤 **Claude（AI）** · 🕒 2026-10-08 04:00 · `✅完成`
+
+- **做了什麼**（ADR-0013 §4，指南 `docs/guides/onedrive.md`）：
+  - **執行前**：`ExecutionRunner` 在 Agent 啟動前、持有使用者鎖時，從 OneDrive 下載雲端的變更，並送出「正在從 OneDrive 同步」。下載失敗只送狀態事件，Agent 照常使用本機檔案執行。
+  - **執行後**：上傳工作寫進 `vibemaker.onedrive_sync_scopes`，服務重啟後會繼續。`OneDriveSyncWorker` 取得同一把使用者鎖後先下載、再上傳。失敗時依 1、5、15、60 分鐘重試，共 5 次；授權失效就停止，並請使用者重新連結。
+  - **比對與衝突**：
+    - 雲端以 eTag 比對，上傳帶 If-Match；本機以大小加修改時間比對。
+    - 兩邊都改過時，原檔名保留雲端版本，本機版本另存「(OneDrive 衝突 時間)」副本，雲端和本機都會有兩份。
+    - 不同步刪除。隱藏檔、node_modules、超過大小上限、名稱不符合 OneDrive 規則的檔案都略過。`deliverables/` 只上傳、不下載。大於 4 MB 的檔案用 upload session。
+  - **檔案讀寫**：一律經 runtime 內的 reader / writer，Agent 拿不到 Graph token。writer 改成可以寫入工作目錄根部的檔案。
+  - **API**：
+    - `GET /api/conversations/{id}/onedrive`、`POST .../onedrive/sync`，未就緒時回 409 `ONEDRIVE_NOT_READY`。
+    - 兩者都驗證擁有者，並加入授權矩陣。授權矩陣新增 `OwnerStatusOverrides`：擁有者沒有連結 OneDrive 時回 409，仍可證明請求本身正確。
+  - **前端**：檔案面板新增「雲端保存狀態」（`app-onedrive-sync`），可以立即同步或重試，與 Agent 任務結果分開顯示。
+  - **Fake Graph**：支援 conflictBehavior（fail / rename / replace）、upload session 的前置條件檢查、children 分頁。
+- **驗證**：
+  - `dotnet build`（0 警告）、`dotnet format --verify-no-changes`。
+  - `dotnet test --solution`：645 / 645 通過。新增 `OneDriveSyncTests` 6 個：上傳與下載、衝突保留兩份、大檔 upload session 與專案資料夾、授權失效、未開放、不外洩 token。
+  - 前端 lint、131 個測試、build 都通過。
+  - `e2e:onedrive`（Fake OIDC + Fake Graph）：管理員開放 → 連結 → 設定資料夾 → 送訊息後檔案面板顯示「已同步到 OneDrive」→ 立即同步 → 解除連結，全部通過。
+- **未驗證、待使用者環境確認**：真實 Entra 的 `Files.ReadWrite` 同意與 callback redirect URI、Microsoft Graph / OneDrive for Business 的實際行為（eTag 變動、upload session、節流）。
+- **已知限制**：以大小加修改時間判斷本機變更。若換根資料夾後又切回原本的資料夾，兩邊已存在的同名檔案會各產生一份衝突副本。
+- **下一步**：恢復 A2（MCP Gateway）。
+
+---
 ### #011 · AppDashboard 側欄清單與漢堡收合
 
 > 👤 **Codex（AI）** · 🕒 2026-10-07 17:15 · `✅完成`

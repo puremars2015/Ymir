@@ -64,18 +64,30 @@ internal sealed class PiAgentHarness(
                 "--session-id", request.SessionId.ToString("D"),
                 .. request.SystemPrompts.SelectMany((_, i) => new[] { "--append-system-prompt", SystemPromptPath(request.ExecutionId, i) }),
                 // 擴充能力由政策決定（ADR-0012 A.3），Agent 無法改變參數。
-                .. PiExtensionConfig.BuildArguments(request.Extensions ?? EffectiveExtensions.None),
+                .. PiExtensionConfig.BuildArguments(request.Extensions ?? EffectiveExtensions.None, request.PlatformMcp is not null),
             ],
-            new Dictionary<string, string>
-            {
-                ["PI_CODING_AGENT_DIR"] = PiRuntimeLayout.AgentDirectory,
-                ["PI_OFFLINE"] = "1",
-                ["PI_SKIP_VERSION_CHECK"] = "1",
-                ["PI_TELEMETRY"] = "0",
-                [PiRuntimeLayout.ApiKeyEnvironmentVariable] = request.ModelApiKey,
-            },
+            BuildEnvironment(request),
             // 專案目錄或未分組對話自己的目錄（ADR-0007）；Pi 的檔案工具以此為根。
             request.WorkingDirectory);
+
+    private static Dictionary<string, string> BuildEnvironment(AgentRunRequest request)
+    {
+        var environment = new Dictionary<string, string>
+        {
+            ["PI_CODING_AGENT_DIR"] = PiRuntimeLayout.AgentDirectory,
+            ["PI_OFFLINE"] = "1",
+            ["PI_SKIP_VERSION_CHECK"] = "1",
+            ["PI_TELEMETRY"] = "0",
+            [PiRuntimeLayout.ApiKeyEnvironmentVariable] = request.ModelApiKey,
+        };
+        if (request.PlatformMcp is { } platform)
+        {
+            // 每人專屬的短期 gateway token（ADR-0012 B.3）：與 LiteLLM key 一樣只以環境變數名稱傳入 runtime。
+            environment[PiExtensionConfig.PlatformMcpTokenEnvironmentVariable] = platform.Token;
+        }
+
+        return environment;
+    }
 
     private async Task PumpAsync(AgentRunRequest request, ChannelWriter<AgentEvent> writer, CancellationToken cancellationToken)
     {
@@ -253,7 +265,7 @@ internal sealed class PiAgentHarness(
     {
         var extensions = request.Extensions ?? EffectiveExtensions.None;
         var userMcp = await ReadUserMcpConfigAsync(request.RuntimeId, cancellationToken).ConfigureAwait(false);
-        var mcpJson = PiExtensionConfig.BuildMcpConfig(userMcp, extensions.Mcp, out var invalid);
+        var mcpJson = PiExtensionConfig.BuildMcpConfig(userMcp, extensions.Mcp, out var invalid, request.PlatformMcp?.Servers);
         if (invalid)
         {
             logger.LogWarning("Ignoring invalid {File} for execution {ExecutionId}", PiRuntimeLayout.UserMcpFileName, request.ExecutionId);

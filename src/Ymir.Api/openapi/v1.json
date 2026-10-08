@@ -326,6 +326,79 @@
         }
       }
     },
+    "/api/conversations/{conversationId}/sites": {
+      "post": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "PublishSite",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublishSiteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/search": {
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "SearchUsers",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UserSearchResult"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/make-topics": {
       "get": {
         "tags": [
@@ -1490,6 +1563,479 @@
         }
       }
     },
+    "/api/admin/mcp-servers": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminListMcpServers",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformMcpServersResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/mcp-servers/{name}/access": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveMcpServerAccess",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveMcpServerAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/knowledge": {
+      "get": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "GetKnowledgeBase",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeBaseResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/knowledge/documents": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "UploadKnowledgeDocument",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fileName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "$ref": "#/components/schemas/Stream"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeDocumentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/knowledge/documents/{documentId}": {
+      "delete": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "RemoveKnowledgeDocument",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/knowledge/documents/{documentId}/retry": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "RetryKnowledgeDocument",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeDocumentResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/projects/{projectId}/knowledge/ask": {
+      "post": {
+        "tags": [
+          "Knowledge"
+        ],
+        "operationId": "AskKnowledgeBase",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskKnowledgeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KnowledgeAnswerResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites": {
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "ListSites",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SitesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{siteId}/publish": {
+      "post": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "RepublishSite",
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepublishSiteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{siteId}/unpublish": {
+      "post": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "UnpublishSite",
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{siteId}": {
+      "delete": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "DeleteSite",
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/sites/{siteId}/access": {
+      "put": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "SetSiteAccess",
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/shared-with-me": {
+      "get": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "ListSitesSharedWithMe",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SharedSiteResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sites/{siteId}/ticket": {
+      "post": {
+        "tags": [
+          "Sites"
+        ],
+        "operationId": "IssueSiteTicket",
+        "parameters": [
+          {
+            "name": "siteId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SiteTicketRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteTicketResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/connectors/onedrive": {
       "get": {
         "tags": [
@@ -1544,6 +2090,64 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversationId}/onedrive": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "GetConversationOneDriveStatus",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationOneDriveResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversationId}/onedrive/sync": {
+      "post": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "SyncConversationOneDrive",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -2236,6 +2840,27 @@
           }
         }
       },
+      "AskKnowledgeRequest": {
+        "required": [
+          "question",
+          "modelId"
+        ],
+        "type": "object",
+        "properties": {
+          "question": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "modelId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "AttachmentResponse": {
         "required": [
           "id",
@@ -2400,6 +3025,66 @@
             ]
           },
           "newPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ConversationOneDriveResponse": {
+        "required": [
+          "availability",
+          "rootPath",
+          "folderPath",
+          "state",
+          "lastSyncedAt",
+          "conflictCount",
+          "lastError"
+        ],
+        "type": "object",
+        "properties": {
+          "availability": {
+            "$ref": "#/components/schemas/OneDriveAvailability"
+          },
+          "rootPath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "folderPath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "state": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/OneDriveSyncState"
+              }
+            ]
+          },
+          "lastSyncedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "conflictCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lastError": {
             "type": [
               "null",
               "string"
@@ -2716,6 +3401,221 @@
           }
         }
       },
+      "KnowledgeAnswerResponse": {
+        "required": [
+          "answer",
+          "insufficientData",
+          "modelAllowed",
+          "modelId",
+          "citations"
+        ],
+        "type": "object",
+        "properties": {
+          "answer": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "insufficientData": {
+            "type": "boolean"
+          },
+          "modelAllowed": {
+            "type": "boolean"
+          },
+          "modelId": {
+            "type": "string"
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeCitationResponse"
+            }
+          }
+        }
+      },
+      "KnowledgeBaseResponse": {
+        "required": [
+          "enabled",
+          "maxFileBytes",
+          "maxDocuments",
+          "supportedExtensions",
+          "documents"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxFileBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "maxDocuments": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "supportedExtensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KnowledgeDocumentResponse"
+            }
+          }
+        }
+      },
+      "KnowledgeCitationResponse": {
+        "required": [
+          "number",
+          "documentId",
+          "fileName",
+          "version",
+          "ordinal",
+          "page",
+          "excerpt",
+          "score"
+        ],
+        "type": "object",
+        "properties": {
+          "number": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "ordinal": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "score": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "KnowledgeDocumentResponse": {
+        "required": [
+          "id",
+          "fileName",
+          "version",
+          "size",
+          "status",
+          "chunkCount",
+          "error",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "version": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/KnowledgeDocumentStatus"
+          },
+          "chunkCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "KnowledgeDocumentStatus": {
+        "enum": [
+          "Pending",
+          "Indexing",
+          "Ready",
+          "Failed",
+          "Removed"
+        ]
+      },
       "LoginProvidersResponse": {
         "required": [
           "oidc",
@@ -2771,6 +3671,44 @@
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "McpAccessMode": {
+        "enum": [
+          "Everyone",
+          "AdminsOnly",
+          "SelectedUsers"
+        ]
+      },
+      "McpServerAccessResponse": {
+        "required": [
+          "name",
+          "description",
+          "enabled",
+          "mode",
+          "userIds"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/McpAccessMode"
+          },
+          "userIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -2947,6 +3885,10 @@
                 "$ref": "#/components/schemas/ThinkingCapabilityResponse"
               }
             ]
+          },
+          "allowKnowledgeBase": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -2958,7 +3900,8 @@
           "oneDriveAllowed",
           "inventoryAvailable",
           "skills",
-          "mcpServers"
+          "mcpServers",
+          "platformMcpServers"
         ],
         "type": "object",
         "properties": {
@@ -2987,6 +3930,12 @@
             "type": "array",
             "items": {
               "type": "string"
+            }
+          },
+          "platformMcpServers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlatformMcpServerSummary"
             }
           }
         }
@@ -3097,6 +4046,15 @@
           }
         }
       },
+      "OneDriveAvailability": {
+        "enum": [
+          "NotAllowed",
+          "NotConnected",
+          "NeedsReauth",
+          "NoRoot",
+          "Ready"
+        ]
+      },
       "OneDriveLinkState": {
         "enum": [
           "NotConnected",
@@ -3152,6 +4110,14 @@
           }
         }
       },
+      "OneDriveSyncState": {
+        "enum": [
+          "Synced",
+          "Pending",
+          "Failed",
+          null
+        ]
+      },
       "PasswordLoginRequest": {
         "required": [
           "account",
@@ -3170,6 +4136,39 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "PlatformMcpServersResponse": {
+        "required": [
+          "enabled",
+          "servers"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/McpServerAccessResponse"
+            }
+          }
+        }
+      },
+      "PlatformMcpServerSummary": {
+        "required": [
+          "name",
+          "description"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
           }
         }
       },
@@ -3207,6 +4206,60 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "PublishSiteRequest": {
+        "required": [
+          "name",
+          "sourcePath"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "sourcePath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "spaMode": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "RepublishSiteRequest": {
+        "required": [
+          "conversationId",
+          "sourcePath",
+          "spaMode"
+        ],
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "sourcePath": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "spaMode": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },
@@ -3445,6 +4498,32 @@
           },
           "isEnabled": {
             "type": "boolean"
+          }
+        }
+      },
+      "SaveMcpServerAccessRequest": {
+        "required": [
+          "enabled",
+          "mode",
+          "userIds"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/McpAccessMode"
+          },
+          "userIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -3764,6 +4843,233 @@
           }
         }
       },
+      "SharedSiteResponse": {
+        "required": [
+          "id",
+          "name",
+          "url",
+          "ownerName",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          },
+          "ownerName": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "SiteAccessMode": {
+        "enum": [
+          "Public",
+          "AllUsers",
+          "SelectedUsers"
+        ]
+      },
+      "SiteAccessRequest": {
+        "required": [
+          "mode",
+          "userIds"
+        ],
+        "type": "object",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/SiteAccessMode"
+          },
+          "userIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
+      "SiteResponse": {
+        "required": [
+          "id",
+          "name",
+          "url",
+          "status",
+          "accessMode",
+          "spaMode",
+          "conversationId",
+          "sourcePath",
+          "fileCount",
+          "totalBytes",
+          "publishedAt",
+          "updatedAt",
+          "sharedWith"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uri"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SiteStatus"
+          },
+          "accessMode": {
+            "$ref": "#/components/schemas/SiteAccessMode"
+          },
+          "spaMode": {
+            "type": "boolean"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourcePath": {
+            "type": "string"
+          },
+          "fileCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "totalBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "publishedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sharedWith": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SiteShareResponse"
+            }
+          }
+        }
+      },
+      "SiteShareResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "accountName"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SitesResponse": {
+        "required": [
+          "enabled",
+          "maxSites",
+          "sites"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "maxSites": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "sites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SiteResponse"
+            }
+          }
+        }
+      },
+      "SiteStatus": {
+        "enum": [
+          "Unpublished",
+          "Published"
+        ]
+      },
+      "SiteTicketRequest": {
+        "required": [
+          "path"
+        ],
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SiteTicketResponse": {
+        "required": [
+          "redirectUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "redirectUrl": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
       "Stream": {
         "type": "string",
         "format": "binary"
@@ -4057,6 +5363,29 @@
           "Admin"
         ]
       },
+      "UserSearchResult": {
+        "required": [
+          "id",
+          "displayName",
+          "accountName"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "UserSettingsResponse": {
         "required": [
           "systemPrompt"
@@ -4296,6 +5625,9 @@
       "name": "Extensions"
     },
     {
+      "name": "Sites"
+    },
+    {
       "name": "Make"
     },
     {
@@ -4309,6 +5641,9 @@
     },
     {
       "name": "Admin"
+    },
+    {
+      "name": "Knowledge"
     },
     {
       "name": "Connectors"

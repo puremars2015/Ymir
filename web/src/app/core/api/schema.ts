@@ -180,6 +180,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/conversations/{conversationId}/sites': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['PublishSite'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/users/search': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['SearchUsers'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/make-topics': {
     parameters: {
       query?: never;
@@ -597,6 +629,230 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/mcp-servers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminListMcpServers'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/mcp-servers/{name}/access': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['AdminSaveMcpServerAccess'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/projects/{projectId}/knowledge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetKnowledgeBase'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/projects/{projectId}/knowledge/documents': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['UploadKnowledgeDocument'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/projects/{projectId}/knowledge/documents/{documentId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations['RemoveKnowledgeDocument'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/projects/{projectId}/knowledge/documents/{documentId}/retry': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['RetryKnowledgeDocument'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/projects/{projectId}/knowledge/ask': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['AskKnowledgeBase'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListSites'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/{siteId}/publish': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['RepublishSite'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/{siteId}/unpublish': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['UnpublishSite'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/{siteId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations['DeleteSite'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/{siteId}/access': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['SetSiteAccess'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/shared-with-me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListSitesSharedWithMe'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/sites/{siteId}/ticket': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['IssueSiteTicket'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/connectors/onedrive': {
     parameters: {
       query?: never;
@@ -623,6 +879,38 @@ export interface paths {
     get?: never;
     put: operations['SetOneDriveRoot'];
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/conversations/{conversationId}/onedrive': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetConversationOneDriveStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/conversations/{conversationId}/onedrive/sync': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['SyncConversationOneDrive'];
     delete?: never;
     options?: never;
     head?: never;
@@ -835,6 +1123,10 @@ export interface components {
       createdAt: string;
       files: components['schemas']['WorkspaceFileResponse'][];
     };
+    AskKnowledgeRequest: {
+      question: null | string;
+      modelId: null | string;
+    };
     AttachmentResponse: {
       /** Format: uuid */
       id: string;
@@ -876,6 +1168,17 @@ export interface components {
     ChangePasswordRequest: {
       currentPassword: null | string;
       newPassword: null | string;
+    };
+    ConversationOneDriveResponse: {
+      availability: components['schemas']['OneDriveAvailability'];
+      rootPath: null | string;
+      folderPath: null | string;
+      state: null | components['schemas']['OneDriveSyncState'];
+      /** Format: date-time */
+      lastSyncedAt: null | string;
+      /** Format: int32 */
+      conflictCount: number | string;
+      lastError: null | string;
     };
     ConversationResponse: {
       /** Format: uuid */
@@ -948,6 +1251,57 @@ export interface components {
       internet: boolean;
       oneDrive: boolean;
     };
+    KnowledgeAnswerResponse: {
+      answer: null | string;
+      insufficientData: boolean;
+      modelAllowed: boolean;
+      modelId: string;
+      citations: components['schemas']['KnowledgeCitationResponse'][];
+    };
+    KnowledgeBaseResponse: {
+      enabled: boolean;
+      /** Format: int64 */
+      maxFileBytes: number | string;
+      /** Format: int32 */
+      maxDocuments: number | string;
+      supportedExtensions: string[];
+      documents: components['schemas']['KnowledgeDocumentResponse'][];
+    };
+    KnowledgeCitationResponse: {
+      /** Format: int32 */
+      number: number | string;
+      /** Format: uuid */
+      documentId: string;
+      fileName: string;
+      /** Format: int32 */
+      version: number | string;
+      /** Format: int32 */
+      ordinal: number | string;
+      /** Format: int32 */
+      page: null | number | string;
+      excerpt: string;
+      /** Format: double */
+      score: number | string;
+    };
+    KnowledgeDocumentResponse: {
+      /** Format: uuid */
+      id: string;
+      fileName: string;
+      /** Format: int32 */
+      version: number | string;
+      /** Format: int64 */
+      size: number | string;
+      status: components['schemas']['KnowledgeDocumentStatus'];
+      /** Format: int32 */
+      chunkCount: number | string;
+      error: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {unknown} */
+    KnowledgeDocumentStatus: 'Pending' | 'Indexing' | 'Ready' | 'Failed' | 'Removed';
     LoginProvidersResponse: {
       oidc: boolean;
       oidcDisplayName: null | string;
@@ -961,6 +1315,15 @@ export interface components {
       description: null | string;
       /** Format: int32 */
       sortOrder: number | string;
+    };
+    /** @enum {unknown} */
+    McpAccessMode: 'Everyone' | 'AdminsOnly' | 'SelectedUsers';
+    McpServerAccessResponse: {
+      name: string;
+      description: string;
+      enabled: boolean;
+      mode: components['schemas']['McpAccessMode'];
+      userIds: string[];
     };
     MeResponse: {
       /** Format: uuid */
@@ -1003,6 +1366,8 @@ export interface components {
       /** @default false */
       supportsThinking: boolean;
       thinking?: null | components['schemas']['ThinkingCapabilityResponse'];
+      /** @default false */
+      allowKnowledgeBase: boolean;
     };
     MyExtensionsResponse: {
       skillsAllowed: boolean;
@@ -1012,6 +1377,7 @@ export interface components {
       inventoryAvailable: boolean;
       skills: string[];
       mcpServers: string[];
+      platformMcpServers: components['schemas']['PlatformMcpServerSummary'][];
     };
     OidcSettingsResponse: {
       source: components['schemas']['OidcSettingsSource'];
@@ -1039,6 +1405,8 @@ export interface components {
       message: string;
     };
     /** @enum {unknown} */
+    OneDriveAvailability: 'NotAllowed' | 'NotConnected' | 'NeedsReauth' | 'NoRoot' | 'Ready';
+    /** @enum {unknown} */
     OneDriveLinkState: 'NotConnected' | 'Connected' | 'NeedsReauth';
     OneDriveStatusResponse: {
       allowed: boolean;
@@ -1050,9 +1418,19 @@ export interface components {
       connectedAt: null | string;
       lastError: null | string;
     };
+    /** @enum {unknown} */
+    OneDriveSyncState: 'Synced' | 'Pending' | 'Failed' | null;
     PasswordLoginRequest: {
       account: null | string;
       password: null | string;
+    };
+    PlatformMcpServersResponse: {
+      enabled: boolean;
+      servers: components['schemas']['McpServerAccessResponse'][];
+    };
+    PlatformMcpServerSummary: {
+      name: string;
+      description: string;
     };
     ProjectResponse: {
       /** Format: uuid */
@@ -1064,6 +1442,18 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+    };
+    PublishSiteRequest: {
+      name: null | string;
+      sourcePath: null | string;
+      /** @default false */
+      spaMode: boolean;
+    };
+    RepublishSiteRequest: {
+      /** Format: uuid */
+      conversationId: null | string;
+      sourcePath: null | string;
+      spaMode: null | boolean;
     };
     ResetPasswordRequest: {
       newPassword: null | string;
@@ -1122,6 +1512,11 @@ export interface components {
       /** Format: int32 */
       sortOrder: number | string;
       isEnabled: boolean;
+    };
+    SaveMcpServerAccessRequest: {
+      enabled: boolean;
+      mode: components['schemas']['McpAccessMode'];
+      userIds: null | string[];
     };
     SaveModelAccessRequest: {
       enabledModelIds: string[];
@@ -1200,6 +1595,65 @@ export interface components {
     SetTunnelTokenRequest: {
       token: null | string;
     };
+    SharedSiteResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** Format: uri */
+      url: null | string;
+      ownerName: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {unknown} */
+    SiteAccessMode: 'Public' | 'AllUsers' | 'SelectedUsers';
+    SiteAccessRequest: {
+      mode: components['schemas']['SiteAccessMode'];
+      userIds: null | string[];
+    };
+    SiteResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** Format: uri */
+      url: null | string;
+      status: components['schemas']['SiteStatus'];
+      accessMode: components['schemas']['SiteAccessMode'];
+      spaMode: boolean;
+      /** Format: uuid */
+      conversationId: string;
+      sourcePath: string;
+      /** Format: int32 */
+      fileCount: number | string;
+      /** Format: int64 */
+      totalBytes: number | string;
+      /** Format: date-time */
+      publishedAt: null | string;
+      /** Format: date-time */
+      updatedAt: string;
+      sharedWith: components['schemas']['SiteShareResponse'][];
+    };
+    SiteShareResponse: {
+      /** Format: uuid */
+      userId: string;
+      displayName: string;
+      accountName: null | string;
+    };
+    SitesResponse: {
+      enabled: boolean;
+      /** Format: int32 */
+      maxSites: number | string;
+      sites: components['schemas']['SiteResponse'][];
+    };
+    /** @enum {unknown} */
+    SiteStatus: 'Unpublished' | 'Published';
+    SiteTicketRequest: {
+      path: null | string;
+    };
+    SiteTicketResponse: {
+      /** Format: uri */
+      redirectUrl: string;
+    };
     /** Format: binary */
     Stream: string;
     TestOidcSettingsRequest: {
@@ -1267,6 +1721,12 @@ export interface components {
     };
     /** @enum {unknown} */
     UserRole: 'User' | 'Admin';
+    UserSearchResult: {
+      /** Format: uuid */
+      id: string;
+      displayName: string;
+      accountName: null | string;
+    };
     UserSettingsResponse: {
       systemPrompt: null | string;
     };
@@ -1586,6 +2046,54 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['MyExtensionsResponse'];
+        };
+      };
+    };
+  };
+  PublishSite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PublishSiteRequest'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SiteResponse'];
+        };
+      };
+    };
+  };
+  SearchUsers: {
+    parameters: {
+      query?: {
+        q?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['UserSearchResult'][];
         };
       };
     };
@@ -2436,6 +2944,344 @@ export interface operations {
       };
     };
   };
+  AdminListMcpServers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlatformMcpServersResponse'];
+        };
+      };
+    };
+  };
+  AdminSaveMcpServerAccess: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        name: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveMcpServerAccessRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  GetKnowledgeBase: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeBaseResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  UploadKnowledgeDocument: {
+    parameters: {
+      query?: {
+        fileName?: string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/octet-stream': components['schemas']['Stream'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeDocumentResponse'];
+        };
+      };
+    };
+  };
+  RemoveKnowledgeDocument: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  RetryKnowledgeDocument: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        documentId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeDocumentResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AskKnowledgeBase: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AskKnowledgeRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeAnswerResponse'];
+        };
+      };
+    };
+  };
+  ListSites: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SitesResponse'];
+        };
+      };
+    };
+  };
+  RepublishSite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        siteId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RepublishSiteRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SiteResponse'];
+        };
+      };
+    };
+  };
+  UnpublishSite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        siteId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SiteResponse'];
+        };
+      };
+    };
+  };
+  DeleteSite: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        siteId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SetSiteAccess: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        siteId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SiteAccessRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SiteResponse'];
+        };
+      };
+    };
+  };
+  ListSitesSharedWithMe: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SharedSiteResponse'][];
+        };
+      };
+    };
+  };
+  IssueSiteTicket: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        siteId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SiteTicketRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SiteTicketResponse'];
+        };
+      };
+    };
+  };
   GetOneDriveStatus: {
     parameters: {
       query?: never;
@@ -2488,6 +3334,55 @@ export interface operations {
         'application/json': components['schemas']['SetOneDriveRootRequest'];
       };
     };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  GetConversationOneDriveStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConversationOneDriveResponse'];
+        };
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SyncConversationOneDrive: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description OK */
       200: {
