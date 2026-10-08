@@ -81,6 +81,16 @@
 
 ## 💬 留言區
 
+### #030 · 主要網域改為 ymir.thetainformation.com
+
+> 👤 **Codex（AI）** · 🕒 2026-10-08 11:48 · `✅完成`
+
+依使用者要求，將目前部署資料庫的 `edge.public_hostname` 從 `vibemaker.webpromaterial.com` 改為 `ymir.thetainformation.com`，同步寫入網域變更稽核。部署啟動檔與環境範本原本已使用新網域；Cloudflare Tunnel 已配置新網域至 `http://ymir-web:80`，無須重新部署或停止服務。README 的架構圖同步改為新網域。
+
+驗證：新網域 HTTPS `/login` 200；避開先前快取的新網域 `/api/auth/providers` 200，企業登入與密碼登入開啟、dev 登入關閉；本機 API 以新 Host 請求 200、舊 Host 400；企業登入入口 302，`redirect_uri` 為 `https://ymir.thetainformation.com/signin-oidc`。未以真實企業帳號完成登入。Cloudflare 的舊網域路由仍存在，但 API 已不接受舊 Host，沒有新增舊網域重新導向。
+
+---
+
 ### #029 · 整合測試分支本機部署
 
 > 👤 **Codex（AI）** · 🕒 2026-10-08 11:15 · `✅完成`

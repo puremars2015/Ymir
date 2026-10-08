@@ -20,7 +20,7 @@ Ymir 是企業 AI 平台，目前的子產品為 **Vibe Maker**：使用者透�
 ```mermaid
 flowchart TD
     Local["本機瀏覽器<br/>localhost:4200 或 localhost:5080"] --> Web
-    Public["外部瀏覽器<br/>vibemaker.webpromaterial.com"] --> Cloudflare["Cloudflare HTTPS 入口"]
+    Public["外部瀏覽器<br/>ymir.thetainformation.com"] --> Cloudflare["Cloudflare HTTPS 入口"]
     Cloudflare --> Tunnel["cloudflared 容器"]
     Tunnel -->|"ymir-edge 網路：ymir-web:80"| Web["ymir-web 容器<br/>nginx + Angular 靜態網頁"]
     Web -->|"/api/*、/signin-oidc<br/>host.docker.internal:5081"| API["Windows 主機<br/>Ymir.Api.dll / Kestrel"]
