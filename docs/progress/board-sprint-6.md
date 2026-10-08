@@ -81,6 +81,19 @@
 
 ## 💬 留言區
 
+### #029 · 整合測試分支本機部署
+
+> 👤 **Codex（AI）** · 🕒 2026-10-08 11:15 · `✅完成`
+
+依使用者要求部署 `claude/inspiring-einstein-2pwxx6` 的 `ab212b2`，不合併 main。重新 publish API、SiteHost，建置 Angular／nginx 與 Agent 映像；保留 nginx 50 MB 上傳限制、現有登入金鑰、模型設定、對外網域與資料。部署前確認 0 個 Queued／Running execution，SQL Server COPY_ONLY／CHECKSUM 備份後套用完整 VibeMaker idempotent migration（sqlcmd 使用 QUOTED_IDENTIFIER ON）。本機備份位於 `%LOCALAPPDATA%/Ymir/deploy/ymir-before-inspiring-ab212b2.bak`。
+
+API、nginx、SiteHost 已啟動；2 個正式使用者容器已移除以便下次使用重建新版，workspace／agent-state 保留。SiteHost 使用本機 `*.sites.localhost:5300`，未新增對外 DNS／Tunnel；知識庫未配置 EmbeddingModel、MCP 目錄為空且 Gateway 未啟動，因此兩者維持停用；OneDrive 沿用既有設定，需要實際帳號授權。
+
+驗證：API health、本機 4200／5080、SiteHost health 與現有對外網域首頁均 200；本機與對外 models 匿名請求均 401；nginx 設定有效、50m 上限保留；新版 Agent uid=1000，Pi 1.0.0、pdftotext、python-pptx 與公告模板 smoke test 通過。16 個 VibeMaker migration 已套用，28 個對話與 124 個訊息保留。未以付費模型執行測試，也未以真實 OneDrive／MCP／Embedding 後端驗證。分支程式碼先前 Linux CI 764 項後端測試、164 項前端測試與映像檢查全數通過。
+
+---
+
+
 ### #028 · main 與擴充能力整合至測試分支
 
 > 👤 **Codex（AI）** · 🕒 2026-10-08 10:15 · `🔬驗證`

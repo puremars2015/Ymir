@@ -2,8 +2,17 @@
 
 Ymir 是企業 AI 平台，目前的子產品為 **Vibe Maker**：使用者透過對話，讓 Pi Agent 在自己的隔離執行環境中建立工具、網站與檔案。前端使用 Angular 22，後端為 .NET 10 的模組化單體，透過 REST API 與 SSE 傳遞資料及執行事件。
 
-本文以 **2026-10-07 本機實際部署**為主，另列出程式碼支援的開發與 Linux 部署架構。
+本文以 **2026-10-08 本機實際部署**為主，另列出程式碼支援的開發與 Linux 部署架構。
 
+
+### 整合測試分支部署（2026-10-08）
+
+目前本機執行 `claude/inspiring-einstein-2pwxx6` 的 `ab212b2` 版本。API 發布於 Windows 主機，前端使用 `localhost/ymir/web:inspiring-ab212b2`，Agent 使用 `localhost/ymir/agent-runtime:inspiring-ab212b2`；既有使用者容器已在沒有執行中的工作時移除，下次使用會以新版重建，workspace 與 agent-state 保留。
+
+- 網站託管：Windows 上新增 SiteHost，監聽 `127.0.0.1:5300`；API 與 SiteHost 共用 `C:/Users/sean.ma/Documents/ymir-sites`。本機成果網址為 `http://<網站代碼>.sites.localhost:5300/`，私人網站登入返回 `http://localhost:4200`。瀏覽器可解析 `*.localhost`；此服務尚未設定對外 DNS／Tunnel 路由。
+- 知識庫：索引、查詢與資料表已部署；尚未設定 `VibeMaker:Rag:EmbeddingModel`，因此維持停用。
+- 平台 MCP：API 的權限管理與整合程式碼已部署；`deploy/mcp/servers.json` 目前沒有後端服務，也未啟動 Gateway，平台 MCP 維持停用。
+- OneDrive：同步程式與資料表已部署，沿用現有企業登入與 connector 設定；實際雲端連結需使用者授權。
 ## 本機實際部署（Windows + Docker Desktop）
 
 目前 API 在 Windows 主機以 Production 模式執行；網頁、nginx、Agent、模型代理及資料庫在 Docker Desktop 的 Linux 容器內執行。API 直接管理 Docker Agent 容器，目前沒有另啟動 Ymir.RuntimeHost。
@@ -11,7 +20,7 @@ Ymir 是企業 AI 平台，目前的子產品為 **Vibe Maker**：使用者透�
 ```mermaid
 flowchart TD
     Local["本機瀏覽器<br/>localhost:4200 或 localhost:5080"] --> Web
-    Public["外部瀏覽器<br/>ymir.thetainformation.com"] --> Cloudflare["Cloudflare HTTPS 入口"]
+    Public["外部瀏覽器<br/>vibemaker.webpromaterial.com"] --> Cloudflare["Cloudflare HTTPS 入口"]
     Cloudflare --> Tunnel["cloudflared 容器"]
     Tunnel -->|"ymir-edge 網路：ymir-web:80"| Web["ymir-web 容器<br/>nginx + Angular 靜態網頁"]
     Web -->|"/api/*、/signin-oidc<br/>host.docker.internal:5081"| API["Windows 主機<br/>Ymir.Api.dll / Kestrel"]
