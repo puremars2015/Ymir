@@ -4,6 +4,8 @@
 - 日期：2026-10-07
 - 依據：使用者要求管理員管理面板可控制開放模型；延伸 ADR-0010 的資料庫系統設定與 ADR-0004 的限模型 virtual key。
 
+- 後續修訂：[ADR-0019](0019-user-model-access.md) 將系統開放清單作為個人預設，管理員可逐模型為特定使用者允許或禁止；執行與金鑰改用個人生效清單。
+
 部署設定 `VibeMaker:Models` 與 LiteLLM 的 `AllowedModels` 交集構成可開放的模型；管理介面不新增任意 provider／模型 ID 或金鑰。`platform.system_settings` 的 `vibemaker.model_access` 保存 `enabledModelIds`／`defaultModelId`，不需新資料表或 migration。未儲存時沿用部署設定；管理員可還原。至少開放一個模型且預設必須已開放，拒絕未知、部署不允許或重複 ID。
 
 `GET/PUT/DELETE /api/admin/settings/models` 使用既有 Admin 與 XSRF 保護，修改及還原寫入稽核。`GET /api/models` 只回生效清單與預設。每次查詢／送訊息／啟動 execution 直接讀取資料庫，沒有權限快取；損毀設定不重新開放部署模型，資料庫失敗不默默回復舊權限。部署移除模型時舊設定取交集，預設無效則取生效清單第一個；交集空時不允許新執行，管理員可還原或重新儲存。

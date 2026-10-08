@@ -7,6 +7,20 @@ namespace Ymir.UnitTests.Models;
 /// <summary>ADR-0004：每位使用者一把 virtual key，快取在記憶體、到期前換發並撤銷舊的。</summary>
 public class RuntimeCredentialServiceTests
 {
+    [Fact]
+    public async Task KnowledgeKeys_DoNotReplaceAgentKey_AndDisableRevokesAllPurposes()
+    {
+        var (service, gateway, _) = Create(multipleModels: true);
+        var ct = TestContext.Current.CancellationToken;
+        var agent = await service.GetAsync(Alice, Guid.NewGuid(), ct, allowedModels: ["minimax"]);
+        var embedding = await service.GetAsync(Alice, Guid.Empty, ct, allowedModels: ["gpt-x"], purpose: RuntimeCredentialPurpose.KnowledgeEmbedding);
+        var answer = await service.GetAsync(Alice, Guid.Empty, ct, allowedModels: ["minimax"], purpose: RuntimeCredentialPurpose.KnowledgeAnswer);
+        Assert.Empty(gateway.Revoked);
+        Assert.Same(agent, await service.GetAsync(Alice, Guid.NewGuid(), ct, allowedModels: ["minimax"]));
+        Assert.Equal(3, gateway.Issued.Count);
+        await service.RevokeAsync(Alice, ct);
+        Assert.Equal(new[] { agent.KeyId, embedding.KeyId, answer.KeyId }.Order(), gateway.Revoked.Order());
+    }
     private static readonly Guid Alice = Guid.NewGuid();
     private static readonly Guid Bob = Guid.NewGuid();
 

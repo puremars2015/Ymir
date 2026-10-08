@@ -62,6 +62,8 @@ dist/
 .angular/
 coverage/
 *.tsbuildinfo
+__pycache__/
+*.pyc
 
 # Cloudflare Tunnel 憑證（ADR-0006）
 deploy/cloudflared/config.yml
@@ -81,3 +83,7 @@ deploy/api/data/
 .vs/
 .idea/
 *.user
+
+# Python 工具快取
+__pycache__/
+*.pyc

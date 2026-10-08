@@ -91,6 +91,8 @@ API 採 BFF + HttpOnly Cookie，可支援 Entra ID OIDC 與本機帳號。前端
 5. 執行事件先寫入 SQL Server，再發布；瀏覽器透過 SSE 接收輸出、工具事件及最終狀態。
 6. 成功執行後，後端只登記本次 `deliverables/{executionId}/` 中的交付成果，保存於 `vibemaker.execution_artifacts`；回覆下載卡片使用此紀錄，不以工作目錄的檔案變化推測成果。
 
+對話區執行工具或終端機時只顯示一行「正在工作中......」，不呈現工具名稱、指令、摘要或個別工具結果。一般回覆照常串流；工作提示在工具結束或執行終止後清除。後端事件保存與稽核流程維持原樣。
+
 同一位使用者的對話共用一個 Agent 容器，專案與獨立對話各有工作目錄。Agent 容器不持有模型供應商金鑰、LiteLLM master key 或 Ymir 資料庫連線字串。
 
 ### 資料與檔案存放
@@ -141,6 +143,8 @@ OpenRouter API key 僅注入 LiteLLM，使用者與 Agent 使用限定模型的�
 
 「管理 → 系統設定 → 開放模型」可勾選已接入的模型及指定預設，至少保留一個，並可還原部署設定。開放清單以 `vibemaker.model_access` 保存於既有 `platform.system_settings`，重啟後保留、不需要新 migration，管理員修改寫入稽核。
 
+「管理 → 使用者 → 模型權限」對每個模型提供「依系統設定／允許／不允許」。預設動態繼承系統開放清單；可額外允許系統未開放但部署已接入的模型，或禁止個人使用已開放的模型。個人覆寫保存於 `platform.system_settings` 的 `vibemaker.user_model_access.{userId}`；「全部依系統設定」清除覆寫。允許個人沒有任何可用模型，此時不能送出新訊息。系統預設不可用時取個人生效清單第一個作為預設。個人設定端點為 `GET/PUT/DELETE /api/admin/users/{userId}/models`；對話選單、執行與 virtual key 均套用個人權限。詳見 [ADR-0019](docs/adr/0019-user-model-access.md)。
+
 `GET/PUT/DELETE /api/admin/settings/models` 受 Admin／XSRF 保護；使用者的 `/api/models`、送出訊息、排隊工作啟動及 LiteLLM 新 virtual key 一致採用生效清單。已開始的工作繼續完成，下次執行模型集合改變時换發金鑰；尚未開始而模型被關閉的工作明確失敗。模型頁面載入與視窗回到前景時重新查詢。詳見 [ADR-0016](docs/adr/0016-admin-model-access.md)。
 
 ## 模型與思考設定
@@ -162,6 +166,19 @@ Pi 1.0.0 透過 `--thinking` 與每次執行的 models.json 明確對應傳輸�
 版面檢查：`npm run e2e:mobile-composer -- <截圖目錄> <baseUrl>` 使用唯讀 API fixtures，驗證新舊對話、橫直向、長對話、多行輸入及附件、模擬鍵盤縮放／位移／收起、縮放閱讀與桌面還原。手機實機 Safari／Chrome 的原生鍵盤尚待驗證。
 
 ## 成果、專案檔案與工具暫存
+
+### `/make` 文件引導與公告模板
+
+輸入 `/help`，Agent 會先介紹 Ymir 的問答、附件分析、專案及成果建置用途，再說明目前只有 `/help` 與 `/make` 兩個斜線指令，並列出管理員開放的建置主題。這次只回覆說明，不建檔或提供下載成果。輸入 `/` 可看到兩個指令提示。
+
+輸入 `/make` 可選擇小工具、網站、**建立簡報**與**建立公告 Word**。主題從 `vibemaker.make_topics` 載入，管理員可在「Make 主題」編輯建置指示、排序或停用。`DocumentMakeTopics` migration 只新增兩個文件主題，不覆寫既有自訂主題。
+
+- 簡報：先確認目的、聽眾、頁數、素材及風格，確認逐頁大綱後產生可編輯 `.pptx`；Agent 映像預裝 `python-pptx` 與中文字型。
+- 公告：先確認主旨、發布單位、日期、正文與聯絡資訊，確認草稿後依公司模板產生 `.docx`。模板保留使用者範例的 Logo、橫幅、背景與頁尾，移除原始活動、姓名及信箱；段落與條列可增減。
+- 平台素材：`runtime/agent/templates/` 隨 Agent 映像部署至唯讀 `/opt/ymir/templates/`；公告建置器只替換 DOCX 正文，保留其他 package parts。來源範例不進版本庫或使用者工作目錄。
+- 暫存 JSON／腳本放在 `.ymir/tmp/`，只有最終 PPTX／DOCX 放入本次成果目錄。部署時需套用 migration 並建置新 Agent 映像；既有容器須於沒有執行中的工作時重建，保留 workspace 與 agent-state。
+
+詳見 [公告模板及欄位](runtime/agent/templates/announcement/README.md)與[簡報建置指引](runtime/agent/templates/presentation/README.md)。
 
 - **成果**：每次執行使用獨立的 `deliverables/{executionId}/`。單一成果直接下載；多個檔案以後端 ZIP 交付並保留目錄結構，包含網站必要的 `package.json`、lockfile。純閱讀或摘要不建立下載卡片，除非使用者要求可下載的文件。
 - **專案檔案**：工作目錄中的原始碼、設定與上傳附件，可在檔案面板切換查看或下載；不包含成果目錄及內部工具檔。

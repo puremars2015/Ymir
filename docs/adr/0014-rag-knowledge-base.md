@@ -46,6 +46,7 @@
 
 - 介面是 Application 層的 `IEmbeddingClient`，Infrastructure 層經 LiteLLM `/v1/embeddings` 實作。
 - 使用**該使用者的 virtual key**（ADR-0004），用量與預算歸使用者；Ymir 不另存金鑰。
+- 與模型權限整合時，Agent、知識庫 Embedding、知識庫回答分開快取限模型 key，避免背景索引撤銷仍在執行的 Agent 金鑰；停用帳號時撤銷所有用途。Embedding key 僅允許部署指定的 Embedding 模型，回答 key 僅允許個人生效清單中標示 `AllowKnowledgeBase` 的模型。個人已禁止的模型只能返回檢索片段，不向該模型送出文件內容（ADR-0019）。
 - 模型名稱設定在 `VibeMaker:Rag:EmbeddingModel`。沒有設定時，知識庫功能停用，介面顯示「尚未設定」。
 - 每個索引版本都記錄模型名稱與向量維度。查詢時，模型或維度不一致的索引不會被使用，介面提示需要重建索引，不混用新舊向量。
 - 呼叫時分批（每批 32 段），並設定逾時。失敗時整個版本標記為失敗，舊版本繼續有效。

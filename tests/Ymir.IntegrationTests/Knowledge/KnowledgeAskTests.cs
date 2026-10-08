@@ -2,13 +2,35 @@ using System.Net;
 using System.Net.Http.Json;
 using Ymir.Api.Endpoints;
 using Ymir.IntegrationTests.Api;
+using Ymir.Platform.Users;
 using Ymir.Testing.FakeLlm;
+using Ymir.VibeMaker.Contracts.Models;
 
 namespace Ymir.IntegrationTests.Knowledge;
 
 /// <summary>知識庫問答（ADR-0014 §8）：檢索、引用、資料不足、模型允許清單、專案隔離。</summary>
 public class KnowledgeAskTests(KnowledgeApiFactory factory) : IClassFixture<KnowledgeApiFactory>
 {
+    [Fact]
+    public async Task UserDeniedModel_CannotSendKnowledgePassagesToIt()
+    {
+        using var client = await factory.LoginAsync($"kb-denied-{Guid.NewGuid():N}");
+        using var admin = await factory.LoginAsync($"kb-admin-{Guid.NewGuid():N}", UserRole.Admin);
+        var me = (await client.GetFromJsonAsync<MeResponse>("/api/me", JsonDefaults.Options, Ct))!;
+        var project = await client.CreateProjectAsync("個人模型權限");
+        await KnowledgeBaseTests.UploadReadyAsync(client, project.Id, "policy.txt", "年度預算為五十萬元，需要主管核准。");
+        using var saved = await admin.PutAsJsonAsync($"/api/admin/users/{me.Id}/models",
+            new SaveUserModelAccessRequest(new Dictionary<string, bool> { [FakeLlmEndpoints.ModelId] = false }), Ct);
+        saved.EnsureSuccessStatusCode();
+        var before = factory.FakeLlm.Requests.Count;
+        using var response = await AskAsync(client, project.Id, "年度預算多少？", FakeLlmEndpoints.ModelId);
+        response.EnsureSuccessStatusCode();
+        var answer = (await response.Content.ReadFromJsonAsync<KnowledgeAnswerResponse>(JsonDefaults.Options, Ct))!;
+        Assert.False(answer.ModelAllowed);
+        Assert.Null(answer.Answer);
+        Assert.NotEmpty(answer.Citations);
+        Assert.Equal(before, factory.FakeLlm.Requests.Count);
+    }
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private static async Task<HttpResponseMessage> AskAsync(HttpClient client, Guid projectId, string question, string? modelId = null) =>

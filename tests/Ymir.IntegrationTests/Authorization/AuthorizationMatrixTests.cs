@@ -126,6 +126,9 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     /// <summary>只有 Admin 能呼叫（SA §4、ADR-0009）：一般使用者必須得到 403。</summary>
     private static readonly Dictionary<string, Func<HttpRequestMessage>> AdminOnlyRequests = new()
     {
+        ["GET /api/admin/users/{userId:guid}/models/"] = () => Get($"/api/admin/users/{Guid.NewGuid()}/models"),
+        ["PUT /api/admin/users/{userId:guid}/models/"] = () => new HttpRequestMessage(HttpMethod.Put, $"/api/admin/users/{Guid.NewGuid()}/models") { Content = JsonContent.Create(new Ymir.VibeMaker.Contracts.Models.SaveUserModelAccessRequest(new Dictionary<string, bool>())) },
+        ["DELETE /api/admin/users/{userId:guid}/models/"] = () => new HttpRequestMessage(HttpMethod.Delete, $"/api/admin/users/{Guid.NewGuid()}/models"),
         ["GET /api/admin/settings/models/"] = () => Get("/api/admin/settings/models"),
         ["PUT /api/admin/settings/models/"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/models") { Content = JsonContent.Create(new Ymir.VibeMaker.Contracts.Models.SaveModelAccessRequest(["fake-model"], "fake-model")) },
         ["DELETE /api/admin/settings/models/"] = () => new HttpRequestMessage(HttpMethod.Delete, "/api/admin/settings/models"),

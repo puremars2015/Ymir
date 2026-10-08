@@ -36,6 +36,7 @@ public sealed partial class KnowledgeQueryService(
     IKnowledgeAnswerClient answers,
     RuntimeCredentialService credentials,
     ModelCatalog models,
+    ModelAccessService modelAccess,
     IOptions<KnowledgeOptions> options,
     IAuditLog auditLog,
     TimeProvider timeProvider,
@@ -80,8 +81,9 @@ public sealed partial class KnowledgeQueryService(
             return (null, KnowledgeAskError.InvalidQuestion);
         }
 
-        var model = models.Resolve(modelId);
-        var allowed = models.AllowsKnowledgeBase(model);
+        var access = await modelAccess.GetForUserAsync(userId, cancellationToken).ConfigureAwait(false);
+        var model = access.Resolve(modelId) ?? models.Resolve(modelId);
+        var allowed = access.IsAvailable(model) && (modelId is null || access.IsAvailable(modelId)) && models.AllowsKnowledgeBase(model);
         // 只用與目前 embedding 設定相同的有效版本（ADR-0014 §3、§7）。
         var documents = await db.KnowledgeDocuments.AsNoTracking()
             .Where(d => d.ProjectId == projectId && d.UserId == userId && d.Status == KnowledgeDocumentStatus.Ready && d.EmbeddingModel == _options.EmbeddingModel)
@@ -95,7 +97,8 @@ public sealed partial class KnowledgeQueryService(
             return (new KnowledgeAnswer(null, true, allowed, model, []), KnowledgeAskError.None);
         }
 
-        var credential = await credentials.GetAsync(userId, Guid.Empty, cancellationToken).ConfigureAwait(false);
+        var credential = await credentials.GetAsync(userId, Guid.Empty, cancellationToken,
+            allowedModels: [_options.EmbeddingModel!], purpose: RuntimeCredentialPurpose.KnowledgeEmbedding).ConfigureAwait(false);
         var query = (await embeddings.EmbedAsync(credential.ApiKey, _options.EmbeddingModel!, [text], cancellationToken).ConfigureAwait(false)).Single();
         var hits = await vectors.SearchAsync(userId, projectId, documents.Keys, query, _options.TopK, cancellationToken).ConfigureAwait(false);
         // 低於門檻的段落不列為引用，避免把不相關的內容當成依據。
@@ -122,7 +125,10 @@ public sealed partial class KnowledgeQueryService(
             return (new KnowledgeAnswer(null, false, false, model, citations), KnowledgeAskError.None);
         }
 
-        var answer = await answers.CompleteAsync(credential.ApiKey, model, SystemPrompt, BuildUserPrompt(text, hits), cancellationToken).ConfigureAwait(false);
+        var answerCredential = await credentials.GetAsync(userId, Guid.Empty, cancellationToken,
+            allowedModels: access.Models.Where(m => m.AllowKnowledgeBase).Select(m => m.Id).ToList(),
+            purpose: RuntimeCredentialPurpose.KnowledgeAnswer).ConfigureAwait(false);
+        var answer = await answers.CompleteAsync(answerCredential.ApiKey, model, SystemPrompt, BuildUserPrompt(text, hits), cancellationToken).ConfigureAwait(false);
         LogAnswered(logger, projectId, citations.Count);
         return (new KnowledgeAnswer(answer, false, true, model, citations), KnowledgeAskError.None);
     }

@@ -115,7 +115,7 @@ public class OneDriveSyncTests(OneDriveApiFactory factory) : IClassFixture<OneDr
         await File.WriteAllTextAsync(Path.Combine(directory, ".env"), "TOKEN=secret", Ct);
         Directory.CreateDirectory(Path.Combine(directory, "node_modules", "pkg"));
         await File.WriteAllTextAsync(Path.Combine(directory, "node_modules", "pkg", "index.js"), "x", Ct);
-        await File.WriteAllTextAsync(Path.Combine(directory, "bad:name.txt"), "not allowed on OneDrive", Ct);
+        await File.WriteAllTextAsync(Path.Combine(directory, new string('a', OneDrivePaths.MaxSegmentLength + 1) + ".txt"), "not allowed on OneDrive", Ct);
 
         status = await SyncNowAsync(client, conversation.Id);
 

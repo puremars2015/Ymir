@@ -2331,6 +2331,171 @@
         }
       }
     },
+    "/api/admin/settings/models": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetModelAccess",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveModelAccess",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveModelAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminResetModelAccess",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/models": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetUserModelAccess",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserModelAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveUserModelAccess",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveUserModelAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserModelAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminResetUserModelAccess",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserModelAccessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/make-topics": {
       "get": {
         "tags": [
@@ -2490,6 +2655,29 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "AdminModelOptionResponse": {
+        "required": [
+          "id",
+          "displayName",
+          "supportsImages",
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "supportsImages": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
           }
         }
       },
@@ -3630,6 +3818,39 @@
           }
         }
       },
+      "ModelAccessResponse": {
+        "required": [
+          "models",
+          "defaultModelId",
+          "usesDeployment",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminModelOptionResponse"
+            }
+          },
+          "defaultModelId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "usesDeployment": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
       "ModelResponse": {
         "required": [
           "id",
@@ -3650,6 +3871,20 @@
           },
           "supportsImages": {
             "type": "boolean"
+          },
+          "supportsThinking": {
+            "type": "boolean",
+            "default": false
+          },
+          "thinking": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ThinkingCapabilityResponse"
+              }
+            ]
           },
           "allowKnowledgeBase": {
             "type": "boolean",
@@ -4292,6 +4527,24 @@
           }
         }
       },
+      "SaveModelAccessRequest": {
+        "required": [
+          "enabledModelIds",
+          "defaultModelId"
+        ],
+        "type": "object",
+        "properties": {
+          "enabledModelIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultModelId": {
+            "type": "string"
+          }
+        }
+      },
       "SaveOidcSettingsRequest": {
         "required": [
           "enabled",
@@ -4419,6 +4672,20 @@
           }
         }
       },
+      "SaveUserModelAccessRequest": {
+        "required": [
+          "overrides"
+        ],
+        "type": "object",
+        "properties": {
+          "overrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "boolean"
+            }
+          }
+        }
+      },
       "SendMessageRequest": {
         "required": [
           "content",
@@ -4455,6 +4722,12 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          "thinkingLevel": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -4815,6 +5088,35 @@
           }
         }
       },
+      "ThinkingCapabilityResponse": {
+        "required": [
+          "parameter",
+          "levels",
+          "defaultLevel",
+          "required"
+        ],
+        "type": "object",
+        "properties": {
+          "parameter": {
+            "type": "string"
+          },
+          "levels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "defaultLevel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          }
+        }
+      },
       "TunnelSettingsResponse": {
         "required": [
           "publicEdgeEnabled",
@@ -4989,6 +5291,69 @@
           },
           "effective": {
             "$ref": "#/components/schemas/ExtensionValues"
+          }
+        }
+      },
+      "UserModelAccessResponse": {
+        "required": [
+          "models",
+          "defaultModelId",
+          "isValid",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserModelOptionResponse"
+            }
+          },
+          "defaultModelId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "isValid": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "UserModelOptionResponse": {
+        "required": [
+          "id",
+          "displayName",
+          "systemEnabled",
+          "override",
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "systemEnabled": {
+            "type": "boolean"
+          },
+          "override": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
           }
         }
       },

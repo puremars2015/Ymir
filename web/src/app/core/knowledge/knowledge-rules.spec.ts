@@ -47,6 +47,7 @@ describe('knowledge rules', () => {
         displayName: 'A',
         isDefault: true,
         supportsImages: false,
+        supportsThinking: false,
         allowKnowledgeBase: false,
       },
       {
@@ -54,6 +55,7 @@ describe('knowledge rules', () => {
         displayName: 'B',
         isDefault: false,
         supportsImages: false,
+        supportsThinking: false,
         allowKnowledgeBase: true,
       },
     ];

@@ -1,10 +1,40 @@
 import { ExecutionEvent } from './execution-events';
-import { applyExecutionEvent, initialExecutionView } from './execution-state';
+import { applyExecutionEvent, hasRunningTools, initialExecutionView } from './execution-state';
 
 const run = (events: ExecutionEvent[]) =>
   events.reduce(applyExecutionEvent, initialExecutionView());
 
 describe('applyExecutionEvent', () => {
+  it('keeps the work indicator until all overlapping tools finish', () => {
+    let view = run([
+      { type: 'tool.started', data: { tool: 'bash', callId: 'c1', summary: 'npm install' } },
+      { type: 'tool.started', data: { tool: 'read', callId: 'c2', summary: 'package.json' } },
+      { type: 'assistant.delta', data: { text: '保留正常回覆' } },
+      { type: 'tool.completed', data: { callId: 'c1', success: true } },
+    ]);
+    expect(hasRunningTools(view)).toBe(true);
+    expect(view.text).toBe('保留正常回覆');
+    view = applyExecutionEvent(view, {
+      type: 'tool.completed',
+      data: { callId: 'c2', success: false },
+    });
+    expect(hasRunningTools(view)).toBe(false);
+  });
+
+  it.each(['execution.completed', 'execution.failed', 'execution.cancelled'] as const)(
+    'removes the work indicator on %s even without tool completion',
+    (type) => {
+      const view = run([
+        { type: 'tool.started', data: { tool: 'bash', callId: 'c1', summary: 'long command' } },
+        type === 'execution.failed'
+          ? { type, data: { code: 'AGENT_RUNTIME_ERROR', message: '無法完成工作' } }
+          : type === 'execution.completed'
+            ? { type, data: { executionId: 'e1', messageId: null } }
+            : { type, data: { executionId: 'e1' } },
+      ]);
+      expect(hasRunningTools(view)).toBe(false);
+    },
+  );
   it('accumulates text and tracks tool calls until completion', () => {
     const view = run([
       { type: 'execution.started', data: { executionId: 'e1' } },

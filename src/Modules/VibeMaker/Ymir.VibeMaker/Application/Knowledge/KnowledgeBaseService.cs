@@ -263,7 +263,8 @@ public sealed partial class KnowledgeBaseService(
             throw new KnowledgeException($"專案知識庫的段落超過上限（{_options.MaxChunks} 段），請移除部分文件。");
         }
 
-        var credential = await credentials.GetAsync(document.UserId, Guid.Empty, cancellationToken).ConfigureAwait(false);
+        var credential = await credentials.GetAsync(document.UserId, Guid.Empty, cancellationToken,
+            allowedModels: [_options.EmbeddingModel!], purpose: RuntimeCredentialPurpose.KnowledgeEmbedding).ConfigureAwait(false);
         var model = _options.EmbeddingModel!;
         var vectorsOut = new List<float[]>(chunks.Count);
         foreach (var batch in chunks.Chunk(Math.Max(1, _options.EmbeddingBatchSize)))

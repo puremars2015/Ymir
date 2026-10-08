@@ -32,6 +32,7 @@ import {
 } from '../../core/auth/auth-rules';
 import { AuthService } from '../../core/auth/auth.service';
 import { AdminTabs } from './admin-tabs';
+import { UserModelCard } from './user-model-card';
 
 /**
  * 使用者管理（Admin，SA §4、ADR-0009）：停用 / 啟用帳號、建立本機帳號、重設本機帳號密碼、
@@ -40,7 +41,7 @@ import { AdminTabs } from './admin-tabs';
  */
 @Component({
   selector: 'app-users-page',
-  imports: [FormsModule, DatePipe, AdminTabs],
+  imports: [FormsModule, DatePipe, AdminTabs, UserModelCard],
   template: `
     <section class="admin">
       <app-admin-tabs />
@@ -133,6 +134,18 @@ import { AdminTabs } from './admin-tabs';
         <p class="error" role="alert">{{ error() }}</p>
       }
 
+      @if (modelUser(); as user) {
+        <div class="card">
+          @for (editing of [user]; track editing.id) {
+            <app-user-model-card
+              [user]="editing"
+              (closed)="modelUser.set(null)"
+              (saved)="message.set($event)"
+            />
+          }
+        </div>
+      }
+
       <div class="table-wrap">
         <table>
           <thead>
@@ -188,6 +201,14 @@ import { AdminTabs } from './admin-tabs';
                       (click)="startExtensions(user)"
                     >
                       擴充能力
+                    </button>
+                    <button
+                      type="button"
+                      class="link"
+                      [disabled]="busy()"
+                      (click)="modelUser.set(user)"
+                    >
+                      模型權限
                     </button>
                     @if (user.authMethod === 'Local') {
                       <button
@@ -378,6 +399,7 @@ export class UsersPage implements OnInit {
   protected readonly newPassword = signal('');
 
   protected readonly resetting = signal<AdminUser | null>(null);
+  protected readonly modelUser = signal<AdminUser | null>(null);
   protected readonly capabilities = CAPABILITIES;
   protected readonly grantSettings = GRANT_SETTINGS;
   /** 正在編輯擴充能力的成員：覆寫草稿與全域預設（用來顯示「依全域預設」的結果）。 */

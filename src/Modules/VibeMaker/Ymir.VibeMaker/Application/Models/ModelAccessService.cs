@@ -5,6 +5,7 @@ using Ymir.Platform.Settings;
 namespace Ymir.VibeMaker.Application.Models;
 
 public sealed record ModelAccessSettings(IReadOnlyList<string> EnabledModelIds, string DefaultModelId);
+public sealed record UserModelAccessState(ModelAccessState System, ModelAccessState Effective, IReadOnlyDictionary<string, bool> Overrides, bool IsValid);
 public sealed record ModelAccessState(IReadOnlyList<ModelDescriptor> Models, string? DefaultModelId, SystemSettingValue? Stored)
 {
     public bool IsAvailable(string? id) => id is not null && Models.Any(m => m.Id == id);
@@ -49,5 +50,44 @@ public sealed class ModelAccessService(ModelCatalog catalog, IOptions<ModelCrede
     {
         await store.DeleteAsync([Key], ct).ConfigureAwait(false);
         return await GetAsync(ct).ConfigureAwait(false);
+    }
+
+    private static string UserKey(Guid userId) => "vibemaker.user_model_access." + userId.ToString("D");
+
+    public async Task<ModelAccessState> GetForUserAsync(Guid userId, CancellationToken ct) =>
+        (await GetUserStateAsync(userId, ct).ConfigureAwait(false)).Effective;
+
+    public async Task<UserModelAccessState> GetUserStateAsync(Guid userId, CancellationToken ct)
+    {
+        var system = await GetAsync(ct).ConfigureAwait(false);
+        var stored = await store.GetAsync(UserKey(userId), ct).ConfigureAwait(false);
+        Dictionary<string, bool>? overrides = [];
+        if (stored is not null)
+        {
+            try { overrides = JsonSerializer.Deserialize<Dictionary<string, bool>>(stored.Value, JsonOptions); }
+            catch (JsonException) { overrides = null; }
+        }
+        // ADR-0019：損毀設定不得藉由繼承而重新開放權限；部署已移除的模型也不得重新出現。
+        var enabled = DeploymentModels.Where(m => overrides is not null && (overrides.TryGetValue(m.Id, out var allow) ? allow : system.IsAvailable(m.Id))).ToList();
+        var defaultId = enabled.Any(m => m.Id == system.DefaultModelId) ? system.DefaultModelId : enabled.FirstOrDefault()?.Id;
+        return new(system, new(enabled, defaultId, stored), overrides ?? [], overrides is not null);
+    }
+
+    public string? ValidateUserOverrides(IReadOnlyDictionary<string, bool>? overrides) =>
+        overrides is null ? "必須提供模型設定。"
+        : overrides.Keys.Any(id => !DeploymentModels.Any(m => m.Id == id)) ? "只能設定部署已接入及允許的模型。" : null;
+
+    public async Task<UserModelAccessState> SaveUserOverridesAsync(Guid userId, IReadOnlyDictionary<string, bool> overrides, string actor, CancellationToken ct)
+    {
+        if (ValidateUserOverrides(overrides) is { } problem) throw new ArgumentException(problem, nameof(overrides));
+        if (overrides.Count == 0) return await ResetUserOverridesAsync(userId, ct).ConfigureAwait(false);
+        await store.SetAsync(UserKey(userId), JsonSerializer.Serialize(overrides, JsonOptions), actor, ct).ConfigureAwait(false);
+        return await GetUserStateAsync(userId, ct).ConfigureAwait(false);
+    }
+
+    public async Task<UserModelAccessState> ResetUserOverridesAsync(Guid userId, CancellationToken ct)
+    {
+        await store.DeleteAsync([UserKey(userId)], ct).ConfigureAwait(false);
+        return await GetUserStateAsync(userId, ct).ConfigureAwait(false);
     }
 }

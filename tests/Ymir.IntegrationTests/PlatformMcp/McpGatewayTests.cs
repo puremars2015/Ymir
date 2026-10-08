@@ -34,7 +34,7 @@ public sealed class McpGatewayApiFactory : ApiFactory
     public const string CredentialEnv = "YMIR_IT_FAKE_MCP_CREDENTIAL";
     public const string ServerName = "echo-svc";
 
-    private readonly Lazy<FakeLlmServer> _fakeLlm = new(() => FakeLlmServer.StartAsync().GetAwaiter().GetResult());
+    private readonly Lazy<FakeLlmServer> _fakeLlm = new(() => FakeLlmServer.StartAsync(OperatingSystem.IsWindows() ? "http://0.0.0.0:0" : "http://127.0.0.1:0").GetAwaiter().GetResult());
     private readonly Lazy<FakeMcpServer> _fakeMcp = new(() => FakeMcpServer.StartAsync(BackendSecret).GetAwaiter().GetResult());
     private readonly List<WebApplication> _gateways = [];
     private readonly string _catalogPath = Path.Combine(Path.GetTempPath(), $"ymir-mcp-{Guid.NewGuid():N}.json");
@@ -69,11 +69,16 @@ public sealed class McpGatewayApiFactory : ApiFactory
     protected override void Configure(IWebHostBuilder builder)
     {
         builder.UseSetting("VibeMaker:Harness", "Pi");
-        builder.UseSetting("VibeMaker:Pi:ModelBaseUrl", _fakeLlm.Value.BaseUrl.ToString());
+        var modelUrl = _fakeLlm.Value.BaseUrl;
+        if (OperatingSystem.IsWindows())
+            modelUrl = new UriBuilder(modelUrl) { Host = "host.docker.internal" }.Uri;
+        builder.UseSetting("VibeMaker:Pi:ModelBaseUrl", modelUrl.ToString());
         builder.UseSetting("VibeMaker:Pi:ModelId", FakeLlmEndpoints.ModelId);
         builder.UseSetting("VibeMaker:Pi:DevelopmentApiKey", "integration-test-key");
         builder.UseSetting("VibeMaker:Pi:AutoRetry", "false");
-        builder.UseSetting("Ymir:Mcp:GatewayUrl", GatewayUrl.ToString());
+        builder.UseSetting("Ymir:Mcp:GatewayUrl", OperatingSystem.IsWindows()
+            ? new UriBuilder(GatewayUrl) { Host = "host.docker.internal" }.Uri.ToString()
+            : GatewayUrl.ToString());
         builder.UseSetting("Ymir:Mcp:CatalogPath", CatalogPath);
         builder.UseSetting("Ymir:Mcp:TokenSigningKey", SigningKey);
     }
@@ -85,7 +90,7 @@ public sealed class McpGatewayApiFactory : ApiFactory
         var url = $"http://127.0.0.1:{port ?? GatewayPort}";
         var gateway = McpGatewayApp.Build(
         [
-            $"--urls={url}",
+            $"--urls={(OperatingSystem.IsWindows() ? $"http://0.0.0.0:{port ?? GatewayPort}" : url)}",
             $"--McpGateway:CatalogPath={CatalogPath}",
             $"--McpGateway:TokenSigningKey={SigningKey}",
             $"--McpGateway:RequestsPerMinute={requestsPerMinute}",

@@ -9,6 +9,8 @@ describe('Composer', () => {
   const topics: MakeTopic[] = [
     { id: 't1', name: '小工具架設', description: '單頁小工具', sortOrder: 10 },
     { id: 't2', name: '網站系統架設', description: null, sortOrder: 20 },
+    { id: 't3', name: '建立簡報', description: '可編輯的 PPTX', sortOrder: 30 },
+    { id: 't4', name: '建立公告 Word', description: '公司公告模板', sortOrder: 40 },
   ];
 
   async function setup() {
@@ -56,6 +58,21 @@ describe('Composer', () => {
     expect(textarea.value).toBe('');
   });
 
+  it('offers both commands for slash and filters help prefixes', async () => {
+    const { type, host, fixture, textarea, press, submissions } = await setup();
+    await type('/');
+    expect(host.querySelector('.help-hint')).not.toBeNull();
+    expect(host.querySelector('.make-hint')).not.toBeNull();
+    await type('/he');
+    expect(host.querySelector('.make-hint')).toBeNull();
+    host.querySelector<HTMLButtonElement>('.help-hint')!.click();
+    await fixture.whenStable();
+    expect(textarea.value).toBe('/help');
+    await press({});
+    expect(submissions).toEqual([{ content: '/help', makeTopicId: null, files: [] }]);
+    expect(host.querySelector('.make-picker')).toBeNull();
+  });
+
   it('does not send on Shift+Enter or while an IME is composing', async () => {
     const { sent, type, press } = await setup();
     await type('你好');
@@ -82,6 +99,8 @@ describe('Composer', () => {
     expect(buttons.map((b) => b.querySelector('strong')?.textContent)).toEqual([
       '小工具架設',
       '網站系統架設',
+      '建立簡報',
+      '建立公告 Word',
     ]);
   });
 
@@ -100,6 +119,21 @@ describe('Composer', () => {
     await type('/make 一個計算機');
     await press({});
     expect(submissions).toEqual([{ content: '/make 一個計算機', makeTopicId: null, files: [] }]);
+  });
+
+  it.each([
+    ['建立簡報', 't3'],
+    ['建立公告 Word', 't4'],
+  ])('sends the document topic %s using its configured id', async (name, id) => {
+    const { submissions, type, press, host, fixture } = await setup();
+    await type('/make');
+    await press({});
+    const button = Array.from(host.querySelectorAll<HTMLButtonElement>('.topic')).find(
+      (candidate) => candidate.querySelector('strong')?.textContent === name,
+    );
+    button!.click();
+    await fixture.whenStable();
+    expect(submissions).toEqual([{ content: `/make ${name}`, makeTopicId: id, files: [] }]);
   });
 
   it('hints /make while typing a slash command and fills it on click', async () => {

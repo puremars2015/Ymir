@@ -45,13 +45,24 @@ public sealed class ModelAccessApiFactory : ApiFactory
     }
 }
 
-public class ModelAccessTests(ModelAccessApiFactory factory) : IClassFixture<ModelAccessApiFactory>
+public class ModelAccessTests : IAsyncLifetime
 {
+    // 模型政策會寫入全域設定；每個測試用獨立資料庫，避免測試順序改變可選模型。
+    private readonly ModelAccessApiFactory _factory = new();
+
+    public ValueTask InitializeAsync() => ValueTask.CompletedTask;
+
+    public async ValueTask DisposeAsync()
+    {
+        await _factory.DisposeAsync().ConfigureAwait(false);
+        GC.SuppressFinalize(this);
+    }
+
     [Fact]
     public async Task ThinkingDepth_ValidatesCapabilityAndLevel_AndPersistsExecutionSnapshot()
     {
         var ct = TestContext.Current.CancellationToken;
-        using var member = await factory.LoginAsync("thinking-member");
+        using var member = await _factory.LoginAsync("thinking-member");
         var models = await member.GetFromJsonAsync<List<ModelResponse>>("/api/models", ct);
         Assert.True(models!.Single(m => m.Id == "two").SupportsThinking);
         Assert.Equal(["low", "high", "xhigh", "max"], models!.Single(m => m.Id == "two").Thinking!.Levels);
@@ -66,7 +77,7 @@ public class ModelAccessTests(ModelAccessApiFactory factory) : IClassFixture<Mod
         using var accepted = await member.PostAsJsonAsync($"/api/conversations/{conversation.Id}/messages", new SendMessageRequest("hello", key, "two", ThinkingLevel: "high"), ct);
         accepted.EnsureSuccessStatusCode();
         var queued = (await accepted.Content.ReadFromJsonAsync<SendMessageResponse>(ct))!;
-        using var scope = factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateScope();
         var execution = await scope.ServiceProvider.GetRequiredService<IVibeMakerDbContext>().AgentExecutions.SingleAsync(e => e.Id == queued.ExecutionId, ct);
         Assert.Equal("high", execution.ThinkingLevel);
         using var retry = await member.PostAsJsonAsync($"/api/conversations/{conversation.Id}/messages", new SendMessageRequest("hello", key, "two", ThinkingLevel: "low"), ct);
@@ -78,8 +89,8 @@ public class ModelAccessTests(ModelAccessApiFactory factory) : IClassFixture<Mod
     public async Task AdminPolicy_PersistsAndEnforcesApiSelection_AndResets()
     {
         var ct = TestContext.Current.CancellationToken;
-        using var admin = await factory.LoginAsync("model-admin", UserRole.Admin);
-        using var member = await factory.LoginAsync("model-member");
+        using var admin = await _factory.LoginAsync("model-admin", UserRole.Admin);
+        using var member = await _factory.LoginAsync("model-member");
         using var forbidden = await member.PutAsJsonAsync("/api/admin/settings/models", new SaveModelAccessRequest(["two"], "two"), ct);
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
         using var invalid = await admin.PutAsJsonAsync("/api/admin/settings/models", new SaveModelAccessRequest([], "one"), ct);
@@ -94,7 +105,7 @@ public class ModelAccessTests(ModelAccessApiFactory factory) : IClassFixture<Mod
         Assert.Equal("two", Assert.Single(visible!).Id);
         Assert.True(visible![0].IsDefault);
         // A fresh scope reads the saved setting (no singleton-only state).
-        using var scope = factory.Services.CreateScope();
+        using var scope = _factory.Services.CreateScope();
         Assert.False((await scope.ServiceProvider.GetRequiredService<ModelAccessService>().GetAsync(ct)).IsAvailable("one"));
         var conversation = await member.CreateConversationAsync(null, "model policy");
         using var rejected = await member.PostAsJsonAsync($"/api/conversations/{conversation.Id}/messages", new SendMessageRequest("hello", Guid.NewGuid(), "one"), ct);
@@ -107,7 +118,7 @@ public class ModelAccessTests(ModelAccessApiFactory factory) : IClassFixture<Mod
         var queued = (await queuedResponse.Content.ReadFromJsonAsync<SendMessageResponse>(ct))!;
         using var disable = await admin.PutAsJsonAsync("/api/admin/settings/models", new SaveModelAccessRequest(["two"], "two"), ct);
         disable.EnsureSuccessStatusCode();
-        using var runScope = factory.Services.CreateScope();
+        using var runScope = _factory.Services.CreateScope();
         await runScope.ServiceProvider.GetRequiredService<ExecutionRunner>().RunAsync(queued.ExecutionId, ct);
         var execution = await runScope.ServiceProvider.GetRequiredService<IVibeMakerDbContext>().AgentExecutions.SingleAsync(e => e.Id == queued.ExecutionId, ct);
         Assert.Equal(ExecutionStatus.Failed, execution.Status);

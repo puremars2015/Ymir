@@ -1,4 +1,5 @@
 using Ymir.Api.Auth;
+using Ymir.Platform.Identity;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Settings;
 using Ymir.VibeMaker.Contracts.Models;
@@ -11,9 +12,9 @@ internal static class SettingsEndpoints
 {
     public static IEndpointRouteBuilder MapSettingsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/models", async (ModelAccessService policy, CancellationToken ct) =>
+        endpoints.MapGet("/api/models", async (ModelAccessService policy, ICurrentUser user, CancellationToken ct) =>
             {
-                var state = await policy.GetAsync(ct);
+                var state = await policy.GetForUserAsync(user.UserId, ct);
                 return state.Models.Select(m => new ModelResponse(m.Id, m.DisplayName, m.Id == state.DefaultModelId, m.SupportsImages, m.EffectiveThinking is not null,
                     m.EffectiveThinking is { } thinking ? new ThinkingCapabilityResponse(thinking.Parameter, thinking.Levels, thinking.DefaultLevel, thinking.Required) : null, m.AllowKnowledgeBase)).ToList();
             })

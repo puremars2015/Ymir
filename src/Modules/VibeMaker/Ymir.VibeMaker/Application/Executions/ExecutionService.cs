@@ -53,7 +53,7 @@ public sealed class ExecutionService(
             return existing;
         }
 
-        var models = await modelAccess.GetAsync(cancellationToken).ConfigureAwait(false);
+        var models = await modelAccess.GetForUserAsync(userId, cancellationToken).ConfigureAwait(false);
         if (models.DefaultModelId is null || (request.ModelId is not null && !models.IsAvailable(request.ModelId)))
         {
             return SubmitMessageResult.ModelNotAvailable;
@@ -81,6 +81,10 @@ public sealed class ExecutionService(
             }
 
             agentPrompt = MakePromptBuilder.ForDescription(makeDescription, await makeTopics.ListEnabledPromptsAsync(cancellationToken).ConfigureAwait(false));
+        }
+        else if (HelpPromptBuilder.IsHelpCommand(request.Content))
+        {
+            agentPrompt = HelpPromptBuilder.Build(await makeTopics.ListEnabledPromptsAsync(cancellationToken).ConfigureAwait(false));
         }
 
         var conversation = await db.Conversations.SingleOrDefaultAsync(c => c.Id == conversationId && c.UserId == userId && c.Status == ConversationStatus.Active, cancellationToken)

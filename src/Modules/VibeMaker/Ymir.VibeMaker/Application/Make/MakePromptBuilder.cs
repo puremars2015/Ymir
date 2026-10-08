@@ -46,7 +46,7 @@ public static class MakePromptBuilder
         }
 
         builder.AppendLine();
-        builder.Append("請先不要建立任何檔案。先用條列的方式問使用者 3～5 個最關鍵的問題（例如用途、主要功能、使用的人、外觀偏好），等使用者回答後，再依上面的建置指示開始建置。請用繁體中文。");
+        builder.Append("請先不要建立任何檔案。依主題的建置指示，先用條列的方式問使用者 3～5 個最關鍵的問題；已提供的資訊不要重複詢問。等使用者回答後，再依上面的建置指示開始建置。請用繁體中文。");
         return builder.ToString();
     }
 

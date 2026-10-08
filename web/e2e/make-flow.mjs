@@ -37,11 +37,11 @@ await page.waitForFunction((sel) => document.querySelector(sel)?.value === '/mak
 });
 step('typing "/" shows the /make hint');
 
-// 3. 只送出 /make → 顯示主題按鈕（預設兩個），不送給 Agent
+// 3. 只送出 /make → 顯示管理員開放的主題，不送給 Agent
 await page.press(composer, 'Enter');
 await page.waitForSelector(topicButtons);
 const names = await page.locator(`${topicButtons} strong`).allInnerTexts();
-for (const expected of ['小工具架設', '網站系統架設']) {
+for (const expected of ['小工具架設', '網站系統架設', '建立簡報', '建立公告 Word']) {
   if (!names.includes(expected)) throw new Error(`missing topic ${expected}: ${names}`);
 }
 if (page.url().includes('/c/')) throw new Error('bare /make must not start a chat');
@@ -90,12 +90,16 @@ step(`admin created topic ${topicName}`);
 
 // 6b. 上移：新主題排到第二個
 const topicItem = `app-make-topics-page li.topic:has-text("${topicName}")`;
-await page.click(`${topicItem} button[aria-label="上移"]`);
-await page.waitForFunction(
-  (name) =>
-    document.querySelectorAll('app-make-topics-page li.topic strong')[1]?.textContent === name,
-  topicName,
-);
+let topicIndex = (await page.locator('app-make-topics-page li.topic strong').allInnerTexts()).indexOf(topicName);
+while (topicIndex > 1) {
+  await page.click(`${topicItem} button[aria-label="上移"]`);
+  topicIndex -= 1;
+  await page.waitForFunction(
+    ({ name, index }) =>
+      document.querySelectorAll('app-make-topics-page li.topic strong')[index]?.textContent === name,
+    { name: topicName, index: topicIndex },
+  );
+}
 step('moved the new topic up');
 
 const openPicker = async () => {
