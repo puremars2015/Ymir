@@ -164,6 +164,7 @@ import { formatSize } from '../core/files/workspace-files';
     }
     textarea {
       flex: 1;
+      min-width: 0;
       border: none;
       background: transparent;
       resize: none;
@@ -173,6 +174,12 @@ import { formatSize } from '../core/files/workspace-files';
       font: inherit;
       color: var(--text);
       outline: none;
+    }
+    @media (max-width: 768px) {
+      textarea {
+        font-size: 1rem;
+        max-height: min(12rem, calc(var(--viewport-height, 100dvh) / 4));
+      }
     }
     .round {
       width: 2.25rem;
@@ -313,7 +320,7 @@ export class Composer {
   protected readonly topics = inject(MakeTopicStore);
   private readonly inputRef = viewChild<ElementRef<HTMLTextAreaElement>>('input');
 
-  readonly placeholder = input('輸入訊息，或輸入 /make 建置小工具、網站');
+  readonly placeholder = input('問問Ymir');
   readonly busy = input(false);
   readonly disabled = input(false);
   readonly allowAttachments = input(true);

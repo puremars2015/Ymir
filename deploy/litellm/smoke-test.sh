@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 對 LiteLLM proxy 送一則訊息：./smoke-test.sh [model] [proxy-url]
-#   model：minimax（預設）或 fake-model
+#   model：minimax（預設）、fake-model 或 config.yaml 的 OpenRouter alias
 # 查看某位 Ymir 使用者的預算與今天的用量：./smoke-test.sh usage <ymir-user-id> [proxy-url]
 set -euo pipefail
 cd "$(dirname "$0")"

@@ -20,6 +20,8 @@ public sealed class WebAppHostingTests : IDisposable
     {
         File.WriteAllText(Path.Combine(_root, "index.html"), "<app-root></app-root>");
         File.WriteAllText(Path.Combine(_root, "main.js"), "console.log('ymir');");
+        File.WriteAllText(Path.Combine(_root, "sw.js"), "// sw");
+        File.WriteAllText(Path.Combine(_root, "manifest.webmanifest"), "{}");
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);
@@ -76,6 +78,34 @@ public sealed class WebAppHostingTests : IDisposable
 
         Assert.Equal(HttpStatusCode.OK, asset.StatusCode);
         Assert.NotEqual(HttpStatusCode.OK, missing.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("/sw.js")]
+    [InlineData("/manifest.webmanifest")]
+    [InlineData("/")]
+    public async Task PwaEntryFiles_RequireRevalidation_OtherAssetsDoNot(string path)
+    {
+        await using var app = await StartAsync(_root);
+        using var client = app.GetTestClient();
+
+        using var entry = await client.GetAsync(path, TestContext.Current.CancellationToken);
+        using var asset = await client.GetAsync("/main.js", TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, entry.StatusCode);
+        Assert.Equal("no-cache", entry.Headers.CacheControl?.ToString());
+        Assert.NotEqual("no-cache", asset.Headers.CacheControl?.ToString());
+    }
+
+    [Fact]
+    public async Task WebManifest_IsServedAsManifestJson()
+    {
+        await using var app = await StartAsync(_root);
+        using var client = app.GetTestClient();
+
+        using var response = await client.GetAsync("/manifest.webmanifest", TestContext.Current.CancellationToken);
+
+        Assert.Equal("application/manifest+json", response.Content.Headers.ContentType?.MediaType);
     }
 
     [Theory]

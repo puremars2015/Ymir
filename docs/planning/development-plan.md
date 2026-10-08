@@ -87,7 +87,7 @@ SA 範例「建立 Todo List 網站」需要 `npm install`，但 SA §7 又規�
 
 - Rootless + bind mount 的 **UID 對應**（`--userns=keep-id` 或 `:U`）、SELinux（`:Z`）、**NAS/NFS 與 rootless 的相容性**。
 - 建議旗標：`--cap-drop=ALL --security-opt no-new-privileges --pids-limit --read-only --tmpfs /tmp --memory --cpus`，不 mount podman socket。詳見 [`runtime/agent/README.md`](../../runtime/agent/README.md)。
-- 冷啟動時間：預拉 image，UI 顯示「正在準備 Runtime」。
+- 冷啟動時間：預拉 image，UI 顯示「正在準備回覆......」。
 - **Sprint 0 實測**：rootless Podman 在 cgroups v1 會忽略 `--memory`/`--cpus`/`--pids-limit`，正式主機必須 cgroups v2 + systemd delegation；`sleep infinity` 需搭配 `--init`。
 
 ### 11. 唯讀檔案瀏覽的安全重點

@@ -131,6 +131,8 @@
     class="picker"
     [models]="modelStore.models()"
     [selected]="selectedModel()"
+    [depth]="modelStore.depth()"
+    (depthChanged)="modelStore.rememberDepth($event)"
     (changed)="selectModel($event)"
   />
   <app-composer
@@ -139,7 +141,7 @@
     (submitted)="submit($event)"
     (stopped)="stop()"
   />
-  <p class="hint muted">
+  <p class="hint muted usage-hint">
     Agent 在你的專屬執行環境中工作；Enter 送出，Shift+Enter 換行；📎
     可附加圖片、影片或文件（也可拖放、貼上）。
   </p>

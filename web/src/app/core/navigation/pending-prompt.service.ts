@@ -3,6 +3,7 @@ import { Injectable } from '@angular/core';
 export interface PendingPrompt {
   prompt: string;
   modelId: string | null;
+  thinkingLevel?: string | null;
   /** 從 `/make` 主題按鈕開始的新對話。 */
   makeTopicId: string | null;
   /** 附加的檔案（對話建立後才能上傳，所以先暫存在記憶體）。 */

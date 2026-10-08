@@ -46,6 +46,8 @@ import {
   Conversation,
   Me,
   ModelOption,
+  ModelAccess,
+  SaveModelAccess,
   SendMessageResponse,
   Project,
   RuntimeStatus,
@@ -57,6 +59,15 @@ import {
 /** 呼叫 Ymir API。認證靠同源 HttpOnly cookie，XSRF header 由 HttpClient 自動加上（ADR-0002）。 */
 @Injectable({ providedIn: 'root' })
 export class ApiService {
+  getModelAccess(): Observable<ModelAccess> {
+    return this.http.get<ModelAccess>('/api/admin/settings/models');
+  }
+  saveModelAccess(request: SaveModelAccess): Observable<ModelAccess> {
+    return this.http.put<ModelAccess>('/api/admin/settings/models', request);
+  }
+  resetModelAccess(): Observable<ModelAccess> {
+    return this.http.delete<ModelAccess>('/api/admin/settings/models');
+  }
   private readonly http = inject(HttpClient);
 
   me(): Observable<Me> {
@@ -349,6 +360,7 @@ export class ApiService {
     makeTopicId: string | null = null,
     attachmentIds: string[] = [],
     clientRequestId: string = crypto.randomUUID(),
+    thinkingLevel: string | null = null,
   ): Observable<SendMessageResponse> {
     return this.http.post<SendMessageResponse>(`/api/conversations/${conversationId}/messages`, {
       content,
@@ -356,6 +368,7 @@ export class ApiService {
       modelId,
       makeTopicId,
       attachmentIds,
+      thinkingLevel,
     });
   }
 

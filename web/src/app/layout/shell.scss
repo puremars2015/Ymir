@@ -375,9 +375,17 @@ svg {
 
 /* 窄螢幕：側欄變成抽屜 */
 @media (max-width: 768px) {
+  :host {
+    position: fixed;
+    inset: var(--viewport-top, 0px) 0 auto;
+    height: var(--viewport-height, 100dvh);
+  }
+
   .sidebar {
     position: fixed;
-    inset: 0 auto 0 0;
+    inset: var(--viewport-top, 0px) auto auto 0;
+    height: var(--viewport-height, 100dvh);
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
     z-index: 20;
     transform: translateX(-100%);
     transition: transform 0.2s;
@@ -404,8 +412,13 @@ svg {
   }
 
   .shell-bar {
-    height: 3.75rem;
-    padding: 0 0.75rem;
+    height: calc(3.75rem + env(safe-area-inset-top));
+    padding: env(safe-area-inset-top) 0.75rem 0;
+  }
+
+  .sidebar-top {
+    min-height: calc(4.25rem + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
   }
 }
 

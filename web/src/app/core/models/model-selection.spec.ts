@@ -8,6 +8,7 @@ const models: ModelOption[] = [
     isDefault: true,
     supportsImages: false,
     allowKnowledgeBase: false,
+    supportsThinking: false,
   },
   {
     id: 'gpt-x',
@@ -15,6 +16,7 @@ const models: ModelOption[] = [
     isDefault: false,
     supportsImages: false,
     allowKnowledgeBase: false,
+    supportsThinking: false,
   },
 ];
 

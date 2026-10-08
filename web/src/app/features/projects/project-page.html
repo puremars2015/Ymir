@@ -6,11 +6,12 @@
       class="picker"
       [models]="modelStore.models()"
       [selected]="selectedModel()"
+      [depth]="modelStore.depth()"
+      (depthChanged)="modelStore.rememberDepth($event)"
       (changed)="modelStore.remember($event)"
     />
     <app-composer
       class="composer"
-      [placeholder]="'在「' + p.name + '」開始新對話'"
       [disabled]="busy()"
       (submitted)="start(p, $event)"
     />

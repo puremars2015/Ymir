@@ -75,6 +75,7 @@
 }
 
 .chat-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -136,6 +137,8 @@
 
 .scroller {
   flex: 1;
+  min-height: 0;
+  overscroll-behavior-y: contain;
   overflow-y: auto;
   display: flex;
   flex-direction: column-reverse; /* 新訊息出現時保持在底部 */
@@ -241,6 +244,7 @@
 }
 
 .composer-area {
+  flex-shrink: 0;
   width: 100%;
   max-width: 48rem;
   margin: 0 auto;
@@ -260,5 +264,24 @@
     text-align: center;
     font-size: 0.75rem;
     margin: 0.5rem 0 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .chat-header {
+    padding: 0.625rem 0.75rem;
+  }
+
+  .turns {
+    padding: 1rem 0.75rem;
+  }
+
+  .composer-area {
+    background: var(--background);
+    padding: 0.5rem 0.75rem max(0.5rem, env(safe-area-inset-bottom));
+
+    .usage-hint {
+      display: none;
+    }
   }
 }

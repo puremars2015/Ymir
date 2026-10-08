@@ -32,6 +32,12 @@
 |---|---|---|---|
 | F1 | 明確交付成果與工作檔分離（ADR-0015） | ✅ | 成功執行登記成果、單檔／ZIP、成果與專案檔案分頁；見 #010 |
 | P0 | 多人、多 Agent 軟體專案協作計畫 | 📝 | 見 [#009](#009--多人多-agent-軟體專案協作計畫)；僅計畫，功能尚未實作，排程另定 |
+| L2 | 管理員開放模型與預設模型 | ✅ | 持久設定、選單／執行／virtual key 一致授權；ADR-0016，見 #015 |
+| L1 | LiteLLM OpenRouter 模型接入 | ✅ | Sonnet 5.5、GPT-6.1 Sol、GPT-6 Luna；virtual key、用量／費用與路由驗證；見 #012 |
+| W7 | 圖示開啟模型與思考深度面板 | ✅ | execution 保存深度、Pi／LiteLLM 實際參數、手機與鍵盤操作；ADR-0017，見 #016 |
+| W6 | 模型名稱與輸入能力圖示 | ✅ | 移除 provider 後綴、文字／圖片 SVG、自訂可存取選單；見 #014 |
+| W5 | 手機對話輸入區靠近底部 | ✅ | 新／既有對話、鍵盤與安全區、訊息獨立捲動；見 #013 |
+| W8 | PWA：手機可「加入主畫面」安裝 | ✅ | 見 #018；iOS / Android 實機安裝**待使用者環境確認** |
 | W4 | AppDashboard 側欄清單與漢堡收合 | ✅ | 圖示、列高與群組分隔線；桌面記住收合，手機抽屜；見 #011 |
 | W3 | AppDashboard 配色與淺色／深色／自動切換 | ✅ | 見 [#008](#008--appdashboard-配色與主題切換) |
 | W2 | Ubuntu 既有 Docker 部署啟動檔 `start-ymir.sh` | ✅ | 見 [#005](#005--ubuntu-既有-docker-部署啟動檔)；語法與隔離模擬通過，實機待驗證 |
@@ -69,6 +75,168 @@
 ---
 
 ## 💬 留言區
+### #023 · 依模型 API 能力提供思考選項
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 23:41 · `✅完成與部署`
+
+依使用者要求新增模型 Thinking 能力契約（Parameter／Levels／DefaultLevel／Required），前端依精確清單顯示，MiniMax 不顯示深度控制；依官方 OpenRouter 目錄，Luna 可選 none／low／medium／high／xhigh／max，Sol／Sonnet 為必須思考且排除 none。未知／不適用的保存偏好採模型預設，不強制改成另一值。提交與執行開始均驗證精確值；原 execution 欄位足以保存新 effort，無 migration。舊 SupportsThinking=true 相容低／中／高，新部署採明確配置。ADR-0018、README、部署環境範例、OpenAPI 與前端型別同步。
+
+实际传輸驗證抓到并修正：Pi 的别名 xhigh 被降为 high，需要显式 thinkingLevelMap；off→null 會排除 off 而改用 minimal，自動改为本次模型不受 Pi effort 管理且不送參數，none 才明確 off→none。LiteLLM 1.103.2 的 reasoning_effort 转換未完整保留新值，OpenRouter 部署採 reasoning.effort，經假上游驗證精確值。無 adapter 的 token-budget／其他開關配置會拒絕啟動，不冒充通用深度，未宣稱已支援所有廠商格式。
+
+驗證：後端單元 406 通過／5 個平台相關略過，模型存取與 OpenAPI 整合 3 通過；前端 lint、139 測試、build 通過；dotnet format verify 與 git diff --check 通過。Pinned Pi 兩種傳輸格式共 38 個本機假請求，LiteLLM 28 個假上游請求，驗證精確 effort、none／自動及同 session 重設，全部通過；新版預覽與部署入口兩次 e2e 驗證各模型選项、點擊／鍵盤／偏好、訊息參數與手機佈局通過。首輪 SQL 測試因 localhost 連線逾時，改用 127.0.0.1 後通過。
+
+部署確認無執行中工作，API 更新至 api-thinking-capabilities-20261007，前端映像 localhost/ymir/web:thinking-capabilities-20261007；launcher 三個 OpenRouter 模型已配置實際 Levels、預設與 Required，保持金鑰、管理員開放清單、workspace／agent-state 和入口 IP。API health、本機與公開入口 200，提供 main-WOD4GX4O.js；未發送付費模型請求，原瀏覽器需重新整理取新版本。
+
+---
+### #022 · 思考深度改用直接點擊按鈕
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 23:25 · `✅修正與部署；原現場原因未重現`
+
+使用者回報電腦上選項正常、點選思考深度沒有改變、面板仍開著。核對前端依 supportsThinking 控制停用、部署 launcher 三個 OpenRouter 模型設定 true；既有 API fixture 瀏覽器檢查未重現原現場問題，不把推測當成已確認原因。將隱藏 radio／label／change 的間接操作改成原生 button 直接 emit，整個選項可點擊，aria-checked 與畫面由同一深度狀態控制；保留 radiogroup 語意、方向鍵／Home／End、Enter／Space、Tab、disabled 模型與 Escape／外部關閉。
+
+擴充既有模型選單 e2e：三個 OpenRouter 模型皆點擊選項邊缘並輪流選四種深度，驗證鍵盤切換、重新整理保存；GPT-6 Luna／GPT-6.1 Sol 加驗送出 modelId 與 thinkingLevel，既有 Sonnet／新對話／專案／不支援模型行為仍通過。前端 lint、build、136 測試與 git diff --check 通過；新版隔離預覽及部署入口兩次 e2e 通過，使用 API fixtures，沒有呼叫付費模型或修改正式對話。已部署 `localhost/ymir/web:thinking-buttons-20261007`，確認本機與公開入口皆提供 main-UPLCSBKV.js，nginx 與入口 IP 保留；預覽容器已清理。使用者原有瀏覽器需重新整理後確認，尚未宣稱已在其原現場重現及驗證。
+
+---
+### #021 · 統一對話輸入提示
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 23:04 · `✅完成`
+
+依使用者要求，共用 composer 的提示文字簡化為「問問Ymir」，移除首頁與專案頁的個別覆寫，讓新對話、既有對話及專案對話一致。前端 lint、production build、git diff --check 通過；純提示文字修改，沒有新增測試。已更新本機前端映像 `localhost/ymir/web:prompt-20261007`，確認入口提供新版 main-EVVTF3DY.js、nginx 設定有效，保留原入口網路 IP 與後端／資料。可重新整理查看。
+
+---
+### #020 · 合併後重新建置與本機部署
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 23:01 · `✅完成`
+
+依使用者要求，重新執行 Angular production build、API Release publish 與 Agent image build，部署合併提交 `4583f3d`。API 更新至 `%LOCALAPPDATA%/Ymir/deploy/api-merged-4583f3d-20261007`；web 與 Agent 映像分別為 `localhost/ymir/web:merged-4583f3d`、`localhost/ymir/agent-runtime:merged-4583f3d`，launcher 已切換新路徑／映像。確認執行中任務為 0，並以 idempotent SQL 套用 OneDriveConnections；既有 ExecutionThinkingLevel 保留。三個閒置正式使用者容器已重建並恢復閒置，沿用原 workspace、agent-state、網路與資源／安全限制。
+
+nginx 維持 `client_max_body_size 50m`，增加 index.html、sw.js、manifest.webmanifest 的 no-cache／no-store，保留 SSE、轉送設定及入口 IP。API health、本機前端與公開入口 200；本機／公開 PWA manifest 與 service worker 200 並確認不快取；未登入 API 回應 401。部署前後均通過模型選單瀏覽器檢查，包含模型名稱／圖示、思考選擇與保存、首次訊息與既有對話、鍵盤操作、手機與縮小視窗；Agent Pi 1.0.0 與 pdftotext 檢查通過。前版 web 容器、API publish 與 launcher 備份保留供回復；預覽及此次 Agent 回復容器已清理。
+
+沒有發送付費模型請求或連線真實 OneDrive；手機實機安裝仍待確認。合併測試結果沿用 #019：前端 136 測試通過，後端完整 Windows 測試仍有 50 個環境／Runtime／Pi 失敗，未宣稱全部通過。本次重新建置與部署驗證通過，資料與金鑰保留。
+
+---
+
+### #019 · 解決 main 與遠端合併衝突
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 22:53 · `✅完成`
+
+完成使用者已開始的 merge（本機 1 個提交、遠端 8 個提交）：index.html 保留本機 `interactive-widget=resizes-content` 與遠端 PWA manifest／iOS meta；看板保留兩邊所有內容，PWA 的重複 W5／#012 改為 W8／#018，原留言文字保留。OpenRouter、模型管理、思考深度與 OneDrive／PWA 功能均保留。修正 3 處檔尾換行及 ModelAccessTests using 排序，使 dotnet format 驗證通過。
+
+驗證：Release solution build 零警告／錯誤；前端 lint、136 測試、build 通過；後端完整 Windows 測試實際結果 583 通過、50 失敗、7 略過，失敗包含 Windows 不支援 Local runtime 的 fixture，以及 Docker／Pi 的 Fake LLM 位址與 runtime 預期不一致，未修改或停用測試來掩蓋。合併相关 OpenAPI 快照 1、OneDrive 9、WebAppHosting 11、Models 8 個整合測試另行通過。完整 Runtime／Pi 路徑需由 Linux CI 驗證。本次測試建立的暫時 Docker 容器已清理，原有服務保留；未更新目前部署的 API／前端。
+
+此合併會以正常提交保留雙方歷史，完成 pull 並 push 至 origin/main，不使用 force push。
+
+---
+
+### #018 · PWA：手機可安裝到主畫面
+
+> 👤 **Claude（AI）** · 🕒 2026-10-07 19:00 · `✅完成`
+
+前端本來就是 SPA，補上 PWA 安裝能力，使用者用手機開網址即可「加入主畫面」，以獨立視窗開啟。
+
+- **新增**：`manifest.webmanifest`、192／512／maskable 圖示（暫由 `apple-touch-icon.png` 放大產生，有正式 logo 再替換）、`sw.js`、`index.html` 的 manifest 與 iOS meta、`viewport-fit=cover`。
+- **service worker 只快取帶雜湊的靜態檔**（cache-first）；`/api`（含 SSE、登入、下載）與 `index.html` 一律不經快取，登入狀態仍是 HttpOnly cookie（ADR-0002），不碰任何憑證。沒有離線功能（Agent 需要連線）。
+- **登入頁安裝提示**：Android 顯示原生安裝按鈕（`beforeinstallprompt`），iOS 顯示「分享 → 加入主畫面」說明，已安裝則不顯示（`PwaInstallService` + 純函式 `pwa-rules.ts`）。
+- **伺服器**：`WebAppHostingExtensions` 對 `index.html`、`sw.js`、`manifest.webmanifest` 回 `Cache-Control: no-cache`，手機才會取得新版。
+- **CSP 不需修改**：`manifest-src` / `worker-src` 退回 `default-src` / `script-src 'self'`。沒有新增相依套件（手寫 service worker）。
+
+驗證：
+- 前端 lint 通過、131 個測試通過（含新增 `pwa-rules.spec.ts`）、production build 通過；
+- `dotnet build`、`dotnet format --verify-no-changes`、`WebAppHostingTests` 11 個通過（含新增 no-cache 與 manifest content-type）；
+- Playwright（Chromium、iPhone 尺寸）：service worker 啟用、manifest 可讀、重新整理後只快取 5 個雜湊檔（無 `/api`、無 `index.html`）、登入頁顯示 iOS 說明。
+
+**未驗證、待使用者環境確認**：真實 iPhone / Android 在 HTTPS 網域（Cloudflare Tunnel）上的安裝與登入（iOS 主畫面 App 的 cookie 與 Safari 分開，第一次需重新登入；Entra OIDC 在獨立視窗內的跳轉需實機測）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #017 · 清理本機未使用 Docker 容器與映像
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 18:51 · `✅完成`
+
+依使用者要求清理目前主機：刪除 30 個停止的容器（舊前端備份／預覽、已停止 Agent 與舊測試容器）及 24 個未被保留容器引用的映像，並清除建置快取。沒有停止任何執行中的服務，也沒有刪除 volume 或 host 資料目錄；workspace／agent-state 的 bind mount 資料保留。除了 7 個執行中服務使用的映像，額外保留部署 launcher 指定的 `localhost/ymir/agent-runtime:deliverables`，避免下次建立 Agent 時缺少映像。
+
+`docker system df`：映像 32 → 8、7.699 GB → 6.616 GB；容器 39 → 9、剩餘全部執行中；建置快取占用 23.61 MB → 0。Docker 管理的內容約減少 1.1 GB；此數值不表示 Windows 虛擬磁碟檔會立即縮小，未停止 Docker 或進行 VHDX 壓縮。3 個既有 volumes 全部保留。清理後 localhost:4200 及 API health 均 HTTP 200，SQL／LiteLLM／Tunnel／EBS 與使用中 Agent 容器保留。
+
+---
+
+### #016 · 圖示模型與思考深度設定
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 18:48 · `✅完成`
+
+輸入區使用滑桿圖示開啟面板，含模型清單與自動／輕量／標準／深入；維持純模型名稱與文字／圖片圖示，旁邊顯示目前選擇。新對話、既有對話與專案共用，Tab 可到深度、Escape／外部點擊關閉，手機依 viewport 展開。修正 Chrome 點擊 radio label 的暫時空 relatedTarget 導致提早關閉。
+
+部署明確宣告 `SupportsThinking`，三個 OpenRouter 模型經官方目錄確認可使用 low／medium／high；MiniMax 維持模型預設。每則訊息捕捉深度，API 驗證能力與允許值，execution migration 保存 `thinking_level`，新對話第一則與冪等重送同樣保留。Pi models.json 開啟 reasoning 能力並傳入 `--thinking`；自動重設 session 且不傳 reasoning_effort，不要求供應商關閉原有思考。[ADR-0017](../adr/0017-execution-thinking-depth.md)、README、OpenAPI 與前端型別已同步。
+
+驗證：後端單元 386 通過／5 Windows shell 測試略過；相關 Models 整合 8 通過、OpenAPI 快照 1 通過；前端 lint／build、128 測試通過。pinned Pi 1.0.0 映像本機假模型 12 次 RPC 驗證三模型的 low／medium／high 與同 session 自動重設；LiteLLM 本機上游 21 次請求驗證原有文字／工具／串流與深度／預設，不呼叫付費模型。瀏覽器 fixtures 驗證面板、鍵盤、深度偏好、既有與第一則訊息參數、無能力模型送 null、手機與深色；手機 composer 與管理員模型面板回歸通過，部署後 localhost:4200 再驗證通過。手機原生鍵盤與付費模型輸出效果未實測。
+
+本機 API 更新至 `api-model-settings-20261007`，web image `localhost/ymir/web:model-settings-20261007`，保留 workspace／agent-state 及入口網路 IP。正式模式不自動 migrate，啟動首次因缺少 thinking_level 退出；已套用該次 idempotent migration 後重啟，health／web 200。部署 launcher 已加入三模型 SupportsThinking 設定，未修改管理員的開放清單。截圖保存於 `%LOCALAPPDATA%/Ymir/deploy/screenshots-model-settings-20261007/deployed/`。既有未提交變更保留，未推送遠端。
+
+---
+
+### #015 · 管理員控制開放模型
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 18:30 · `✅完成`
+
+新增「管理 → 系統設定 → 開放模型」勾選清單、預設與还原部署設定；既有 system_settings 保存政策，不需要 migration。後端只允許部署 Models／AllowedModels 交集，至少一個與合法預設；Admin／XSRF／稽核保護。使用者清單與新訊息立即讀取政策，排隊執行啟動前重查、模型關閉則失敗，已開始不打斷。下次執行 virtual key 模型集合不同時換發、撤銷舊 key，空模型不發 key。前端頁面與視窗回前景刷新，儲存後同步刷新。新增 ADR-0016、OpenAPI／前端型別與 README。
+
+驗證：後端 build／Release publish 零警告、單元 384 通過／5 個 Windows shell 測試略過；模型相關整合 7、授權矩陣 4、OpenAPI 快照 1 通過（SQL 使用 127.0.0.1 避免 localhost IPv6 逾時）；測試覆蓋非法政策、不允許的模型、損毀設定不重新開放、持久設定、拒絕成員修改／停用模型、排隊停用與 virtual key 換發。前端 lint／123 Vitest／build 通過；`e2e:admin-models` 唯讀狀態 fixtures 驗證儲存、還原、空清單、預設、重新整理、使用者清單與手機；model-picker 及 mobile-composer 回歸通過。未對真實使用者變更開放政策，沒有額外上游付費模型呼叫。
+
+本機 API 更新至 `api-model-access-20261007`（確認排隊／執行數為 0），前端映像 `localhost/ymir/web:model-access-20261007`；保留 API launcher／前端旧容器備份。未重啟 LiteLLM／SQL／Agent，也不改動目前開放模型。
+
+### #014 · 模型名稱與輸入能力圖示
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 18:10 · `✅完成`
+
+共用模型選單只顯示名稱，移除既有 OpenRouter 後綴及「可看圖片」文字，文字／圖片能力改為 OpenRouter 風格的小型 SVG 徽章。文字輸入皆顯示 T，圖片以既有 supportsImages 決定；不推測音訊或影片能力。API 型別、模型 alias 與路由保持不變，部署模型名称範本同步移除後綴。選單改為可容納 SVG 的 listbox，支援方向鍵、Home／End、Enter／空白、Escape、Tab、外部點擊與焦點回復，隨可用空間展開，viewport 改變時關閉。
+
+驗證：lint、build、123 個 Vitest 通過；新增 `e2e:model-picker` 唯讀 fixtures，驗證模型名稱、文字／圖片圖示、選擇保存與重新整理、鍵盤、外部關閉、對話／專案重用、手機定位、深色與鍵盤尺寸；`e2e:mobile-composer` 回歸通過。既有 chat-flow 模型選擇與還原檢查同步改用新選單；未執行會建立真實對話的完整 chat-flow。
+
+README 已更新，本機前端映像為 `localhost/ymir/web:model-picker-20261007`；原容器保留為備份，維持 50m、API 代理與網路。未重啟 API／LiteLLM／資料庫／Agent。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+### #013 · 手機對話輸入區靠近底部
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 18:00 · `✅完成`
+
+手機新對話原本置中，既有對話的冗長說明則占據輸入框下方空間；現在兩者均靠近底部，保留 8px／safe-area。訊息區獨立捲動、header／composer 不縮小；多行輸入高度限制為可見畫面的四分之一。Shell 監聽 VisualViewport resize／scroll，調整手機頁面高度及位置，縮放閱讀時不重新縮排，離開手機尺寸後清除覆寫；viewport meta 與側欄也配合安全區。README 同步更新。
+
+驗證：`npm run lint`、`npm test -- --watch=false`（123 通過）、`npm run build` 通過。`npm run e2e:mobile-composer` 在唯讀 API fixtures 下驗證 390×844／375×667／667×375、新舊對話、送出按鈕、多行輸入、附件、40 則訊息獨立捲動、模擬鍵盤縮小／平移／收起、pinch zoom 與桌面還原；`e2e:sidebar` 桌面收合、手機焦點與抽屜回歸通過。未在手機實機 Safari／Chrome 測試原生鍵盤。
+
+本機前端更新至 `localhost/ymir/web:mobile-composer-20261007`，保留原 nginx 50m／API 代理設定、連線網路與旧容器以便回復；API、LiteLLM、資料庫與 Agent 未重啟。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+### #012 · LiteLLM OpenRouter 模型接入
+
+> 👤 **Codex（AI）** · 🕒 2026-10-07 17:45 · `✅完成`
+
+依使用者指定開放 anthropic/claude-sonnet-5.5、openai/gpt-6.1-sol、openai/gpt-6-luna。LiteLLM 原生 OpenRouter provider、Compose 的 OPENROUTER_API_KEY／OR_APP_NAME、金鑰與 Ymir 模型設定範本、部署說明及 README 已更新。上游 key 僅交给 LiteLLM；Models 與明確的 AllowedModels 同步加入三個 alias，支援圖片輸入，保留既有 MiniMax-M2.7 預設。
+
+驗證：OpenRouter key 驗證與官方模型清單確認成功；固定的 LiteLLM 1.103.2 映像中 test-openrouter.py 完成三模型共 9 次本機 HTTP stub 驗證（路由、模型 ID、鑰匙、文字、工具與串流）；Compose config --quiet、git diff --check 通過。重建本機 LiteLLM 並於零排隊／執行工作時重啟 API，health 200。額外建立 5 分鐘、US$0.05 上限且僅允許三模型的測試 virtual key，三個真實模型皆 HTTP 200、非零 response cost；未列入模型 403，測試 key 已撤銷。未對真實使用者對話送出 Agent 訊息，未測試真實圖片或工具呼叫；其 provider 格式由 stub 覆蓋。
+
+現有 PostgreSQL volume、master key、salt、MiniMax key 保留；服務設定備份位於本機部署目錄。變更僅部署設定與文件，不修改 API 契約／資料庫 schema，也不新增圖片生成、語音或 embeddings 的 UI。
+
+---
 
 ### #019 · H2 完成：私人網站的票據登入、分享與管理員可見（本輪計畫收尾）
 

@@ -22,23 +22,28 @@ import { ModelPicker } from '../../shared/model-picker';
   imports: [Composer, ModelPicker],
   template: `
     <section class="welcome">
-      <h1>{{ greeting() }}</h1>
-      <p class="muted">描述你想做的小工具或網站，Agent 會在你的工作環境中幫你完成。</p>
-      <app-model-picker
-        class="picker"
-        [models]="modelStore.models()"
-        [selected]="selectedModel()"
-        (changed)="modelStore.remember($event)"
-      />
-      <app-composer
-        class="composer"
-        placeholder="有什麼可以幫忙的？例如：幫我建立一個 Todo List 網站"
-        [disabled]="busy()"
-        (submitted)="start($event)"
-      />
-      @if (error()) {
-        <p class="error">{{ error() }}</p>
-      }
+      <div class="welcome-copy">
+        <h1>{{ greeting() }}</h1>
+        <p class="muted">描述你想做的小工具或網站，Agent 會在你的工作環境中幫你完成。</p>
+      </div>
+      <div class="welcome-composer">
+        <app-model-picker
+          class="picker"
+          [models]="modelStore.models()"
+          [selected]="selectedModel()"
+          [depth]="modelStore.depth()"
+          (depthChanged)="modelStore.rememberDepth($event)"
+          (changed)="modelStore.remember($event)"
+        />
+        <app-composer
+          class="composer"
+          [disabled]="busy()"
+          (submitted)="start($event)"
+        />
+        @if (error()) {
+          <p class="error">{{ error() }}</p>
+        }
+      </div>
     </section>
   `,
   styles: `
@@ -68,6 +73,33 @@ import { ModelPicker } from '../../shared/model-picker';
       display: block;
       margin-top: 0.5rem;
       text-align: left;
+    }
+    @media (max-width: 768px) {
+      :host {
+        display: flex;
+        align-items: stretch;
+        min-height: 0;
+        padding: 0 0.75rem max(0.5rem, env(safe-area-inset-bottom));
+      }
+      .welcome {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 0;
+        min-height: 0;
+      }
+      .welcome-copy {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        align-content: center;
+      }
+      .welcome-composer {
+        flex-shrink: 0;
+        text-align: left;
+      }
+      .picker {
+        margin-top: 0.5rem;
+      }
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

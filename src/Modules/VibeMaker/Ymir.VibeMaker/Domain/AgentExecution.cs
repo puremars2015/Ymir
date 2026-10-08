@@ -41,6 +41,9 @@ public sealed class AgentExecution
     /// <summary>這次執行使用的模型（稽核與用量分析）；舊資料為 null，代表當時的預設模型。</summary>
     public string? ModelId { get; private set; }
 
+    /// <summary>這次執行選擇的思考深度；null 使用模型預設（ADR-0017）。</summary>
+    public string? ThinkingLevel { get; private set; }
+
     /// <summary>
     /// 實際送給 Agent 的內容；null 時使用 USER 訊息原文。<c>/make</c> 指令由後端展開成完整指示（<see cref="Application.Make.MakePromptBuilder"/>），
     /// 對話紀錄仍只顯示使用者輸入的短文字。
@@ -49,10 +52,14 @@ public sealed class AgentExecution
 
     public byte[] RowVersion { get; private set; } = [];
 
-    public static AgentExecution Queue(Conversation conversation, Message userMessage, Guid clientRequestId, DateTimeOffset now, string? modelId = null, string? agentPrompt = null)
+    public static AgentExecution Queue(Conversation conversation, Message userMessage, Guid clientRequestId, DateTimeOffset now, string? modelId = null, string? agentPrompt = null, string? thinkingLevel = null)
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(userMessage);
+        if (thinkingLevel is not (null or "none" or "minimal" or "low" or "medium" or "high" or "xhigh" or "max"))
+        {
+            throw new DomainValidationException("無效的思考深度。");
+        }
         var execution = new AgentExecution
         {
             Id = Guid.CreateVersion7(now),
@@ -63,6 +70,7 @@ public sealed class AgentExecution
             Status = ExecutionStatus.Queued,
             CreatedAt = now,
             ModelId = modelId,
+            ThinkingLevel = thinkingLevel,
             AgentPrompt = agentPrompt,
         };
         userMessage.AttachExecution(execution.Id);

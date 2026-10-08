@@ -150,6 +150,7 @@ export class ChatPage {
     modelId: string | null = this.selectedModel(),
     makeTopicId: string | null = null,
     files: File[] = [],
+    thinkingLevel: string | null = this.modelStore.thinkingFor(modelId),
   ): void {
     if (this.live() || this.uploading()) {
       return;
@@ -169,6 +170,8 @@ export class ChatPage {
             modelId,
             makeTopicId,
             uploaded.map((a) => a.id),
+            crypto.randomUUID(),
+            thinkingLevel,
           );
         }),
       )
@@ -334,7 +337,13 @@ export class ChatPage {
           if (pending.modelId) {
             this.chosenModel.set(pending.modelId);
           }
-          this.send(pending.prompt, pending.modelId, pending.makeTopicId, pending.files);
+          this.send(
+            pending.prompt,
+            pending.modelId,
+            pending.makeTopicId,
+            pending.files,
+            pending.thinkingLevel ?? null,
+          );
         }
       },
       error: (error: unknown) => this.error.set(describeApiError(error)),

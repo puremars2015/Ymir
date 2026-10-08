@@ -21,7 +21,7 @@ public sealed class ExecutionService(
     IExecutionCancellationRegistry cancellations,
     ExecutionEventWriter eventWriter,
     IAuditLog auditLog,
-    ModelCatalog models,
+    ModelAccessService modelAccess,
     MakeTopicService makeTopics,
     Runtime.RuntimePolicyService policies,
     ModelBudgetGuard budgets,
@@ -53,7 +53,8 @@ public sealed class ExecutionService(
             return existing;
         }
 
-        if (request.ModelId is not null && !models.IsAvailable(request.ModelId))
+        var models = await modelAccess.GetAsync(cancellationToken).ConfigureAwait(false);
+        if (models.DefaultModelId is null || (request.ModelId is not null && !models.IsAvailable(request.ModelId)))
         {
             return SubmitMessageResult.ModelNotAvailable;
         }
@@ -90,6 +91,12 @@ public sealed class ExecutionService(
         }
 
         var now = timeProvider.GetUtcNow();
+        var selectedModel = models.Resolve(request.ModelId ?? conversation.ModelId)!;
+        if (!models.Models.Any(m => m.Id == selectedModel && m.AcceptsThinking(request.ThinkingLevel)))
+        {
+            throw new DomainValidationException("此模型不支援所選的思考深度。");
+        }
+
         if (await CheckQuotaAsync(userId, now, cancellationToken).ConfigureAwait(false) is { } quota)
         {
             return quota;
@@ -116,7 +123,7 @@ public sealed class ExecutionService(
         }
 
         // 執行時的模型：這次選的 → 對話上次選的 → 預設；已不在清單的模型退回預設。
-        var execution = AgentExecution.Queue(conversation, message, request.ClientRequestId, now, models.Resolve(request.ModelId ?? conversation.ModelId), agentPrompt);
+        var execution = AgentExecution.Queue(conversation, message, request.ClientRequestId, now, selectedModel, agentPrompt, request.ThinkingLevel);
         foreach (var attachment in attachments)
         {
             attachment.AttachTo(message.Id);

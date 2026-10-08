@@ -59,12 +59,15 @@ await page.click('a.new-chat');
 await page.waitForSelector('app-new-chat-page h1');
 
 // 1c. 首頁選模型（需要 API 設定兩個以上的 VibeMaker:Models）
-const modelOptions = await page.locator('app-new-chat-page select[name=model] option').count();
+await page.getByRole('button', { name: '模型與思考設定', exact: true }).click();
+const modelOptions = await page.getByRole('option').count();
 if (modelOptions >= 2) {
-  await page.selectOption('app-new-chat-page select[name=model]', { index: 1 });
+  await page.getByRole('option').nth(1).click();
+} else {
+  await page.keyboard.press('Escape');
 }
 await page.screenshot({ path: `${outDir}/01-home.png` });
-const chosenModel = await page.inputValue('app-new-chat-page select[name=model]');
+const chosenModel = await page.locator('app-model-picker .picker .model-name').innerText();
 step(`model picker (${modelOptions} models, chose ${chosenModel})`);
 
 // 2. 像 ChatGPT 一樣直接在首頁輸入 → 建立未分組對話並送出
@@ -104,7 +107,7 @@ step('agent-created file previewable and downloadable (inline chip, files panel,
 // 3. 重新整理後歷史仍在
 await page.reload();
 await page.waitForSelector('.turn.assistant:has-text("已完成")');
-const rememberedModel = await page.inputValue('app-chat-page select[name=model]');
+const rememberedModel = await page.locator('app-model-picker .picker .model-name').innerText();
 if (rememberedModel !== chosenModel)
   throw new Error(`conversation did not remember model: ${rememberedModel}`);
 step(`history persisted after reload (model ${rememberedModel} remembered)`);

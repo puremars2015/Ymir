@@ -133,6 +133,7 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             execution.Property(e => e.Status).HasConversion<UpperSnakeCaseEnumConverter<ExecutionStatus>>().HasMaxLength(30);
             execution.Property(e => e.ErrorCode).HasMaxLength(100);
             execution.Property(e => e.ModelId).HasMaxLength(Conversation.ModelIdMaxLength);
+            execution.Property(e => e.ThinkingLevel).HasMaxLength(10);
             execution.Property(e => e.AgentPrompt);
             execution.Property(e => e.RowVersion).IsRowVersion();
             execution.HasOne<Conversation>().WithMany().HasForeignKey(e => e.ConversationId).OnDelete(DeleteBehavior.Restrict);

@@ -11,8 +11,12 @@ internal static class SettingsEndpoints
 {
     public static IEndpointRouteBuilder MapSettingsEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/models", (ModelCatalog catalog) =>
-                catalog.Models.Select(m => new ModelResponse(m.Id, m.DisplayName, m.Id == catalog.DefaultModelId, m.SupportsImages, m.AllowKnowledgeBase)).ToList())
+        endpoints.MapGet("/api/models", async (ModelAccessService policy, CancellationToken ct) =>
+            {
+                var state = await policy.GetAsync(ct);
+                return state.Models.Select(m => new ModelResponse(m.Id, m.DisplayName, m.Id == state.DefaultModelId, m.SupportsImages, m.EffectiveThinking is not null,
+                    m.EffectiveThinking is { } thinking ? new ThinkingCapabilityResponse(thinking.Parameter, thinking.Levels, thinking.DefaultLevel, thinking.Required) : null, m.AllowKnowledgeBase)).ToList();
+            })
             .WithName("ListModels")
             .WithTags("Models");
 

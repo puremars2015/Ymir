@@ -24,7 +24,7 @@ public sealed class ExecutionRunner(
     IAgentRuntimeManager runtimeManager,
     IAgentHarness harness,
     RuntimeCredentialService credentials,
-    ModelCatalog models,
+    ModelAccessService modelAccess,
     ExecutionEventWriter eventWriter,
     IExecutionCancellationRegistry cancellations,
     UserExecutionLocks userLocks,
@@ -88,10 +88,23 @@ public sealed class ExecutionRunner(
         RuntimeInfo runtime;
         AgentSession session;
         RuntimeModelCredential credential;
+        string selectedModel;
         EffectiveExtensions extensions;
         try
         {
-            await AppendAsync(executionId, new StatusEvent("正在準備 Runtime"), stoppingToken).ConfigureAwait(false);
+            var modelPolicy = await modelAccess.GetAsync(runToken).ConfigureAwait(false);
+            if (modelPolicy.DefaultModelId is null || (execution.ModelId is not null && !modelPolicy.IsAvailable(execution.ModelId)))
+            {
+                await FinishAsync(execution, new AgentFailed(ExecutionErrorCodes.ModelNotAvailable, "此模型已停止開放，請選擇其他模型。"), stoppingToken).ConfigureAwait(false);
+                return;
+            }
+            selectedModel = modelPolicy.Resolve(execution.ModelId)!;
+            if (!modelPolicy.Models.Any(m => m.Id == selectedModel && m.AcceptsThinking(execution.ThinkingLevel)))
+            {
+                await FinishAsync(execution, new AgentFailed(ExecutionErrorCodes.ModelNotAvailable, "此模型已不支援選擇的思考深度，請重新選擇。"), stoppingToken).ConfigureAwait(false);
+                return;
+            }
+            await AppendAsync(executionId, new StatusEvent("正在準備回覆......"), stoppingToken).ConfigureAwait(false);
             // 擴充能力由伺服器在每次執行時決定（ADR-0012 A.3）；對外連線決定 container 的 network（A.8）。
             // 這裡持有使用者的執行鎖，沒有其他 Agent 在這個 runtime 執行，network 不符時可以安全地重建。
             extensions = await extensionPolicy.ResolveAsync(execution.UserId, stoppingToken).ConfigureAwait(false);
@@ -100,7 +113,7 @@ public sealed class ExecutionRunner(
             await AuditRuntimeTransitionAsync(runtime, stoppingToken).ConfigureAwait(false);
             session = await GetOrCreateSessionAsync(execution, runtime, stoppingToken).ConfigureAwait(false);
             // 使用者的 LiteLLM virtual key（ADR-0004）：只放進 Agent 程序的環境變數，container 內不會有 master key。
-            credential = await credentials.GetAsync(execution.UserId, runtime.RuntimeId, runToken, policy.MonthlyBudget).ConfigureAwait(false);
+            credential = await credentials.GetAsync(execution.UserId, runtime.RuntimeId, runToken, policy.MonthlyBudget, modelPolicy.Models.Select(m => m.Id).ToList()).ConfigureAwait(false);
 
             execution.Start(session.Id, runtime.RuntimeId, timeProvider.GetUtcNow());
             await db.SaveChangesAsync(stoppingToken).ConfigureAwait(false);
@@ -166,10 +179,11 @@ public sealed class ExecutionRunner(
                 await GetPromptAsync(execution, stoppingToken).ConfigureAwait(false),
                 workingDirectory,
                 credential.ApiKey,
-                models.Resolve(execution.ModelId),
+                selectedModel,
                 await GetSystemPromptsAsync(execution, stoppingToken).ConfigureAwait(false),
                 extensions,
                 await GetAttachmentsAsync(execution, stoppingToken).ConfigureAwait(false),
+                execution.ThinkingLevel,
                 // 平台 MCP（ADR-0012 B）：目錄 ∩ 存取清單，token 期限涵蓋這次執行。
                 await platformMcp.PrepareRunAsync(execution.UserId, policy.ExecutionTimeout, runToken).ConfigureAwait(false));
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
