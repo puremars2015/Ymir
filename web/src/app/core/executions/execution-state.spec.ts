@@ -18,7 +18,26 @@ describe('applyExecutionEvent', () => {
       type: 'tool.completed',
       data: { callId: 'c2', success: false },
     });
+    // 工具都結束但 Agent 還沒輸出文字：仍視為工作中，避免連續呼叫工具時閃爍
+    expect(hasRunningTools(view)).toBe(true);
+    view = applyExecutionEvent(view, { type: 'assistant.delta', data: { text: '完成' } });
     expect(hasRunningTools(view)).toBe(false);
+  });
+
+  it('stays working across the gap between consecutive tools', () => {
+    const view = run([
+      { type: 'tool.started', data: { tool: 'bash', callId: 'c1', summary: 'a' } },
+      { type: 'tool.completed', data: { callId: 'c1', success: true } },
+    ]);
+    expect(hasRunningTools(view)).toBe(true);
+    expect(
+      hasRunningTools(
+        applyExecutionEvent(view, {
+          type: 'tool.started',
+          data: { tool: 'bash', callId: 'c2', summary: 'b' },
+        }),
+      ),
+    ).toBe(true);
   });
 
   it.each(['execution.completed', 'execution.failed', 'execution.cancelled'] as const)(
