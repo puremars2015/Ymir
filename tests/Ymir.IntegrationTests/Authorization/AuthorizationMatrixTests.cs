@@ -163,6 +163,12 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["GET /api/admin/audit"] = () => Get("/api/admin/audit"),
         ["GET /api/admin/health"] = () => Get("/api/admin/health"),
         ["GET /api/admin/settings/oidc"] = () => Get("/api/admin/settings/oidc"),
+        ["PUT /api/admin/settings/branding/"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/branding")
+        {
+            Content = JsonContent.Create(new SaveBrandingRequest("Intruder")),
+        },
+        ["PUT /api/admin/settings/branding/favicon"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/branding/favicon") { Content = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47]) { Headers = { ContentType = new("application/octet-stream") } } },
+        ["DELETE /api/admin/settings/branding/favicon"] = () => new HttpRequestMessage(HttpMethod.Delete, "/api/admin/settings/branding/favicon"),
         ["GET /api/admin/settings/tunnel"] = () => Get("/api/admin/settings/tunnel"),
         ["PUT /api/admin/settings/tunnel/token"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/tunnel/token")
         {
@@ -210,6 +216,8 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "POST /api/me/password",
         "POST /api/auth/logout",
         "GET /api/auth/providers",
+        "GET /api/branding",
+        "GET /api/branding/favicon",
         "GET /api/auth/login",
         "POST /api/auth/password-login",
         "POST /api/dev/login",

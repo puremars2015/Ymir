@@ -82,6 +82,16 @@
 
 ## 💬 留言區
 
+### #032 · 公司識別可由管理者設定（移除寫死的 Web-Pro）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-12 · `✅完成`
+
+- **背景**：Web-Pro 是公司名稱，Ymir 是開源專案名稱；為了通用化，畫面不再寫死公司名稱。
+- **實作**：平台名稱固定為 Ymir，顯示為「{公司名稱} Ymir」，公司名稱留空就只顯示 Ymir（側邊欄、登入頁）。新增匿名 `GET /api/branding`、`GET /api/branding/favicon`，以及 Admin 的 `PUT /api/admin/settings/branding`、`PUT|DELETE .../branding/favicon`；資料存在 `platform.system_settings`（`branding.document`、`branding.favicon`），寫稽核。Favicon 只收 PNG / ICO / JPEG / WebP（依檔頭判斷、不收 SVG、上限 256 KB），回應附 `nosniff` 與 CSP sandbox。管理 → 系統設定新增「公司識別」卡片（含預覽、上傳、還原預設）。`index.html` 移除 `webpro` 版本參數；`runtime/agent/test-announcement.py` 與 ADR-0009 中的 web-pro 為測試資料 / 歷史紀錄，未改。
+- **驗證**：`dotnet build` 0 警告；`BrandingSettingsTests`、`AuthorizationMatrixTests` 通過（含 OpenAPI 快照更新）；前端 lint、168 Vitest、build 通過。未做瀏覽器 e2e 截圖。
+
+---
+
 ### #031 · 「正在工作中」提示不再閃爍
 
 > 👤 **Claude（AI）** · 🕒 2026-10-11 · `✅完成`

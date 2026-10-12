@@ -399,6 +399,42 @@
         }
       }
     },
+    "/api/branding": {
+      "get": {
+        "tags": [
+          "Branding"
+        ],
+        "operationId": "GetBranding",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/branding/favicon": {
+      "get": {
+        "tags": [
+          "Branding"
+        ],
+        "operationId": "GetBrandingFavicon",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/make-topics": {
       "get": {
         "tags": [
@@ -2331,6 +2367,84 @@
         }
       }
     },
+    "/api/admin/settings/branding": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveBranding",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveBrandingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/settings/branding/favicon": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminUploadFavicon",
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "$ref": "#/components/schemas/Stream"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandingResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminDeleteFavicon",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrandingResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/settings/models": {
       "get": {
         "tags": [
@@ -2994,6 +3108,24 @@
           "Local",
           "Dev"
         ]
+      },
+      "BrandingResponse": {
+        "required": [
+          "companyName",
+          "faviconUrl"
+        ],
+        "type": "object",
+        "properties": {
+          "companyName": {
+            "type": "string"
+          },
+          "faviconUrl": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
       },
       "CancelExecutionResponse": {
         "required": [
@@ -4443,6 +4575,20 @@
           }
         }
       },
+      "SaveBrandingRequest": {
+        "required": [
+          "companyName"
+        ],
+        "type": "object",
+        "properties": {
+          "companyName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "SaveExtensionPolicyRequest": {
         "required": [
           "skills",
@@ -5626,6 +5772,9 @@
     },
     {
       "name": "Sites"
+    },
+    {
+      "name": "Branding"
     },
     {
       "name": "Make"

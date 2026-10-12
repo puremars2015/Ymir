@@ -11,6 +11,7 @@ import {
   OidcTestResult,
   SaveOidcSettingsRequest,
   TunnelSettings,
+  Branding,
   RuntimePolicy,
   SaveRuntimePolicyRequest,
   ExtensionPolicy,
@@ -156,6 +157,24 @@ export class ApiService {
 
   adminTestOidcSettings(tenantId: string): Observable<OidcTestResult> {
     return this.http.post<OidcTestResult>('/api/admin/settings/oidc/test', { tenantId });
+  }
+
+  getBranding(): Observable<Branding> {
+    return this.http.get<Branding>('/api/branding');
+  }
+
+  adminSaveBranding(companyName: string): Observable<Branding> {
+    return this.http.put<Branding>('/api/admin/settings/branding', { companyName });
+  }
+
+  adminUploadFavicon(file: Blob): Observable<Branding> {
+    return this.http.put<Branding>('/api/admin/settings/branding/favicon', file, {
+      headers: { 'Content-Type': 'application/octet-stream' },
+    });
+  }
+
+  adminDeleteFavicon(): Observable<Branding> {
+    return this.http.delete<Branding>('/api/admin/settings/branding/favicon');
   }
 
   adminGetTunnelSettings(): Observable<TunnelSettings> {

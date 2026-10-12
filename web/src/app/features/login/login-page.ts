@@ -13,6 +13,7 @@ import { ApiService, describeApiError } from '../../core/api/api.service';
 import { LoginProviders, UserRole } from '../../core/api/api-types';
 import { isLocalPath, loginErrorMessage, oidcLoginUrl } from '../../core/auth/auth-rules';
 import { AuthService } from '../../core/auth/auth.service';
+import { BrandingStore } from '../../core/branding/branding.store';
 import { PwaInstallService } from '../../core/pwa/pwa-install.service';
 
 /**
@@ -26,7 +27,7 @@ import { PwaInstallService } from '../../core/pwa/pwa-install.service';
   imports: [FormsModule],
   template: `
     <section class="card narrow login">
-      <h1>登入 Web-Pro Ymir</h1>
+      <h1>登入 {{ branding.name() }}</h1>
 
       @if (queryError()) {
         <p class="error" role="alert">{{ queryError() }}</p>
@@ -176,6 +177,7 @@ export class LoginPage implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   protected readonly pwa = inject(PwaInstallService);
+  protected readonly branding = inject(BrandingStore);
 
   readonly returnUrl = input<string>();
   /** OIDC callback 失敗時後端導回 `/login?error=...`。 */

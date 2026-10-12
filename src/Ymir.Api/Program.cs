@@ -84,6 +84,7 @@ app.MapKnowledgeEndpoints();
 app.MapSiteEndpoints();
 app.MapOneDriveEndpoints();
 app.MapAdminSettingsEndpoints();
+app.MapBrandingEndpoints();
 app.MapAdminModelEndpoints();
 app.MapMakeTopicEndpoints();
 app.MapDefaultEndpoints();
