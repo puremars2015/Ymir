@@ -1,9 +1,10 @@
-﻿# 啟動目前 Windows 部署：Docker 提供資料庫／網頁／Tunnel，API 在主機背景執行。
+﻿# 啟動目前 Windows 部署：Docker 提供資料庫／模型閘道，API 以 HTTPS 提供本機網頁。
 # 不建置、不拉程式碼、不建立或重建容器，也不啟動使用者的 Agent runtime。
 [CmdletBinding()]
 param(
     [string]$DeployDirectory = (Join-Path $env:LOCALAPPDATA 'Ymir\deploy'),
-    [ValidateRange(1, 65535)][int]$ApiPort = 5081
+    [ValidateRange(1, 65535)][int]$ApiPort = 5081,
+    [uri]$WebUrl = 'https://localhost:5443'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -39,7 +40,7 @@ try {
     if (-not $lockHeld) { throw '另一個 Ymir 啟動程序正在執行，請等它完成。' }
 
     $docker = (Get-Command docker.exe -ErrorAction Stop).Source
-    $launcher = Join-Path $DeployDirectory 'run-api.ps1'
+    $launcher = Join-Path $DeployDirectory 'run-api-local-only.ps1'
     if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) {
         throw "找不到已部署的 API 啟動檔：$launcher。請先完成部署，或指定 -DeployDirectory。"
     }
@@ -61,7 +62,7 @@ try {
     }
 
     # 先確認所有部署容器存在，避免缺少部署時只啟動一半。
-    $containers = @('ymir-sql', 'ymir-litellm-litellm-db-1', 'ymir-litellm-litellm-1', 'ymir-web', 'ymir-tunnel-cloudflared-1')
+    $containers = @('ymir-sql', 'ymir-litellm-litellm-db-1', 'ymir-litellm-litellm-1')
     foreach ($name in $containers) {
         & $docker container inspect --format '{{.Name}}' $name *> $null
         if ($LASTEXITCODE -ne 0) { throw "找不到容器 $name，請先完成 Ymir 部署。" }
@@ -113,13 +114,11 @@ try {
     } while ([DateTime]::UtcNow -lt $deadline)
     if (-not $apiReady) { throw 'API 未通過健康檢查，請確認資料庫、LiteLLM 與部署設定；不會重複啟動 API。' }
 
-    $web = Invoke-WebRequest -Uri 'http://127.0.0.1:5080/login' -UseBasicParsing -TimeoutSec 10
-    if ($web.StatusCode -ne 200) { throw '本機網頁未就緒，請查看 ymir-web 的紀錄。' }
+    $web = Invoke-WebRequest -Uri ([uri]::new($WebUrl, '/login')) -UseBasicParsing -TimeoutSec 10
+    if ($web.StatusCode -ne 200) { throw '本機網頁未就緒，請查看 API 紀錄與 HTTPS 憑證。' }
     Write-Host ''
     Write-Host 'Ymir 已啟動，可以關閉這個視窗。' -ForegroundColor Green
-    Write-Host '網站：https://ymir.thetainformation.com'
-    Write-Host '本機網頁：http://localhost:5080（正式登入請使用 HTTPS 網址）'
-    Write-Host '外網連線仍取決於既有 Cloudflare Tunnel、DNS 與網路狀態。'
+    Write-Host "本機網頁：$WebUrl"
     if ($logHint) { Write-Host $logHint }
 }
 catch {

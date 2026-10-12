@@ -189,7 +189,7 @@ docker compose -f compose.windows.yml logs -f api
 
 ## Windows：既有主機 API 部署的一鍵啟動
 
-若目前使用「主機上的 .NET API + Docker 網頁／資料庫／模型閘道／Tunnel」部署，可在 PowerShell 執行：
+若目前使用「主機上的 .NET API + Docker 資料庫／模型閘道」部署，可在 PowerShell 執行（只啟動本機服務）：
 
 ```powershell
 & "C:\Users\sean.ma\Documents\Ymir\start-ymir.ps1"
@@ -201,11 +201,22 @@ docker compose -f compose.windows.yml logs -f api
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\Users\sean.ma\Documents\Ymir\start-ymir.ps1"
 ```
 
-腳本預設讀取 `%LOCALAPPDATA%\Ymir\deploy\run-api.ps1`，沿用已部署版本的登入、模型與資料設定，不包含憑證，也不重新建置。其他部署目錄可透過 `-DeployDirectory` 指定；`-ApiPort` 須與該啟動檔的 API 埠一致。
+腳本預設讀取 `%LOCALAPPDATA%\Ymir\deploy\run-api-local-only.ps1`，沿用已部署版本的登入、模型與資料設定，不包含憑證，也不重新建置。其他部署目錄可透過 `-DeployDirectory` 指定；`-ApiPort` 須與該啟動檔的 HTTP 健康檢查埠一致，`-WebUrl` 預設為 `https://localhost:5443`。
 
-它會在必要時啟動 Docker Desktop、檢查所有容器存在、依序啟動 SQL Server／LiteLLM PostgreSQL／LiteLLM／網頁／Tunnel，並在 API 未執行時以背景程序啟動。已執行的服務直接保留；其他程式占用 API 埠時報錯，不會停止它或再啟動 API。完成後可關閉執行腳本的視窗，API 紀錄保存在部署目錄的 `logs\startup-*.log`。
+本機 launcher 放在部署目錄，不進版控；從既有 launcher 複製並保留帳號、Data Protection、資料庫及模型設定，在所有既有設定之後、啟動 API 之前加入：
 
-此腳本只啟動既有部署，未部署或容器不存在時顯示錯誤；不啟動使用者 Agent 容器。它不是上一節 API／runtime host 容器拓樸的啟動方式。對外網址仍需要原有 Cloudflare Tunnel／DNS 設定與網路可用。
+```powershell
+$env:Ymir__PublicEdge__Enabled = 'false'
+$env:ASPNETCORE_URLS = 'http://127.0.0.1:5081;https://localhost:5443'
+$env:AllowedHosts = 'localhost;127.0.0.1;[::1]'
+$env:Ymir__Web__RootPath = Join-Path $PSScriptRoot 'web-local/browser'
+```
+
+`web-local/browser` 須含完整 Angular build（含 `index.html`），API 直接提供同源網頁與 SSE。Production 登入 Cookie 需要 HTTPS；先以 `dotnet dev-certs https --check --trust` 確認受信任的 localhost 憑證，沒有憑證時用 `dotnet dev-certs https --trust` 建立。維持 Production 與 Docker runtime，不啟用免密碼 dev 登入。
+
+它會在必要時啟動 Docker Desktop、檢查必要容器存在、依序啟動 SQL Server／LiteLLM PostgreSQL／LiteLLM，並在 API 未執行時以背景程序啟動。**不啟動 nginx 或 Tunnel，也不需要 Tunnel 容器存在**。已執行的服務直接保留；其他程式占用 API 埠時報錯，不會停止它或再啟動 API。完成後可關閉執行腳本的視窗，API 紀錄保存在部署目錄的 `logs\startup-*.log`。
+
+此腳本只啟動既有部署，未部署或容器不存在時顯示錯誤；使用者 Agent 容器由聊天請求建立。確認 launcher 的 `VibeMaker__Runtime__Image` 指定映像存在；若本機映像已清除，在 repo 根目錄執行 `docker build -t <設定中的映像名稱> -f runtime/agent/Containerfile runtime/agent` 補回。它不是上一節 API／runtime host 容器拓樸的啟動方式。
 
 ## 維運
 

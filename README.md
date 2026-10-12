@@ -2,7 +2,7 @@
 
 Ymir 是企業 AI 平台，目前的子產品為 **Vibe Maker**：使用者透過對話，讓 Pi Agent 在自己的隔離執行環境中建立工具、網站與檔案。前端使用 Angular 22，後端為 .NET 10 的模組化單體，透過 REST API 與 SSE 傳遞資料及執行事件。
 
-本文以 **2026-10-08 本機實際部署**為主，另列出程式碼支援的開發與 Linux 部署架構。
+本文以 **2026-10-12 本機實際部署**為主，另列出程式碼支援的開發與 Linux 部署架構。
 
 
 ### 整合測試分支部署（2026-10-08）
@@ -15,15 +15,11 @@ Ymir 是企業 AI 平台，目前的子產品為 **Vibe Maker**：使用者透�
 - OneDrive：同步程式與資料表已部署，沿用現有企業登入與 connector 設定；實際雲端連結需使用者授權。
 ## 本機實際部署（Windows + Docker Desktop）
 
-目前 API 在 Windows 主機以 Production 模式執行；網頁、nginx、Agent、模型代理及資料庫在 Docker Desktop 的 Linux 容器內執行。API 直接管理 Docker Agent 容器，目前沒有另啟動 Ymir.RuntimeHost。
+目前 API 在 Windows 主機以 Production 模式執行，直接以 HTTPS 提供 Angular 網頁；Agent、模型代理及資料庫在 Docker Desktop 的 Linux 容器內執行。本機入口為 https://localhost:5443，nginx 與 Tunnel 保持停止。API 直接管理 Docker Agent 容器，目前沒有另啟動 Ymir.RuntimeHost。
 
 ```mermaid
 flowchart TD
-    Local["本機瀏覽器<br/>localhost:4200 或 localhost:5080"] --> Web
-    Public["外部瀏覽器<br/>ymir.thetainformation.com"] --> Cloudflare["Cloudflare HTTPS 入口"]
-    Cloudflare --> Tunnel["cloudflared 容器"]
-    Tunnel -->|"ymir-edge 網路：ymir-web:80"| Web["ymir-web 容器<br/>nginx + Angular 靜態網頁"]
-    Web -->|"/api/*、/signin-oidc<br/>host.docker.internal:5081"| API["Windows 主機<br/>Ymir.Api.dll / Kestrel"]
+    Local["本機瀏覽器<br/>https://localhost:5443"] --> API["Windows 主機<br/>Angular + Ymir.Api.dll / Kestrel"]
     API --> SQL["ymir-sql 容器<br/>SQL Server：主機 14330 → 容器 1433"]
     API -->|"Docker run / exec"| Agent["每位使用者一個 Agent 容器<br/>Pi Agent RPC"]
     API -->|"管理 virtual key 與用量<br/>127.0.0.1:4000"| LiteLLM["LiteLLM 容器"]
@@ -37,19 +33,19 @@ flowchart TD
 
 | 元件 | 執行位置 | 入口或連線 | 責任 |
 |---|---|---|---|
-| Angular + nginx | `ymir-web` 容器，映像 `localhost/ymir/web:model-access-20261007` | `127.0.0.1:4200`、`127.0.0.1:5080` → 容器 `80` | 提供 Angular 靜態網頁、SPA 路由及 API 反向代理 |
-| Ymir API | Windows 背景程序 `dotnet Ymir.Api.dll` | `127.0.0.1:5081` | 登入、授權、專案、對話、附件、Agent 執行與管理功能 |
+| Angular | Windows API 直接提供 `web-local/browser` | `https://localhost:5443` | Angular 靜態網頁、SPA 路由，與 API 同源 |
+| Ymir API | Windows 背景程序 `dotnet Ymir.Api.dll` | `https://localhost:5443`，健康檢查 `127.0.0.1:5081` | 登入、授權、專案、對話、附件、Agent 執行與管理功能 |
 | SQL Server | `ymir-sql` 容器 | `127.0.0.1:14330` → 容器 `1433` | Ymir 業務資料 |
-| Agent runtime | `ymir-user-{userId}` 容器，映像 `localhost/ymir/agent-runtime:deliverables` | API 透過 Docker 管理，無對外服務埠 | 執行 Pi Agent、工具與檔案操作 |
+| Agent runtime | `ymir-user-{userId}` 容器，映像 `localhost/ymir/agent-runtime:inspiring-ab212b2` | API 透過 Docker 管理，無對外服務埠 | 執行 Pi Agent、工具與檔案操作 |
 | LiteLLM | `ymir-litellm-litellm-1` 容器 | `127.0.0.1:4000` → 容器 `4000` | 模型路由、每位使用者的 virtual key、預算與用量 |
 | PostgreSQL | `ymir-litellm-litellm-db-1` 容器 | 容器 `5432`，未發布主機連接埠 | LiteLLM 的金鑰與用量資料 |
-| Cloudflare Tunnel | `ymir-tunnel-cloudflared-1` 容器 | 對外建立 Tunnel；內部連到 `http://ymir-web:80` | 將公開 HTTPS 網域導向本機網頁入口 |
+| Cloudflare Tunnel／nginx | 既有容器保留且停止 | 本機模式不使用 | 本機啟動腳本不啟動這些服務 |
 
-`start-ymir.ps1` 會啟動既有 Docker 容器，並透過 `%LOCALAPPDATA%\Ymir\deploy\run-api.ps1` 啟動 Windows API；它不負責建置或重建容器。部署產物位於 `%LOCALAPPDATA%\Ymir\deploy`。
+`start-ymir.ps1` 只啟動資料庫與模型閘道容器，並透過 `%LOCALAPPDATA%\Ymir\deploy\run-api-local-only.ps1` 啟動 Windows API。登入網址為 `https://localhost:5443`；API 同源提供 Angular 與 SSE，不啟動 nginx 或 Tunnel。它不負責建置或重建容器。部署產物位於 `%LOCALAPPDATA%\Ymir\deploy`。
 
-### nginx 所在位置與代理行為
+### 先前 nginx 部署（目前停止）
 
-nginx **1.31.6** 執行在 `ymir-web` 的 Linux 容器內，因此 Windows 程序清單不會出現 `nginx.exe`。目前瀏覽器使用的 `localhost:4200` 是 nginx 入口。
+nginx **1.31.6** 執行在 `ymir-web` 的 Linux 容器內，因此 Windows 程序清單不會出現 `nginx.exe`。先前瀏覽器使用的 `localhost:4200` 是 nginx 入口；本機模式改由 API 直接提供 HTTPS 網頁。
 
 - 容器內設定檔：`/etc/nginx/conf.d/default.conf`。
 - 靜態網頁目錄：`/usr/share/nginx/html`。
