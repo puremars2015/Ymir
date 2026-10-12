@@ -31,6 +31,7 @@
 | # | 工作項目 | 狀態 | 前置 / 待決定 |
 |---|---|---|---|
 | I1 | main 與擴充能力整合 | ✅ | 已整合回 main；先前測試見 #028，2026-10-12 分支清理見 #034 |
+| W11 | Windows 本機 HTTPS 與聊天 runtime 恢復 | ✅ | 本機登入頁、假模型聊天／SSE 通過，啟動腳本不啟動 Tunnel；見 #035 |
 | G1 | 分支整合與 main／rebase 開發流程 | ✅ | 使用者 2026-10-12 改為直接在 main 開發；見 #034，取代 I1 的保留分支要求 |
 | W10 | 「正在工作中」提示不閃爍 | ✅ | 連續呼叫工具時，工具之間的空檔仍維持提示，Agent 輸出文字或執行終止才消失；見 #031 |
 | W9 | 對話工具執行提示簡化 | ✅ | 工具／終端只顯示「正在工作中......」、清除完成／失敗／取消狀態；見 #027 |
@@ -82,6 +83,17 @@
 ---
 
 ## 💬 留言區
+### #035 · 本機 HTTPS 啟動與 Agent runtime 恢復
+
+> 👤 **Codex（AI）** · 🕒 2026-10-12 14:43 · `✅完成`
+
+使用者回報聊天一直等待、沒有新 Agent container，並要求先不使用或啟動 Tunnel，改在本機修正。資料庫確認三次執行皆在準備階段以 `RUNTIME_START_FAILED` 結束，Docker 本機缺少設定指定的 Agent 映像。依目前 Containerfile 重建 `localhost/ymir/agent-runtime:inspiring-ab212b2`，保留既有 workspace、agent-state、帳號、模型及資料。檢查期間使用者調整部署停止容器，待使用者授權本機修復後才啟動 SQL Server／LiteLLM PostgreSQL／LiteLLM。
+
+本機部署新增不進版控的 `run-api-local-only.ps1`，沿用既有部署設定但關閉 PublicEdge，僅監聽 loopback 的 HTTP health 與 `https://localhost:5443`，限制 AllowedHosts；使用既有受信任的 localhost 憑證，API 直接提供從已部署網頁複製的 Angular build。維持 Production／Docker 與正式登入規則，未啟用 dev 登入。`start-ymir.ps1` 改讀本機 launcher，只啟動資料庫與模型閘道，不需要也不啟動 nginx／Tunnel；README 與部署指南同步。原公開部署 launcher 保留。
+
+驗證：Agent image build 成功，uid=1000、Pi 1.0.0、python-pptx 1.0.2 smoke 通過；PowerShell AST 語法、`git diff --check`、啟動腳本首次及重複執行通過；localhost HTTPS 登入頁 200、health Healthy、providers 顯示密碼／企業登入且 devLogin=false，瀏覽器確認登入表單正常，API 僅監聽 loopback，Tunnel／nginx 保持 exited。`dotnet test --project tests/Ymir.IntegrationTests --no-build -- --filter-method '*Help_SendsPlatformFactsToAgent_AndKeepsOriginalMessage*'` 1 項通過：真實 Docker container／Pi、Fake LLM、API 與 SSE 完成事件。首次測試用 localhost 連 SQL 發生連線逾時，改用 127.0.0.1:14330 後通過；測試使用獨立資料庫／暫存 workspace，已清理該次測試容器。未用真實帳號完成 localhost 登入、未呼叫付費模型；企業登入需要 Entra 註冊 localhost callback，尚未驗證。截圖中的等待提示發生於終止事件之前，目前沒有證據需修改前端錯誤處理。main CI 依此次推送結果追蹤。
+
+---
 
 ### #034 · 既有分支整合與 main／rebase 開發規則
 
