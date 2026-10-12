@@ -30,7 +30,7 @@
 
 | # | 工作項目 | 狀態 | 前置 / 待決定 |
 |---|---|---|---|
-| I1 | main 與擴充能力整合測試分支 | 🔬 | `claude/inspiring-einstein-2pwxx6`；不合併 main，見 #028 |
+| I1 | main 與擴充能力整合 | ✅ | 已整合回 main；先前測試見 #028，2026-10-12 分支清理見 #034 |
 | G1 | 分支整合與 main／rebase 開發流程 | ✅ | 使用者 2026-10-12 改為直接在 main 開發；見 #034，取代 I1 的保留分支要求 |
 | W10 | 「正在工作中」提示不閃爍 | ✅ | 連續呼叫工具時，工具之間的空檔仍維持提示，Agent 輸出文字或執行終止才消失；見 #031 |
 | W9 | 對話工具執行提示簡化 | ✅ | 工具／終端只顯示「正在工作中......」、清除完成／失敗／取消狀態；見 #027 |
@@ -91,7 +91,7 @@
 
 更新 [CLAUDE.md](../../CLAUDE.md) 與新增 [AGENTS.md](../../AGENTS.md)：直接在 main 工作，工作前及 push 前 fetch／rebase origin/main，不另建工作分支／worktree／PR、不 force push、不重寫已推送歷史；保留未提交變更、衝突後重新驗證，追蹤 main CI。同步更新 Stop hook 的提示，並設定本機 `pull.rebase=true` 與 `branch.main.rebase=true`。
 
-驗證：文件連結與 code fence、hook Bash 語法、`git diff --check` 通過；逐一以 `git merge-base --is-ancestor` 確認 5 個本機與 9 個 origin 非 main 分支均已整合。此次只整合部署文件並修改開發流程，未改應用程式或現場部署；遠端 CI 結果以該次 main workflow 為準。
+驗證：文件連結與 code fence、hook Bash 語法、`git diff --check` 通過；逐一以 `git merge-base --is-ancestor` 確認 5 個本機與 9 個 origin 非 main 分支均已整合。main 推送成功後，已刪除上述 5 個本機與 9 個遠端分支並 prune；本機與 origin 只剩 main（origin/HEAD 為別名），工作目錄乾淨。此次只整合部署文件並修改開發流程，未改應用程式或現場部署；遠端 CI 結果以該次 main workflow 為準。
 
 ---
 
