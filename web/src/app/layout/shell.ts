@@ -18,6 +18,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter, map, Observable } from 'rxjs';
 import { describeApiError } from '../core/api/api.service';
 import { AuthService } from '../core/auth/auth.service';
+import { BrandingStore } from '../core/branding/branding.store';
 import { NavigationStore } from '../core/navigation/navigation.store';
 import { normalizeTitle } from '../core/navigation/navigation-edits';
 import { parseActiveRoute } from './active-route';
@@ -50,6 +51,7 @@ type ItemKind = 'conversation' | 'project';
 })
 export class Shell implements OnInit {
   protected readonly auth = inject(AuthService);
+  protected readonly branding = inject(BrandingStore);
   protected readonly store = inject(NavigationStore);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);

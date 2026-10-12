@@ -212,6 +212,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/branding': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetBranding'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/branding/favicon': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetBrandingFavicon'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/make-topics': {
     parameters: {
       query?: never;
@@ -997,6 +1029,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/settings/branding': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['AdminSaveBranding'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/settings/branding/favicon': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['AdminUploadFavicon'];
+    post?: never;
+    delete: operations['AdminDeleteFavicon'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/settings/models': {
     parameters: {
       query?: never;
@@ -1160,6 +1224,10 @@ export interface components {
     AuditResult: 'Success' | 'Failure' | 'Denied';
     /** @enum {unknown} */
     AuthMethod: 'Oidc' | 'Local' | 'Dev';
+    BrandingResponse: {
+      companyName: string;
+      faviconUrl: null | string;
+    };
     CancelExecutionResponse: {
       /** Format: uuid */
       executionId: string;
@@ -1496,6 +1564,9 @@ export interface components {
       status: components['schemas']['RuntimeStatus'];
       /** Format: date-time */
       lastActiveAt: null | string;
+    };
+    SaveBrandingRequest: {
+      companyName: null | string;
     };
     SaveExtensionPolicyRequest: {
       skills: boolean;
@@ -2095,6 +2166,51 @@ export interface operations {
         content: {
           'application/json': components['schemas']['UserSearchResult'][];
         };
+      };
+    };
+  };
+  GetBranding: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BrandingResponse'];
+        };
+      };
+    };
+  };
+  GetBrandingFavicon: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Not Found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };
@@ -3545,6 +3661,74 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['TunnelSettingsResponse'];
+        };
+      };
+    };
+  };
+  AdminSaveBranding: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveBrandingRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BrandingResponse'];
+        };
+      };
+    };
+  };
+  AdminUploadFavicon: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/octet-stream': components['schemas']['Stream'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BrandingResponse'];
+        };
+      };
+    };
+  };
+  AdminDeleteFavicon: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['BrandingResponse'];
         };
       };
     };

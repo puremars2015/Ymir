@@ -38,6 +38,7 @@ export type SaveOidcSettingsRequest = Schemas['SaveOidcSettingsRequest'];
 export type OidcTestResult = Schemas['OidcTestResponse'];
 export type ArtifactGroup = Schemas['ArtifactGroupResponse'];
 export type WorkspaceFile = Schemas['WorkspaceFileResponse'];
+export type Branding = Schemas['BrandingResponse'];
 export type TunnelSettings = Schemas['TunnelSettingsResponse'];
 export type WorkspaceFiles = Schemas['WorkspaceFilesResponse'];
 export type Attachment = Schemas['AttachmentResponse'];
