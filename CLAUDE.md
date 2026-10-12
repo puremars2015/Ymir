@@ -178,6 +178,14 @@ API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:de
 - 測試：xUnit v3（`TestContext.Current.CancellationToken`）；外部依賴用 Fake LLM / Scripted harness，不要在測試中呼叫真實模型。
 - Angular：standalone component、signals、`ChangeDetectionStrategy.OnPush`、新的控制流程語法（`@if` / `@for`）；狀態轉換寫成純函式並加上 Vitest 測試。
 
+## Git 開發規則（使用者決定：2026-10-12）
+
+- **直接在 `main` 開發**：不建立工作分支、不建立額外 worktree，也不使用 PR／merge commit 作為日常交付流程；除非使用者明確要求例外。
+- **用 rebase 同步**：工作前確認目前為 `main`、工作目錄乾淨，執行 `git fetch origin` 與 `git rebase origin/main`。工作完成並 commit 後，push 前再同步一次，將尚未推送的本機提交接在最新遠端 `main` 之後。
+- **保留其他人的變更**：遇到未提交變更先確認來源，不得直接 reset、clean 或覆蓋；rebase 衝突需保留雙方功能，解決後重新驗證，再執行 `git rebase --continue`。
+- **只推送 `main`**：使用一般 `git push origin main`，不 force push、不重寫已推送的共享歷史。若 push 被拒絕是因遠端有新提交，再 fetch／rebase／驗證後重試。
+- 本次清理既有分支的整合保留原歷史；上述規則適用後續開發。歷史看板中的分支與 PR 紀錄保留供追溯。
+
 ## 每次修改後的流程（必做）
 
 任何檔案修改完成後，結束回合前依序完成：
@@ -185,7 +193,7 @@ API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:de
 1. **驗證**：跑相關的 build、test、lint，確認通過。開發在 Claude Code 雲端沙箱進行；需要沙箱網路不允許的外部資源（例如模型供應商 API）的驗證可以**跳過**，改用 Fake LLM 等本機替代驗證，並在看板註明「未驗證、待使用者環境確認」，不要為此繞過網路限制。
 2. **Commit**：一次一個垂直切片，訊息說明做了什麼與為什麼，結尾附 attribution trailer。
 3. **更新進度紀錄**：在 `docs/progress/` 目前 Sprint 的看板留言（做了什麼、實際跑過的驗證、卡關與待決定事項），更新置頂區的工作項目狀態，然後 commit。
-4. **Push**：`git push -u origin <目前分支>`；網路失敗依 2 / 4 / 8 / 16 秒重試。不要推到其他分支。
-5. **合併回 main**（使用者要求：每次做完都直接 merge）：開 PR → `main`，等 CI 全部通過後以 merge commit 合併（指定 head SHA）。CI 失敗就修正、驗證、commit、看板留言、push，直到通過；不得跳過或停用測試。合併後把工作分支重設到最新的 `main`（`git fetch origin main && git checkout -B <分支> origin/main`）再開始下一件工作。
+4. **同步與 Push**：確認在 `main` 且工作目錄乾淨，執行 `git fetch origin`、`git rebase origin/main`；若整合了新變更或解決衝突，重新執行相關驗證，再 `git push origin main`。網路失敗依 2 / 4 / 8 / 16 秒重試；遠端提交造成的拒絕需重新 fetch／rebase，不使用 force push。
+5. **CI**：追蹤推送至 `main` 的 CI，失敗就直接在 `main` 修正、驗證、commit、看板留言，再依上一步同步與 push，直到通過；不得跳過或停用測試。不另建工作分支或 PR。
 
 `.claude/hooks/require-commit-push-progress.sh`（Stop hook）會在回合結束時檢查：有未 commit 的變更、最後一次更新 `docs/progress/` 之後還有其他 commit、或有未 push 的 commit，都會擋下要求補完。
