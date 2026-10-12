@@ -94,7 +94,7 @@ docker compose exec -T litellm-db pg_dump -U litellm litellm | gzip > /backup/li
    ```sql
    RESTORE DATABASE [ymir] FROM DISK = N'/var/opt/mssql/backup/ymir-2026-10-07.bak' WITH REPLACE, CHECKSUM;
    ```
-   正式環境不會自動 migrate：備份比目前程式舊時，先依 `deploy/api/README.md` 第 4 步執行 `dotnet ef database update`（兩個 DbContext 都要），再啟動 API。
+   正式環境不會自動 migrate：備份比目前程式舊時，先依 [Linux 部署指南的 migration 步驟](../../deploy/api/README.md#首次部署前置準備) 執行 `dotnet ef database update`（兩個 DbContext 都要，且以 `--connection` 明確指定還原後的正式資料庫），再啟動 API。
 3. **還原 Data Protection 金鑰**：解壓縮到 `/srv/ymir/api/keys/`，擁有者 `1654:1654`、權限 700。**要用和資料庫同一天的備份**。
 4. **還原 workspace**：
    ```bash

@@ -120,6 +120,8 @@ API 採 BFF + HttpOnly Cookie，可支援 Entra ID OIDC 與本機帳號。前端
 
 ## 其他支援的部署架構
 
+Linux 正式部署採 ADR-0008 的 **rootful Podman API＋主機 RuntimeHost＋rootless Agent**。首次安裝、migration、systemd 啟動、自動開機與錯誤檢查見 [Linux 部署指南](deploy/api/README.md#linuxrootful-podman--quadlet)；先依 [RuntimeHost 安裝指南](deploy/runtime-host/README.md#安裝linux需要-root) 準備主機服務。`start-ymir.sh` 僅適用既有 Linux Docker 部署，Podman Quadlet 使用 systemd 管理。
+
 ### Aspire 本機開發
 
 `Ymir.AppHost` 編排 SQL Server、Fake LLM、API 與 Angular 開發伺服器。Angular 使用 `localhost:4200`，由 `web/proxy.conf.mjs` 將 API 與 OIDC callback 轉送到 Aspire 提供的 API 位址，未提供時預設 `http://localhost:5080`。

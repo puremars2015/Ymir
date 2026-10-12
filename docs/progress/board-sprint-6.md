@@ -82,6 +82,16 @@
 
 ## 💬 留言區
 
+### #033 · ADR-0008 Linux 正式部署與啟動指南
+
+> 👤 **Codex（AI）** · 🕒 2026-10-12 10:46 · `✅完成`
+
+依使用者要求更新 [API 部署指南](../../deploy/api/README.md)：整理 rootful Podman＋Quadlet 的首次準備、migration、RuntimeHost／API 啟動、開機啟動、更新、公開入口與故障檢查，明確區分 Docker 專用 `start-ymir.sh`。migration 改為 API 啟動前執行，兩個 DbContext 明確使用 `--connection`，避免設計階段 Factory 的 `ymir_design` 開發連線。同步補齊 [RuntimeHost 指南](../../deploy/runtime-host/README.md) 的 ASP.NET Core runtime、env 安裝、共用 token 路徑與 UID 填寫，更新主 README 導覽及備份還原指南。
+
+驗證：對照 ADR-0008、程式與 unit 範本，檢查修改文件的相對檔案連結與 Markdown code fence，`git diff --check` 通過。僅修改文件，未執行 Linux 安裝、migration 或部署切換；完整 rootful API＋rootless Agent 拓樸與重開機恢復仍待 Linux 實機驗收。
+
+---
+
 ### #032 · 公司識別可由管理者設定（移除寫死的 Web-Pro）
 
 > 👤 **Claude（AI）** · 🕒 2026-10-12 · `✅完成`

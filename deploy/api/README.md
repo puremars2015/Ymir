@@ -33,10 +33,17 @@
 
 ## Linux：rootful Podman + Quadlet
 
-前提：
-- runtime host 已依 [`deploy/runtime-host/README.md`](../runtime-host/README.md) 安裝並啟動；
-- SQL Server 與 LiteLLM（[`deploy/litellm`](../litellm/README.md)）已在主機上執行；
-- Podman 4.4 以上（支援 Quadlet）。
+### 首次部署前置準備
+
+以下指令在 Linux 的 repo 根目錄執行。這是 ADR-0008 的正式部署方式：API 與 Angular 在 rootful Podman 容器內，API 程序使用非 root 的 uid 1654；RuntimeHost 是主機服務，以 `ymir` 帳號管理 rootless Agent 容器。
+
+以下流程已對照程式與部署範本；完整 rootful API＋rootless Agent 拓樸仍需在目標 Linux 主機驗收，包含 socket 群組、模型連線與重開機恢復。
+
+- Linux 主機需有運作中的 systemd、支援 Quadlet 的 Podman（專案最低要求 4.4）、.NET 10 SDK 與 ASP.NET Core 10 runtime。SDK 用於 publish 與 migration，RuntimeHost 執行時需要 ASP.NET Core runtime。
+- 先依 [RuntimeHost 安裝指南](../runtime-host/README.md#安裝linux需要-root) 建立 `ymir` 帳號、`ymir-runtime` 群組、subuid/subgid、linger 與 `/srv/ymir/workspaces`，以 `ymir` 帳號建置 Agent image，發布並啟動 RuntimeHost。API image 與 Agent image 分別位於 root 與 `ymir` 的 Podman 儲存區。
+- SQL Server、[LiteLLM 與其 PostgreSQL](../litellm/README.md) 必須先啟動。依實際部署填入連線埠；API 的 loopback 位址與 Agent 容器內的模型位址不同，兩邊都需能連線。
+- 從既有 Windows 部署遷移時，先依 [備份與還原指南](../../docs/guides/backup-restore.md) 搬移資料庫、workspace、agent-state 及與資料庫配套的 Data Protection 金鑰；新建空金鑰目錄不能取代原金鑰。
+- 首次安裝才複製 `.env.example`；更新既有部署時編輯原設定，保留 token、登入與模型設定。
 
 1. **建置 image**：在 repo 根目錄執行，image 會放在 root 的儲存區。
    ```bash
@@ -49,18 +56,81 @@
    sudo install -m 600 deploy/api/.env.example /etc/ymir/api.env
    sudoedit /etc/ymir/api.env   # 填入連線字串、runtime host token、LiteLLM master key；YMIR_* 兩行只有 compose 用得到，可刪除
    ```
-3. **Quadlet unit**：把 gid 換成 `ymir-runtime` 的實際值。
+   - `VibeMaker__Runtime__Remote__Token` 必須與 `/etc/ymir/runtime-host.env` 的 `RuntimeHost__Token` 相同。
+   - 填入 SQL Server 連線字串、LiteLLM master key／模型路由、企業登入與公開網域設定，替換所有 `<...>` 範例值。
+   - API image 預設 `Provider=Remote`；RuntimeHost 設定 `Provider=Podman`。
+3. **安裝 Quadlet unit**：把 gid 換成 `ymir-runtime` 的實際值；此步只產生 unit，先不要啟動 API。
    ```bash
-   GID=$(getent group ymir-runtime | cut -d: -f3)
-   sed "s/<ymir-runtime gid>/$GID/" deploy/api/ymir-api.container | sudo tee /etc/containers/systemd/ymir-api.container
-   sudo /usr/libexec/podman/quadlet -dryrun     # 檢查產生的 podman run 參數
-   sudo systemctl daemon-reload && sudo systemctl start ymir-api
-   journalctl -u ymir-api -f
-   curl -I http://127.0.0.1:5080/               # 200，Angular 首頁
+   sudo install -d /etc/containers/systemd
+   runtime_gid=$(getent group ymir-runtime | cut -d: -f3)
+   test -n "$runtime_gid" || { echo '請先建立 ymir-runtime 群組'; exit 1; }
+   sed "s/<ymir-runtime gid>/$runtime_gid/" deploy/api/ymir-api.container \
+     | sudo tee /etc/containers/systemd/ymir-api.container >/dev/null
+   sudo systemctl daemon-reload
    ```
-   - Quadlet 產生的 unit 不需要 `systemctl enable`，`[Install]` 區段會讓它開機自動啟動。
-4. **Migration**：Production 不會自動 migrate。第一次啟動前，先在 repo 執行 `dotnet ef database update`，兩個 DbContext 都要跑。
-5. **更新**：重新 `podman build`，再 `sudo systemctl restart ymir-api`。
+4. **Migration（必須在 API 啟動前完成）**：Production 不會自動 migrate。兩個設計階段 Factory 使用 `ymir_design` 開發連線，因此必須以 `--connection` 指定正式資料庫。以下使用 Bash 的隱藏輸入；輸入與 `/etc/ymir/api.env` 相同的目標資料庫連線字串（migration 帳號需具備 schema 修改權限）。既有資料庫先備份；兩個指令都成功後再啟動 API。
+   ```bash
+   dotnet tool restore
+   read -r -s -p '正式 SQL Server 連線字串: ' YMIR_MIGRATION_CONNECTION
+   echo
+   dotnet ef database update \
+     --project src/Platform/Ymir.Platform.Infrastructure \
+     --context PlatformDbContext --connection "$YMIR_MIGRATION_CONNECTION"
+   dotnet ef database update \
+     --project src/Modules/VibeMaker/Ymir.VibeMaker.Infrastructure \
+     --context VibeMakerDbContext --connection "$YMIR_MIGRATION_CONNECTION"
+   unset YMIR_MIGRATION_CONNECTION
+   ```
+5. **啟動與驗證**：RuntimeHost 的 systemd unit 已安裝，SQL Server 與 LiteLLM 已就緒後執行：
+   ```bash
+   sudo systemctl enable --now ymir-runtime-host.service
+   sudo systemctl start ymir-api.service
+   sudo systemctl status ymir-runtime-host.service ymir-api.service --no-pager
+   sudo -u ymir curl -f --unix-socket /run/ymir-runtime/runtime.sock http://localhost/health
+   curl -f http://127.0.0.1:5080/health
+   curl -f http://127.0.0.1:5080/api/auth/providers
+   curl -f -o /dev/null http://127.0.0.1:5080/login
+   ```
+   預期 RuntimeHost 回 `ok`、API health 回 `Healthy`、登入方式與登入頁回 HTTP 200。接著以實際使用者登入並送出訊息，驗證 Agent 建立、模型連線、SSE、檔案保存與取消。
+
+### 日常啟動、開機與更新
+
+已完成上述安裝時，手動啟動只需：
+
+```bash
+sudo systemctl start ymir-runtime-host.service
+sudo systemctl start ymir-api.service
+```
+
+服務交由 systemd 管理，關閉終端不會停止服務。RuntimeHost 使用 `enable --now` 設定開機啟動；API Quadlet 的 `[Install] WantedBy=multi-user.target` 會在 unit 產生時建立開機依賴，**不要對 Quadlet 產生的 `ymir-api.service` 執行 `systemctl enable`**。詳見 [Podman Quadlet 官方說明](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html#enabling-unit-files)。SQL Server、LiteLLM／PostgreSQL 與 Tunnel 的開機啟動需各自設定，API unit 不會替它們安裝或啟動服務。
+
+更新 API 時，在 repo 根目錄重新建置；若有新 migration，先備份資料庫、停止 API 並執行上方第 4 步，再啟動新版：
+
+```bash
+sudo podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:latest .
+sudo systemctl restart ymir-api.service
+curl -f http://127.0.0.1:5080/health
+```
+
+RuntimeHost 的更新需另外 publish 至 `/opt/ymir/runtime-host` 並重啟 `ymir-runtime-host.service`；先確認沒有執行中的 Agent 工作。
+
+### 公開入口與故障檢查
+
+API 與前端同源，由容器提供，不需另外啟動 Angular dev server 或 nginx。API 預設只監聽 `127.0.0.1:5080`；外部瀏覽器需經 [Cloudflare Tunnel](../../docs/guides/cloudflare-tunnel.md)。Linux 的 Tunnel origin 設為 `http://127.0.0.1:5080`；使用 rootless cloudflared Quadlet 時，依 [RuntimeHost Tunnel 安裝步驟](../runtime-host/README.md#cloudflare-tunnel-由管理介面設定adr-0010) 設定 user service、token 與 hostname。
+
+```bash
+sudo journalctl -u ymir-runtime-host.service -u ymir-api.service -n 100 --no-pager
+sudo podman ps -a
+sudo -u ymir ls -l /run/ymir-runtime/runtime.sock
+```
+
+- API unit 找不到：確認 `/etc/containers/systemd/ymir-api.container` 已安裝、GID 已替換，且執行過 `daemon-reload`；檢查 Podman 版本與 Quadlet generator 的錯誤。
+- API health 不健康：查看 journal 中 SQL Server、LiteLLM 與 RuntimeHost 的檢查結果。
+- RuntimeHost 401：核對兩份 env 的共用 token。
+- socket `Permission denied`：核對 socket／目錄權限與 API supplementary group；可用 `sudo podman exec ymir-api id` 檢查。
+- rootful API 與 rootless Agent 使用不同的 Podman 儲存區；`sudo podman ps` 不會列出 `ymir` 的 Agent。
+
+`start-ymir.sh` 只適用下節的既有 **Docker** 部署，不能用來啟動此 Podman Quadlet 拓樸；Windows 的 `run-api.ps1` 與 AppData 部署目錄也不適用 Linux。
 
 > **SELinux 主機（Fedora / RHEL）**：
 > - 容器（`container_t`）連到 runtime host（`unconfined_service_t`）的 Unix socket 可能被 policy 拒絕。
