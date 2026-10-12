@@ -24,6 +24,8 @@
 
 > 以下步驟在雲端開發沙箱無法驗證（沒有可用的 rootless Podman 主機），**待使用者環境確認**。
 
+在 Linux 的 repo 根目錄執行；建置需 .NET 10 SDK，主機執行 RuntimeHost 需 ASP.NET Core 10 runtime。此處先完成主機服務與 rootless Agent 準備，再依 [API 首次部署指南](../api/README.md#linuxrootful-podman--quadlet) 安裝 rootful API 容器。
+
 1. **建立帳號與 group**：
    - `ymir` 跑 rootless Podman；
    - `ymir-runtime` 是 socket 的 group，API 容器用它連線。
@@ -39,22 +41,29 @@
    ```
 3. **建置 Agent runtime image**，以 `ymir` 帳號建置，image 存在它的 rootless 儲存區：
    ```bash
-   sudo -u ymir -H podman build --build-arg PI_VERSION=1.0.0 -t localhost/ymir/agent-runtime:1.0.0 -f runtime/agent/Containerfile runtime/agent
+   sudo -u ymir -H env XDG_RUNTIME_DIR=/run/user/$(id -u ymir) podman build --build-arg PI_VERSION=1.0.0 -t localhost/ymir/agent-runtime:1.0.0 -f runtime/agent/Containerfile runtime/agent
    ```
-4. **發行 runtime host**：主機需要 .NET 10 runtime。
+4. **發行 runtime host**：主機需要 ASP.NET Core 10 runtime。
    ```bash
    dotnet publish src/Ymir.RuntimeHost -c Release -o /tmp/ymir-runtime-host
    sudo install -d /opt/ymir/runtime-host && sudo cp -r /tmp/ymir-runtime-host/. /opt/ymir/runtime-host/
    ```
 5. **設定**：
-   - 複製 [`runtime-host.env.example`](runtime-host.env.example) 到 `/etc/ymir/runtime-host.env`，權限 `chmod 600`，擁有者 root。
-   - 產生 token：`openssl rand -hex 32`。這個值也要填進 API 的 `deploy/api/.env`。
-   - 填入 `XDG_RUNTIME_DIR=/run/user/$(id -u ymir)`。
+   ```bash
+   sudo install -d -m 755 /etc/ymir
+   sudo install -m 600 deploy/runtime-host/runtime-host.env.example /etc/ymir/runtime-host.env
+   sudoedit /etc/ymir/runtime-host.env
+   ```
+   - 首次安裝才複製範本，更新既有部署時保留原設定。
+   - 產生 token：`openssl rand -hex 32`。同一值填入此檔的 `RuntimeHost__Token` 與 `/etc/ymir/api.env` 的 `VibeMaker__Runtime__Remote__Token`（Docker Compose 才使用 `deploy/api/.env`）。
+   - 執行 `id -u ymir`，將實際數字填入 `XDG_RUNTIME_DIR=/run/user/<uid>`；env 檔不會替你執行 `$(id -u ymir)`。
+   - 保留 `Provider=Podman`、Unix socket、workspace 與 Agent image 設定；不使用 Tunnel 管理時，將 `RuntimeHost__Tunnel__Mode` 設為 `Disabled`。
 6. **啟動**：
    ```bash
    sudo cp deploy/runtime-host/ymir-runtime-host.service /etc/systemd/system/
-   sudo systemctl daemon-reload && sudo systemctl enable --now ymir-runtime-host
-   journalctl -u ymir-runtime-host -f
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now ymir-runtime-host.service
+   sudo journalctl -u ymir-runtime-host.service -n 100 --no-pager
    ```
 7. **驗證**：
    ```bash
