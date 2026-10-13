@@ -10,6 +10,7 @@ using Ymir.IntegrationTests.Api;
 using Ymir.IntegrationTests.Executions;
 using Ymir.Platform.Auditing;
 using Ymir.Platform.Users;
+using Ymir.VibeMaker.Application.Admin;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
@@ -207,6 +208,14 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
         Assert.Equal(2, row.Last24Hours);
         Assert.NotNull(row.LastExecutionAt);
         Assert.NotEmpty(row.DisplayName);
+
+        // 依模型拆分（ADR-0021）：沒有連接 LiteLLM 時只有執行數，LiteLLM 欄位為 null
+        var model = Assert.Single(row.Models);
+        Assert.Equal("fake-model", model.ModelId);
+        Assert.Equal(ModelUsageKind.Catalog, model.Kind);
+        Assert.Equal(2, model.Executions);
+        Assert.Null(model.SpendUsd);
+        Assert.Null(model.ModelRequests);
 
         using var invalid = await admin.GetAsync("/api/admin/usage?days=365", Ct);
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);

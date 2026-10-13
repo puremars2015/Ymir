@@ -83,6 +83,8 @@ public class LiteLlmBudgetTests(LiteLlmBudgetApiFactory factory) : IClassFixture
             Assert.True(row.CompletionTokens >= FakeLiteLlmUsers.CompletionTokensPerRequest);
             Assert.True(row.ModelRequests >= 1);
             Assert.Equal(0.02m, row.BudgetUsd);
+            // 依模型拆分讀 LiteLLM 的 model_groups（ADR-0021）
+            Assert.Contains(row.Models, m => m.ModelId == FakeLlmEndpoints.ModelId && m.ModelRequests >= 1);
 
             // 繼續使用直到預算用完：LiteLLM 拒絕呼叫，execution 以預算摘要結束（不含原始錯誤）
             JsonElement? failed = null;

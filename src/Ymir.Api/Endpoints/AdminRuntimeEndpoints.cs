@@ -1,9 +1,11 @@
+using Microsoft.Extensions.Options;
 using Ymir.Api.Auth;
 using Ymir.Api.Problems;
 using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Users;
 using Ymir.VibeMaker.Application.Admin;
+using Ymir.VibeMaker.Application.Knowledge;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Domain;
@@ -11,7 +13,8 @@ using Ymir.VibeMaker.Domain;
 namespace Ymir.Api.Endpoints;
 
 /// <summary>
-/// Admin：執行政策（閒置停止、單次執行上限、每人配額，ADR-0011）與各使用者的用量。
+/// Admin：執行政策（閒置停止、單次執行上限、每人配額，ADR-0011）與各使用者的用量，
+/// 用量含每人每模型的執行數、請求、token 與費用（ADR-0021，token 與費用讀 LiteLLM，Ymir 不保存）。
 /// 政策存在 <c>platform.system_settings</c>，優先於部署設定，存檔後不必重新啟動。
 /// </summary>
 internal static class AdminRuntimeEndpoints
@@ -75,6 +78,8 @@ internal static class AdminRuntimeEndpoints
         RuntimePolicyService policies,
         IModelGateway models,
         IUserDirectory users,
+        ModelCatalog catalog,
+        IOptions<KnowledgeOptions> knowledge,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -92,7 +97,7 @@ internal static class AdminRuntimeEndpoints
         if (models.SupportsUsage)
         {
             var today = DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);
-            var userIds = usage.Keys.Union(await stats.ListRuntimeUserIdsAsync(cancellationToken)).ToList();
+            var userIds = usage.Keys.Union(await stats.ListModelUserIdsAsync(cancellationToken)).ToList();
             modelUsage = await models.GetUsageAsync(userIds, today.AddDays(-(range - 1)), today, cancellationToken);
         }
 
@@ -133,12 +138,25 @@ internal static class AdminRuntimeEndpoints
                         m?.Requests,
                         m?.Budget?.Spend,
                         m?.Budget?.MaxBudget,
-                        m?.Budget?.ResetAt);
+                        m?.Budget?.ResetAt,
+                        // 沒有連接 LiteLLM 時 modelUsage 是空的，m 為 null，各模型的 LiteLLM 欄位也是 null（ADR-0021）。
+                        [.. ModelUsageBreakdown.Merge(u?.Models ?? [], m, catalog, knowledge.Value.EmbeddingModel).Select(ToModelResponse)]);
                 })
                 .OrderByDescending(r => r.Executions)
                 .ThenByDescending(r => r.SpendUsd ?? 0)
                 .ThenByDescending(r => r.LastExecutionAt)]));
     }
+
+    private static UserModelUsageResponse ToModelResponse(UserModelUsage x) => new(
+        x.ModelId,
+        x.DisplayName ?? "（未標示模型）",
+        x.Kind,
+        x.Executions,
+        x.Failed,
+        x.Metrics?.Spend,
+        x.Metrics?.PromptTokens,
+        x.Metrics?.CompletionTokens,
+        x.Metrics?.Requests);
 
     private static async Task<RuntimePolicyResponse> ToResponseAsync(RuntimePolicyState state, IUserDirectory users, CancellationToken cancellationToken)
     {
@@ -190,6 +208,7 @@ public sealed record AdminUsageResponse(int Days, int DailyExecutionLimit, bool 
 /// <param name="SpendUsd">期間內的模型費用（LiteLLM；依設定的單價計算）。null 表示沒有資料或無法取得。</param>
 /// <param name="BudgetSpendUsd">本期（30 天預算週期）已花費。</param>
 /// <param name="BudgetUsd">LiteLLM 上這位使用者的預算上限。</param>
+/// <param name="Models">依模型拆分（ADR-0021）：各列執行數加總等於 <paramref name="Executions"/>；有 LiteLLM 資料時請求、token 與費用加總等於總計。</param>
 public sealed record UserUsageResponse(
     Guid UserId,
     string DisplayName,
@@ -207,4 +226,18 @@ public sealed record UserUsageResponse(
     long? ModelRequests,
     decimal? BudgetSpendUsd,
     decimal? BudgetUsd,
-    DateTimeOffset? BudgetResetAt);
+    DateTimeOffset? BudgetResetAt,
+    IReadOnlyList<UserModelUsageResponse> Models);
+
+/// <param name="ModelId">null = 未標示模型（舊執行沒有保存模型，或 LiteLLM 未標示模型的請求）。</param>
+/// <param name="SpendUsd">LiteLLM；null 表示沒有連接 LiteLLM 或這位使用者查詢失敗，0 表示沒有用量。</param>
+public sealed record UserModelUsageResponse(
+    string? ModelId,
+    string DisplayName,
+    ModelUsageKind Kind,
+    int Executions,
+    int Failed,
+    decimal? SpendUsd,
+    long? PromptTokens,
+    long? CompletionTokens,
+    long? ModelRequests);

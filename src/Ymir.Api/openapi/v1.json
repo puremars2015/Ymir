@@ -4030,6 +4030,14 @@
           }
         }
       },
+      "ModelUsageKind": {
+        "enum": [
+          "Catalog",
+          "Embedding",
+          "Unlisted",
+          "Unattributed"
+        ]
+      },
       "MyExtensionsResponse": {
         "required": [
           "skillsAllowed",
@@ -5515,6 +5523,86 @@
           }
         }
       },
+      "UserModelUsageResponse": {
+        "required": [
+          "modelId",
+          "displayName",
+          "kind",
+          "executions",
+          "failed",
+          "spendUsd",
+          "promptTokens",
+          "completionTokens",
+          "modelRequests"
+        ],
+        "type": "object",
+        "properties": {
+          "modelId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ModelUsageKind"
+          },
+          "executions": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "failed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "spendUsd": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "promptTokens": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "completionTokens": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "modelRequests": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
       "UserRole": {
         "enum": [
           "User",
@@ -5582,7 +5670,8 @@
           "modelRequests",
           "budgetSpendUsd",
           "budgetUsd",
-          "budgetResetAt"
+          "budgetResetAt",
+          "models"
         ],
         "type": "object",
         "properties": {
@@ -5718,6 +5807,12 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserModelUsageResponse"
+            }
           }
         }
       },

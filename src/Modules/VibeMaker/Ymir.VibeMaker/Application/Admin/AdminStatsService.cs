@@ -67,7 +67,8 @@ public sealed class AdminStatsService(
             .ConfigureAwait(false);
 
     /// <summary>
-    /// 各使用者近 <paramref name="days"/> 天的用量：執行數、結果、Agent 實際執行時間，以及過去 24 小時的次數（與每日上限比較）。
+    /// 各使用者近 <paramref name="days"/> 天的用量：執行數、結果、Agent 實際執行時間，以及過去 24 小時的次數（與每日上限比較），
+    /// 並依執行時選用的模型拆分執行數（ADR-0021；舊執行沒有保存模型時 ModelId 為 null）。
     /// 依執行數由多到少排序。
     /// </summary>
     public async Task<IReadOnlyList<UserUsage>> GetUsageAsync(int days, CancellationToken cancellationToken)
@@ -77,7 +78,7 @@ public sealed class AdminStatsService(
         var last24Hours = now.AddDays(-1);
         var rows = await db.AgentExecutions.AsNoTracking()
             .Where(e => e.CreatedAt >= since)
-            .Select(e => new { e.UserId, e.Status, e.CreatedAt, e.StartedAt, e.EndedAt })
+            .Select(e => new { e.UserId, e.Status, e.CreatedAt, e.StartedAt, e.EndedAt, e.ModelId })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         var runtimeStatuses = await db.AgentRuntimes.AsNoTracking()
@@ -97,14 +98,24 @@ public sealed class AdminStatsService(
                 TimeSpan.FromTicks(g.Where(e => e.StartedAt is not null && e.EndedAt is not null).Sum(e => (e.EndedAt!.Value - e.StartedAt!.Value).Ticks)),
                 g.Count(e => e.CreatedAt > last24Hours),
                 g.Max(e => e.CreatedAt),
-                statusByUser.TryGetValue(g.Key, out var status) ? status : null))
+                statusByUser.TryGetValue(g.Key, out var status) ? status : null,
+                // 在記憶體分組（ToListAsync 之後）；模型 id 以 ordinal 比較，與 LiteLLM 的 model group 對應（ADR-0021）。
+                [.. g.GroupBy(e => e.ModelId, StringComparer.Ordinal)
+                    .Select(m => new ModelExecutionCount(m.Key, m.Count(), m.Count(e => e.Status == ExecutionStatus.Failed)))]))
             .OrderByDescending(u => u.Executions)
             .ThenByDescending(u => u.LastExecutionAt)];
     }
 
-    /// <summary>用過 runtime 的使用者（模型用量要查的對象）。</summary>
-    public async Task<IReadOnlyList<Guid>> ListRuntimeUserIdsAsync(CancellationToken cancellationToken) =>
-        await db.AgentRuntimes.AsNoTracking().Select(r => r.UserId).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
+    /// <summary>
+    /// 模型用量要查的對象：用過 runtime 的使用者，加上上傳過知識庫文件的使用者。
+    /// 知識庫的 key 掛在 <see cref="Guid.Empty"/> runtime 上，只用知識庫的使用者沒有 runtime 紀錄（ADR-0014、ADR-0021）。
+    /// </summary>
+    public async Task<IReadOnlyList<Guid>> ListModelUserIdsAsync(CancellationToken cancellationToken)
+    {
+        var runtimeUsers = await db.AgentRuntimes.AsNoTracking().Select(r => r.UserId).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var knowledgeUsers = await db.KnowledgeDocuments.AsNoTracking().Select(d => d.UserId).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
+        return [.. runtimeUsers.Union(knowledgeUsers)];
+    }
 
     /// <summary>停止指定使用者的 runtime（不刪除檔案）；沒有 runtime 時回傳 false。</summary>
     public async Task<bool> StopRuntimeAsync(Guid userId, string actor, CancellationToken cancellationToken)
@@ -137,7 +148,8 @@ public sealed record UserUsage(
     TimeSpan RunTime,
     int Last24Hours,
     DateTimeOffset? LastExecutionAt,
-    RuntimeStatus? RuntimeStatus);
+    RuntimeStatus? RuntimeStatus,
+    IReadOnlyList<ModelExecutionCount> Models);
 
 public sealed record DailyExecutionCount(DateOnly Date, int Total, int Failed);
 
