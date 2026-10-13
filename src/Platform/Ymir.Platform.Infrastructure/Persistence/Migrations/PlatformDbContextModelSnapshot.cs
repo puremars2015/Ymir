@@ -112,7 +112,7 @@ namespace Ymir.Platform.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Value")
                         .IsRequired()
-                        .HasMaxLength(8000)
+                        .HasMaxLength(524288)
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("value");
 

@@ -47,6 +47,27 @@ public class BrandingSettingsTests(ApiFactory factory) : IClassFixture<ApiFactor
         Assert.Equal(HttpStatusCode.NotFound, gone.StatusCode);
     }
 
+    // 一般多尺寸 .ico 常在 15～100 KB；系統設定原本只收 8000 字（約 6 KB 圖片），超過會回 500。
+    [Theory]
+    [InlineData(100 * 1024)]
+    [InlineData(BrandingEndpoints.MaxFaviconBytes)]
+    public async Task Favicon_UpToTheLimit_IsSavedAndServed(int size)
+    {
+        using var admin = await factory.LoginAsync($"brand-size-{Guid.NewGuid():N}", UserRole.Admin);
+        using var anonymous = factory.CreateClient();
+        var icon = new byte[size];
+        Png.CopyTo(icon, 0);
+        Random.Shared.NextBytes(icon.AsSpan(Png.Length));
+
+        using var upload = await admin.PutAsync("/api/admin/settings/branding/favicon", Octet(icon), Ct);
+        var branding = await upload.Content.ReadFromJsonAsync<BrandingResponse>(JsonDefaults.Options, Ct);
+        using var served = await anonymous.GetAsync(branding!.FaviconUrl, Ct);
+
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, served.StatusCode);
+        Assert.Equal(icon, await served.Content.ReadAsByteArrayAsync(Ct));
+    }
+
     [Fact]
     public async Task Favicon_RejectsNonImagesAndOversizedFiles()
     {

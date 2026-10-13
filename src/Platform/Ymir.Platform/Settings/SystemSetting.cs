@@ -4,7 +4,12 @@ namespace Ymir.Platform.Settings;
 public sealed class SystemSetting
 {
     public const int KeyMaxLength = 100;
-    public const int ValueMaxLength = 8000;
+
+    /// <summary>
+    /// 最大的設定值是公司識別的 favicon：256 KB 圖片的 base64 約 35 萬字（<c>BrandingEndpoints.MaxFaviconBytes</c>）。
+    /// 原本 8000 字只放得下約 6 KB 的圖片，超過時寫入會丟例外而回 500；欄位本來就是 nvarchar(max)。
+    /// </summary>
+    public const int ValueMaxLength = 512 * 1024;
 
     private SystemSetting()
     {
