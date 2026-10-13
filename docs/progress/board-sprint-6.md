@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-08 11:30 ・ 狀態：**✅ 本輪計畫完成（A2、R0～R2、H0～H2 都在開發分支，使用者要求先不合併回 main；P0 維持僅計畫）**
+> 最後更新：2026-10-13 10:45 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -28,28 +28,10 @@
   | 3 | Gateway | 獨立服務 |
   | 4 | Egress | 管理員控制（`internet` 能力，全域預設 + 每人覆寫），**預設允許**（A0 後決定） |
 
+### 原計畫項目（ADR-0012 擴充能力、OneDrive、RAG、網站託管）
+
 | # | 工作項目 | 狀態 | 前置 / 待決定 |
 |---|---|---|---|
-| I1 | main 與擴充能力整合 | ✅ | 已整合回 main；先前測試見 #028，2026-10-12 分支清理見 #034 |
-| W11 | Windows 本機 HTTPS 與聊天 runtime 恢復 | ✅ | 本機登入頁、假模型聊天／SSE 通過，啟動腳本不啟動 Tunnel；見 #035 |
-| G1 | 分支整合與 main／rebase 開發流程 | ✅ | 使用者 2026-10-12 改為直接在 main 開發；見 #034，取代 I1 的保留分支要求 |
-| W10 | 「正在工作中」提示不閃爍 | ✅ | 連續呼叫工具時，工具之間的空檔仍維持提示，Agent 輸出文字或執行終止才消失；見 #031 |
-| W9 | 對話工具執行提示簡化 | ✅ | 工具／終端只顯示「正在工作中......」、清除完成／失敗／取消狀態；見 #027 |
-| L3 | 個別使用者模型權限 | ✅ | 系統預設＋逐模型允許／禁止、選單／execution／virtual key 一致；ADR-0019，見 #026 |
-| M2 | `/help` 系統用途與指令說明 | ✅ | Agent 說明功能、兩個指令與開放主題，斜線提示；見 #025 |
-| M1 | `/make` 簡報與公司公告 Word 引導 | ✅ | 兩個可管理主題、唯讀公告模板及文件工具映像；見 #024 |
-| F1 | 明確交付成果與工作檔分離（ADR-0015） | ✅ | 成功執行登記成果、單檔／ZIP、成果與專案檔案分頁；見 #010 |
-| P0 | 多人、多 Agent 軟體專案協作計畫 | 📝 | 見 [#009](#009--多人多-agent-軟體專案協作計畫)；僅計畫，功能尚未實作，排程另定 |
-| L2 | 管理員開放模型與預設模型 | ✅ | 持久設定、選單／執行／virtual key 一致授權；ADR-0016，見 #015 |
-| L1 | LiteLLM OpenRouter 模型接入 | ✅ | Sonnet 5.5、GPT-6.1 Sol、GPT-6 Luna；virtual key、用量／費用與路由驗證；見 #012 |
-| W7 | 圖示開啟模型與思考深度面板 | ✅ | execution 保存深度、Pi／LiteLLM 實際參數、手機與鍵盤操作；ADR-0017，見 #016 |
-| W6 | 模型名稱與輸入能力圖示 | ✅ | 移除 provider 後綴、文字／圖片 SVG、自訂可存取選單；見 #014 |
-| W5 | 手機對話輸入區靠近底部 | ✅ | 新／既有對話、鍵盤與安全區、訊息獨立捲動；見 #013 |
-| W8 | PWA：手機可「加入主畫面」安裝 | ✅ | 見 #018；iOS / Android 實機安裝**待使用者環境確認** |
-| W4 | AppDashboard 側欄清單與漢堡收合 | ✅ | 圖示、列高與群組分隔線；桌面記住收合，手機抽屜；見 #011 |
-| W3 | AppDashboard 配色與淺色／深色／自動切換 | ✅ | 見 [#008](#008--appdashboard-配色與主題切換) |
-| W2 | Ubuntu 既有 Docker 部署啟動檔 `start-ymir.sh` | ✅ | 見 [#005](#005--ubuntu-既有-docker-部署啟動檔)；語法與隔離模擬通過，實機待驗證 |
-| W1 | Windows 既有部署一鍵啟動檔 `start-ymir.ps1` | ✅ | 見 [#004](#004--windows-既有部署一鍵啟動檔)；已在目前主機驗證 |
 | A0 | ADR-0012 spike：實測 Pi 1.0.0 在 RPC 模式的 `--no-skills` / `--skill`、能否不讀使用者層 `mcp.json`、平台 MCP 設定能否放在 Agent 不可寫的位置，以及 rootless Podman 能否限制 egress；結果寫回 ADR-0012 | ✅ | — |
 | A1a | 擴充政策（ADR-0012 第一階段）：<br>• `vibemaker.extension_policy`（`skills`、`mcp`）+ 每人覆寫資料表 `vibemaker.user_extension_grants`<br>• `IExtensionPolicy`<br>• `PiAgentHarness` 依政策組合參數<br>• `ymir-extension-builder` skill<br>• 管理介面、`GET /api/extensions`、稽核、授權矩陣<br>• 一律 `-ne`、每次執行重寫 `settings.json` / `trust.json` / `mcp.json`（A0 結果） | ✅ | — |
 | A1b | 對外連線（ADR-0012 A.8）：<br>• `RuntimeNetworkAccess`、`VibeMaker:Runtime:RestrictedNetwork`<br>• container label 比對與重建、`runtime.recreate` 稽核<br>• runtime host 協定（只接受 enum）<br>• `internet` 能力加入擴充政策（全域 + 每人）<br>• 受限網路部署文件 | ✅ | — |
@@ -63,6 +45,34 @@
 | H0 | 網站託管 ADR（[ADR-0016](../adr/0016-site-hosting.md)；0015 已用於明確交付成果）：獨立網站網域、每站來源隔離、私人網站登入、經主機複製產物、容量限制 | ✅ | 使用者 2026-10-08 決定：網域為設定值 `<代碼>.<BaseDomain>`（真實 DNS / Tunnel 待使用者環境）；可見範圍由網站擁有者選擇，Ymir 管理員一律可看 |
 | H1 | 公開網站發布：網站與版本、產物檢查、SiteHost 託管（ADR-0016 不用 Nginx）、原子切換、取消發布 | ✅ | 見 #018 |
 | H2 | 身分與分享：公司模式、指定使用者、分享給我的網站 | ✅ | 見 #019 |
+| P0 | 多人、多 Agent 軟體專案協作計畫 | 📝 | 見 [#009](#009--多人多-agent-軟體專案協作計畫)；僅計畫，功能尚未實作，排程另定 |
+
+### 插單、使用者回報與維運（新的在上）
+
+| # | 工作項目 | 狀態 | 備註 |
+|---|---|---|---|
+| B1 | 公司識別 favicon 超過約 6 KB 上傳回 500 | ✅ | `SystemSetting.ValueMaxLength` 放寬到 512K 字（欄位已是 nvarchar(max)），補 100 KB／256 KB 測試；見 #036 |
+| B2 | `OneDriveSyncTests` 撤銷授權測試偶發 409 | ✅ | 測試競態：執行後的背景上傳晚於撤銷才跑；改為先等上傳完成，產品程式未變；見 #036 |
+| D1 | ADR 編號重複與看板置頂區整理 | ✅ | 模型開放的 ADR 由 0016 改為 [ADR-0020](../adr/0020-admin-model-access.md)、補齊 ADR 索引；置頂區拆成原計畫／插單兩張表；見 #036 |
+| W11 | Windows 本機 HTTPS 與聊天 runtime 恢復 | ✅ | 本機登入頁、假模型聊天／SSE 通過，啟動腳本不啟動 Tunnel；見 #035 |
+| G1 | 分支整合與 main／rebase 開發流程 | ✅ | 使用者 2026-10-12 改為直接在 main 開發；見 #034，取代 I1 的保留分支要求 |
+| I1 | main 與擴充能力整合 | ✅ | 已整合回 main；先前測試見 #028，2026-10-12 分支清理見 #034 |
+| W10 | 「正在工作中」提示不閃爍 | ✅ | 連續呼叫工具時，工具之間的空檔仍維持提示，Agent 輸出文字或執行終止才消失；見 #031 |
+| W9 | 對話工具執行提示簡化 | ✅ | 工具／終端只顯示「正在工作中......」、清除完成／失敗／取消狀態；見 #027 |
+| L3 | 個別使用者模型權限 | ✅ | 系統預設＋逐模型允許／禁止、選單／execution／virtual key 一致；ADR-0019，見 #026 |
+| M2 | `/help` 系統用途與指令說明 | ✅ | Agent 說明功能、兩個指令與開放主題，斜線提示；見 #025 |
+| M1 | `/make` 簡報與公司公告 Word 引導 | ✅ | 兩個可管理主題、唯讀公告模板及文件工具映像；見 #024 |
+| F1 | 明確交付成果與工作檔分離（ADR-0015） | ✅ | 成功執行登記成果、單檔／ZIP、成果與專案檔案分頁；見 #010 |
+| L2 | 管理員開放模型與預設模型 | ✅ | 持久設定、選單／執行／virtual key 一致授權；ADR-0020（原誤編為 ADR-0016，2026-10-13 改號，見 #036），見 #015 |
+| L1 | LiteLLM OpenRouter 模型接入 | ✅ | Sonnet 5.5、GPT-6.1 Sol、GPT-6 Luna；virtual key、用量／費用與路由驗證；見 #012 |
+| W7 | 圖示開啟模型與思考深度面板 | ✅ | execution 保存深度、Pi／LiteLLM 實際參數、手機與鍵盤操作；ADR-0017，見 #016 |
+| W6 | 模型名稱與輸入能力圖示 | ✅ | 移除 provider 後綴、文字／圖片 SVG、自訂可存取選單；見 #014 |
+| W5 | 手機對話輸入區靠近底部 | ✅ | 新／既有對話、鍵盤與安全區、訊息獨立捲動；見 #013 |
+| W8 | PWA：手機可「加入主畫面」安裝 | ✅ | 見 #018；iOS / Android 實機安裝**待使用者環境確認** |
+| W4 | AppDashboard 側欄清單與漢堡收合 | ✅ | 圖示、列高與群組分隔線；桌面記住收合，手機抽屜；見 #011 |
+| W3 | AppDashboard 配色與淺色／深色／自動切換 | ✅ | 見 [#008](#008--appdashboard-配色與主題切換) |
+| W2 | Ubuntu 既有 Docker 部署啟動檔 `start-ymir.sh` | ✅ | 見 [#005](#005--ubuntu-既有-docker-部署啟動檔)；語法與隔離模擬通過，實機待驗證 |
+| W1 | Windows 既有部署一鍵啟動檔 `start-ymir.ps1` | ✅ | 見 [#004](#004--windows-既有部署一鍵啟動檔)；已在目前主機驗證 |
 | C1 | 對話附加檔案 / 圖片 / 影片給 Agent（使用者回報） | ✅ | 見 [#006](#006--對話可以附加檔案圖片影片給-agent)；真實視覺模型**待使用者環境確認** |
 
 **從 Sprint 2 移交、待使用者環境確認**（見 [Sprint 2 看板 #037](board-sprint-2.md)）：
@@ -83,6 +93,27 @@
 ---
 
 ## 💬 留言區
+### #036 · favicon 上傳 500、OneDrive 偶發測試修正，ADR 編號與置頂區整理
+
+> 👤 **Claude（AI）** · 🕒 2026-10-13 10:45 · `✅完成`
+
+- **背景**：使用者要求檢查專案問題，之後決定修正 favicon bug、整理 ADR 編號與看板置頂區，並合併回 main（使用者明確要求，作為 G1「直接在 main 開發」的例外；以 fast-forward 合併，不產生 merge commit）。
+- **B1 favicon**：`BrandingEndpoints` 與前端都允許 256 KB，但值以 base64 存進 `platform.system_settings`，`SystemSetting.ValueMaxLength` 只有 8000 字（約 6 KB 圖片），超過時網域層丟 `ArgumentException` → 500（以 16 KB PNG 重現）。欄位本來就是 `nvarchar(max)`，所以把上限放寬為 512K 字；migration `SystemSettingsLargeValues` 只更新模型快照、資料表不變。補上 100 KB 與剛好 256 KB 的上傳／匿名讀回測試。
+- **D1 ADR 編號**：兩個分支同時新增了 ADR-0016（網站託管、管理員開放模型）。網站託管的 0016 已被程式碼與 CLAUDE.md 大量引用，所以保留；管理員開放模型改為 [ADR-0020](../adr/0020-admin-model-access.md)（內容未變，檔內註明原編號），同步 ADR-0017／0019 與 README 的引用；[ADR 索引](../adr/README.md) 補上 0017、0018、0020；CLAUDE.md 改為「目前到 ADR-0020」。依留言規則不修改舊留言：**#015 等舊留言中指模型開放的「ADR-0016」即現在的 ADR-0020**。
+- **置頂區**：狀態改為進行中（原計畫已整合回 main），工作項目拆成「原計畫」與「插單、使用者回報與維運」兩張表，各列內容不變（L2 改指 ADR-0020）。
+- **B2 偶發測試**：完整測試（單元＋整合同時跑）時 `OneDriveSyncTests.RevokedAuthorization_StopsSync_AndKeepsLocalFiles` 偶發失敗（修正前 4 次完整執行失敗 2 次，只跑整合測試 5 次都通過）：「立即同步」回 409 而不是 202。原因是執行結束後的背景上傳可能晚於測試撤銷 refresh token 才跑，先把連結標成 `NeedsReauth`。比照同檔第一個測試，先等這次上傳完成再撤銷；產品程式未變。
+- **驗證**：`dotnet build Ymir.slnx` 0 警告；`dotnet format --verify-no-changes` 通過；`BrandingSettingsTests` 4 項通過；`OneDriveSyncTests` 連跑 5 次通過；修正後 `dotnet test --solution Ymir.slnx` 連跑 3 次，每次 768 項全部通過。只改後端、測試與文件，前端未變更（本次檢查時前端 lint、168 Vitest、build 已通過）；文件相對連結檢查、`git diff --check` 通過。
+- **檢查時發現、尚未處理**（`⚠️發現`，待使用者決定）：`start-ymir.ps1` 改讀不在版控的 `run-api-local-only.ps1`，且不再啟動 `ymir-web`／Tunnel；換機器會直接失敗，用它啟動時對外網域不會開放（見 #035）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
 ### #035 · 本機 HTTPS 啟動與 Agent runtime 恢復
 
 > 👤 **Codex（AI）** · 🕒 2026-10-12 14:43 · `✅完成`

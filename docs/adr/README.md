@@ -20,7 +20,10 @@
 | [0014](0014-rag-knowledge-base.md) | RAG 知識庫：專案文件索引、經 LiteLLM 的 Embedding、每專案一份 SQLite | 已採納 |
 | [0015](0015-explicit-execution-deliverables.md) | 交付成果與工作檔案分離 | 已採納 |
 | [0016](0016-site-hosting.md) | 網站託管：獨立網域、SiteHost 服務、票據登入與分享 | 已採納 |
+| [0017](0017-execution-thinking-depth.md) | 每次執行保存思考深度 | 已採納（固定深度清單由 ADR-0018 取代） |
+| [0018](0018-model-specific-thinking-capabilities.md) | 依模型與傳輸 API 提供思考選項 | 已採納 |
 | [0019](0019-user-model-access.md) | 個別使用者模型權限：動態繼承、允許與禁止 | 已採納 |
+| [0020](0020-admin-model-access.md) | 管理員控制開放模型（原誤用 0016，2026-10-13 改號） | 已採納（個人權限由 ADR-0019 延伸） |
 
 新增 ADR 時複製以下格式：
 
