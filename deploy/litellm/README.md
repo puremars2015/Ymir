@@ -9,6 +9,9 @@ Ymir 的模型入口是 LiteLLM（SA §19、[ADR-0004](../../docs/adr/0004-litel
 | `compose.yml` | LiteLLM proxy（`ghcr.io/berriai/litellm:v1.103.2`，只綁 `127.0.0.1:4000`）+ LiteLLM 專用 PostgreSQL（virtual key 需要，不對外開 port） |
 | `.env.example` | 金鑰範本；複製成 `.env` 後填入（**`.env` 已被 `.gitignore` 排除，不得提交**） |
 | `smoke-test.sh` | 對 proxy 送一則訊息 |
+| `login-chatgpt.sh` / `chatgpt-oauth.py` | ChatGPT 訂閱官方 device-code 登入及可用模型查詢（先登入再接路由） |
+
+ChatGPT OAuth 接入流程、共用帳號／配額限制及 token 持久化見 [CHATGPT-OAUTH.md](CHATGPT-OAUTH.md)。登入由獨立互動容器完成，不在 LiteLLM proxy worker 等待使用者；現有 MiniMax／OpenRouter 路由不變。
 
 ## 使用
 
