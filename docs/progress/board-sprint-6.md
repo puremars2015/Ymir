@@ -55,6 +55,7 @@
 | D2 | RuntimeHost cgroup exec 與 socket 掛載修復 | 🔬 | 已套用，Agent exec／stdin／env 與 API Healthy 通過；真實對話待使用者重試，見 #047 |
 | D3 | 上傳寫檔 wrapper 參數展開修復 | 🔬 | 已熱更新，實際 Agent 原寫檔腳本／API 健康通過；原檔重傳待使用者確認，見 #050 |
 | L4 | 六模型選單：移除 M2、新增 M3／M2.7／四個 OpenRouter 模型 | 🔬 | 已部署、六路由及服務健康通過；管理者勾選開放與真模型推論待驗證，見 #041 |
+| OAUTH1 | LiteLLM ChatGPT 訂閱 OAuth 接入 | 🚧 | 官方登入／安全持久化工具及離線測試完成；待使用者登入、選可用模型再接路由，見 #052 |
 | B1 | 公司識別 favicon 超過約 6 KB 上傳回 500 | ✅ | `SystemSetting.ValueMaxLength` 放寬到 512K 字（欄位已是 nvarchar(max)），補 100 KB／256 KB 測試；見 #036 |
 | B2 | `OneDriveSyncTests` 撤銷授權測試偶發 409 | ✅ | 測試競態：執行後的背景上傳晚於撤銷才跑；改為先等上傳完成，產品程式未變；見 #036 |
 | D1 | ADR 編號重複與看板置頂區整理 | ✅ | 模型開放的 ADR 由 0016 改為 [ADR-0020](../adr/0020-admin-model-access.md)、補齊 ADR 索引；置頂區拆成原計畫／插單兩張表；見 #036 |
@@ -97,6 +98,18 @@
 ---
 
 ## 💬 留言區
+
+### #052 · ChatGPT OAuth：先官方登入與帳號模型目錄
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
+
+使用者要求 LiteLLM 增加 ChatGPT OAuth 提供模型服務，已確認初期供所有獲授權 Ymir 使用者使用，登入後再依帳號可用清單選模型。已告知共用同一帳號／workspace 訂閱配額、provider spend 可能為 0 而美元 max_budget 無法管控訂閱額度；token 僅給 LiteLLM，不交給 API／RuntimeHost／Agent。
+
+核對 LiteLLM 官方 provider 文件與本機 pinned 1.103.2，已包含 authenticator、Responses／Chat bridge。新增獨立互動 login 容器工具：官方 device flow、私有 named volume（目錄 700、auth.json 600）、只查官方模型目錄並保存非機密能力資料；不推測 OpenRouter ID、不呼叫模型。catalog-only 阻止 refresh 失敗後退回互動登入；錯誤不列出 token／憑證。現有 proxy、模型清單及服務尚未更動。
+
+驗證：5 個離線測試通過（模型篩選／能力／異常、private file permissions、輸出無 token、headless 不啟動登入），Bash／Python 說明入口及 diff check 通過。待使用者完成官方登入，再選模型、驗證 Pi 所需 stream／tools 橋接、部署新路由與權限；OAuth 登入、metadata endpoint 和模型呼叫尚未實測。工作前已 fetch／rebase，保留本機三份配置變更。前輪 e85285d 的 CI（三 job）已全部成功。
+
+---
 
 ### #051 · GitHub 權限更新後成功推送 Linux 修復
 
