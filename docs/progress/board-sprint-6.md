@@ -51,8 +51,9 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | 🚧 | 開發分支 `claude/per-user-model-usage` 已完成並驗證，**尚未合併回 main**（待使用者決定）；管理 → 用量「依模型」卡片；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058 |
 | DOC1 | 精簡 README 專案入口 | ✅ | 保留介紹／功能／技術／開發／文件導覽，移除歷史主機快照與實作流水帳，見 #056 |
-| ARCH1 | 現況系統架構圖與專案導覽 | ✅ | 根目錄 architecture.md、五張 Mermaid 圖與 README 入口；區分正式部署／可選功能／未驗證項目，見 #055 |
+| ARCH1 | 現況系統架構圖與專案導覽 | ✅ | 根目錄 architecture.md、五張 Mermaid 圖與 README 入口；區分正式部署／可選功能／未驗證項目，見 #058 |
 | LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #039 |
 | D2 | RuntimeHost cgroup exec 與 socket 掛載修復 | 🔬 | 已套用，Agent exec／stdin／env 與 API Healthy 通過；真實對話待使用者重試，見 #047 |
 | D3 | 上傳寫檔 wrapper 參數展開修復 | 🔬 | 已熱更新，實際 Agent 原寫檔腳本／API 健康通過；原檔重傳待使用者確認，見 #050 |
@@ -101,6 +102,41 @@
 ---
 
 ## 💬 留言區
+### #058 · 每人每模型用量（ADR-0021，開發分支）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-13 15:20 · `🚧進度`
+
+- **背景**：使用者要求「開一個新 branch 開發新功能，記錄每個人的每個模型的用量」。依使用者明確要求，這次在分支 `claude/per-user-model-usage` 開發（G1「直接在 main 開發」的例外），**尚未合併回 main**。
+- **設計**（[ADR-0021](../adr/0021-per-user-model-usage.md)，延伸 ADR-0004 補充與 ADR-0011 §6）：
+  - 不推翻「Ymir 不保存 token 與費用」：LiteLLM 的每日彙總 `LiteLLM_DailyUserSpend` 本來就依使用者與模型永久保留。改讀 `/user/daily/activity` 的 `breakdown.model_groups`（key 是公開 model_name，即 Ymir 的模型 id），`page_size` 由 100 改為 1000。
+  - 執行次數與失敗次數來自 Ymir 既有的 `agent_executions.model_id`，依模型分組。不新增資料表或 migration。
+  - `ModelUsageBreakdown.Merge`（純函式）以模型 id 合併兩邊資料，分成清單內、知識庫 embedding、不在清單、未標示四類。「未標示模型」那一列包含舊執行，以及 LiteLLM 總計減去各模型的差額，所以各列加總等於使用者總計。
+  - 查詢對象加上只用知識庫的使用者（他們沒有 runtime）。
+- **API**：`GET /api/admin/usage` 每位使用者新增 `models[]`，只新增欄位、仍只限 Admin；已更新 OpenAPI 快照與 `schema.ts`。
+- **前端**：用量頁新增「依模型」卡片，包含各模型合計（使用人數、執行／失敗、請求、token、費用、佔比）與「使用者 × 模型」明細。沒有連接 LiteLLM 時只顯示執行數。
+- **Fake LLM**：依 request 的 model 記錄用量，使用者 key 的 embeddings 也記錄（費用 0）；回傳 `breakdown.model_groups`，並故意讓 `breakdown.models` 用不同的 key。
+- **過程**：由多個 agent 分工：調查現況 → 三種設計由評審整合 → 依序實作後端／前端／文件 → 四個面向審查並由驗證者嘗試推翻。確認成立的 5 項（無 blocker）已修正：
+  - LiteLLM 的每日彙總不以 model group 區分，指向同一上游模型的 alias 會合併。已寫入 ADR-0021「影響」，並在 `deploy/litellm/README.md`「新增模型」規定每個 `model_name` 的上游模型不可重複。
+  - 沒有 model group 的紀錄，LiteLLM 會以供應商模型名稱為 key。相關註解已改為照實描述。
+  - 補上失敗執行與舊執行（`ModelId` 為 null）的整合測試；排序測試改為能證明「依請求數」這一層（以突變測試確認：拿掉該排序後測試會失敗）。
+- **驗證**：
+  - 後端：`dotnet build Ymir.slnx` 0 警告；`dotnet format --verify-no-changes` 通過；`dotnet test --solution Ymir.slnx` 783 項全部通過（含新的 `ModelUsageBreakdownTests` 9 項、`ModelUsageTests` 3 項，以及 `LiteLlmModelGatewayTests` 新增的 3 項）。
+  - 前端：lint、175 項 Vitest、build 通過。
+  - 端對端：`npm run e2e:admin` 全部步驟通過（SQL Server、Fake LLM 以 `FAKE_LLM_MASTER_KEY` 模擬 LiteLLM、Fake OIDC、API 用 Pi harness），截圖確認「依模型」卡片顯示 fake-model 的費用、token 與佔比。
+- **未驗證、待使用者環境確認**：真實 LiteLLM 1.103.2 的 `breakdown.model_groups` 實際回應（已對照原始碼，但沙箱沒有真實 LiteLLM）；真實模型的單價與費用。
+- **待決定**（`❓待決定`）：
+  1. 這個分支要合併回 main 嗎？
+  2. 是否需要 Ymir 自己保存用量歷史？例如本地時區換日、LiteLLM 資料庫遺失後仍保留歷史、依對話或專案拆分。這需要新 ADR 推翻 ADR-0004 補充。
+  3. 是否要讓成員看到自己的用量，或提供 CSV 匯出？
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #057 · 開放模型標示 provider，使用者只看模型名稱
 
