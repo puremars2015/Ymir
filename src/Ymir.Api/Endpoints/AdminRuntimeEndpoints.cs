@@ -156,7 +156,8 @@ internal static class AdminRuntimeEndpoints
         x.Metrics?.Spend,
         x.Metrics?.PromptTokens,
         x.Metrics?.CompletionTokens,
-        x.Metrics?.Requests);
+        x.Metrics?.Requests,
+        x.Provider);
 
     private static async Task<RuntimePolicyResponse> ToResponseAsync(RuntimePolicyState state, IUserDirectory users, CancellationToken cancellationToken)
     {
@@ -240,4 +241,5 @@ public sealed record UserModelUsageResponse(
     decimal? SpendUsd,
     long? PromptTokens,
     long? CompletionTokens,
-    long? ModelRequests);
+    long? ModelRequests,
+    string? Provider = null);

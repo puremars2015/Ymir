@@ -1810,6 +1810,7 @@ export interface components {
       completionTokens: null | number | string;
       /** Format: int64 */
       modelRequests: null | number | string;
+      provider?: null | string;
     };
     /** @enum {unknown} */
     UserRole: 'User' | 'Admin';

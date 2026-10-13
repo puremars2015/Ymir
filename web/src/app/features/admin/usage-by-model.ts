@@ -10,6 +10,7 @@ import {
   userModelRows,
 } from '../../core/admin/usage-rules';
 import { AdminUsage, ModelUsageKind } from '../../core/api/api-types';
+import { withProvider } from '../../core/models/model-label';
 
 /**
  * 用量頁的「依模型」卡片（ADR-0021）：所有使用者合計的模型用量，以及每人每模型的明細。
@@ -130,7 +131,7 @@ import { AdminUsage, ModelUsageKind } from '../../core/api/api-types';
 
     <ng-template #modelCell let-model>
       <span class="model">
-        <span>{{ model.displayName }}</span>
+        <span>{{ modelName(model) }}</span>
         @if (model.modelId !== null && model.modelId !== model.displayName) {
           <span class="muted small">{{ model.modelId }}</span>
         }
@@ -209,6 +210,11 @@ export class UsageByModel {
   protected readonly totalSpend = computed(() =>
     this.totals().reduce((sum, total) => sum + (total.spendUsd ?? 0), 0),
   );
+
+  /** 用量頁是管理介面，模型名稱帶 provider（ADR-0020 補充）。 */
+  protected modelName(model: { displayName: string; provider?: string | null }): string {
+    return withProvider(model.displayName, model.provider);
+  }
 
   protected kindLabel(kind: ModelUsageKind): string | null {
     return modelKindLabel(kind);

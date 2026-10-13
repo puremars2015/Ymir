@@ -5600,6 +5600,12 @@
               "string"
             ],
             "format": "int64"
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

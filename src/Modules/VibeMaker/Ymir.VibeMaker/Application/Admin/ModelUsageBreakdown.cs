@@ -25,7 +25,8 @@ public sealed record ModelExecutionCount(string? ModelId, int Executions, int Fa
 /// <param name="ModelId">null 表示「未標示模型」那一列。</param>
 /// <param name="DisplayName">模型清單的顯示名稱；不在清單時為模型 id；未標示模型為 null。</param>
 /// <param name="Metrics">LiteLLM 的請求、token 與費用；null 表示沒有連接 LiteLLM 或這位使用者查詢失敗。</param>
-public sealed record UserModelUsage(string? ModelId, string? DisplayName, ModelUsageKind Kind, int Executions, int Failed, ModelUsageMetrics? Metrics);
+/// <param name="Provider">模型清單設定的 provider；用量頁是管理介面，與開放模型一樣顯示「名稱 (provider)」（ADR-0020 補充）。</param>
+public sealed record UserModelUsage(string? ModelId, string? DisplayName, ModelUsageKind Kind, int Executions, int Failed, ModelUsageMetrics? Metrics, string? Provider = null);
 
 /// <summary>
 /// 把 Ymir 的執行數（依 <c>AgentExecution.ModelId</c>）與 LiteLLM 的用量（依 model group）以模型 id 合併成每人每模型的列（ADR-0021）。
@@ -61,8 +62,8 @@ public static class ModelUsageBreakdown
                 ? null
                 : groups.Where(g => string.Equals(g.ModelId, modelId, StringComparison.Ordinal))
                     .Aggregate(ModelUsageMetrics.Zero, (sum, g) => sum.Add(g.Metrics));
-            var (kind, displayName) = Classify(modelId, catalog, embeddingModelId);
-            var row = new UserModelUsage(modelId, displayName, kind, matching.Sum(e => e.Executions), matching.Sum(e => e.Failed), metrics);
+            var (kind, displayName, provider) = Classify(modelId, catalog, embeddingModelId);
+            var row = new UserModelUsage(modelId, displayName, kind, matching.Sum(e => e.Executions), matching.Sum(e => e.Failed), metrics, provider);
             if (!IsEmpty(row))
             {
                 rows.Add(row);
@@ -87,17 +88,17 @@ public static class ModelUsageBreakdown
         return rows;
     }
 
-    private static (ModelUsageKind Kind, string DisplayName) Classify(string modelId, ModelCatalog catalog, string? embeddingModelId)
+    private static (ModelUsageKind Kind, string DisplayName, string? Provider) Classify(string modelId, ModelCatalog catalog, string? embeddingModelId)
     {
         // 模型清單優先：embedding 模型若也列在清單內，以清單的名稱顯示。
         if (catalog.Models.FirstOrDefault(m => string.Equals(m.Id, modelId, StringComparison.Ordinal)) is { } descriptor)
         {
-            return (ModelUsageKind.Catalog, descriptor.DisplayName);
+            return (ModelUsageKind.Catalog, descriptor.DisplayName, descriptor.Provider);
         }
 
         return string.Equals(modelId, embeddingModelId, StringComparison.Ordinal)
-            ? (ModelUsageKind.Embedding, modelId)
-            : (ModelUsageKind.Unlisted, modelId);
+            ? (ModelUsageKind.Embedding, modelId, null)
+            : (ModelUsageKind.Unlisted, modelId, null);
     }
 
     /// <summary>總計減去各模型加總，每個欄位不小於 0（LiteLLM 內部不一致時不顯示負數）；費用差額低於容差視為 0。</summary>

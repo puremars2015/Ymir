@@ -131,6 +131,13 @@ describe('per-model usage rules', () => {
     expect(totals[1].users).toBe(1);
   });
 
+  it('合計保留模型的 provider，供管理介面顯示（ADR-0020 補充）', () => {
+    const [total] = modelTotals([
+      withModels('a', { ...model('m1', 1, null), provider: 'minimax.io' }),
+    ]);
+    expect(total.provider).toBe('minimax.io');
+  });
+
   it('LiteLLM 欄位全部沒有資料時維持 null，只加總有值的部分', () => {
     const [none] = modelTotals([
       withModels('a', model('m1', 1, null)),

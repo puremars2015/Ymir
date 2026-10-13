@@ -9,7 +9,7 @@ public class ModelUsageBreakdownTests
     private const string Embedding = "fake-embedding";
 
     private static readonly ModelCatalog Catalog = new(
-        [new ModelDescriptor("fake-model", "Fake"), new ModelDescriptor("fake-model-2", "Fake 2")],
+        [new ModelDescriptor("fake-model", "Fake"), new ModelDescriptor("fake-model-2", "Fake 2", Provider: "OpenRouter")],
         "fake-model");
 
     private static ModelUserUsage Gateway(params ModelGroupUsage[] models)
@@ -46,6 +46,9 @@ public class ModelUsageBreakdownTests
         Assert.Equal(("Fake 2", ModelUsageKind.Catalog), Describe(rows, "fake-model-2"));
         Assert.Equal((Embedding, ModelUsageKind.Embedding), Describe(rows, Embedding));
         Assert.Equal(("retired-model", ModelUsageKind.Unlisted), Describe(rows, "retired-model"));
+        // 用量頁是管理介面：清單內的模型帶 provider，不在清單的沒有（ADR-0020 補充）
+        Assert.Equal("OpenRouter", Assert.Single(rows, r => r.ModelId == "fake-model-2").Provider);
+        Assert.Null(Assert.Single(rows, r => r.ModelId == "retired-model").Provider);
 
         // 模型清單優先：embedding 模型若也列在清單內，以清單的名稱顯示。
         var listed = ModelUsageBreakdown.Merge([new ModelExecutionCount("fake-model", 1, 0)], null, Catalog, "fake-model");

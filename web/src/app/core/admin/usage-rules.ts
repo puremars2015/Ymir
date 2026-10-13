@@ -91,6 +91,8 @@ export function modelKindLabel(kind: ModelUsageKind): string | null {
 export interface ModelUsageTotal {
   modelId: string | null;
   displayName: string;
+  /** 管理介面顯示「名稱 (provider)」（ADR-0020 補充）。 */
+  provider?: string | null;
   kind: ModelUsageKind;
   users: number;
   executions: number;
@@ -117,6 +119,7 @@ export function modelTotals(users: UserUsage[]): ModelUsageTotal[] {
       const total = byModel.get(m.modelId) ?? {
         modelId: m.modelId,
         displayName: m.displayName,
+        provider: m.provider,
         kind: m.kind,
         users: 0,
         executions: 0,
