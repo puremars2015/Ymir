@@ -12,7 +12,7 @@
 | 使用者 workspace | `/srv/ymir/workspaces/users/{userId}/` | **必要** | Agent 產生的檔案（`workspace/`）與 Pi session（`agent-state/`，對話上下文）。container 本身不用備份，遺失時會自動重建（SA §15） |
 | 部署設定與 secret | `/etc/ymir/api.env`、`/etc/ymir/runtime-host.env`、`deploy/litellm/.env` | 必要（另外保管） | 含 runtime host token、LiteLLM master key、模型金鑰、DB 連線字串。**不要和一般備份放在一起**，改放公司的 secret 管理工具或離線保管 |
 | Cloudflare Tunnel token | `/home/ymir/.config/ymir/cloudflared.env`（600） | 可重新取得 | 可以從 Cloudflare dashboard 重新複製，再到管理介面套用 |
-| LiteLLM 資料庫（PostgreSQL） | `deploy/litellm` 的 `litellm-db` volume | 建議 | virtual key、使用者預算與花費紀錄。遺失時 key 會在下一次換發時重建，但**本期花費與用量紀錄會歸零** |
+| LiteLLM 資料庫（PostgreSQL） | `deploy/litellm` 的 `litellm-db` volume | 建議 | virtual key、使用者預算與花費紀錄；每人每模型用量也只在這裡（Ymir 不另外保存，ADR-0021）。遺失時 key 會在下一次換發時重建，但**本期花費與用量紀錄會歸零** |
 | Agent runtime image | `localhost/ymir/agent-runtime:<版本>` | 不需要 | 可由 `runtime/agent/Containerfile` 重新 build |
 
 **不需要備份**：

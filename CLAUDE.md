@@ -9,7 +9,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 |---|---|
 | `docs/sa/vibe-maker-core-mvp-sa.md` | SA（需求、資料模型、API、SSE 契約、驗收條件），以章節編號引用，例如「SA §10」 |
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
-| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0020；索引見 `docs/adr/README.md`） |
+| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0021；索引見 `docs/adr/README.md`） |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
 | `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
@@ -139,7 +139,7 @@ RAG 知識庫（ADR-0014）：專案擁有者在專案頁上傳文件（`/api/pr
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName` / `Provider`（預設為 `VibeMaker__Pi__ModelId`；provider 只在管理介面顯示，使用者只看到模型名稱，只有同一份清單裡有同名模型時才以「名稱 (provider)」區分，ADR-0020 補充）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
 
-模型金鑰（ADR-0004）：設定 `VibeMaker__LiteLlm__BaseUrl` 與 `VibeMaker__LiteLlm__MasterKey` 後，API 為每位使用者向 LiteLLM 發 virtual key（帶 `user_id`，發 key 前 upsert LiteLLM 使用者並套用每月預算）；用量頁的費用 / token 與預算檢查都經 `IModelGateway` 讀 LiteLLM，Ymir 不自己保存；非 Development 未設定會拒絕啟動。本機可用 `FAKE_LLM_MASTER_KEY=<任意值>` 讓 Fake LLM 模擬 LiteLLM 的 key 管理（說明見 `deploy/litellm/README.md`）。
+模型金鑰（ADR-0004）：設定 `VibeMaker__LiteLlm__BaseUrl` 與 `VibeMaker__LiteLlm__MasterKey` 後，API 為每位使用者向 LiteLLM 發 virtual key（帶 `user_id`，發 key 前 upsert LiteLLM 使用者並套用每月預算）；用量頁的費用 / token（含每人每模型，ADR-0021）與預算檢查都經 `IModelGateway` 讀 LiteLLM，Ymir 不自己保存；非 Development 未設定會拒絕啟動。本機可用 `FAKE_LLM_MASTER_KEY=<任意值>` 讓 Fake LLM 模擬 LiteLLM 的 key 管理（說明見 `deploy/litellm/README.md`）。
 
 Runtime：`VibeMaker:Runtime:Provider` = `Podman`（正式）| `Docker`（只用於開發 / 驗證，例如 Windows，ADR-0005；指南 `docs/guides/windows-docker.md`）| `Local`（Linux / macOS 開發用，無隔離）| `Remote`（API 在容器內，呼叫 runtime host：`VibeMaker:Runtime:Remote:Endpoint` / `Token`，ADR-0008）。Runtime host 自己用 Podman / Docker / Local。
 

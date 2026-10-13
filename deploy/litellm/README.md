@@ -104,7 +104,7 @@ Agent container 只拿得到這把 virtual key，**master key 與 MiniMax key �
 - Development 沒設定時，會退回固定的 `VibeMaker__Pi__DevelopmentApiKey`（給 Fake LLM 用）。
 - 想在本機不跑 LiteLLM 也驗證整個發 key 流程：用 `FAKE_LLM_MASTER_KEY=sk-dev dotnet run --project tests/Ymir.Testing.FakeLlm` 啟動 Fake LLM。
   - 它會模擬 `/key/generate`，並拒絕 master key 與未發放的 key；
-  - 也會模擬使用者、預算與用量（`/user/*`、`/user/daily/activity`）：每次呼叫算 10 + 5 個 token、US$0.01。
+  - 也會模擬使用者、預算與用量（`/user/*`、`/user/daily/activity`）：每次 chat completion 算 10 + 5 個 token、US$0.01，依 request 的 model 記錄，回傳 `breakdown.model_groups`；使用者 key 的 embeddings 也依 model 記錄（每段文字 8 個輸入 token、費用 0）。
 
 ## 用量與每人預算（ADR-0011）
 
@@ -114,6 +114,7 @@ Agent container 只拿得到這把 virtual key，**master key 與 MiniMax key �
   - 這個功能上線前發出的 key 沒有 `user_id`，它們的花費不會算到使用者身上；這些 key 最晚 24 小時後換發。
 - **管理介面「用量」**：每位使用者的費用、輸入 / 輸出 token、請求數、本期已用 / 預算。
   - 資料來自 `GET /user/daily/activity?user_id=&start_date=&end_date=` 與 `GET /user/info?user_id=`。
+  - 「依模型」卡片（每人每模型，[ADR-0021](../../docs/adr/0021-per-user-model-usage.md)）：依模型拆分讀 `breakdown.model_groups`（公開 model_name，即 `config.yaml` 的 `model_name`，與 Ymir 的模型 Id 相同），不讀 `breakdown.models`（供應商模型名稱）；升級 LiteLLM 時重跑 `LiteLlmModelGatewayTests`。
 - **單價**：費用依 `config.yaml` 每個模型的 `input_cost_per_token` / `output_cost_per_token` 計算。
   - LiteLLM 沒有 MiniMax 的內建單價：沒填時**費用為 0、預算永遠不會用完**，但 token 數仍然正確。
   - 請依 MiniMax 方案填入（單位：美元 / token，例如每百萬 token US$0.30 → `0.0000003`）。
