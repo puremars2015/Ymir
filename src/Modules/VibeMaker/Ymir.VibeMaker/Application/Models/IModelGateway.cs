@@ -26,7 +26,8 @@ public interface IModelGateway
     Task<ModelBudgetStatus?> GetBudgetStatusAsync(Guid userId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// 各使用者在 <paramref name="fromDate"/> ～ <paramref name="toDate"/>（含，UTC 日期）的模型用量。
+    /// 各使用者在 <paramref name="fromDate"/> ～ <paramref name="toDate"/>（含，UTC 日期）的模型用量，
+    /// 含依模型（LiteLLM model group）拆分的明細（ADR-0021）。
     /// 單一使用者查詢失敗時該使用者不在結果中，不讓整批失敗。
     /// </summary>
     Task<IReadOnlyDictionary<Guid, ModelUserUsage>> GetUsageAsync(IReadOnlyCollection<Guid> userIds, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken);
@@ -52,7 +53,26 @@ public sealed record ModelBudgetStatus(decimal Spend, decimal? MaxBudget, DateTi
 
 /// <param name="Spend">期間內的模型費用（美元，依 LiteLLM 設定的單價計算；沒有單價時為 0）。</param>
 /// <param name="Budget">本期預算狀態（可能取不到）。</param>
-public sealed record ModelUserUsage(decimal Spend, long PromptTokens, long CompletionTokens, long Requests, ModelBudgetStatus? Budget);
+/// <param name="Models">
+/// 依模型拆分（依 ModelId 以 ordinal 排序）。LiteLLM 未標示 model group 的請求不在這裡，
+/// 所以加總可能小於總計；差額由 Application 層列為「未標示模型」（ADR-0021）。
+/// </param>
+public sealed record ModelUserUsage(decimal Spend, long PromptTokens, long CompletionTokens, long Requests, ModelBudgetStatus? Budget, IReadOnlyList<ModelGroupUsage> Models);
+
+/// <summary>一段期間內的模型請求數、token 與費用（來自 LiteLLM，Ymir 不保存，ADR-0004 補充、ADR-0021）。</summary>
+public sealed record ModelUsageMetrics(decimal Spend, long PromptTokens, long CompletionTokens, long Requests)
+{
+    public static ModelUsageMetrics Zero { get; } = new(0, 0, 0, 0);
+
+    public ModelUsageMetrics Add(ModelUsageMetrics other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        return new(Spend + other.Spend, PromptTokens + other.PromptTokens, CompletionTokens + other.CompletionTokens, Requests + other.Requests);
+    }
+}
+
+/// <param name="ModelId">LiteLLM model group（公開 model_name）= ModelDescriptor.Id。</param>
+public sealed record ModelGroupUsage(string ModelId, ModelUsageMetrics Metrics);
 
 /// <param name="KeyId">撤銷用的識別（LiteLLM 的 hashed token），本身不能拿來呼叫模型。</param>
 /// <param name="ApiKey">給 Agent 使用的 virtual key；只存在記憶體，不寫資料庫、不寫 log。</param>

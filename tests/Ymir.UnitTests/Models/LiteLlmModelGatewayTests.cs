@@ -181,16 +181,90 @@ public class LiteLlmModelGatewayTests
                 return StubHttpHandler.Json("""{"user_info":{"spend":0.5,"max_budget":20}}""");
             }
 
+            // 格式同 LiteLLM 1.103.2：breakdown.models 是供應商的模型名稱、api_key_breakdown 是 key hash，兩者都不得讀出（ADR-0021）。
             return uri.Query.Contains("page=1&", StringComparison.Ordinal)
-                ? StubHttpHandler.Json("""{"results":[{"date":"2026-10-04","metrics":{"spend":0.25,"prompt_tokens":100,"completion_tokens":40,"api_requests":2}}],"metadata":{"has_more":true}}""")
-                : StubHttpHandler.Json("""{"results":[{"date":"2026-10-05","metrics":{"spend":0.5,"prompt_tokens":200,"completion_tokens":60,"api_requests":3}}],"metadata":{"has_more":false}}""");
+                ? StubHttpHandler.Json("""
+                    {"results":[{"date":"2026-10-04",
+                      "metrics":{"spend":0.25,"prompt_tokens":100,"completion_tokens":40,"api_requests":2},
+                      "breakdown":{
+                        "model_groups":{"minimax":{"metrics":{"spend":0.25,"prompt_tokens":100,"completion_tokens":40,"api_requests":2},
+                          "api_key_breakdown":{"hashed-key-1":{"metrics":{"spend":0.25,"api_requests":2}}}}},
+                        "models":{"provider-model-name":{"metrics":{"spend":0.25,"prompt_tokens":100,"completion_tokens":40,"api_requests":2}}}}}],
+                     "metadata":{"has_more":true}}
+                    """)
+                : StubHttpHandler.Json("""
+                    {"results":[{"date":"2026-10-05",
+                      "metrics":{"spend":0.5,"prompt_tokens":200,"completion_tokens":60,"api_requests":3},
+                      "breakdown":{"model_groups":{
+                        "minimax":{"metrics":{"spend":0.2,"prompt_tokens":80,"completion_tokens":20,"api_requests":1}},
+                        "openrouter-chat":{"metrics":{"spend":0.3,"prompt_tokens":120,"completion_tokens":40,"api_requests":2}}}}}],
+                     "metadata":{"has_more":false}}
+                    """);
         });
 
         var usage = await gateway.GetUsageAsync([UserId, failing], new DateOnly(2026, 9, 29), new DateOnly(2026, 10, 5), TestContext.Current.CancellationToken);
 
         var row = Assert.Single(usage).Value;
-        Assert.Equal(new ModelUserUsage(0.75m, 300, 100, 5, new ModelBudgetStatus(0.5m, 20m, null)), row);
+        Assert.Equal((0.75m, 300L, 100L, 5L), (row.Spend, row.PromptTokens, row.CompletionTokens, row.Requests));
+        Assert.Equal(new ModelBudgetStatus(0.5m, 20m, null), row.Budget);
+        Assert.Equal(
+            [new ModelGroupUsage("minimax", new(0.45m, 180, 60, 3)), new ModelGroupUsage("openrouter-chat", new(0.3m, 120, 40, 2))],
+            row.Models);
         Assert.Contains(handler.Requests, r => r.Request.RequestUri!.Query.Contains("start_date=2026-09-29&end_date=2026-10-05", StringComparison.Ordinal));
+        Assert.Contains(handler.Requests, r => r.Request.RequestUri!.Query.Contains("page_size=1000", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Usage_WithoutBreakdown_KeepsTotalsAndHasNoModels()
+    {
+        var (gateway, _) = Create((request, _) => request.RequestUri!.AbsolutePath == "/user/info"
+            ? StubHttpHandler.Json("""{"user_info":{"spend":0.1}}""")
+            : StubHttpHandler.Json("""{"results":[{"date":"2026-10-05","metrics":{"spend":0.1,"prompt_tokens":10,"completion_tokens":5,"api_requests":1}}],"metadata":{"has_more":false}}"""));
+
+        var usage = await gateway.GetUsageAsync([UserId], new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 5), TestContext.Current.CancellationToken);
+
+        var row = Assert.Single(usage).Value;
+        Assert.Equal((0.1m, 10L, 5L, 1L), (row.Spend, row.PromptTokens, row.CompletionTokens, row.Requests));
+        Assert.Empty(row.Models);
+    }
+
+    [Fact]
+    public async Task Usage_ParsesExponentSpendInModelGroups()
+    {
+        var (gateway, _) = Create((request, _) => request.RequestUri!.AbsolutePath == "/user/info"
+            ? StubHttpHandler.Json("""{"user_info":{"spend":0}}""")
+            : StubHttpHandler.Json("""
+                {"results":[{"date":"2026-10-05","metrics":{"spend":1e-05,"prompt_tokens":8,"completion_tokens":0,"api_requests":2},
+                  "breakdown":{"model_groups":{"fake-embedding":{"metrics":{"spend":1e-05,"prompt_tokens":8,"completion_tokens":0,"api_requests":1}},
+                    "":{"metrics":{"spend":0,"api_requests":1}}}}}],
+                 "metadata":{"has_more":false}}
+                """));
+
+        var usage = await gateway.GetUsageAsync([UserId], new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 5), TestContext.Current.CancellationToken);
+
+        var row = Assert.Single(usage).Value;
+        Assert.Equal(0.00001m, row.Spend);
+        // 空的 model group key 不列出（由 Application 層併入「未標示模型」）
+        Assert.Equal([new ModelGroupUsage("fake-embedding", new(0.00001m, 8, 0, 1))], row.Models);
+    }
+
+    [Fact]
+    public async Task Usage_StopsAtThePageCap()
+    {
+        var (gateway, handler) = Create((request, _) => request.RequestUri!.AbsolutePath == "/user/info"
+            ? StubHttpHandler.Json("""{"user_info":{"spend":0}}""")
+            : StubHttpHandler.Json("""
+                {"results":[{"date":"2026-10-05","metrics":{"spend":0.01,"prompt_tokens":10,"completion_tokens":5,"api_requests":1},
+                  "breakdown":{"model_groups":{"minimax":{"metrics":{"spend":0.01,"prompt_tokens":10,"completion_tokens":5,"api_requests":1}}}}}],
+                 "metadata":{"has_more":true}}
+                """));
+
+        var usage = await gateway.GetUsageAsync([UserId], new DateOnly(2026, 10, 5), new DateOnly(2026, 10, 5), TestContext.Current.CancellationToken);
+
+        Assert.Equal(20, handler.Requests.Count(r => r.Request.RequestUri!.AbsolutePath == "/user/daily/activity"));
+        var row = Assert.Single(usage).Value;
+        Assert.Equal((0.2m, 200L, 100L, 20L), (row.Spend, row.PromptTokens, row.CompletionTokens, row.Requests));
+        Assert.Equal([new ModelGroupUsage("minimax", new(0.2m, 200, 100, 20))], row.Models);
     }
 
     [Fact]

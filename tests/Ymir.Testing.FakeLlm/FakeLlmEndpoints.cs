@@ -142,7 +142,12 @@ public static class FakeLlmEndpoints
         });
     }
 
-    /// <summary>格式同 LiteLLM 的 <c>/user/daily/activity</c>：results[].metrics 與 metadata 合計。</summary>
+    /// <summary>
+    /// 格式同 LiteLLM 的 <c>/user/daily/activity</c>：results[].metrics（當天所有模型的合計）、
+    /// results[].breakdown.model_groups（依 request 的 model）與 metadata 合計，只有一頁。
+    /// breakdown.models 的 key 故意加上 <c>fake-provider/</c> 前綴（模擬供應商的模型名稱），
+    /// 測試因此能確認 Ymir 讀的是 model_groups（ADR-0021）。
+    /// </summary>
     private static async Task HandleDailyActivityAsync(HttpContext context)
     {
         var state = context.RequestServices.GetRequiredService<FakeLlmState>();
@@ -153,37 +158,72 @@ public static class FakeLlmEndpoints
 
         var from = DateOnly.Parse(context.Request.Query["start_date"].ToString(), System.Globalization.CultureInfo.InvariantCulture);
         var to = DateOnly.Parse(context.Request.Query["end_date"].ToString(), System.Globalization.CultureInfo.InvariantCulture);
-        var days = state.LiteLlmUsers.Find(context.Request.Query["user_id"])?.Daily
-            .Where(d => d.Key >= from && d.Key <= to)
-            .OrderBy(d => d.Key)
-            .Select(d => new
+        var days = (state.LiteLlmUsers.Find(context.Request.Query["user_id"])?.Daily ?? new Dictionary<(DateOnly Date, string Model), FakeUsageCounters>())
+            .Where(d => d.Key.Date >= from && d.Key.Date <= to)
+            .GroupBy(d => d.Key.Date)
+            .OrderBy(g => g.Key)
+            .Select(g =>
             {
-                date = d.Key.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
-                metrics = new
+                var modelGroups = new JsonObject();
+                var models = new JsonObject();
+                foreach (var (key, counters) in g.OrderBy(d => d.Key.Model, StringComparer.Ordinal))
                 {
-                    spend = d.Value.Spend,
-                    prompt_tokens = d.Value.Requests * FakeLiteLlmUsers.PromptTokensPerRequest,
-                    completion_tokens = d.Value.Requests * FakeLiteLlmUsers.CompletionTokensPerRequest,
-                    total_tokens = d.Value.Requests * (FakeLiteLlmUsers.PromptTokensPerRequest + FakeLiteLlmUsers.CompletionTokensPerRequest),
-                    api_requests = d.Value.Requests,
-                },
+                    if (key.Model.Length == 0)
+                    {
+                        continue; // LiteLLM 沒有標示 model group 的紀錄：只算在當天的 metrics
+                    }
+
+                    modelGroups[key.Model] = new JsonObject
+                    {
+                        ["metrics"] = Metrics(counters),
+                        ["metadata"] = new JsonObject(),
+                        ["api_key_breakdown"] = new JsonObject(),
+                    };
+                    models["fake-provider/" + key.Model] = new JsonObject
+                    {
+                        ["metrics"] = Metrics(counters),
+                        ["metadata"] = new JsonObject(),
+                        ["api_key_breakdown"] = new JsonObject(),
+                    };
+                }
+
+                var total = new FakeUsageCounters(
+                    g.Sum(d => d.Value.Requests),
+                    g.Sum(d => d.Value.PromptTokens),
+                    g.Sum(d => d.Value.CompletionTokens),
+                    g.Sum(d => d.Value.Spend));
+                return (Date: g.Key, Total: total, Breakdown: new JsonObject { ["model_groups"] = modelGroups, ["models"] = models });
             })
-            .ToList() ?? [];
-        await context.Response.WriteAsJsonAsync(new
+            .ToList();
+        await context.Response.WriteAsJsonAsync(new JsonObject
         {
-            results = days,
-            metadata = new
+            ["results"] = new JsonArray([.. days.Select(d => (JsonNode)new JsonObject
             {
-                total_spend = days.Sum(d => d.metrics.spend),
-                total_prompt_tokens = days.Sum(d => d.metrics.prompt_tokens),
-                total_completion_tokens = days.Sum(d => d.metrics.completion_tokens),
-                total_api_requests = days.Sum(d => d.metrics.api_requests),
-                page = 1,
-                total_pages = 1,
-                has_more = false,
+                ["date"] = d.Date.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture),
+                ["metrics"] = Metrics(d.Total),
+                ["breakdown"] = d.Breakdown,
+            })]),
+            ["metadata"] = new JsonObject
+            {
+                ["total_spend"] = days.Sum(d => d.Total.Spend),
+                ["total_prompt_tokens"] = days.Sum(d => d.Total.PromptTokens),
+                ["total_completion_tokens"] = days.Sum(d => d.Total.CompletionTokens),
+                ["total_api_requests"] = days.Sum(d => d.Total.Requests),
+                ["page"] = 1,
+                ["total_pages"] = 1,
+                ["has_more"] = false,
             },
         });
     }
+
+    private static JsonObject Metrics(FakeUsageCounters counters) => new()
+    {
+        ["spend"] = counters.Spend,
+        ["prompt_tokens"] = counters.PromptTokens,
+        ["completion_tokens"] = counters.CompletionTokens,
+        ["total_tokens"] = counters.PromptTokens + counters.CompletionTokens,
+        ["api_requests"] = counters.Requests,
+    };
 
     private static async Task HandleDeleteKeyAsync(HttpContext context)
     {
@@ -213,7 +253,14 @@ public static class FakeLlmEndpoints
             JsonValue value => [value.GetValue<string>()],
             _ => [],
         };
-        context.RequestServices.GetRequiredService<FakeLlmState>().RecordEmbeddings(texts.Count);
+        var state = context.RequestServices.GetRequiredService<FakeLlmState>();
+        state.RecordEmbeddings(texts.Count);
+        // 模擬 LiteLLM 依 key 的使用者記錄 embedding 用量（費用 0，不影響預算；這裡不拒絕呼叫）。
+        if (state.MasterKey is not null && state.UserOfKey(BearerToken(context)) is { } liteLlmUser)
+        {
+            liteLlmUser.RecordRequest(request["model"]?.GetValue<string>() ?? "fake-embedding", promptTokens: texts.Count * 8L, completionTokens: 0, cost: 0m);
+        }
+
         await context.Response.WriteAsJsonAsync(new JsonObject
         {
             ["object"] = "list",
@@ -253,7 +300,7 @@ public static class FakeLlmEndpoints
             return;
         }
 
-        liteLlmUser?.RecordRequest();
+        liteLlmUser?.RecordRequest(request["model"]?.GetValue<string>() ?? ModelId);
         var reply = FakeLlmScript.Decide(request);
         if (reply.ErrorStatusCode is { } status)
         {

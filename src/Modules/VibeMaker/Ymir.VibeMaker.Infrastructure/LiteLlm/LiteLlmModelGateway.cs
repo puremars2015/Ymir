@@ -16,6 +16,10 @@ namespace Ymir.VibeMaker.Infrastructure.LiteLlm;
 /// key 帶 LiteLLM 的 <c>user_id</c>（= Ymir user id），LiteLLM 因此依使用者彙總花費並套用使用者的每月預算；
 /// 用量讀 <c>/user/daily/activity</c>，本期花費與預算讀 <c>/user/info</c>（ADR-0011）。
 /// </para>
+/// <para>
+/// 依模型拆分只讀 <c>breakdown.model_groups</c>（key 是公開的 model_name，與 Ymir 的模型 id 相同，ADR-0021）；
+/// <c>breakdown.models</c>（供應商的模型名稱）與各處的 <c>api_key_breakdown</c>（key hash）一律不讀，不會離開這個類別。
+/// </para>
 /// </summary>
 internal sealed class LiteLlmModelGateway(HttpClient httpClient, IOptions<LiteLlmOptions> options, TimeProvider timeProvider, ILogger<LiteLlmModelGateway> logger)
     : IModelGateway
@@ -26,7 +30,7 @@ internal sealed class LiteLlmModelGateway(HttpClient httpClient, IOptions<LiteLl
     internal const string BudgetDuration = "30d";
 
     private const int UsageConcurrency = 4;
-    private const int UsagePageSize = 100;
+    private const int UsagePageSize = 1000; // LiteLLM 上限 le=1000
     private const int MaxUsagePages = 20;
 
     public bool SupportsUsage => true;
@@ -144,8 +148,10 @@ internal sealed class LiteLlmModelGateway(HttpClient httpClient, IOptions<LiteLl
 
     private async Task<ModelUserUsage> GetUserUsageAsync(Guid userId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
     {
-        decimal spend = 0;
-        long prompt = 0, completion = 0, requests = 0;
+        var total = ModelUsageMetrics.Zero;
+        // 每筆 DailyUserSpend 只會出現在一頁（date desc, id asc 分頁），跨頁、跨日直接相加就是精確值（ADR-0021）。
+        var groups = new Dictionary<string, ModelUsageMetrics>(StringComparer.Ordinal);
+        var truncated = true;
         for (var page = 1; page <= MaxUsagePages; page++)
         {
             var path = string.Create(
@@ -155,21 +161,48 @@ internal sealed class LiteLlmModelGateway(HttpClient httpClient, IOptions<LiteLl
             EnsureSuccess("user/daily/activity", status);
             foreach (var day in body?["results"] as JsonArray ?? [])
             {
-                var metrics = day?["metrics"] as JsonObject;
-                spend += ReadDecimal(metrics, "spend");
-                prompt += (long)ReadDecimal(metrics, "prompt_tokens");
-                completion += (long)ReadDecimal(metrics, "completion_tokens");
-                requests += (long)ReadDecimal(metrics, "api_requests");
+                total = total.Add(ReadMetrics(day?["metrics"] as JsonObject));
+
+                // 只讀 model_groups；breakdown.models、api_key_breakdown 等其他欄位不讀（SA §12、ADR-0021）。
+                if (day?["breakdown"]?["model_groups"] is JsonObject modelGroups)
+                {
+                    foreach (var (name, entry) in modelGroups)
+                    {
+                        if (!string.IsNullOrEmpty(name) && entry?["metrics"] is JsonObject metrics)
+                        {
+                            groups[name] = groups.GetValueOrDefault(name, ModelUsageMetrics.Zero).Add(ReadMetrics(metrics));
+                        }
+                    }
+                }
             }
 
             if (body?["metadata"]?["has_more"]?.GetValueKind() != System.Text.Json.JsonValueKind.True)
             {
+                truncated = false;
                 break;
             }
         }
 
-        return new ModelUserUsage(spend, prompt, completion, requests, await GetBudgetStatusAsync(userId, cancellationToken).ConfigureAwait(false));
+        if (truncated)
+        {
+            // 總計與依模型拆分以相同方式截斷，兩者仍一致；只有極大量使用才會到這裡。
+            logger.LogWarning("LiteLLM usage for user {UserId} exceeds {MaxPages} pages of {PageSize}; totals are truncated", userId, MaxUsagePages, UsagePageSize);
+        }
+
+        return new ModelUserUsage(
+            total.Spend,
+            total.PromptTokens,
+            total.CompletionTokens,
+            total.Requests,
+            await GetBudgetStatusAsync(userId, cancellationToken).ConfigureAwait(false),
+            [.. groups.OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => new ModelGroupUsage(g.Key, g.Value))]);
     }
+
+    private static ModelUsageMetrics ReadMetrics(JsonObject? metrics) => new(
+        ReadDecimal(metrics, "spend"),
+        (long)ReadDecimal(metrics, "prompt_tokens"),
+        (long)ReadDecimal(metrics, "completion_tokens"),
+        (long)ReadDecimal(metrics, "api_requests"));
 
     internal static ModelBudgetStatus ParseBudget(JsonObject body)
     {
