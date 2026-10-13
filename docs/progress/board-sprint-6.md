@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| DOC1 | 精簡 README 專案入口 | ✅ | 保留介紹／功能／技術／開發／文件導覽，移除歷史主機快照與實作流水帳，見 #056 |
 | ARCH1 | 現況系統架構圖與專案導覽 | ✅ | 根目錄 architecture.md、五張 Mermaid 圖與 README 入口；區分正式部署／可選功能／未驗證項目，見 #055 |
 | LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #039 |
 | D2 | RuntimeHost cgroup exec 與 socket 掛載修復 | 🔬 | 已套用，Agent exec／stdin／env 與 API Healthy 通過；真實對話待使用者重試，見 #047 |
@@ -99,6 +100,16 @@
 ---
 
 ## 💬 留言區
+
+### #056 · README 回歸專案入口
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `✅完成`
+
+依使用者要求將 README 從 196 行整理為 68 行，保留產品介紹、功能、技術組成、精簡目錄、本機 AppHost 開發與文件導覽。移除舊 Windows 部署、個人路徑、分支／image 快照、修復流水帳、重複架構及 UI／API 實作細節；改由 architecture.md、ADR、部署指南及進度看板承載，舊版內容仍可由 Git 歷史追溯。未改動應用程式或正式服務。
+
+驗證：README 所有本機文件連結存在、Markdown fence 成對、過時主機特定字串移除與 `git diff --check` 通過。純文件變更未重跑應用程式 build／test，推送後追蹤 CI。
+
+---
 
 ### #055 · 完整架構圖文文件
 
