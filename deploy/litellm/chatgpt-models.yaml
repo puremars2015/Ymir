@@ -1,0 +1,27 @@
+# Optional ChatGPT subscription routes. Requires a completed official OAuth login.
+# These aliases are distinct from OpenRouter and share one ChatGPT account quota.
+model_list:
+  - model_name: chatgpt-gpt-6.1-sol
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-6.1-sol
+      rpm: 6
+      tpm: 64000
+      timeout: 60
+  - model_name: chatgpt-gpt-6-luna
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-6-luna
+      rpm: 6
+      tpm: 64000
+      timeout: 60
+  - model_name: chatgpt-gpt-6-astra
+    model_info:
+      mode: responses
+    litellm_params:
+      model: chatgpt/gpt-6-astra
+      rpm: 6
+      tpm: 64000
+      timeout: 60

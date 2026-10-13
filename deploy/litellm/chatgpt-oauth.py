@@ -23,7 +23,7 @@ def normalize_models(payload):
         model_id = entry.get("slug") or entry.get("id")
         if not isinstance(model_id, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]+", model_id):
             continue
-        if entry.get("visibility") == "hidden" or entry.get("supported_in_api") is False:
+        if entry.get("visibility") in ("hidden", "hide") or entry.get("supported_in_api") is False:
             continue
         models.append({
             "id": model_id,
@@ -38,7 +38,10 @@ def normalize_models(payload):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog-only", action="store_true")
+    parser.add_argument("--client-version", default=os.environ.get("CHATGPT_CATALOG_CLIENT_VERSION", "0.162.1"))
     args = parser.parse_args()
+    if not re.fullmatch(r"\d+\.\d+\.\d+", args.client_version):
+        raise SystemExit("模型目錄 client version 必須為 major.minor.patch。")
     directory = Path(os.environ.get("CHATGPT_TOKEN_DIR", "/var/lib/litellm/chatgpt"))
     os.environ["CHATGPT_TOKEN_DIR"] = str(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -73,7 +76,7 @@ def main():
     headers = get_chatgpt_default_headers(access_token, authenticator.get_account_id())
     headers["accept"] = "application/json"
     # 僅查詢可用模型，不呼叫 Responses 或 Chat Completions。
-    request = urllib.request.Request(base + "/models?client_version=0.89.0", headers=headers)
+    request = urllib.request.Request(base + "/models?client_version=" + args.client_version, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             models = normalize_models(json.load(response))

@@ -23,6 +23,9 @@ for file in /etc/ymir/api.env "$directory/.env" "$directory/ymir-models.env.exam
     [[ -f $file ]] || fail "缺少 $file"
 done
 systemctl is-active --quiet ymir-api.service || fail '正式 API 尚未啟動。'
+if as_owner podman exec litellm_litellm_1 python -c 'import os,sys; sys.exit(0 if os.environ.get("CHATGPT_TOKEN_DIR") else 1)'; then
+    fail 'ChatGPT OAuth 已啟用；請使用 apply-chatgpt-linux.sh 更新，避免六模型工具移除 OAuth 路由。'
+fi
 database=$(python3 - "$directory/.env" <<'PY'
 import pathlib, re, sys
 def read(path):

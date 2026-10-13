@@ -71,6 +71,8 @@ deploy/cloudflared/.env
 
 # LiteLLM 金鑰（MiniMax API key、master key）
 deploy/litellm/.env
+# Optional merged provider configuration is generated, not maintained by hand.
+deploy/litellm/config.chatgpt.runtime.yaml
 deploy/cloudflared/*.json
 cert.pem
 

@@ -55,7 +55,7 @@
 | D2 | RuntimeHost cgroup exec 與 socket 掛載修復 | 🔬 | 已套用，Agent exec／stdin／env 與 API Healthy 通過；真實對話待使用者重試，見 #047 |
 | D3 | 上傳寫檔 wrapper 參數展開修復 | 🔬 | 已熱更新，實際 Agent 原寫檔腳本／API 健康通過；原檔重傳待使用者確認，見 #050 |
 | L4 | 六模型選單：移除 M2、新增 M3／M2.7／四個 OpenRouter 模型 | 🔬 | 已部署、六路由及服務健康通過；管理者勾選開放與真模型推論待驗證，見 #041 |
-| OAUTH1 | LiteLLM ChatGPT 訂閱 OAuth 接入 | 🚧 | 官方登入／安全持久化工具及離線測試完成；待使用者登入、選可用模型再接路由，見 #052 |
+| OAUTH1 | LiteLLM ChatGPT 訂閱 OAuth 接入 | 🔬 | Sol／Luna／Astra 已部署，原六路由保留、API／登入頁健康；待管理員開放與真實推論，見 #054 |
 | B1 | 公司識別 favicon 超過約 6 KB 上傳回 500 | ✅ | `SystemSetting.ValueMaxLength` 放寬到 512K 字（欄位已是 nvarchar(max)），補 100 KB／256 KB 測試；見 #036 |
 | B2 | `OneDriveSyncTests` 撤銷授權測試偶發 409 | ✅ | 測試競態：執行後的背景上傳晚於撤銷才跑；改為先等上傳完成，產品程式未變；見 #036 |
 | D1 | ADR 編號重複與看板置頂區整理 | ✅ | 模型開放的 ADR 由 0016 改為 [ADR-0020](../adr/0020-admin-model-access.md)、補齊 ADR 索引；置頂區拆成原計畫／插單兩張表；見 #036 |
@@ -98,6 +98,26 @@
 ---
 
 ## 💬 留言區
+
+### #054 · OAuth 三模型正式部署成功
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🔬驗證`
+
+使用者在本機 sudo 視窗完成部署並回報狀態碼 0；再次獨立確認 LiteLLM `/v1/models` 包含三個 `chatgpt-*` alias 與原六個正式模型，私有 OAuth 持久 volume 設定及 headless guard 已載入。正式 API `/health` 與 nginx `/login` 皆 HTTP 200。部署保留既有權限政策；管理員仍需在「管理 → 開放模型」勾選新增模型。未呼叫真實模型推論，訂閱用量／費用追蹤及真實 Pi 工具串流仍待驗證；不將離線橋接測試當成上游成功。
+
+---
+
+### #053 · OAuth 已登入，核對目錄與三個訂閱路由
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
+
+使用者回報登入工具 1，實際 token 已保存；原因是工具使用的模型目錄 client_version=0.89.0 太舊，官方 backend 回空清單。核對 OpenAI 官方 Codex release 0.162.1 後更新查詢版本，headless 重查取得 7 個可見模型，排除 hide／hidden 內部模型，不需重新登入、不呼叫推論。使用者選擇 GPT-6.1 Sol、GPT-6 Luna、GPT-6 Astra；新增獨立 `chatgpt-*` alias、opt-in compose overlay、可寫外部 token volume、單 worker、API model env append／回復部署工具，保留原六模型、預設及權限。
+
+Pinned 1.103.2 的 Chat validator 不接受新 ID 的 xhigh，改用已核對的 Responses `reasoning.effort`，低至 max 原樣傳送；ultra 不在 Ymir 契約、不開放不降級。各 route 初期 6 RPM／64000 TPM。實測 default simple routing 不會累計 RPM，因此 opt-in config 使用 usage-based-routing-v2 與 pre-call checks；離線限 1 RPM 的第二個請求確認不到達上游。Direct SDK 假 SSE 測試出現非致命 standard_logging_object callback／usage serialization 警告，實際 proxy token／費用追蹤仍待真實推論確認，不宣稱完整用量驗證。另以中性 CHATGPT_DEFAULT_INSTRUCTIONS 取代 SDK 寫死「based on GPT-5」的預設指示，保留 Pi system prompt／工具。
+
+驗證：8 項純離線測試（目錄、私有權限、輸出不含 token、headless拒絕登入、env保留／冪等、guard）通過；隔離 pinned image 本機 SSE 驗證三模型文字／tools／stream、模型ID、全部支援effort及 RPM 擋上游通過。已針對實際 SDK 核對 typed guard error signature，401拒絕 device login／等待通過。config 合併及 compose overlay（單worker／volume／原環境）驗證通過。Proxy guard 阻止 refresh 失敗時的互動 fallback，不抄 token 到 API／Agent。主機路由部署與真實推論尚未執行，待使用者 sudo。
+
+---
 
 ### #052 · ChatGPT OAuth：先官方登入與帳號模型目錄
 

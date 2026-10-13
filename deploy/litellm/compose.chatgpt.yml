@@ -1,0 +1,23 @@
+# Opt-in only: complete login-chatgpt.sh before enabling these routes.
+# Use with compose.yml; only recreate litellm, never its PostgreSQL dependency.
+services:
+  litellm:
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
+    environment:
+      CHATGPT_TOKEN_DIR: /var/lib/litellm/chatgpt
+      CHATGPT_AUTH_FILE: auth.json
+      # Avoid the SDK's hard-coded "based on GPT-5" Codex prompt on GPT-6 routes.
+      CHATGPT_DEFAULT_INSTRUCTIONS: >-
+        You are an AI assistant served through ChatGPT OAuth. Follow the supplied
+        system instructions and tool definitions. Do not infer your model identity
+        from previous conversation messages.
+      PYTHONPATH: /opt/ymir/chatgpt-guard
+    volumes:
+      - ./config.chatgpt.runtime.yaml:/app/config.yaml:ro
+      # Refresh-token rotation must write to the same durable copy.
+      - chatgpt-auth:/var/lib/litellm/chatgpt
+      - ./chatgpt-proxy-guard.py:/opt/ymir/chatgpt-guard/sitecustomize.py:ro
+volumes:
+  chatgpt-auth:
+    external: true
+    name: ymir-chatgpt-auth

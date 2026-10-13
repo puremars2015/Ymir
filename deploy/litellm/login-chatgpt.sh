@@ -17,6 +17,7 @@ exec podman run --rm -it --name "ymir-chatgpt-login-$UID" \
     --tmpfs /tmp:rw,size=64m,mode=1777 \
     --env HOME=/tmp --env CHATGPT_TOKEN_DIR=/var/lib/litellm/chatgpt \
     --env CHATGPT_AUTH_FILE=auth.json \
+    --env "CHATGPT_CATALOG_CLIENT_VERSION=${CHATGPT_CATALOG_CLIENT_VERSION:-0.162.1}" \
     --volume "$volume:/var/lib/litellm/chatgpt" \
     --volume "$directory/chatgpt-oauth.py:/opt/ymir-chatgpt-oauth.py:ro" \
     --entrypoint python ghcr.io/berriai/litellm:v1.103.2 \
