@@ -1438,6 +1438,8 @@ export interface components {
       /** @default false */
       allowKnowledgeBase: boolean;
     };
+    /** @enum {unknown} */
+    ModelUsageKind: 'Catalog' | 'Embedding' | 'Unlisted' | 'Unattributed';
     MyExtensionsResponse: {
       skillsAllowed: boolean;
       mcpAllowed: boolean;
@@ -1792,6 +1794,23 @@ export interface components {
       enabled: boolean;
       provider?: null | string;
     };
+    UserModelUsageResponse: {
+      modelId: null | string;
+      displayName: string;
+      kind: components['schemas']['ModelUsageKind'];
+      /** Format: int32 */
+      executions: number | string;
+      /** Format: int32 */
+      failed: number | string;
+      /** Format: double */
+      spendUsd: null | number | string;
+      /** Format: int64 */
+      promptTokens: null | number | string;
+      /** Format: int64 */
+      completionTokens: null | number | string;
+      /** Format: int64 */
+      modelRequests: null | number | string;
+    };
     /** @enum {unknown} */
     UserRole: 'User' | 'Admin';
     UserSearchResult: {
@@ -1838,6 +1857,7 @@ export interface components {
       budgetUsd: null | number | string;
       /** Format: date-time */
       budgetResetAt: null | string;
+      models: components['schemas']['UserModelUsageResponse'][];
     };
     WorkspaceFileResponse: {
       path: string;

@@ -199,7 +199,9 @@ step('runtime policy saved; daily limit rejects the next message without a resta
 
 // 12. 用量：使用者的執行次數，24 小時次數標示已達上限；之後還原執行政策
 await admin.click('app-admin-tabs a:has-text("用量")');
-const workerRow = admin.locator(`app-usage-page tr:has-text("${workerAccount}")`);
+const workerRow = admin.locator(
+  `app-usage-page table[data-table=users] tr:has-text("${workerAccount}")`,
+);
 await workerRow.locator('.quota[data-level="reached"]').waitFor();
 await admin.selectOption('app-usage-page select[name=days]', { label: '近 30 天' });
 await workerRow.waitFor();
@@ -230,13 +232,22 @@ for (let i = 0; i < 4 && !(await budgetMessage.count()); i++) {
 await budgetMessage.first().waitFor();
 await worker.screenshot({ path: `${outDir}/09-budget-exceeded.png` });
 await admin.click('app-admin-tabs a:has-text("用量")');
-await admin.locator('app-usage-page th:has-text("費用")').waitFor();
+await admin.locator('app-usage-page table[data-table=users] th:has-text("費用")').waitFor();
 await workerRow.locator('.quota[data-level="reached"]:has-text("US$0.02")').waitFor();
+// 依模型（ADR-0021）：合計表有 fake-model 的費用，每人每模型表有 worker 的 fake-model 列
+await admin.waitForSelector(
+  'app-usage-by-model table[data-table=models] tr:has-text("fake-model"):has-text("US$")',
+);
+await admin.waitForSelector(
+  `app-usage-by-model table[data-table=user-models] tr:has-text("${workerAccount}"):has-text("fake-model")`,
+);
 await admin.screenshot({ path: `${outDir}/10-usage-model.png`, fullPage: true });
 await admin.click('app-admin-tabs a:has-text("系統設定")');
 await admin.locator('app-runtime-settings-card button:has-text("還原為部署設定")').click();
 await admin.locator('app-runtime-settings-card [role=status]:has-text("已還原")').waitFor();
-step('monthly model budget enforced; usage page shows LiteLLM spend, tokens and budget');
+step(
+  'monthly model budget enforced; usage page shows LiteLLM spend, tokens and budget, and the per-model breakdown',
+);
 
 // 14. Agent 擴充能力（ADR-0012）：全域預設開放 skill；使用者頁對 worker 個人開放 MCP；worker 的個人設定頁看到結果
 const extensionCard = admin.locator('app-extension-settings-card');

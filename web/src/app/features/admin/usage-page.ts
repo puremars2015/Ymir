@@ -22,11 +22,15 @@ import {
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { AdminUsage, UserUsage } from '../../core/api/api-types';
 import { AdminTabs } from './admin-tabs';
+import { UsageByModel } from './usage-by-model';
 
-/** Admin 用量（ADR-0011）：各使用者的執行數、結果、Agent 執行時間與每日配額的使用狀況。 */
+/**
+ * Admin 用量（ADR-0011）：各使用者的執行數、結果、Agent 執行時間與每日配額的使用狀況；
+ * 下方的「依模型」卡片（`app-usage-by-model`，ADR-0021）列出每人每模型的執行次數與 LiteLLM 用量。
+ */
 @Component({
   selector: 'app-usage-page',
-  imports: [AdminTabs, DatePipe, FormsModule, RouterLink],
+  imports: [AdminTabs, DatePipe, FormsModule, RouterLink, UsageByModel],
   template: `
     <section class="admin">
       <app-admin-tabs />
@@ -86,7 +90,7 @@ import { AdminTabs } from './admin-tabs';
 
         <article class="card">
           <div class="table-wrap">
-            <table>
+            <table data-table="users">
               <thead>
                 <tr>
                   <th>使用者</th>
@@ -177,6 +181,8 @@ import { AdminTabs } from './admin-tabs';
             <span class="quota" data-level="reached">已達上限</span>
           </p>
         </article>
+
+        <app-usage-by-model [usage]="u" />
       } @else if (loading()) {
         <p class="muted">載入中…</p>
       }
