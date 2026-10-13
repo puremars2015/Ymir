@@ -54,8 +54,8 @@ public sealed record ModelBudgetStatus(decimal Spend, decimal? MaxBudget, DateTi
 /// <param name="Spend">期間內的模型費用（美元，依 LiteLLM 設定的單價計算；沒有單價時為 0）。</param>
 /// <param name="Budget">本期預算狀態（可能取不到）。</param>
 /// <param name="Models">
-/// 依模型拆分（依 ModelId 以 ordinal 排序）。LiteLLM 未標示 model group 的請求不在這裡，
-/// 所以加總可能小於總計；差額由 Application 層列為「未標示模型」（ADR-0021）。
+/// 依模型拆分（依 ModelId 以 ordinal 排序）。LiteLLM 以 model group 為 key，沒有 model group 時退回供應商模型名稱；
+/// 兩者都沒有的紀錄不在這裡，所以加總可能小於總計；差額由 Application 層列為「未標示模型」（ADR-0021）。
 /// </param>
 public sealed record ModelUserUsage(decimal Spend, long PromptTokens, long CompletionTokens, long Requests, ModelBudgetStatus? Budget, IReadOnlyList<ModelGroupUsage> Models);
 
@@ -71,7 +71,7 @@ public sealed record ModelUsageMetrics(decimal Spend, long PromptTokens, long Co
     }
 }
 
-/// <param name="ModelId">LiteLLM model group（公開 model_name）= ModelDescriptor.Id。</param>
+/// <param name="ModelId">LiteLLM model group（公開 model_name）= ModelDescriptor.Id；沒有 model group 的紀錄是供應商模型名稱。</param>
 public sealed record ModelGroupUsage(string ModelId, ModelUsageMetrics Metrics);
 
 /// <param name="KeyId">撤銷用的識別（LiteLLM 的 hashed token），本身不能拿來呼叫模型。</param>

@@ -47,11 +47,11 @@ public sealed class FakeLiteLlmUser(string userId)
 
     public bool IsOverBudget => MaxBudget is { } max && Spend >= max;
 
-    /// <summary>依 (UTC 日期, model) 累計的用量；model 為空字串表示 LiteLLM 沒有標示 model group 的紀錄。</summary>
+    /// <summary>依 (UTC 日期, model) 累計的用量；model 為空字串表示 LiteLLM 既沒有 model group 也沒有模型名稱的紀錄。</summary>
     public IReadOnlyDictionary<(DateOnly Date, string Model), FakeUsageCounters> Daily => _daily;
 
-    /// <summary>記一次請求；測試也可以直接呼叫來準備用量（例如過去的日期、沒有 model group 的紀錄）。</summary>
-    /// <param name="model">request 的 model（LiteLLM 的 model group）；空字串表示沒有 model group。</param>
+    /// <summary>記一次請求；測試也可以直接呼叫來準備用量（例如過去的日期、不會出現在 model_groups 的紀錄）。</summary>
+    /// <param name="model">request 的 model（LiteLLM 的 model group）；空字串表示 model group 與模型名稱都沒有（LiteLLM 會以模型名稱代替空的 model group，只有兩者都空時才不列入 model_groups）。</param>
     /// <param name="date">UTC 日期；預設今天。</param>
     public void RecordRequest(
         string model,

@@ -214,7 +214,7 @@ export class UsageByModel {
     return modelKindLabel(kind);
   }
 
-  /** 未標示模型的來源說明：舊執行沒有保存模型，或 LiteLLM 沒有 model group 的請求（ADR-0021）。 */
+  /** 未標示模型的來源說明：舊執行沒有保存模型，或 LiteLLM 既沒有 model group 也沒有模型名稱的紀錄（ADR-0021）。 */
   protected hint(kind: ModelUsageKind): string | null {
     return kind === 'Unattributed' ? '舊的執行紀錄沒有保存模型，或 LiteLLM 未標示模型的請求' : null;
   }

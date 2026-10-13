@@ -149,7 +149,8 @@ internal sealed class LiteLlmModelGateway(HttpClient httpClient, IOptions<LiteLl
     private async Task<ModelUserUsage> GetUserUsageAsync(Guid userId, DateOnly fromDate, DateOnly toDate, CancellationToken cancellationToken)
     {
         var total = ModelUsageMetrics.Zero;
-        // 每筆 DailyUserSpend 只會出現在一頁（date desc, id asc 分頁），跨頁、跨日直接相加就是精確值（ADR-0021）。
+        // 每筆 DailyUserSpend 只會出現在一頁（date desc, id asc 分頁），跨頁、跨日直接相加不會漏算或重複；
+        // 但 model_group 不在 LiteLLM 每日彙總的唯一鍵內，指向同一上游模型的 alias 會合併（ADR-0021「影響」）。
         var groups = new Dictionary<string, ModelUsageMetrics>(StringComparer.Ordinal);
         var truncated = true;
         for (var page = 1; page <= MaxUsagePages; page++)

@@ -97,7 +97,7 @@ Agent container 只拿得到這把 virtual key，**master key 與 MiniMax key �
 | `VibeMaker__Models__0__Id` / `VibeMaker__Models__0__DisplayName` | 對話中可選的模型清單（`__1__`、`__2__` 依序增加）；Id 必須與 `config.yaml` 的 `model_name` 相同。DisplayName 只寫模型名稱。未設定時只有預設模型 |
 | `VibeMaker__Models__0__Provider` | 提供這個模型的供應商，例如 `minimax.io`、`OpenRouter`、`ChatGPT OAuth`；只在管理介面顯示「名稱 (provider)」，使用者的模型選單只顯示名稱（同名模型才加上 provider 區分，ADR-0020 補充） |
 
-- **新增模型**：先在 `config.yaml` 加一筆 `model_name`，再在 Ymir 的 `VibeMaker__Models__*` 加同名的 Id。
+- **新增模型**：先在 `config.yaml` 加一筆 `model_name`，再在 Ymir 的 `VibeMaker__Models__*` 加同名的 Id。每個 `model_name` 的 `litellm_params.model`（含 provider）不可與其他 `model_name` 重複，否則用量頁的「依模型」會把它們合併成同一個模型（LiteLLM 的每日彙總不以 model group 區分，[ADR-0021](../../docs/adr/0021-per-user-model-usage.md)）。
   - virtual key 預設只允許清單內的模型；
   - 選了清單外的模型，API 回 `400 MODEL_NOT_AVAILABLE`。
 - 非 Development 環境沒有設定 `VibeMaker__LiteLlm__MasterKey` 時，API 會拒絕啟動。

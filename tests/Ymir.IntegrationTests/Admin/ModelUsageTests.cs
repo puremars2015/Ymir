@@ -1,6 +1,8 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Ymir.Api.Endpoints;
 using Ymir.IntegrationTests.Api;
 using Ymir.IntegrationTests.Executions;
@@ -8,7 +10,9 @@ using Ymir.IntegrationTests.Knowledge;
 using Ymir.Platform.Users;
 using Ymir.Testing.FakeLlm;
 using Ymir.VibeMaker.Application.Admin;
+using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Contracts.Executions;
+using Ymir.VibeMaker.Domain;
 
 namespace Ymir.IntegrationTests.Admin;
 
@@ -94,7 +98,7 @@ public class ModelUsageTests(ModelUsageApiFactory factory) : IClassFixture<Model
         aLiteLlm.RecordRequest("fake-model-2");
         aLiteLlm.RecordRequest(ModelUsageApiFactory.EmbeddingModel, promptTokens: 16, completionTokens: 0, cost: 0m);
         aLiteLlm.RecordRequest("retired-model");
-        aLiteLlm.RecordRequest(string.Empty); // LiteLLM 沒有標示 model group 的紀錄
+        aLiteLlm.RecordRequest(string.Empty); // model group 與模型名稱都沒有、不會出現在 model_groups 的紀錄
         aLiteLlm.RecordRequest(FakeLlmEndpoints.ModelId, date: todayUtc.AddDays(-7)); // 超出查詢期間
 
         using var b = await factory.LoginAsync($"model-usage-b-{Guid.NewGuid():N}");
@@ -143,6 +147,41 @@ public class ModelUsageTests(ModelUsageApiFactory factory) : IClassFixture<Model
         var bRow = Assert.Single(usage.Users, u => u.UserId == bId);
         var bModel = Assert.Single(bRow.Models);
         Assert.Equal((FakeLlmEndpoints.ModelId, 3L, 1), (bModel.ModelId, bModel.ModelRequests, bModel.Executions));
+    }
+
+    [Fact]
+    public async Task Usage_CountsFailedAndLegacyExecutionsPerModel()
+    {
+        using var d = await factory.LoginAsync($"model-usage-legacy-{Guid.NewGuid():N}");
+        var dId = await UserIdAsync(d);
+        var conversation = await d.CreateConversationAsync(null, "model usage legacy");
+        for (var i = 0; i < 3; i++)
+        {
+            await RunAsync(d, conversation.Id, $"run {i}");
+        }
+
+        // Scripted harness 不會失敗、新執行一定有模型：直接改資料，模擬一次失敗與一筆 ModelId 欄位加入前的舊執行。
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IVibeMakerDbContext>();
+            var ids = await db.AgentExecutions.Where(e => e.UserId == dId).OrderBy(e => e.CreatedAt).Select(e => e.Id).ToListAsync(Ct);
+            Assert.Equal(3, ids.Count);
+            await db.AgentExecutions.Where(e => e.Id == ids[0]).ExecuteUpdateAsync(e => e.SetProperty(x => x.Status, ExecutionStatus.Failed), Ct);
+            await db.AgentExecutions.Where(e => e.Id == ids[1]).ExecuteUpdateAsync(e => e.SetProperty(x => x.ModelId, (string?)null), Ct);
+        }
+
+        using var admin = await factory.LoginAsync($"model-usage-legacy-admin-{Guid.NewGuid():N}", UserRole.Admin);
+        var usage = await admin.GetFromJsonAsync<AdminUsageResponse>("/api/admin/usage?days=7", JsonDefaults.Options, Ct);
+
+        var row = Assert.Single(usage!.Users, u => u.UserId == dId);
+        Assert.Equal((3, 1), (row.Executions, row.Failed));
+        Assert.Equal([FakeLlmEndpoints.ModelId, null], row.Models.Select(m => m.ModelId));
+        // 失敗的執行算在它選的模型下；舊執行（沒有保存模型）算在「未標示模型」。
+        Assert.Equal((2, 1), (row.Models[0].Executions, row.Models[0].Failed));
+        Assert.Equal((ModelUsageKind.Unattributed, 1, 0), (row.Models[1].Kind, row.Models[1].Executions, row.Models[1].Failed));
+        // 各列加總等於使用者的總計（ADR-0021）
+        Assert.Equal(row.Executions, row.Models.Sum(m => m.Executions));
+        Assert.Equal(row.Failed, row.Models.Sum(m => m.Failed));
     }
 
     [Fact]

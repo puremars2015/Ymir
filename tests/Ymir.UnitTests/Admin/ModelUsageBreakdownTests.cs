@@ -136,13 +136,13 @@ public class ModelUsageBreakdownTests
             Gateway(
                 new ModelUsageMetrics(1m, 0, 0, 10),
                 new ModelGroupUsage("a", new(0.5m, 0, 0, 1)),
-                new ModelGroupUsage("b", new(0.1m, 0, 0, 5)),
+                new ModelGroupUsage("g", new(0.1m, 0, 0, 5)),
                 new ModelGroupUsage("f", new(0.1m, 0, 0, 2))),
             Catalog,
             Embedding);
 
-        // a：費用最高；b、f 費用相同依請求數；c、d、e 都沒有 LiteLLM 用量，依執行數再依 id；未標示模型最後（儘管執行數最多）
-        Assert.Equal(["a", "b", "f", "e", "c", "d", null], rows.Select(r => r.ModelId));
+        // a：費用最高；g、f 費用相同依請求數（id 順序相反，證明不是退回 id 排序）；c、d、e 都沒有 LiteLLM 用量，依執行數再依 id；未標示模型最後（儘管執行數最多）
+        Assert.Equal(["a", "g", "f", "e", "c", "d", null], rows.Select(r => r.ModelId));
     }
 
     [Fact]

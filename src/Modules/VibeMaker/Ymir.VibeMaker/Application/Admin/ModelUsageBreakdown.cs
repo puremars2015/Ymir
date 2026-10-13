@@ -11,10 +11,10 @@ public enum ModelUsageKind
     /// <summary>知識庫的 embedding 模型（<c>VibeMaker:Rag:EmbeddingModel</c>）。</summary>
     Embedding,
 
-    /// <summary>不在模型清單（例如已移除、改名，或 LiteLLM 的 wildcard group）。</summary>
+    /// <summary>不在模型清單（例如已移除、改名、LiteLLM 的 wildcard group，或沒有 model group 時以供應商模型名稱為 key 的紀錄）。</summary>
     Unlisted,
 
-    /// <summary>未標示模型：舊執行沒有保存模型，或 LiteLLM 未標示 model group 的請求。</summary>
+    /// <summary>未標示模型：舊執行沒有保存模型，或 LiteLLM 既沒有 model group 也沒有模型名稱的紀錄。</summary>
     Unattributed,
 }
 

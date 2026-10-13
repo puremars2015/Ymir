@@ -170,7 +170,7 @@ public static class FakeLlmEndpoints
                 {
                     if (key.Model.Length == 0)
                     {
-                        continue; // LiteLLM 沒有標示 model group 的紀錄：只算在當天的 metrics
+                        continue; // model group 與模型名稱都沒有的紀錄：LiteLLM 只算在當天的 metrics
                     }
 
                     modelGroups[key.Model] = new JsonObject
