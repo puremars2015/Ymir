@@ -57,7 +57,7 @@
 | D2 | RuntimeHost cgroup exec 與 socket 掛載修復 | 🔬 | 已套用，Agent exec／stdin／env 與 API Healthy 通過；真實對話待使用者重試，見 #047 |
 | D3 | 上傳寫檔 wrapper 參數展開修復 | 🔬 | 已熱更新，實際 Agent 原寫檔腳本／API 健康通過；原檔重傳待使用者確認，見 #050 |
 | L4 | 六模型選單：移除 M2、新增 M3／M2.7／四個 OpenRouter 模型 | 🔬 | 已部署、六路由及服務健康通過；管理者勾選開放與真模型推論待驗證，見 #041 |
-| L6 | 開放模型標示 provider（管理端顯示、使用者不顯示） | ✅ | `VibeMaker__Models__N__Provider`；正式主機需重跑 `apply-chatgpt-linux.sh` 或手動補 Provider 才會生效；見 #057 |
+| L6 | 開放模型標示 provider（管理端顯示、使用者不顯示） | ✅ | `VibeMaker__Models__N__Provider`；正式主機需重跑 `apply-chatgpt-linux.sh` 或手動補 Provider 才會生效；同名模型加 provider 區分（使用者 2026-10-13 決定）；見 #057 |
 | OAUTH1 | LiteLLM ChatGPT 訂閱 OAuth 接入 | 🔬 | Sol／Luna／Astra 已部署，原六路由保留、API／登入頁健康；待管理員開放與真實推論，見 #054 |
 | B1 | 公司識別 favicon 超過約 6 KB 上傳回 500 | ✅ | `SystemSetting.ValueMaxLength` 放寬到 512K 字（欄位已是 nvarchar(max)），補 100 KB／256 KB 測試；見 #036 |
 | B2 | `OneDriveSyncTests` 撤銷授權測試偶發 409 | ✅ | 測試競態：執行後的背景上傳晚於撤銷才跑；改為先等上傳完成，產品程式未變；見 #036 |
@@ -123,9 +123,11 @@
 - **❓待決定**：同時開放兩個同名模型時，使用者會看到 provider。替代做法是在管理端禁止同時開放同名模型。
 
 <details>
-<summary>💬 回覆（0）</summary>
+<summary>💬 回覆（1）</summary>
 
-（尚無回覆）
+> ↳ 👤 **使用者**（Claude 代記） · 🕒 2026-10-13 20:10
+>
+> 決定：同一位使用者同時被開放兩個同名模型時，加上 provider 區分（維持目前實作，不在管理端禁止）。
 
 </details>
 
