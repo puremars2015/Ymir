@@ -13,6 +13,8 @@ Group=ymir-runtime
 # 建立 /run/ymir-runtime（擁有者 ymir:ymir-runtime），socket 放在這裡；服務停止時自動清除。
 RuntimeDirectory=ymir-runtime
 RuntimeDirectoryMode=0750
+# API bind-mount 此目錄；重啟若移除再建立，API 會仍指向舊 inode 而連不到新 socket。
+RuntimeDirectoryPreserve=yes
 WorkingDirectory=/opt/ymir/runtime-host
 # Token、WorkspaceRoot、XDG_RUNTIME_DIR 等設定；權限 600，擁有者 root（systemd 以 root 讀取後再切換使用者）。
 EnvironmentFile=/etc/ymir/runtime-host.env

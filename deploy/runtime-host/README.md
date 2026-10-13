@@ -75,6 +75,20 @@
 
 ## 設定
 
+### Ubuntu：Agent exec 的 cgroup 權限錯誤
+
+若 RuntimeHost 的 system service 可以建立 Agent 容器，但執行 `bash`／`mkdir` 時報 `cgroup.procs: Permission denied`、exit code 126，可能是 RuntimeHost 位於 `system.slice`，rootless Podman 容器位於 `ymir` 的 user manager subtree，cgroup v2 不允許跨未授權的共同父層遷移程序。僅有 `Delegate=yes` 不代表這兩個 subtree 之間也取得授權。
+
+目前主機的修復工具：
+
+```bash
+sudo bash deploy/runtime-host/fix-linux-exec-scope.sh
+```
+
+腳本先用 `systemd-run --user --scope --quiet` 驗證現存 Agent 的 uid／Pi、stdin 和環境變數；全部通過且沒有排隊／執行中的工作後，備份 RuntimeHost env，安裝 root-owned `ymir-podman-scope` wrapper，設定 `VibeMaker__Runtime__ContainerExecutable` 並重啟 RuntimeHost。從 system service cgroup 再驗證 wrapper；設定 `RuntimeDirectoryPreserve=yes` 保留 API bind-mount 的 socket 目錄，並重啟 API 刷新舊掛載，等待整體 health=Healthy 再啟動 nginx／Tunnel。失敗時嘗試回復原 env／drop-in；不刪除容器或使用者檔案，不執行付費模型。
+
+這個修復保留 rootless Podman、CPU／memory／pids 限制、keep-id、唯讀檔案系統及既有 capabilities 政策；不要用 privileged、停用 cgroups、廣泛 chmod／chown `/sys/fs/cgroup` 來繞過問題。供應商 key 不寫進 scope 命令參數。
+
 | 設定 | 說明 |
 |---|---|
 | `RuntimeHost__Listen` | `unix:/run/ymir-runtime/runtime.sock`（建議）；或只限 loopback 的 `http://127.0.0.1:5090`（例如 Windows 開發機） |

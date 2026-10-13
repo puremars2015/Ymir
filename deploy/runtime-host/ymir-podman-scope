@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# system 層 RuntimeHost 與 user 層 Podman cgroup 的共同父層未授權給 ymir。
+# 先進入 user manager scope，保留 argv／stdin／stdout／環境變數及退出碼。
+# 不關閉 cgroups、不增加容器 capabilities，也不傳遞 secret 值到 argv。
+set -euo pipefail
+[[ $(id -un) == ymir ]] || { printf '此 wrapper 僅允許 ymir 帳號執行。\n' >&2; exit 1; }
+export XDG_RUNTIME_DIR=/run/user/$(id -u)
+export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus
+exec /usr/bin/systemd-run --user --scope --quiet -- /usr/bin/podman "$@"

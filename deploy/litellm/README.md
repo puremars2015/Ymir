@@ -5,7 +5,7 @@ Ymir 的模型入口是 LiteLLM（SA §19、[ADR-0004](../../docs/adr/0004-litel
 
 | 檔案 | 用途 |
 |---|---|
-| `config.yaml` | LiteLLM 設定：`minimax`（`https://api.minimax.io/v1`，OpenAI 相容）、`fake-model` |
+| `config.yaml` | LiteLLM 設定：MiniMax M2.7／M3（直連）、四個 OpenRouter 模型、`fake-model` |
 | `compose.yml` | LiteLLM proxy（`ghcr.io/berriai/litellm:v1.103.2`，只綁 `127.0.0.1:4000`）+ LiteLLM 專用 PostgreSQL（virtual key 需要，不對外開 port） |
 | `.env.example` | 金鑰範本；複製成 `.env` 後填入（**`.env` 已被 `.gitignore` 排除，不得提交**） |
 | `smoke-test.sh` | 對 proxy 送一則訊息 |
@@ -25,18 +25,33 @@ docker compose up -d
 
 ## OpenRouter
 
-LiteLLM 已設定下列三個 OpenRouter 路由，使用官方 `openrouter/` provider；對話、串流與工具呼叫仍經既有的 OpenAI 相容入口。OpenRouter 上游金鑰只放在 LiteLLM 的 `.env`，不交給瀏覽器、Ymir 使用者或 Agent。
+LiteLLM 已設定下列四個 OpenRouter 路由，使用官方 `openrouter/` provider；對話、串流與工具呼叫仍經既有的 OpenAI 相容入口。OpenRouter 上游金鑰只放在 LiteLLM 的 `.env`，不交給瀏覽器、Ymir 使用者或 Agent。
 
 | LiteLLM alias / Ymir Model ID | OpenRouter 模型 ID | 圖片輸入 / 工具 |
 |---|---|---|
 | `openrouter-sonnet-5.5` | `anthropic/claude-sonnet-5.5` | 支援 |
 | `openrouter-gpt-6.1-sol` | `openai/gpt-6.1-sol` | 支援 |
 | `openrouter-gpt-6-luna` | `openai/gpt-6-luna` | 支援 |
+| `openrouter-haiku-5.5` | `anthropic/claude-haiku-5.5` | 支援 |
+
+### 目前 Ubuntu 正式部署更新
+
+確認 `deploy/litellm/.env` 有 `OPENROUTER_API_KEY` 後，在專案根目錄執行：
+
+```bash
+sudo bash deploy/litellm/apply-linux-models.sh
+```
+
+腳本備份設定、檢查無排隊／執行中的工作，同步 `/etc/ymir/api.env` 的完整六模型設定，僅重建 LiteLLM 代理以載入 key，再啟動 API／nginx／Tunnel。保留 SQL、PostgreSQL、持久金鑰、既有全域／個人權限；失敗時嘗試恢復 API，LiteLLM 重建不自動撤回。備份含密鑰，不可分享。前端不需重建，管理選單由 API 設定產生。
+
+完整六模型設定見 `ymir-models.env.example`；M2.7 沿用 `minimax` alias，避免既有授權消失，M3 使用 `minimax-m3`。預設 M2.7；已有管理員保存的開放清單不會自動開放新增模型，部署後需在「開放模型」勾選並儲存。MiniMax M3 支援圖片但不提供 effort 深度（不得冒充 M3.1）；M2.7 僅文字。OpenRouter 能力依 2026-10-13 官方 models 目錄，Haiku 支援 low／medium／high／xhigh／max，但沒有 none。
+
+MiniMax 官方公告 M2.7 於 2026-11-18 退役；M Plan／Token Plan 從 2026-10-19 起會改路由至 M3.1 Flash Preview。MiniMax 單價為標準 pay-as-you-go，M3 超過 512k 輸入或 Priority 較高，需依方案核對帳單，不將代理統計視為上游帳單。參考 [MiniMax 官方模型](https://platform.minimax.io/docs/guides/models-intro)、[OpenAI 相容介面](https://platform.minimax.io/docs/api-reference/text-openai-api)、[單價](https://platform.minimax.io/docs/pricing/overview)。
 
 1. 在 `.env` 填入 `OPENROUTER_API_KEY`。模型設定使用 `openrouter/<OpenRouter 模型 ID>`，不要把 Ymir 的 alias 當成上游模型 ID。
 2. `docker compose up -d --no-deps litellm` 重建 proxy，載入新的環境變數；保留既有 PostgreSQL volume 與金鑰。單純 `docker compose restart` 不會載入新的環境變數。
-3. 將 [ymir-openrouter.env.example](ymir-openrouter.env.example) 的設定加入 Ymir API 與 RuntimeHost 部署環境，保留既有預設模型。`SupportsImages` 必須與所選模型相符；Agent 使用的模型需支援 `tools`。
-4. 確認没有執行或排隊中的工作，再重啟 API／RuntimeHost。API 會重新建立模型清單並換發包含這三個 alias 的 virtual key；只改 LiteLLM 路由不會讓舊 key 自動取得新模型權限。
+3. 將 [ymir-models.env.example](ymir-models.env.example) 的完整設定替換 API 的舊 Models／AllowedModels。`SupportsImages` 必須與所選模型相符；Agent 使用的模型需支援 `tools`。Remote 模式的 RuntimeHost 不需要同步 API 模型選單。
+4. 確認沒有執行或排隊中的工作，再重啟 API。API 會重新建立模型清單，下一次執行時按生效權限換發 virtual key；只改 LiteLLM 路由不會讓舊 key 自動取得新模型權限。
 5. 使用者重新整理後即可從模型選單選取 OpenRouter。`./smoke-test.sh openrouter-sonnet-5.5` 可檢查上游文字回應；會使用 OpenRouter 帳號額度。
 
 **新增其他 OpenRouter 模型**：在 `config.yaml` 加入不同的 `model_name`，例如 `openrouter-sonnet`，並直接設定 `model: openrouter/anthropic/claude-sonnet-4.6`、`api_key: os.environ/OPENROUTER_API_KEY`。在 Ymir 的 Models 與明確設定的 AllowedModels 同步加入相同 alias；使用者即可逐一選用。不要使用無限制的 wildcard key。
@@ -49,7 +64,7 @@ LiteLLM 已設定下列三個 OpenRouter 路由，使用官方 `openrouter/` pro
 
 ## MiniMax 與共用設定注意
 
-- **模型名稱**：`config.yaml` 預設為 `openai/MiniMax-M2`。實際可用的模型依訂閱方案而定，請在 MiniMax 後台確認後修改。
+- **模型名稱**：`config.yaml` 預設為 `openai/MiniMax-M2.7`，另有 `openai/MiniMax-M3`。實際可用的模型依訂閱方案而定，請在 MiniMax 後台確認。
 - **金鑰**：
   - `MINIMAX_API_KEY` 只放在 LiteLLM，不得放進 Agent container。
   - Agent 之後會拿 LiteLLM 發的短效 virtual key（ADR-0004，Sprint 4）。
@@ -113,4 +128,4 @@ docker cp test-openrouter.py ymir-litellm-litellm-1:/tmp/ymir-test-openrouter.py
 docker exec ymir-litellm-litellm-1 python /tmp/ymir-test-openrouter.py /tmp/ymir-openrouter-config-test.yaml
 ```
 
-測試在程序內啟動 HTTP stub，驗證三個 alias、上游模型 ID、文字回應、工具呼叫與串流；不使用真實金鑰、不呼叫外部模型、不寫入用量資料庫。
+測試在程序內啟動 HTTP stub，驗證六個 alias、上游模型 ID、文字回應、工具呼叫、串流與 OpenRouter reasoning；不使用真實金鑰、不呼叫外部模型、不寫入用量資料庫。

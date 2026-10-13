@@ -21,17 +21,36 @@ model_list:
       api_key: os.environ/OPENROUTER_API_KEY
       api_base: https://openrouter.ai/api/v1
 
+  - model_name: openrouter-haiku-5.5
+    litellm_params:
+      model: openrouter/anthropic/claude-haiku-5.5
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+
   # MiniMax 國際站的 OpenAI 相容端點。模型名稱依訂閱方案而定，在 MiniMax 後台確認後修改 openai/ 後面的名稱。
   - model_name: minimax
     litellm_params:
-      model: openai/MiniMax-M2
+      model: openai/MiniMax-M2.7
       api_base: https://api.minimax.io/v1
       api_key: os.environ/MINIMAX_API_KEY
-    # 單價（美元 / token）：用量頁的費用與每人每月預算都依此計算（ADR-0011）。
-    # LiteLLM 沒有 MiniMax 的內建單價，請依你的 MiniMax 方案填寫；保持 0 時費用為 0、預算不會用完（token 數仍正確）。
+    # 沿用 minimax alias，避免既有開放清單與個人授權失效；已不再呼叫 M2。
+    # MiniMax 官方標準 pay-as-you-go 單價（美元 / token）；訂閱方案需依實際帳單核對。
     model_info:
-      input_cost_per_token: 0
-      output_cost_per_token: 0
+      input_cost_per_token: 0.0000003
+      output_cost_per_token: 0.0000012
+      cache_read_input_token_cost: 0.00000006
+      cache_creation_input_token_cost: 0.000000375
+
+  - model_name: minimax-m3
+    litellm_params:
+      model: openai/MiniMax-M3
+      api_base: https://api.minimax.io/v1
+      api_key: os.environ/MINIMAX_API_KEY
+    # Standard、輸入 <= 512k 的單價；更長輸入／Priority 費用較高，需另行核對帳單。
+    model_info:
+      input_cost_per_token: 0.0000003
+      output_cost_per_token: 0.0000012
+      cache_read_input_token_cost: 0.00000006
 
   # 開發 / 離線驗證用：轉給 Ymir 的 Fake LLM（dotnet run --project tests/Ymir.Testing.FakeLlm），不需要任何金鑰。
   - model_name: fake-model

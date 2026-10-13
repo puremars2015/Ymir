@@ -51,6 +51,9 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #038 |
+| D2 | RuntimeHost cgroup exec 與 socket 掛載修復 | 🔬 | 已套用，Agent exec／stdin／env 與 API Healthy 通過；真實對話待使用者重試，見 #046 |
+| L4 | 六模型選單：移除 M2、新增 M3／M2.7／四個 OpenRouter 模型 | 🔬 | 已部署、六路由及服務健康通過；管理者勾選開放與真模型推論待驗證，見 #040 |
 | B1 | 公司識別 favicon 超過約 6 KB 上傳回 500 | ✅ | `SystemSetting.ValueMaxLength` 放寬到 512K 字（欄位已是 nvarchar(max)），補 100 KB／256 KB 測試；見 #036 |
 | B2 | `OneDriveSyncTests` 撤銷授權測試偶發 409 | ✅ | 測試競態：執行後的背景上傳晚於撤銷才跑；改為先等上傳完成，產品程式未變；見 #036 |
 | D1 | ADR 編號重複與看板置頂區整理 | ✅ | 模型開放的 ADR 由 0016 改為 [ADR-0020](../adr/0020-admin-model-access.md)、補齊 ADR 索引；置頂區拆成原計畫／插單兩張表；見 #036 |
@@ -93,6 +96,129 @@
 ---
 
 ## 💬 留言區
+
+### #047 · Linux 部署與模型修復交付、同步最新 main
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `⛔卡關`
+
+依使用者要求提交本輪 15 個部署／模型／runtime 修復檔案與進度，排除既有 cloudflared compose 修改、舊代理設定及 OpenCode 本機設定；.env／密鑰未提交。fetch 發現遠端另有 6 筆 Windows／部署指南／main 開發流程更新，依 AGENTS.md 使用 rebase，保留雙方内容並將本輪留言編號改為 #036～#046，避免與遠端 #033～#035 重複。
+
+提交前重新驗證：所有新增 Bash／內嵌 Python 語法、help、非 root 拒絕、六模型 pinned LiteLLM 本機假上游測試（文字／工具／串流／reasoning／目錄一致性）、diff check 通過；未呼叫付費模型。原有三份未提交檔案已還原並逐份核對 SHA-256 一致，暫存備份保留。rebase 完成且衝突解決後重新驗證；一般 `git push origin main` 被 GitHub 403 拒絕（repository 寫入憑證權限），未 force push，main CI 尚未觸發。需修正 GitHub 寫入權限後再次 fetch／rebase／push。
+
+---
+
+### #046 · Agent exec 與 API socket 修復完成，整體健康通過
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🔬驗證`
+
+主機修復紀錄與使用者回報皆為 0：兩個 Agent 的 user-scope Pi 1.0.0／stdin／env、transient system-service wrapper 測試通過；RuntimeDirectoryPreserve=yes 已套用，API 重新建立 socket 目錄掛載。獨立確認 API `/health` 200 Healthy、nginx `/login` 200、LiteLLM liveliness 200，RuntimeHost／API／nginx／Tunnel 皆 active/running。
+
+設定備份 `/var/backups/ymir/runtime-scope-20261013-093020-3370491`（含密鑰，僅 root 可讀）。容器、workspace、agent-state、SQL／PostgreSQL 資料保留，未呼叫付費模型。請使用者重新送出訊息驗證真實對話；此驗證尚未完成，不將本機健康檢查等同模型推論成功。
+
+---
+
+### #045 · cgroup 修復已套用，補上 API socket 掛載刷新
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
+
+使用者回報 0，主機輸出確認兩個 Agent user scope 及 transient system service wrapper 測試皆通過，RuntimeHost active，cgroup 修復已套用。最後獨立探測 API 卻為 Unhealthy；LiteLLM 200，API journal 的 runtime health 為 Unix socket connect 的 Cannot assign requested address。RuntimeHost restart 會移除／重建 RuntimeDirectory，而 API 仍 bind-mount 舊目錄，原腳本未檢查整體 API health。
+
+補上 RuntimeDirectoryPreserve=yes（範本與安裝 drop-in）、重啟 API 刷新掛載、等待 API Healthy 與 nginx 200 後才宣告完成；錯誤回復涵蓋 drop-in 與 API／入口恢復。Bash 語法、設定一致性、readiness 延遲／逾時模擬與 diff check 通過；主機最後一步待 sudo 執行。未刪除容器／資料，未呼叫付費模型。
+
+---
+
+### #044 · user scope 實機成功，修復 readiness 等待
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
+
+實機 sudo 測試已成功在兩個既有 Agent 容器執行 Pi 1.0.0，stdin／環境變數驗證也通過，證實 user scope 能避開先前 cgroup exec 錯誤。設定安裝後退出 7，journal 顯示 RuntimeHost 重啟尚未完成便探測 Unix socket，腳本隨即回復原 env；回復後 service active，容器程序仍保留。
+
+將 curl retry 改成明確的 60 秒 readiness 迴圈。隔離模擬「前兩次失敗、第三次成功」及持續失敗逾時皆通過，Bash 語法與 diff check 通過。主機再次套用與 system-service wrapper 驗證待執行，未呼叫付費模型。
+
+---
+
+### #043 · 修復檢查的跨帳號工作目錄
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
+
+第二次修復退出 1，紀錄為 `cannot chdir to /home/itadmin/Documents/Ymir: Permission denied`；不是已確認的 Agent 消失，而是 runuser 沿用私人家目錄 cwd，Podman 在列出容器之前就失敗。`as_ymir` helper 改為先切到 `/` 再降權，不放寬 itadmin 家目錄權限。此輪仍未變更 RuntimeHost env／容器；Bash 語法通過，重新開啟測試與修復視窗，实际 ymir scope 測試待執行。
+
+---
+
+### #042 · 修正部署鎖被 rootlessport 繼承
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
+
+cgroup 修復腳本第一次未套用設定，因部署鎖被拒絕；`lslocks` 確認模型部署已退出，但 LiteLLM rootlessport 仍持有 `/run/lock/ymir-production-switch.lock`。先前腳本的 FD 9 被背景子程序繼承，屬部署工具缺陷，不是仍有另一個部署。
+
+確認沒有執行中的舊部署腳本後，三個新部署／修復工具統一使用 v2 鎖，runuser helper 和 scope probe 明確關閉子程序 FD 9。不刪除舊鎖、不殺正常 rootlessport、不重啟資料服務。隔離測試重現「父程序退出、背景子程序仍持鎖」，加入 `9>&-` 後新程序可取得鎖；三腳本 Bash 語法與 git diff --check 通過。已重新開啟修復終端，ymir user scope／實際 Agent 修復結果待 sudo 執行。
+
+---
+
+### #041 · Agent exec cgroup 權限錯誤診斷與修復工具
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
+
+使用者回報「Agent 執行環境發生錯誤」。RuntimeHost journal 確認建立／啟動容器後，`podman exec` 因 crun 無法寫入 `cgroup.procs` 回 126；API 於 PrepareDelivery 階段失敗，尚未進入模型推論。RuntimeHost 位於 system.slice，Agent 位於 ymir user manager subtree；兩個 service 即使 Delegate=yes，仍不代表共同父層允許跨 subtree 遷移。診斷指向 rootless cgroup 執行上下文，非已證實的模型 key／路由問題。
+
+新增 root-owned wrapper 安裝腳本與操作說明：先測試 user scope 下 Agent uid／Pi／stdin／env，通過且無工作後才設定 ContainerExecutable；重啟 RuntimeHost 後由 transient system service 再驗證。保留現存容器及資料，不關閉資源限制、不用 privileged／廣泛 cgroup chmod。Bash 語法、help、非 root 拒絕、wrapper 帳號限制通過；在目前 itadmin 的 user scope 以 LiteLLM 容器驗證 exec／stdin／env 通過。ymir Agent 的 sudo 修復待執行，未呼叫付費模型。
+
+---
+
+### #040 · 六模型設定已部署，服務健康通過
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🔬驗證`
+
+使用者在主機終端完成 sudo，更新腳本紀錄及使用者回報皆為 status code 0。獨立確認 LiteLLM 容器已載入 OpenRouter key；`/v1/models` 包含 minimax（M2.7）、minimax-m3、openrouter-gpt-6.1-sol、openrouter-gpt-6-luna、openrouter-sonnet-5.5、openrouter-haiku-5.5（fake-model 僅測試路由，不在 API 允許清單）。API `/health` 200 Healthy、nginx `/login` 200，API／nginx／Tunnel 三個 systemd 服務均 active/running。
+
+未覆寫既有全域或個人權限，新增模型需由管理者在「開放模型」勾選儲存；未驗證瀏覽器選單及付費模型推論。部署設定備份 `/var/backups/ymir/models-20261013-012639-3004716` 含密鑰、僅 root 可讀，並非資料庫／使用者檔案備份。SQL／PostgreSQL 容器及資料未重建。
+
+---
+
+### #039 · 六模型目錄、路由與 Ubuntu 更新工具
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
+
+依使用者要求移除 MiniMax M2，`minimax` alias 改為 MiniMax M2.7（保留舊授權），新增 `minimax-m3`；OpenRouter 保留 Sol／Luna／Sonnet 5.5 並新增 Haiku 5.5。新增完整 API Models／AllowedModels env 範例與正式部署腳本，不覆寫既有全域／個人模型權限。能力／模型 ID 核對 MiniMax OpenAI 相容文件與 OpenRouter 官方目錄；M3 支援圖片、不冒充 M3.1 的 effort，Haiku 不宣告 none。提醒 M2.7 官方退役時程與 MiniMax 長上下文／方案價格差異。
+
+驗證：使用者將 key 填入 `deploy/litellm/.env` 後，OpenRouter `/api/v1/key` 200；SQL 唯讀確認無 QUEUED／RUNNING 工作。Pinned LiteLLM 的本機 HTTP stub 驗證六個路由的模型 ID、獨立憑證、文字／工具／串流、四個 OpenRouter 的 reasoning；API env 六個 ID 與 AllowedModels／圖片／thinking 設定一致性通過。Bash／Python 語法、help、非 root 拒絕通過。未呼叫真實付費推論；部署與瀏覽器選單待 sudo 執行，未把 key 輸出或寫進版控。
+
+---
+
+### #038 · Linux 正式 API／ymir-web nginx／Tunnel 已啟動
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🔬驗證`
+
+部署腳本第一次完成 sudo 與 nginx preflight 後，因 LiteLLM 主機 4000 連不上而停止回復；容器內健康檢查 200，確認為埠轉送問題。重新載入 LiteLLM 網路未恢復，僅重啟 LiteLLM 代理（restart 報 conmon 錯誤，接著 start 成功），主機健康探測恢復 200；未重啟或重建 SQL／PostgreSQL。
+
+使用者在主機終端完成 sudo／SWITCH 後，腳本紀錄顯示成功，三個正式 systemd unit 均 loaded／active／running。本機 API `/health` 200 Healthy，nginx `/login` 200，確認正式 origin 的容器名稱為 `ymir-web`，Tunnel 依賴 origin 並使用 `AddHost=ymir-web:127.0.0.1`。外層終端包裝器未顯示數字狀態碼，不影響以上實際檢查。
+
+公開探測兩個網域 `/login`、主要網域 `/api/me` 及 `/health` 均回 403、Server=cloudflare；尚不能宣稱外網或企業登入／SSE 成功，待瀏覽器與 Cloudflare 規則確認。設定備份 `/var/backups/ymir/production-20261013-003139-2960693`（含密鑰、僅 root 可讀）；SQL 尚無持久化 volume，不可刪除／重建。
+
+---
+
+### #037 · 正式部署保留 ymir-web nginx 入口
+
+> 👤 **GPT（AI）** · 🕒 2026-10-12 · `🚧進度`
+
+使用者更正 #036：要求保留 nginx，不讓 Tunnel 直接連 Kestrel。切換腳本已改為 Tunnel → `ymir-web:80` → 正式 API:5080；沿用 origin Quadlet 映像、以 rootful `ymir-web` 取代 4200 代理，Cloudflare 來源維持原值。新增正式 nginx 設定，保留 Host／HTTPS forwarding、SSE、50 MiB body 限制，阻擋 health／dev 路徑；備份／錯誤回復涵蓋 origin unit 與 nginx 設定。
+
+驗證：Bash 與內嵌 Python 語法、help、非 root 拒絕執行、Quadlet 轉換重複執行一致性；隔離 nginx:alpine 容器以非 root、唯讀、NET_BIND_SERVICE 通過 `nginx -t`，修正唯讀 rootfs 下所有 temp paths。腳本會先以既有正式 nginx 映像做同樣隔離檢查。sudo 部署、公開入口、企業登入與 SSE 尚未驗證，待使用者執行。未更動使用者原有 `ymir-web-proxy.conf`。
+
+---
+
+### #036 · Ubuntu 正式部署切換腳本（待主機執行）
+
+> 👤 **GPT（AI）** · 🕒 2026-10-12 · `⛔卡關`
+
+使用者要求統一 Linux 正式架構；發現既有 rootful Quadlet API／Tunnel 被 masked、使用者層開發 API failed、舊 nginx 指向 4200、LiteLLM 雖 running 但主機 4000 無法連線。sudo 需互動驗證，使用者選擇產生腳本自行執行。
+
+新增 [切換腳本](../../deploy/api/activate-linux-production.sh)及[操作說明](../../deploy/api/LINUX-PRODUCTION-SWITCH.md)：沿用 Production 映像與密鑰、備份設定、檢查依賴、停用開發 API、解除正式服務遮罩、移除 Tunnel 對舊 nginx 的依賴、健康檢查與錯誤回復。Cloudflare 來源需先手動改為 `http://127.0.0.1:5080`。不重建／刪除 SQL、PostgreSQL 或使用者檔案；SQL 無 volume 的風險仍待原生備份及遷移。
+
+驗證：`bash -n`、`--help`、非 root 拒絕執行；未執行 sudo 切換、未驗證外網／企業登入／SSE，未呼叫真實付費模型。保留使用者原有 cloudflared compose 修改與未追蹤 nginx 設定。
+
+---
+
 ### #036 · favicon 上傳 500、OneDrive 偶發測試修正，ADR 編號與置頂區整理
 
 > 👤 **Claude（AI）** · 🕒 2026-10-13 10:45 · `✅完成`
