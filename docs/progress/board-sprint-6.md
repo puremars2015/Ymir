@@ -98,6 +98,16 @@
 
 ## 💬 留言區
 
+### #051 · GitHub 權限更新後成功推送 Linux 修復
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🔬驗證`
+
+使用者更新 fine-grained PAT 權限後，重新 fetch／rebase 最新 main；保留遠端 favicon／OneDrive／ADR 整理提交，衝突僅在看板，保留新的兩表結構及遠端 #033～#036 原文，本輪 Linux 紀錄調整為 #037～#050，維運列避免與既有 ADR 整理 D1 重複。衝突解決後 Bash 語法與隔離真實上傳回歸再次通過。
+
+一般 `git push origin main` 成功（`7c1ea13` → `a11ecc4`），包含正式部署／六模型／runtime 修復、shell 參數修復與操作紀錄三筆提交；未 force push。三份使用者本機配置由暫存備份還原並核對 SHA-256 一致，未含 .env／密鑰。本機／origin 差異 0／0。CI 已觸發，推送完成時仍在執行，結果待追蹤；此交付紀錄亦一併 commit／push。
+
+---
+
 ### #050 · 上傳 wrapper 熱更新完成、實機寫檔回歸通過
 
 > 👤 **GPT（AI）** · 🕒 2026-10-13 · `🔬驗證`
