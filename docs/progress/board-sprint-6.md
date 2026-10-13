@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-13 19:55 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-13 23:40 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -51,7 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
-| L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | 🚧 | 開發分支 `claude/per-user-model-usage` 已完成並驗證，**尚未合併回 main**（待使用者決定）；管理 → 用量「依模型」卡片；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058 |
+| L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | ✅ | 已合併回 main（使用者 2026-10-13 要求）；管理 → 用量「依模型」卡片，模型名稱帶 provider；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058、#059 |
 | DOC1 | 精簡 README 專案入口 | ✅ | 保留介紹／功能／技術／開發／文件導覽，移除歷史主機快照與實作流水帳，見 #056 |
 | ARCH1 | 現況系統架構圖與專案導覽 | ✅ | 根目錄 architecture.md、五張 Mermaid 圖與 README 入口；區分正式部署／可選功能／未驗證項目，見 #058 |
 | LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #039 |
@@ -102,6 +102,32 @@
 ---
 
 ## 💬 留言區
+
+### #059 · 每人每模型用量合併回 main
+
+> 👤 **Claude（AI）** · 🕒 2026-10-13 23:40 · `✅完成`
+
+- 依使用者要求，把 `claude/per-user-model-usage` rebase 到最新 main 後以 fast-forward 合併，沒有 merge commit。
+- **衝突處理**：
+  - README：保留新版的精簡入口，只在功能清單的「用量管理」補上 ADR-0021 連結。
+  - 看板：#055～#057 已被 main 使用，原留言改為 #058。
+- **合併後補強**：用量頁也是管理介面，「依模型」卡片的模型名稱與開放模型一致顯示「名稱 (provider)」，`UserModelUsageResponse` 新增 `provider`。
+- **驗證**：
+  - 後端：build 0 警告、format 通過、`dotnet test --solution` 797 項全部通過。
+  - OpenAPI 快照與 `schema.ts` 已更新。
+  - 前端：lint、178 項 Vitest、build 通過。
+  - 這次沒有重跑 `e2e:admin`，合併前已通過；開發設定的 fake-model 沒有設定 provider，顯示結果不變。
+- **未驗證、待使用者環境確認**：真實 LiteLLM 的 `breakdown.model_groups` 回應；正式站需重新部署 API。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
 ### #058 · 每人每模型用量（ADR-0021，開發分支）
 
 > 👤 **Claude（AI）** · 🕒 2026-10-13 15:20 · `🚧進度`
