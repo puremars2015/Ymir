@@ -37,7 +37,7 @@ public class MakeCommandTests(MakeApiFactory factory) : IClassFixture<MakeApiFac
 
         var topics = await client.GetFromJsonAsync<List<MakeTopicResponse>>("/api/make-topics", JsonDefaults.Options, TestContext.Current.CancellationToken);
 
-        Assert.Equal(["小工具架設", "網站系統架設", "建立簡報", "建立公告 Word"], topics!.Take(4).Select(t => t.Name));
+        Assert.Equal(["小工具架設", "網站系統架設", "建立簡報", "建立公告 Word", "建立 RAG 知識庫"], topics!.Take(5).Select(t => t.Name));
     }
 
     [Fact]
@@ -75,6 +75,20 @@ public class MakeCommandTests(MakeApiFactory factory) : IClassFixture<MakeApiFac
         Assert.Contains("build.py", announcement.Instructions, StringComparison.Ordinal);
         Assert.Contains("不交付", announcement.Instructions, StringComparison.Ordinal);
         Assert.Contains("聯絡窗口", announcement.Instructions, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RagGuideTopic_GuidesToProjectKnowledgeBase_WithoutLettingTheAgentBuildSqlite()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var admin = await factory.LoginAsync("make-rag-admin", UserRole.Admin);
+        var topics = await admin.GetFromJsonAsync<List<AdminMakeTopicResponse>>("/api/admin/make-topics", JsonDefaults.Options, ct);
+        var rag = Assert.Single(topics!, t => t.Id == Guid.Parse("0199b7a0-0000-7000-8000-000000000005"));
+        Assert.True(rag.IsEnabled);
+        Assert.Contains("SQLite", rag.Description, StringComparison.Ordinal);
+        Assert.Contains("知識庫", rag.Instructions, StringComparison.Ordinal);
+        Assert.Contains("不要自己建立 SQLite", rag.Instructions, StringComparison.Ordinal);
+        Assert.Contains("已就緒", rag.Instructions, StringComparison.Ordinal);
     }
 
     [Theory]
