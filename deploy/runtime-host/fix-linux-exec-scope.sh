@@ -22,9 +22,9 @@ mapfile -t names < <(as_ymir podman ps --filter label=ymir.user-id --format '{{.
 for name in "${names[@]}"; do
     [[ $name =~ ^ymir-user-[0-9a-f]{32}$ ]] || fail 'Agent 容器名稱不符預期。'
     printf '驗證 user scope 下的 Agent exec：%s\n' "$name"
-    as_ymir /usr/bin/systemd-run --user --scope --quiet -- /usr/bin/podman exec "$name" sh -c 'test "$(id -u)" = 1000 && pi --version'
+    as_ymir /usr/bin/systemd-run --user --scope --quiet --expand-environment=no -- /usr/bin/podman exec "$name" sh -c 'test "$(id -u)" = 1000 && pi --version'
     # 測試 stdin 和環境變數能傳入，不使用模型金鑰、不呼叫上游。
-    printf 'ymir-scope-stdin\n' | as_ymir env YMIR_SCOPE_PROBE=probe /usr/bin/systemd-run --user --scope --quiet -- /usr/bin/podman exec -i --env YMIR_SCOPE_PROBE "$name" sh -c 'read -r line; test "$line" = ymir-scope-stdin && test "$YMIR_SCOPE_PROBE" = probe'
+    printf 'ymir-scope-stdin\n' | as_ymir env YMIR_SCOPE_PROBE=probe /usr/bin/systemd-run --user --scope --quiet --expand-environment=no -- /usr/bin/podman exec -i --env YMIR_SCOPE_PROBE "$name" sh -c 'read -r line; test "$line" = ymir-scope-stdin && test "$YMIR_SCOPE_PROBE" = probe'
 done
 database=$(python3 - <<'PY'
 import pathlib,re
@@ -99,7 +99,7 @@ if [[ $ready != true ]]; then
     false
 fi
 # 從 system service 的 cgroup 實際驗證 wrapper，不僅測試登入 shell。
-systemd-run --quiet --wait --pipe --collect --property=User=ymir --property=Group=ymir-runtime \
+systemd-run --quiet --wait --pipe --collect --expand-environment=no --property=User=ymir --property=Group=ymir-runtime \
     "$target" exec "${names[0]}" sh -c 'test "$(id -u)" = 1000 && pi --version' 9>&-
 # 舊 API 已掛載先前被移除的 socket 目錄，必須重新建立容器掛載。
 systemctl restart ymir-api.service

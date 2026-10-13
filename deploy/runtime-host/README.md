@@ -89,6 +89,14 @@ sudo bash deploy/runtime-host/fix-linux-exec-scope.sh
 
 這個修復保留 rootless Podman、CPU／memory／pids 限制、keep-id、唯讀檔案系統及既有 capabilities 政策；不要用 privileged、停用 cgroups、廣泛 chmod／chown `/sys/fs/cgroup` 來繞過問題。供應商 key 不寫進 scope 命令參數。
 
+wrapper 必須使用 `--expand-environment=no`，讓 `bash -c` 的 `${1##*/}`／`${1%/*}`／`$1` 等參數原樣進入容器；否則 systemd 會誤展開寫檔腳本，造成附件寫入失敗，並被現有 API 顯示成「檔名不合法或是空檔案」。已安裝早期 wrapper 的目前主機可熱更新，不需重啟服務或容器：
+
+```bash
+sudo bash deploy/runtime-host/update-linux-scope-wrapper.sh
+```
+
+工具先測試固定的 user scope，再備份並原子替換 root-owned wrapper，最後以實際 wrapper 重跑。`test-podman-scope.py` 使用原始 C# WriteScript，在現存 Agent 的唯一 `/tmp` 測試目錄驗證中文／空白檔名、二進位 stdin、大小與內容、symlink 防逃逸；不讀寫使用者 workspace、資料庫或付費模型。亦可在有 GNU coreutils／bash 的隔離測試容器執行 `python3 deploy/runtime-host/test-podman-scope.py <container>`。
+
 | 設定 | 說明 |
 |---|---|
 | `RuntimeHost__Listen` | `unix:/run/ymir-runtime/runtime.sock`（建議）；或只限 loopback 的 `http://127.0.0.1:5090`（例如 Windows 開發機） |

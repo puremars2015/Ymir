@@ -6,4 +6,5 @@ set -euo pipefail
 [[ $(id -un) == ymir ]] || { printf '此 wrapper 僅允許 ymir 帳號執行。\n' >&2; exit 1; }
 export XDG_RUNTIME_DIR=/run/user/$(id -u)
 export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus
-exec /usr/bin/systemd-run --user --scope --quiet -- /usr/bin/podman "$@"
+# systemd 不可再解讀 argv 裡的 $1／${1##*/} 等 shell 語法，必須原樣交給容器。
+exec /usr/bin/systemd-run --user --scope --quiet --expand-environment=no -- /usr/bin/podman "$@"
