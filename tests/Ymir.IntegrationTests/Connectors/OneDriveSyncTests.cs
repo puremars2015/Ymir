@@ -196,7 +196,11 @@ public class OneDriveSyncTests(OneDriveApiFactory factory) : IClassFixture<OneDr
         var (client, userId) = await ConnectedUserAsync("od-sync-dan");
         using var _ = client;
         var conversation = await client.CreateConversationAsync(null, "reauth");
+        var before = DateTimeOffset.UtcNow.AddSeconds(-1);
         await RunAsync(client, conversation.Id, "hello");
+        // 先等執行後的背景上傳完成：否則它可能在撤銷之後才跑，先把連結標成 NeedsReauth，
+        // 「立即同步」就會回 409 而不是 202（負載高時偶發）。
+        Assert.Equal(OneDriveSyncState.Synced, (await WaitForSyncAsync(client, conversation.Id, before)).State);
         var directory = HostDirectory(userId, conversation.Id);
         await File.WriteAllTextAsync(Path.Combine(directory, "keep.txt"), "local", Ct);
 
