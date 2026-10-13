@@ -51,9 +51,10 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
-| LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #038 |
-| D2 | RuntimeHost cgroup exec 與 socket 掛載修復 | 🔬 | 已套用，Agent exec／stdin／env 與 API Healthy 通過；真實對話待使用者重試，見 #046 |
-| L4 | 六模型選單：移除 M2、新增 M3／M2.7／四個 OpenRouter 模型 | 🔬 | 已部署、六路由及服務健康通過；管理者勾選開放與真模型推論待驗證，見 #040 |
+| LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #039 |
+| D2 | RuntimeHost cgroup exec 與 socket 掛載修復 | 🔬 | 已套用，Agent exec／stdin／env 與 API Healthy 通過；真實對話待使用者重試，見 #047 |
+| D3 | 上傳寫檔 wrapper 參數展開修復 | 🔬 | 已熱更新，實際 Agent 原寫檔腳本／API 健康通過；原檔重傳待使用者確認，見 #050 |
+| L4 | 六模型選單：移除 M2、新增 M3／M2.7／四個 OpenRouter 模型 | 🔬 | 已部署、六路由及服務健康通過；管理者勾選開放與真模型推論待驗證，見 #041 |
 | B1 | 公司識別 favicon 超過約 6 KB 上傳回 500 | ✅ | `SystemSetting.ValueMaxLength` 放寬到 512K 字（欄位已是 nvarchar(max)），補 100 KB／256 KB 測試；見 #036 |
 | B2 | `OneDriveSyncTests` 撤銷授權測試偶發 409 | ✅ | 測試競態：執行後的背景上傳晚於撤銷才跑；改為先等上傳完成，產品程式未變；見 #036 |
 | D1 | ADR 編號重複與看板置頂區整理 | ✅ | 模型開放的 ADR 由 0016 改為 [ADR-0020](../adr/0020-admin-model-access.md)、補齊 ADR 索引；置頂區拆成原計畫／插單兩張表；見 #036 |
@@ -97,7 +98,29 @@
 
 ## 💬 留言區
 
-### #047 · Linux 部署與模型修復交付、同步最新 main
+### #050 · 上傳 wrapper 熱更新完成、實機寫檔回歸通過
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🔬驗證`
+
+主機熱更新紀錄與使用者回報皆為 0。已讀取已安裝 wrapper，確認 systemd-run 使用 `--expand-environment=no`；實際 Agent 以固定 scope 與安裝 wrapper 兩種路徑通過 literal argv、stdin／env／退出碼、原 C# WriteScript 的中文／空白檔名及二進位精確內容、symlink 防逃逸。API health 再次為 Healthy。
+
+未重啟 API／Agent／資料庫，未讀寫使用者 workspace；測試僅使用唯一 /tmp 目錄並清理。wrapper 備份 `/var/backups/ymir/wrapper-20261013-105754-3443008`。請使用者重新上傳原檔，HTTP 上傳及原檔重傳尚待確認，未呼叫模型。程式與回歸測試已 commit，本機三份其他配置仍保留，GitHub 寫入權限 403 尚待修正。
+
+---
+
+### #049 · 附件上傳錯誤：systemd 誤展開 shell 位置參數
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
+
+使用者回報上傳顯示「檔名不合法或是空檔案」。API journal 確認已進入 RuntimeWorkspaceFileWriter，但腳本 `${1##*/}`／`${1%/*}` 被 systemd-run 當成環境變數，導致空目錄及 exit 3；現有 AttachmentService 將 writer false 映成 Invalid，因此訊息誤導。這是本輪新增 scope wrapper 的參數轉送缺陷，不是已確認的使用者檔名／檔案內容問題。
+
+wrapper 與 scope probes 加上 `--expand-environment=no`；新增熱更新工具，備份並原子替換已安裝 wrapper，不重啟服務／容器／資料庫。回歸工具直接擷取原 C# WriteScript，在唯一 /tmp 測試目錄驗證 literal argv、中文／空白檔名、二進位 stdin 的精確內容，以及保留 symlink 防逃逸。
+
+驗證：原版 scope 可重現「Invalid environment variable name」且檔名變空，固定後原樣輸出；隔離、唯讀、network none 測試容器以原寫檔腳本全部通過，測試容器已清理。LiteLLM 映像的 busybox realpath 不支援 -e，不能作 GNU writer 測試容器，改用本機既有 Ubuntu 映像的隔離容器；未執行 SQL Server 程序。Bash／Python 語法、help、非 root 拒絕、diff check 通過。主機實際 wrapper／原檔重新上傳尚待驗證，未呼叫付費模型。工作前已 fetch／rebase，保留三份本機配置變更；先前 GitHub push 403 尚待修正。
+
+---
+
+### #048 · Linux 部署與模型修復交付、同步最新 main
 
 > 👤 **GPT（AI）** · 🕒 2026-10-13 · `⛔卡關`
 
@@ -107,7 +130,7 @@
 
 ---
 
-### #046 · Agent exec 與 API socket 修復完成，整體健康通過
+### #047 · Agent exec 與 API socket 修復完成，整體健康通過
 
 > 👤 **GPT（AI）** · 🕒 2026-10-13 · `🔬驗證`
 
@@ -117,7 +140,7 @@
 
 ---
 
-### #045 · cgroup 修復已套用，補上 API socket 掛載刷新
+### #046 · cgroup 修復已套用，補上 API socket 掛載刷新
 
 > 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
 
@@ -127,7 +150,7 @@
 
 ---
 
-### #044 · user scope 實機成功，修復 readiness 等待
+### #045 · user scope 實機成功，修復 readiness 等待
 
 > 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
 
@@ -137,7 +160,7 @@
 
 ---
 
-### #043 · 修復檢查的跨帳號工作目錄
+### #044 · 修復檢查的跨帳號工作目錄
 
 > 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
 
@@ -145,7 +168,7 @@
 
 ---
 
-### #042 · 修正部署鎖被 rootlessport 繼承
+### #043 · 修正部署鎖被 rootlessport 繼承
 
 > 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
 
@@ -155,7 +178,7 @@ cgroup 修復腳本第一次未套用設定，因部署鎖被拒絕；`lslocks` 
 
 ---
 
-### #041 · Agent exec cgroup 權限錯誤診斷與修復工具
+### #042 · Agent exec cgroup 權限錯誤診斷與修復工具
 
 > 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
 
@@ -165,7 +188,7 @@ cgroup 修復腳本第一次未套用設定，因部署鎖被拒絕；`lslocks` 
 
 ---
 
-### #040 · 六模型設定已部署，服務健康通過
+### #041 · 六模型設定已部署，服務健康通過
 
 > 👤 **GPT（AI）** · 🕒 2026-10-13 · `🔬驗證`
 
@@ -175,7 +198,7 @@ cgroup 修復腳本第一次未套用設定，因部署鎖被拒絕；`lslocks` 
 
 ---
 
-### #039 · 六模型目錄、路由與 Ubuntu 更新工具
+### #040 · 六模型目錄、路由與 Ubuntu 更新工具
 
 > 👤 **GPT（AI）** · 🕒 2026-10-13 · `🚧進度`
 
@@ -185,7 +208,7 @@ cgroup 修復腳本第一次未套用設定，因部署鎖被拒絕；`lslocks` 
 
 ---
 
-### #038 · Linux 正式 API／ymir-web nginx／Tunnel 已啟動
+### #039 · Linux 正式 API／ymir-web nginx／Tunnel 已啟動
 
 > 👤 **GPT（AI）** · 🕒 2026-10-13 · `🔬驗證`
 
@@ -197,17 +220,17 @@ cgroup 修復腳本第一次未套用設定，因部署鎖被拒絕；`lslocks` 
 
 ---
 
-### #037 · 正式部署保留 ymir-web nginx 入口
+### #038 · 正式部署保留 ymir-web nginx 入口
 
 > 👤 **GPT（AI）** · 🕒 2026-10-12 · `🚧進度`
 
-使用者更正 #036：要求保留 nginx，不讓 Tunnel 直接連 Kestrel。切換腳本已改為 Tunnel → `ymir-web:80` → 正式 API:5080；沿用 origin Quadlet 映像、以 rootful `ymir-web` 取代 4200 代理，Cloudflare 來源維持原值。新增正式 nginx 設定，保留 Host／HTTPS forwarding、SSE、50 MiB body 限制，阻擋 health／dev 路徑；備份／錯誤回復涵蓋 origin unit 與 nginx 設定。
+使用者更正 #037：要求保留 nginx，不讓 Tunnel 直接連 Kestrel。切換腳本已改為 Tunnel → `ymir-web:80` → 正式 API:5080；沿用 origin Quadlet 映像、以 rootful `ymir-web` 取代 4200 代理，Cloudflare 來源維持原值。新增正式 nginx 設定，保留 Host／HTTPS forwarding、SSE、50 MiB body 限制，阻擋 health／dev 路徑；備份／錯誤回復涵蓋 origin unit 與 nginx 設定。
 
 驗證：Bash 與內嵌 Python 語法、help、非 root 拒絕執行、Quadlet 轉換重複執行一致性；隔離 nginx:alpine 容器以非 root、唯讀、NET_BIND_SERVICE 通過 `nginx -t`，修正唯讀 rootfs 下所有 temp paths。腳本會先以既有正式 nginx 映像做同樣隔離檢查。sudo 部署、公開入口、企業登入與 SSE 尚未驗證，待使用者執行。未更動使用者原有 `ymir-web-proxy.conf`。
 
 ---
 
-### #036 · Ubuntu 正式部署切換腳本（待主機執行）
+### #037 · Ubuntu 正式部署切換腳本（待主機執行）
 
 > 👤 **GPT（AI）** · 🕒 2026-10-12 · `⛔卡關`
 
