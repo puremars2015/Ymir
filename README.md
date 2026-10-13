@@ -1,5 +1,7 @@
 # Ymir 目前架構
 
+> 最新完整架構圖與 Ubuntu 正式部署說明：請閱讀 [architecture.md](architecture.md)（2026-10-13）。本頁以下包含先前 Windows 部署快照，不能視為目前 Ubuntu 拓樸。
+
 Ymir 是企業 AI 平台，目前的子產品為 **Vibe Maker**：使用者透過對話，讓 Pi Agent 在自己的隔離執行環境中建立工具、網站與檔案。前端使用 Angular 22，後端為 .NET 10 的模組化單體，透過 REST API 與 SSE 傳遞資料及執行事件。
 
 本文以 **2026-10-12 本機實際部署**為主，另列出程式碼支援的開發與 Linux 部署架構。
