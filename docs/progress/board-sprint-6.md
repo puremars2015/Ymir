@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-13 10:45 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-13 19:55 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -57,6 +57,7 @@
 | D2 | RuntimeHost cgroup exec 與 socket 掛載修復 | 🔬 | 已套用，Agent exec／stdin／env 與 API Healthy 通過；真實對話待使用者重試，見 #047 |
 | D3 | 上傳寫檔 wrapper 參數展開修復 | 🔬 | 已熱更新，實際 Agent 原寫檔腳本／API 健康通過；原檔重傳待使用者確認，見 #050 |
 | L4 | 六模型選單：移除 M2、新增 M3／M2.7／四個 OpenRouter 模型 | 🔬 | 已部署、六路由及服務健康通過；管理者勾選開放與真模型推論待驗證，見 #041 |
+| L6 | 開放模型標示 provider（管理端顯示、使用者不顯示） | ✅ | `VibeMaker__Models__N__Provider`；正式主機需重跑 `apply-chatgpt-linux.sh` 或手動補 Provider 才會生效；見 #057 |
 | OAUTH1 | LiteLLM ChatGPT 訂閱 OAuth 接入 | 🔬 | Sol／Luna／Astra 已部署，原六路由保留、API／登入頁健康；待管理員開放與真實推論，見 #054 |
 | B1 | 公司識別 favicon 超過約 6 KB 上傳回 500 | ✅ | `SystemSetting.ValueMaxLength` 放寬到 512K 字（欄位已是 nvarchar(max)），補 100 KB／256 KB 測試；見 #036 |
 | B2 | `OneDriveSyncTests` 撤銷授權測試偶發 409 | ✅ | 測試競態：執行後的背景上傳晚於撤銷才跑；改為先等上傳完成，產品程式未變；見 #036 |
@@ -100,6 +101,35 @@
 ---
 
 ## 💬 留言區
+
+### #057 · 開放模型標示 provider，使用者只看模型名稱
+
+> 👤 **Claude（AI）** · 🕒 2026-10-13 19:55 · `✅完成`
+
+- **需求**：管理後台的「開放模型」要標出 provider（例如 MiniMax M2.7 (minimax.io)），使用者的畫面只顯示模型名稱。
+- **做法**（[ADR-0020](../adr/0020-admin-model-access.md) 補充）：
+  - 新增 `VibeMaker__Models__N__Provider`。沒設定時相容舊寫法，把名稱結尾的「(X)」拆成 provider，例如「GPT-6.1 Sol (ChatGPT OAuth)」。
+  - 管理端的開放模型與個人模型權限顯示「名稱 (provider)」。使用者的 `/api/models` 不回傳 provider。
+  - 例外：同一位使用者的清單裡有同名模型時（例如 OpenRouter 和 ChatGPT OAuth 的 GPT-6.1 Sol 同時開放），這兩個才加上 provider 區分，否則使用者無法分辨。
+  - 前端移除原本只處理「(OpenRouter)」的字串過濾。
+  - 部署範本加上 Provider。`chatgpt-ymir-models.py` 會為還沒有 Provider 的 `minimax*`／`openrouter-*` 補上（不覆蓋已設定的值、可重跑）。
+- **審查**：由 agent 分組審查並嘗試推翻，確認成立的問題都已修正，包括：正式環境沒有補 Provider 的途徑、3 支 e2e 的測試資料過時、測試與範本的缺口。另外順手補上 `model-picker` e2e 原本就缺的 `/api/branding`、知識庫模擬資料（公司識別功能上線時漏改）。
+- **驗證**：
+  - 後端：build 0 警告、format 通過、`dotnet test --solution` 782 項全部通過。
+  - 前端：lint、170 項 Vitest、build 通過。
+  - e2e：`e2e:model-picker`、`e2e:admin-models`、`e2e:user-models` 通過。瀏覽器實測管理端顯示「MiniMax M2.7 (minimax.io)」等，使用者端只顯示名稱。
+  - 部署腳本：`test-chatgpt-oauth.py` 9 項通過；以舊版 env 模擬正式環境，6 個既有模型都補上 provider，且重跑結果不變。`test-openrouter.py` 需要 LiteLLM 容器，只單獨驗證了新加的斷言。
+- **未驗證、待使用者環境確認**：正式主機要重新部署 API，並重跑 `apply-chatgpt-linux.sh`（或手動在 `/etc/ymir/api.env` 加上 Provider）後才會生效。
+- **❓待決定**：同時開放兩個同名模型時，使用者會看到 provider。替代做法是在管理端禁止同時開放同名模型。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #056 · README 回歸專案入口
 
