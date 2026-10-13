@@ -11,8 +11,8 @@ let enabled = ['one', 'two'],
   usesDeployment = true;
 let saves = 0;
 const models = [
-  { id: 'one', displayName: 'MiniMax-M2.7', supportsImages: false },
-  { id: 'two', displayName: 'Claude Sonnet 5.5 (OpenRouter)', supportsImages: true },
+  { id: 'one', displayName: 'MiniMax-M2.7', provider: 'minimax.io', supportsImages: false },
+  { id: 'two', displayName: 'Claude Sonnet 5.5', provider: 'OpenRouter', supportsImages: true },
 ];
 const state = () => ({
   models: models.map((m) => ({ ...m, enabled: enabled.includes(m.id) })),
@@ -53,7 +53,8 @@ await context.route('**/api/**', async (route) => {
       : path === '/api/models'
         ? models
             .filter((m) => enabled.includes(m.id))
-            .map((m) => ({ ...m, isDefault: m.id === defaultId }))
+            // 使用者的 /api/models 不含 provider（ADR-0020 補充）
+            .map(({ provider: _provider, ...m }) => ({ ...m, isDefault: m.id === defaultId }))
         : ['/api/projects', '/api/conversations', '/api/make-topics'].includes(path)
           ? []
           : null;
@@ -66,8 +67,9 @@ page.on('pageerror', (e) => errors.push(e.message));
 const card = page.locator('app-model-settings-card');
 try {
   await page.goto(`${baseUrl}/admin/settings`);
-  const one = card.getByRole('checkbox', { name: 'MiniMax-M2.7', exact: true });
-  const two = card.getByRole('checkbox', { name: 'Claude Sonnet 5.5', exact: true });
+  // 管理員看得到 provider（ADR-0020 補充）
+  const one = card.getByRole('checkbox', { name: 'MiniMax-M2.7 (minimax.io)', exact: true });
+  const two = card.getByRole('checkbox', { name: 'Claude Sonnet 5.5 (OpenRouter)', exact: true });
   await one.waitFor();
   await page.waitForFunction(
     () => document.querySelectorAll('app-model-settings-card input[type=checkbox]')[1]?.checked,

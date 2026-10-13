@@ -2,7 +2,8 @@ namespace Ymir.VibeMaker.Application.Models;
 
 /// <param name="Id">LiteLLM 的 model_name，也是傳給 Pi <c>--model</c> 的值。</param>
 /// <param name="SupportsImages">模型能直接看圖片（視覺輸入）；是的話使用者附加的圖片會一併附給模型，否則 Agent 只能用工具處理檔案。</param>
-public sealed record ModelDescriptor(string Id, string DisplayName, bool SupportsImages = false, bool SupportsThinking = false, ThinkingCapability? Thinking = null, bool AllowKnowledgeBase = false)
+/// <param name="Provider">提供這個模型的供應商（例如 minimax.io、OpenRouter、ChatGPT OAuth），只在管理介面顯示（<see cref="ModelNames"/>）。</param>
+public sealed record ModelDescriptor(string Id, string DisplayName, bool SupportsImages = false, bool SupportsThinking = false, ThinkingCapability? Thinking = null, bool AllowKnowledgeBase = false, string? Provider = null)
 {
     public ThinkingCapability? EffectiveThinking => Thinking ?? (SupportsThinking ? ThinkingCapability.Legacy : null);
     public bool AcceptsThinking(string? level) => level is null || EffectiveThinking?.Levels.Contains(level, StringComparer.Ordinal) == true;

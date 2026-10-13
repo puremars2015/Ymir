@@ -54,6 +54,13 @@ try {
     'Configure at least four deployment models for this verification.',
   );
   const [a, b, c, d] = all.models;
+  assert.equal(
+    new Set([a, b, c, d].map((m) => m.displayName)).size,
+    4,
+    'Configure distinct display names for the first four deployment models.',
+  );
+  // 管理介面的權限下拉選單以「名稱 (provider)」命名；使用者的選單只有名稱（ADR-0020 補充）
+  const label = (m) => (m.provider ? `${m.displayName} (${m.provider})` : m.displayName);
   await change(admin, '/api/admin/settings/models', 'PUT', {
     enabledModelIds: [a.id, b.id, d.id],
     defaultModelId: a.id,
@@ -63,10 +70,10 @@ try {
   await row.getByRole('button', { name: '模型權限', exact: true }).click();
   const card = admin.locator('app-user-model-card');
   await card
-    .getByRole('combobox', { name: `${c.displayName} 模型權限`, exact: true })
+    .getByRole('combobox', { name: `${label(c)} 模型權限`, exact: true })
     .selectOption('Allow');
   await card
-    .getByRole('combobox', { name: `${d.displayName} 模型權限`, exact: true })
+    .getByRole('combobox', { name: `${label(d)} 模型權限`, exact: true })
     .selectOption('Deny');
   await card.screenshot({ path: `${outDir}/01-user-model-overrides.png` });
   await card.getByRole('button', { name: '儲存模型權限', exact: true }).click();
@@ -90,9 +97,7 @@ try {
     .waitFor();
   await card.getByRole('combobox').first().waitFor();
   assert.equal(
-    await card
-      .getByRole('combobox', { name: `${c.displayName} 模型權限`, exact: true })
-      .inputValue(),
+    await card.getByRole('combobox', { name: `${label(c)} 模型權限`, exact: true }).inputValue(),
     'Inherit',
   );
   await row.getByRole('button', { name: '模型權限', exact: true }).click();
@@ -101,9 +106,7 @@ try {
     .waitFor();
   await card.getByRole('combobox').first().waitFor();
   assert.equal(
-    await card
-      .getByRole('combobox', { name: `${c.displayName} 模型權限`, exact: true })
-      .inputValue(),
+    await card.getByRole('combobox', { name: `${label(c)} 模型權限`, exact: true }).inputValue(),
     'Allow',
   );
   await alice.reload();
@@ -116,19 +119,21 @@ try {
   assert.ok(
     !(await alice.getByRole('option').allTextContents()).some((n) => n.includes(d.displayName)),
   );
+  // 使用者的選單只有模型名稱，不顯示 provider（ADR-0020 補充）
+  assert.ok(
+    !(await alice.getByRole('option').allTextContents()).some((n) =>
+      [a, b, c].some((m) => m.provider && n.includes(`(${m.provider})`)),
+    ),
+  );
   await admin.reload();
   await row.getByRole('button', { name: '模型權限', exact: true }).click();
-  await card.getByRole('combobox', { name: `${c.displayName} 模型權限`, exact: true }).waitFor();
+  await card.getByRole('combobox', { name: `${label(c)} 模型權限`, exact: true }).waitFor();
   assert.equal(
-    await card
-      .getByRole('combobox', { name: `${c.displayName} 模型權限`, exact: true })
-      .inputValue(),
+    await card.getByRole('combobox', { name: `${label(c)} 模型權限`, exact: true }).inputValue(),
     'Allow',
   );
   assert.equal(
-    await card
-      .getByRole('combobox', { name: `${d.displayName} 模型權限`, exact: true })
-      .inputValue(),
+    await card.getByRole('combobox', { name: `${label(d)} 模型權限`, exact: true }).inputValue(),
     'Deny',
   );
   await card.getByRole('button', { name: '全部依系統設定', exact: true }).click();

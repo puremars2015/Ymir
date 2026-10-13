@@ -8,7 +8,8 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService, describeApiError } from '../../core/api/api.service';
-import { ModelAccess } from '../../core/api/api-types';
+import { AdminModelOption, ModelAccess } from '../../core/api/api-types';
+import { withProvider } from '../../core/models/model-label';
 import { ModelStore } from '../../core/models/model.store';
 
 @Component({
@@ -31,7 +32,7 @@ import { ModelStore } from '../../core/models/model.store';
               (ngModelChange)="toggle(model.id, $event)"
               [disabled]="busy()"
             />
-            <span>{{ name(model.displayName) }}</span>
+            <span>{{ label(model) }}</span>
           </label>
         }
         <label
@@ -44,7 +45,7 @@ import { ModelStore } from '../../core/models/model.store';
           >
             @for (model of s.models; track model.id) {
               @if (enabled().includes(model.id)) {
-                <option [value]="model.id">{{ name(model.displayName) }}</option>
+                <option [value]="model.id">{{ label(model) }}</option>
               }
             }
           </select>
@@ -126,8 +127,9 @@ export class ModelSettingsCard implements OnInit {
   ngOnInit(): void {
     this.load();
   }
-  protected name(value: string): string {
-    return value.replace(/\s*[（(]OpenRouter[）)]\s*$/i, '').trim();
+  /** 管理員要知道模型由哪個 provider 提供（ADR-0020 補充）。 */
+  protected label(model: AdminModelOption): string {
+    return withProvider(model.displayName, model.provider);
   }
   protected load(): void {
     this.api.getModelAccess().subscribe({

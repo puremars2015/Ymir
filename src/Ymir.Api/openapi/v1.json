@@ -2792,6 +2792,12 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -5500,6 +5506,12 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "provider": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

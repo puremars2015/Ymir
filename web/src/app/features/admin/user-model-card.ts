@@ -10,7 +10,8 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService, describeApiError } from '../../core/api/api.service';
-import { AdminUser, UserModelAccess } from '../../core/api/api-types';
+import { AdminUser, UserModelAccess, UserModelOption } from '../../core/api/api-types';
+import { withProvider } from '../../core/models/model-label';
 import { ModelStore } from '../../core/models/model.store';
 import {
   ModelDraft,
@@ -38,14 +39,14 @@ import {
           @for (model of s.models; track model.id) {
             <label class="model-row">
               <span
-                >{{ model.displayName
+                >{{ label(model)
                 }}<small class="muted"
                   >系統：{{ model.systemEnabled ? '開放' : '未開放' }}</small
                 ></span
               >
               <select
                 [name]="model.id"
-                [attr.aria-label]="model.displayName + ' 模型權限'"
+                [attr.aria-label]="label(model) + ' 模型權限'"
                 [ngModel]="draft()[model.id]"
                 (ngModelChange)="patch(model.id, $event)"
                 [disabled]="busy()"
@@ -147,6 +148,11 @@ export class UserModelCard implements OnInit {
       error: (e: unknown) => this.error.set(describeApiError(e)),
     });
   }
+  /** 管理員要知道模型由哪個 provider 提供（ADR-0020 補充）。 */
+  protected label(model: UserModelOption): string {
+    return withProvider(model.displayName, model.provider);
+  }
+
   protected patch(id: string, grant: ModelGrant): void {
     this.draft.update((d) => ({ ...d, [id]: grant }));
   }

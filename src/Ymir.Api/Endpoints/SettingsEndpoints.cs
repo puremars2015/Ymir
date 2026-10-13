@@ -15,7 +15,9 @@ internal static class SettingsEndpoints
         endpoints.MapGet("/api/models", async (ModelAccessService policy, ICurrentUser user, CancellationToken ct) =>
             {
                 var state = await policy.GetForUserAsync(user.UserId, ct);
-                return state.Models.Select(m => new ModelResponse(m.Id, m.DisplayName, m.Id == state.DefaultModelId, m.SupportsImages, m.EffectiveThinking is not null,
+                // 使用者只看模型名稱，不回傳 provider；同名模型才加上 provider 區分（ADR-0020 補充）。
+                var names = ModelNames.ForUsers(state.Models);
+                return state.Models.Select((m, i) => new ModelResponse(m.Id, names[i], m.Id == state.DefaultModelId, m.SupportsImages, m.EffectiveThinking is not null,
                     m.EffectiveThinking is { } thinking ? new ThinkingCapabilityResponse(thinking.Parameter, thinking.Levels, thinking.DefaultLevel, thinking.Required) : null, m.AllowKnowledgeBase)).ToList();
             })
             .WithName("ListModels")

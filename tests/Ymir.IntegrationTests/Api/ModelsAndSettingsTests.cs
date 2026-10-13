@@ -17,9 +17,14 @@ public sealed class MultiModelApiFactory : ApiFactory
         builder.UseSetting("VibeMaker:Pi:ModelId", "minimax");
         builder.UseSetting("VibeMaker:Models:0:Id", "minimax");
         builder.UseSetting("VibeMaker:Models:0:DisplayName", "MiniMax M2");
+        builder.UseSetting("VibeMaker:Models:0:Provider", "minimax.io");
         builder.UseSetting("VibeMaker:Models:1:Id", "gpt-x");
-        builder.UseSetting("VibeMaker:Models:1:DisplayName", "GPT X");
+        // 舊寫法：provider 寫在名稱結尾的括號（ADR-0020 補充的相容規則）
+        builder.UseSetting("VibeMaker:Models:1:DisplayName", "GPT X (OpenRouter)");
         builder.UseSetting("VibeMaker:Models:1:SupportsImages", "true");
+        builder.UseSetting("VibeMaker:Models:2:Id", "gpt-x-oauth");
+        builder.UseSetting("VibeMaker:Models:2:DisplayName", "GPT X");
+        builder.UseSetting("VibeMaker:Models:2:Provider", "ChatGPT OAuth");
     }
 }
 
@@ -32,7 +37,32 @@ public class ModelsAndSettingsTests(MultiModelApiFactory factory) : IClassFixtur
 
         var models = await client.GetFromJsonAsync<List<ModelResponse>>("/api/models", JsonDefaults.Options, TestContext.Current.CancellationToken);
 
-        Assert.Equal([new ModelResponse("minimax", "MiniMax M2", true, false), new ModelResponse("gpt-x", "GPT X", false, true)], models);
+        // 使用者只看到模型名稱、沒有 provider；同名的兩個模型才加上 provider 區分（ADR-0020 補充）。
+        Assert.Equal(
+            [
+                new ModelResponse("minimax", "MiniMax M2", true, false),
+                new ModelResponse("gpt-x", "GPT X (OpenRouter)", false, true),
+                new ModelResponse("gpt-x-oauth", "GPT X (ChatGPT OAuth)", false, false),
+            ],
+            models);
+    }
+
+    [Fact]
+    public async Task AdminModelOptions_ShowTheProvider_SeparatelyFromTheModelName()
+    {
+        using var admin = await factory.LoginAsync("models-admin", Ymir.Platform.Users.UserRole.Admin);
+
+        var access = await admin.GetFromJsonAsync<ModelAccessResponse>("/api/admin/settings/models", JsonDefaults.Options, TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            [("minimax", "MiniMax M2", "minimax.io"), ("gpt-x", "GPT X", "OpenRouter"), ("gpt-x-oauth", "GPT X", "ChatGPT OAuth")],
+            access!.Models.Select(m => (m.Id, m.DisplayName, m.Provider)));
+
+        // 使用者層級的模型權限（ADR-0019）也是管理介面，同樣帶 provider
+        using var member = await factory.LoginAsync("models-provider-member");
+        var memberId = (await member.GetFromJsonAsync<JsonElement>("/api/me", TestContext.Current.CancellationToken)).GetProperty("id").GetGuid();
+        var userAccess = await admin.GetFromJsonAsync<UserModelAccessResponse>($"/api/admin/users/{memberId}/models", JsonDefaults.Options, TestContext.Current.CancellationToken);
+        Assert.Equal(["minimax.io", "OpenRouter", "ChatGPT OAuth"], userAccess!.Models.Select(m => m.Provider));
     }
 
     [Fact]

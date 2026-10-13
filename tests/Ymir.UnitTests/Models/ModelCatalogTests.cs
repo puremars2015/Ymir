@@ -59,6 +59,20 @@ public class ModelCatalogTests
     }
 
     [Fact]
+    public void ModelList_ReadsTheProvider_AndSplitsALegacyProviderSuffix()
+    {
+        var catalog = FromConfig(
+            ("VibeMaker:Pi:ModelId", "minimax"),
+            ("VibeMaker:Models:0:Id", "minimax"),
+            ("VibeMaker:Models:0:DisplayName", "MiniMax M2.7"),
+            ("VibeMaker:Models:0:Provider", "minimax.io"),
+            ("VibeMaker:Models:1:Id", "chatgpt-gpt-6.1-sol"),
+            ("VibeMaker:Models:1:DisplayName", "GPT-6.1 Sol (ChatGPT OAuth)"));
+
+        Assert.Equal([("MiniMax M2.7", "minimax.io"), ("GPT-6.1 Sol", "ChatGPT OAuth")], catalog.Models.Select(m => (m.DisplayName, m.Provider)));
+    }
+
+    [Fact]
     public void Resolve_FallsBackToDefault_ForUnknownOrMissingModels()
     {
         var catalog = new ModelCatalog([new ModelDescriptor("a", "A"), new ModelDescriptor("b", "B")], "a");

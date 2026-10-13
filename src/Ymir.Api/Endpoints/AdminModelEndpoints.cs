@@ -24,7 +24,7 @@ internal static class AdminModelEndpoints
     }
 
     private static ModelAccessResponse ToResponse(ModelAccessService policy, ModelAccessState state) => new(
-        policy.DeploymentModels.Select(m => new AdminModelOptionResponse(m.Id, m.DisplayName, m.SupportsImages, state.IsAvailable(m.Id))).ToList(),
+        policy.DeploymentModels.Select(m => new AdminModelOptionResponse(m.Id, m.DisplayName, m.SupportsImages, state.IsAvailable(m.Id), m.Provider)).ToList(),
         state.DefaultModelId, state.Stored is null, state.Stored?.UpdatedAt);
 
     private static async Task<IResult> SaveAsync(SaveModelAccessRequest request, ModelAccessService policy, ICurrentUser user, IAuditLog audit, TimeProvider time, CancellationToken ct)
@@ -45,7 +45,7 @@ internal static class AdminModelEndpoints
 
     private static UserModelAccessResponse ToUserResponse(ModelAccessService policy, UserModelAccessState state) => new(
         policy.DeploymentModels.Select(m => new UserModelOptionResponse(m.Id, m.DisplayName, state.System.IsAvailable(m.Id),
-            state.Overrides.TryGetValue(m.Id, out var value) ? value : null, state.Effective.IsAvailable(m.Id))).ToList(),
+            state.Overrides.TryGetValue(m.Id, out var value) ? value : null, state.Effective.IsAvailable(m.Id), m.Provider)).ToList(),
         state.Effective.DefaultModelId, state.IsValid, state.Effective.Stored?.UpdatedAt);
 
     private static IResult UserNotFound() => ApiProblem.Create(404, "USER_NOT_FOUND", "找不到使用者。");

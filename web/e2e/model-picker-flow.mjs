@@ -58,7 +58,7 @@ await context.route('**/api/**', async (route) => {
             { id: 'test', displayName: 'MiniMax-M2.7', isDefault: true, supportsImages: false },
             {
               id: 'openrouter-sonnet-5.5',
-              displayName: 'Claude Sonnet 5.5 (OpenRouter)',
+              displayName: 'Claude Sonnet 5.5',
               isDefault: false,
               supportsImages: true,
               supportsThinking: true,
@@ -71,7 +71,7 @@ await context.route('**/api/**', async (route) => {
             },
             {
               id: 'openrouter-gpt-6.1-sol',
-              displayName: 'GPT-6.1 Sol (OpenRouter)',
+              displayName: 'GPT-6.1 Sol',
               isDefault: false,
               supportsImages: true,
               supportsThinking: true,
@@ -84,7 +84,7 @@ await context.route('**/api/**', async (route) => {
             },
             {
               id: 'openrouter-gpt-6-luna',
-              displayName: 'GPT-6 Luna (OpenRouter)',
+              displayName: 'GPT-6 Luna',
               isDefault: false,
               supportsImages: true,
               supportsThinking: true,
@@ -128,7 +128,17 @@ await context.route('**/api/**', async (route) => {
                     ? { files: [], truncated: false }
                     : path.endsWith('/artifacts') || path === '/api/make-topics'
                       ? []
-                      : null;
+                      : path === '/api/branding'
+                        ? { companyName: '', faviconUrl: null }
+                        : path.endsWith('/knowledge')
+                          ? {
+                              enabled: false,
+                              maxFileBytes: 0,
+                              maxDocuments: 0,
+                              supportedExtensions: [],
+                              documents: [],
+                            }
+                          : null;
   if (data == null) throw new Error(`No fixture for ${path}`);
   await route.fulfill({ json: data });
 });
@@ -154,6 +164,7 @@ try {
   await picker.click();
   await panel.waitFor();
   assert.equal(await page.getByRole('option').count(), 4);
+  // /api/models 不含 provider（ADR-0020 補充），選單只顯示模型名稱
   assert.equal((await list.innerText()).includes('OpenRouter'), false);
   assert.equal(await page.getByRole('radio').count(), 0);
   const sonnet = page.getByRole('option', { name: 'Claude Sonnet 5.5', exact: true });

@@ -1146,6 +1146,7 @@ export interface components {
       displayName: string;
       supportsImages: boolean;
       enabled: boolean;
+      provider?: null | string;
     };
     AdminOverviewResponse: {
       users: components['schemas']['UserCountsResponse'];
@@ -1789,6 +1790,7 @@ export interface components {
       systemEnabled: boolean;
       override: null | boolean;
       enabled: boolean;
+      provider?: null | string;
     };
     /** @enum {unknown} */
     UserRole: 'User' | 'Admin';

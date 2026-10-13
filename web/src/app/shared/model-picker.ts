@@ -30,7 +30,7 @@ import { effortLabels, effectiveThinking, thinkingLevels } from '../core/models/
         aria-haspopup="dialog"
         [attr.aria-expanded]="open()"
         [attr.aria-controls]="listId + '-panel'"
-        [attr.aria-description]="name(model)"
+        [attr.aria-description]="model.displayName"
         (click)="toggle()"
         (keydown)="onTriggerKey($event)"
       >
@@ -41,7 +41,7 @@ import { effortLabels, effectiveThinking, thinkingLevels } from '../core/models/
         </svg>
       </button>
       <span class="selection-summary">
-        <span class="model-name">{{ name(model) }}</span>
+        <span class="model-name">{{ model.displayName }}</span>
         @if (levels().length > 0) {
           <span class="depth-summary">· {{ depthLabel() }}</span>
         }
@@ -76,7 +76,7 @@ import { effortLabels, effectiveThinking, thinkingLevels } from '../core/models/
                 role="option"
                 tabindex="-1"
                 [id]="listId + '-' + index"
-                [attr.aria-label]="name(option)"
+                [attr.aria-label]="option.displayName"
                 [attr.aria-description]="
                   option.supportsImages ? '支援文字與圖片輸入' : '支援文字輸入'
                 "
@@ -85,7 +85,7 @@ import { effortLabels, effectiveThinking, thinkingLevels } from '../core/models/
                 (pointermove)="active.set(index)"
                 (click)="choose(index)"
               >
-                <span class="model-name">{{ name(option) }}</span>
+                <span class="model-name">{{ option.displayName }}</span>
                 <ng-container
                   [ngTemplateOutlet]="modalities"
                   [ngTemplateOutletContext]="{ $implicit: option }"
@@ -199,10 +199,6 @@ export class ModelPicker {
       viewport?.removeEventListener('resize', close);
       viewport?.removeEventListener('scroll', close);
     });
-  }
-
-  protected name(model: ModelOption): string {
-    return model.displayName.replace(/\s*[（(]OpenRouter[）)]\s*$/i, '').trim();
   }
 
   protected toggle(): void {
