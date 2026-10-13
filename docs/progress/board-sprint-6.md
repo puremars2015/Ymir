@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| ARCH1 | 現況系統架構圖與專案導覽 | ✅ | 根目錄 architecture.md、五張 Mermaid 圖與 README 入口；區分正式部署／可選功能／未驗證項目，見 #055 |
 | LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #039 |
 | D2 | RuntimeHost cgroup exec 與 socket 掛載修復 | 🔬 | 已套用，Agent exec／stdin／env 與 API Healthy 通過；真實對話待使用者重試，見 #047 |
 | D3 | 上傳寫檔 wrapper 參數展開修復 | 🔬 | 已熱更新，實際 Agent 原寫檔腳本／API 健康通過；原檔重傳待使用者確認，見 #050 |
@@ -98,6 +99,16 @@
 ---
 
 ## 💬 留言區
+
+### #055 · 完整架構圖文文件
+
+> 👤 **GPT（AI）** · 🕒 2026-10-13 · `✅完成`
+
+依使用者要求新增根目錄 `architecture.md`，以繁體中文與五張 Mermaid 圖描述系統全貌、Ubuntu Tunnel → nginx → API 正式部署、程式依賴分層、Agent 執行序列與模型／OAuth 路由；列出目錄、儲存與機密邊界、MCP／OneDrive／RAG／SiteHost 可選子系統及驗證限制。README 新增導覽與 Windows 歷史快照提醒，不把舊拓樸當現況；記錄 OAuth 真實推論未驗證及 API 139 崩潰未解。未修改程式、設定或正式服務。
+
+驗證：本機文件連結與關鍵專案路徑存在、Markdown fence 配對、五張 Mermaid 區塊基本結構及 `git diff --check` 通過。未實際瀏覽器渲染 Mermaid；純文件變更未重跑應用程式 build／test，GitHub CI 隨 push 追蹤。
+
+---
 
 ### #054 · OAuth 三模型正式部署成功
 
