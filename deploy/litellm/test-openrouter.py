@@ -73,6 +73,7 @@ if len(sys.argv) > 2:
     assert len(set(ids)) == 6 and set(ids) == set(expected) and allowed == ids
     assert settings["VibeMaker__Pi__ModelId"] == "minimax"
     assert settings["VibeMaker__Models__0__DisplayName"] == "MiniMax M2.7"
+    assert [settings[f"VibeMaker__Models__{index}__Provider"] for index in range(6)] == ["minimax.io"] * 2 + ["OpenRouter"] * 4
     assert settings["VibeMaker__Models__0__SupportsImages"] == "false"
     assert settings["VibeMaker__Models__1__SupportsImages"] == "true"
     for index in range(2, 6):

@@ -5,11 +5,39 @@ import re
 import sys
 
 SELECTED = {
-    "gpt-6.1-sol": "GPT-6.1 Sol (ChatGPT OAuth)",
-    "gpt-6-luna": "GPT-6 Luna (ChatGPT OAuth)",
-    "gpt-6-astra": "GPT-6 Astra (ChatGPT OAuth)",
+    "gpt-6.1-sol": "GPT-6.1 Sol",
+    "gpt-6-luna": "GPT-6 Luna",
+    "gpt-6-astra": "GPT-6 Astra",
 }
+# 使用者只看到模型名稱；provider 只在管理介面顯示（ADR-0020 補充）。
+PROVIDER = "ChatGPT OAuth"
 EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+# 既有模型沒有 Provider 時依 alias 補上（ADR-0020 補充）；已設定的 Provider 不覆蓋。
+KNOWN_PROVIDERS = (("minimax", "minimax.io"), ("openrouter-", "OpenRouter"))
+
+
+def known_provider(alias):
+    for prefix, provider in KNOWN_PROVIDERS:
+        if alias == prefix or alias.startswith(prefix if prefix.endswith("-") else prefix + "-"):
+            return provider
+    return None
+
+
+def backfill_providers(lines, model_ids):
+    """Add Provider lines for known aliases that have neither a Provider nor a legacy "(X)" name suffix."""
+    has_provider = {int(m[1]) for m in (re.match(r"VibeMaker__Models__(\d+)__Provider=", line) for line in lines) if m}
+    suffixed = {int(m[1]) for m in (re.fullmatch(r"VibeMaker__Models__(\d+)__DisplayName=.*[)）]\s*", line) for line in lines) if m}
+    result = []
+    for line in lines:
+        result.append(line)
+        match = re.fullmatch(r"VibeMaker__Models__(\d+)__Id=.*", line)
+        if not match:
+            continue
+        index = int(match[1])
+        provider = known_provider(model_ids.get(index, ""))
+        if provider and index not in has_provider and index not in suffixed:
+            result.append(f"VibeMaker__Models__{index}__Provider={provider}")
+    return result
 
 
 def append_models(text, catalog):
@@ -37,6 +65,7 @@ def append_models(text, catalog):
             continue
         kept.append(line)
     remaining = {index: model_id for index, model_id in model_ids.items() if index not in old_indices}
+    kept = backfill_providers(kept, remaining)
     index = max(remaining, default=-1) + 1
     if not allowed:
         allowed = list(remaining.values())
@@ -52,7 +81,7 @@ def append_models(text, catalog):
         default = model.get("defaultReasoningLevel")
         if default not in levels:
             raise ValueError("Unsupported default effort for " + model_id)
-        kept.extend([prefix + "Id=" + alias, prefix + "DisplayName=" + display,
+        kept.extend([prefix + "Id=" + alias, prefix + "DisplayName=" + display, prefix + "Provider=" + PROVIDER,
                      prefix + "SupportsImages=" + str(images).lower(),
                      prefix + "Thinking__Parameter=reasoning.effort",
                      prefix + "Thinking__DefaultLevel=" + default,

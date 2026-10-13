@@ -14,3 +14,13 @@
 新訊息明確指定已停用模型回 `MODEL_NOT_AVAILABLE`；未指定時，對話舊模型若已停用則採目前預設。排隊 execution 啟動前重新檢查固定的模型，已停用則失敗，不自行切換另一個模型。已開始的工作繼續完成，設定變更不強制撤銷正在使用的 key。下一次執行的 virtual key 僅包含生效清單；快取模型集合不相同時換發並撤銷上一把 key，沒有空清單或不限模型的 key。換發失敗則執行失敗，撤銷失敗沿用既有診斷與到期機制。檢查點之後的設定變更視為已開始的工作，下一次執行再套用。
 
 前端新對話、對話及專案載入模型時重新查詢；視窗回到前景時刷新，管理員儲存／還原後也刷新。背景分頁尚未刷新前可能保留舊清單，但後端仍拒絕停用模型；重新選擇即可。模型 ID、名稱與多模態設定仍由部署維護，管理員頁面只決定開放清單與預設。
+
+## 補充（2026-10-13）：provider 只給管理員看
+
+- 使用者要求：管理端的開放模型要看得出由哪個 provider 提供（例如同一個模型經 OpenRouter 或 ChatGPT OAuth、MiniMax 經 minimax.io），使用者只需要知道是哪一個模型。
+- 部署設定新增 `VibeMaker:Models:N:Provider`，與 `DisplayName`（只寫模型名稱）分開保存在 `ModelDescriptor.Provider`。
+- 相容舊設定：沒有設定 `Provider` 時，名稱結尾的「(X)」或「（X）」拆成 provider，例如「GPT-6.1 Sol (ChatGPT OAuth)」→ 名稱「GPT-6.1 Sol」、provider「ChatGPT OAuth」。真正名稱就帶括號的模型應明確設定 `Provider`（有設定時名稱原樣保留）。
+- 既有部署要補 `Provider` 才會在管理介面標出 MiniMax 與 OpenRouter 模型的 provider（它們的舊名稱沒有括號）：沒有 ChatGPT OAuth 的主機重跑 `apply-linux-models.sh`（套用新版 `ymir-models.env.example`）；已啟用 ChatGPT OAuth 的主機重跑 `apply-chatgpt-linux.sh`，`chatgpt-ymir-models.py` 會為沒有 Provider、名稱也沒有括號的 `minimax*`／`openrouter-*` 補上 provider，不覆蓋已設定的值；也可以手動在 API 的環境檔加上 `VibeMaker__Models__N__Provider`。
+- 管理端的 `GET /api/admin/settings/models` 與 `/api/admin/users/{id}/models` 回傳 `provider`，畫面顯示「名稱 (provider)」。
+- 使用者的 `GET /api/models` 不回傳 provider，只有名稱；只在同一份清單裡有同名模型時，這幾個才以「名稱 (provider)」區分，否則使用者無從選擇（`ModelNames.ForUsers`）。
+- provider 只是顯示用的標籤，不影響路由、授權或金鑰；路由仍由 LiteLLM 的 `model_name` 決定。

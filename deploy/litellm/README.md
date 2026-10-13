@@ -94,7 +94,8 @@ Agent container 只拿得到這把 virtual key，**master key 與 MiniMax key �
 | `VibeMaker__LiteLlm__MaxBudget` | 舊設定：每把 key 的預算。key 每 24 小時換發，等於每天重置，建議改用 `MonthlyBudgetUsd` |
 | `VibeMaker__Pi__ModelBaseUrl` | **Agent container 內**連 LiteLLM 的位址：`http://host.containers.internal:4000/v1`（Podman）或 `http://host.docker.internal:4000/v1`（Docker）；要讓管理員可以關閉 Agent 的對外連線時，改成接在 Agent network 上的 `http://litellm:4000/v1`（見 `deploy/runtime-host/README.md`「受限網路」） |
 | `VibeMaker__Pi__ModelId` | 預設模型，例如 `minimax`（對應 `config.yaml` 的 `model_name`） |
-| `VibeMaker__Models__0__Id` / `VibeMaker__Models__0__DisplayName` | 對話中可選的模型清單（`__1__`、`__2__` 依序增加）；Id 必須與 `config.yaml` 的 `model_name` 相同。未設定時只有預設模型 |
+| `VibeMaker__Models__0__Id` / `VibeMaker__Models__0__DisplayName` | 對話中可選的模型清單（`__1__`、`__2__` 依序增加）；Id 必須與 `config.yaml` 的 `model_name` 相同。DisplayName 只寫模型名稱。未設定時只有預設模型 |
+| `VibeMaker__Models__0__Provider` | 提供這個模型的供應商，例如 `minimax.io`、`OpenRouter`、`ChatGPT OAuth`；只在管理介面顯示「名稱 (provider)」，使用者的模型選單只顯示名稱（同名模型才加上 provider 區分，ADR-0020 補充） |
 
 - **新增模型**：先在 `config.yaml` 加一筆 `model_name`，再在 Ymir 的 `VibeMaker__Models__*` 加同名的 Id。
   - virtual key 預設只允許清單內的模型；

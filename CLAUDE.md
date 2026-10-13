@@ -137,7 +137,7 @@ RAG 知識庫（ADR-0014）：專案擁有者在專案頁上傳文件（`/api/pr
 
 網站託管（ADR-0016，`deploy/sites/README.md`）：檔案面板「發布網站」選含 `index.html` 的目錄 → `SiteService` 經 `IWorkspaceFileReader` 複製到網站 volume `Ymir:Sites:Root/{siteId}/{versionId}/`（完整寫好才切換 `CurrentVersionId`，保留最近 3 版，失敗不影響目前版本）；`Ymir.SiteHost` 依 Host 找網站、只提供版本目錄內的檔案（路徑逐段檢查、SPA 模式無副檔名回 index.html、`nosniff`）。網站網域（`Ymir:Sites:BaseUrl`）必須與 Ymir 登入網域不同；API 不掛載 workspace，SiteHost 唯讀、不執行使用者程式。存取模式（`PUT /api/sites/{id}/access`）：公開 / 所有 Ymir 使用者 / 指定使用者（`vibemaker.site_shares`），擁有者與 Admin 一律可看（`SiteAccessRules.CanView`，API 與 SiteHost 共用）。私人網站：SiteHost 導向平台 `/site-access` → 前端 `POST /api/sites/{id}/ticket`（60 秒、一次性、只存雜湊）→ SiteHost `/.ymir/auth` 兌換成只限該 hostname、綁定網站的 `ymir_site` cookie；每個請求重新檢查帳號狀態與分享（快取 ≤ 30 秒）。平台 cookie 不得送到網站網域；導回路徑只接受站內相對路徑（`SafeReturnPath`）。
 
-可選模型：`VibeMaker__Models__N__Id` / `DisplayName`（預設為 `VibeMaker__Pi__ModelId`）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
+可選模型：`VibeMaker__Models__N__Id` / `DisplayName` / `Provider`（預設為 `VibeMaker__Pi__ModelId`；provider 只在管理介面顯示，使用者只看到模型名稱，只有同一份清單裡有同名模型時才以「名稱 (provider)」區分，ADR-0020 補充）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
 
 模型金鑰（ADR-0004）：設定 `VibeMaker__LiteLlm__BaseUrl` 與 `VibeMaker__LiteLlm__MasterKey` 後，API 為每位使用者向 LiteLLM 發 virtual key（帶 `user_id`，發 key 前 upsert LiteLLM 使用者並套用每月預算）；用量頁的費用 / token 與預算檢查都經 `IModelGateway` 讀 LiteLLM，Ymir 不自己保存；非 Development 未設定會拒絕啟動。本機可用 `FAKE_LLM_MASTER_KEY=<任意值>` 讓 Fake LLM 模擬 LiteLLM 的 key 管理（說明見 `deploy/litellm/README.md`）。
 

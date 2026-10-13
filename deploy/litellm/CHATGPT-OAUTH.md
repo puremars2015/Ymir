@@ -28,11 +28,13 @@ sudo bash deploy/litellm/apply-chatgpt-linux.sh
 
 腳本檢查 headless OAuth／模型目錄、沒有 QUEUED／RUNNING 工作後，保留原六模型與預設、追加 API Models／AllowedModels，生成非機密的 `config.chatgpt.runtime.yaml`，使用 `compose.yml`＋`compose.chatgpt.yml` 僅重建 LiteLLM 代理、重啟 API／入口。SQL、PostgreSQL、使用者 workspace 與權限設定不變；錯誤時嘗試回復原 provider／API，token volume 保留。設定備份含 API 密鑰，不可分享。部署後需在「管理 → 開放模型」勾選三個新選項，不會偷偷覆寫既有全域或個人權限。
 
-| Ymir／LiteLLM alias | 上游 | 顯示名稱 |
-|---|---|---|
-| `chatgpt-gpt-6.1-sol` | `chatgpt/gpt-6.1-sol` | GPT-6.1 Sol (ChatGPT OAuth) |
-| `chatgpt-gpt-6-luna` | `chatgpt/gpt-6-luna` | GPT-6 Luna (ChatGPT OAuth) |
-| `chatgpt-gpt-6-astra` | `chatgpt/gpt-6-astra` | GPT-6 Astra (ChatGPT OAuth) |
+| Ymir／LiteLLM alias | 上游 | 顯示名稱（DisplayName） | Provider |
+|---|---|---|---|
+| `chatgpt-gpt-6.1-sol` | `chatgpt/gpt-6.1-sol` | GPT-6.1 Sol | ChatGPT OAuth |
+| `chatgpt-gpt-6-luna` | `chatgpt/gpt-6-luna` | GPT-6 Luna | ChatGPT OAuth |
+| `chatgpt-gpt-6-astra` | `chatgpt/gpt-6-astra` | GPT-6 Astra | ChatGPT OAuth |
+
+管理介面顯示「GPT-6.1 Sol (ChatGPT OAuth)」；使用者的模型選單只顯示「GPT-6.1 Sol」，同時開放 OpenRouter 的同名模型時才加上 provider 區分（ADR-0020 補充）。重跑 `apply-chatgpt-linux.sh` 時，既有的 `minimax*`／`openrouter-*` 模型若還沒有 Provider（名稱也沒有括號），會補上 `minimax.io`／`OpenRouter`，已設定的不覆蓋。
 
 初期各路由 6 RPM／64000 TPM，使用 usage-based-routing-v2 與 pre-call checks；超限請求應在到達上游前拒絕。單一 proxy worker、同一可寫 auth volume。日後重建代理必須保留兩份 compose 檔；原六模型重置工具在 OAuth 啟用時會拒絕執行，避免不小心移除路由。
 

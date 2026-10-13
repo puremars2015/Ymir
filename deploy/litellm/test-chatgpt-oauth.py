@@ -105,6 +105,22 @@ class CatalogTests(unittest.TestCase):
         self.assertIn("VibeMaker__Models__0__DisplayName=MiniMax M2.7", result)
         self.assertIn("AllowedModels__1=openrouter-gpt-6-luna", result)
         self.assertIn("Models__2__Id=chatgpt-gpt-6.1-sol", result)
+        self.assertIn("Models__2__DisplayName=GPT-6.1 Sol\n", result)
+        self.assertIn("Models__2__Provider=ChatGPT OAuth", result)
+        # 既有的 MiniMax／OpenRouter 模型沒有 Provider 時依 alias 補上，重跑不會重複
+        self.assertEqual(result.count("VibeMaker__Models__0__Provider=minimax.io"), 1)
+        self.assertEqual(result.count("VibeMaker__Models__1__Provider=OpenRouter"), 1)
+
+    def test_api_model_append_keeps_existing_provider_and_legacy_suffix(self):
+        text = ("VibeMaker__Models__0__Id=minimax\nVibeMaker__Models__0__DisplayName=MiniMax M2.7\nVibeMaker__Models__0__Provider=Custom\n"
+                "VibeMaker__Models__1__Id=openrouter-gpt-6-luna\nVibeMaker__Models__1__DisplayName=GPT-6 Luna (OpenRouter)\n"
+                "VibeMaker__Models__2__Id=other\nVibeMaker__Models__2__DisplayName=Other\n")
+        catalog = [{"id": model_id, "reasoningLevels": ["low"], "defaultReasoningLevel": "low"} for model_id in model_module.SELECTED]
+        result = model_module.append_models(text, catalog)
+        self.assertIn("Models__0__Provider=Custom", result)
+        self.assertNotIn("Models__0__Provider=minimax.io", result)
+        self.assertNotIn("Models__1__Provider=", result)
+        self.assertNotIn("Models__2__Provider=", result)
         self.assertIn("Thinking__Parameter=reasoning.effort", result)
         self.assertNotIn("=ultra", result)
         self.assertNotIn("=none", result)
