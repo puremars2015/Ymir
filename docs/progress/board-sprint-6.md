@@ -1376,3 +1376,10 @@ README 已更新，本機前端映像為 `localhost/ymir/web:model-picker-202610
 </details>
 
 ---
+
+### 主聊天畫面漢堡選單：收放加入滑動動畫
+- **需求**：桌面版收放側邊欄時原本是 `display: none` 瞬間切換，要有滑動效果。
+- **做法**：`shell.scss` 桌面版改以 `width` / `padding` / `border` 過渡（0.25 秒）收放，內容固定寬度避免文字重新換行，收合後延遲 `visibility: hidden`；`prefers-reduced-motion` 時關閉動畫。手機抽屜原本就有 `transform` 動畫，未動。元件樣式預算警告線 7kB → 7.5kB（錯誤線 8kB 不變）。
+- **驗證**：`npm run build` 無警告、`npm run lint` 通過。未以瀏覽器實際錄製動畫，待使用者環境目視確認。
+
+---

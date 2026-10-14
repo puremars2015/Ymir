@@ -367,9 +367,31 @@ svg {
   }
 }
 
+/* 桌面：以寬度過渡做出滑動收放；內容固定寬度，避免收合時文字重新換行 */
 @media (min-width: 769px) {
+  .sidebar {
+    transition:
+      width 0.25s,
+      padding 0.25s,
+      border-width 0.25s,
+      visibility 0s 0.25s;
+
+    > * {
+      min-width: 16.25rem;
+    }
+  }
+
   .sidebar-collapsed .sidebar {
-    display: none;
+    width: 0;
+    padding-inline: 0;
+    border-width: 0;
+    box-shadow: none;
+    visibility: hidden;
+  }
+
+  .shell:not(.sidebar-collapsed) .sidebar {
+    visibility: visible;
+    transition-delay: 0s;
   }
 }
 
@@ -424,6 +446,7 @@ svg {
 
 @media (prefers-reduced-motion: reduce) {
   .sidebar,
+  .sidebar-collapsed .sidebar,
   .chevron svg {
     transition: none;
   }
