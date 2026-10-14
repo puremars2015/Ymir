@@ -8,6 +8,8 @@ public sealed class YmirAuthOptions
     public OidcLoginOptions Oidc { get; set; } = new();
 
     public LocalAccountLoginOptions LocalAccounts { get; set; } = new();
+
+    public GoogleLoginOptions Google { get; set; } = new();
 }
 
 /// <summary>企業帳號（Entra ID）OIDC 登入。設定 <see cref="Authority"/> 與 <see cref="ClientId"/> 才啟用。</summary>
@@ -48,4 +50,34 @@ public sealed class LocalAccountLoginOptions
 
     /// <summary>每個來源 IP 每分鐘可嘗試帳號密碼登入的次數（另有每個帳號連續失敗 5 次鎖定 15 分鐘）。</summary>
     public int LoginAttemptsPerMinute { get; set; } = 10;
+}
+
+/// <summary>
+/// Google 帳號 SSO（OIDC，ADR-0023）。設定 <see cref="ClientId"/> 與 <see cref="ClientSecret"/> 才啟用；
+/// 只能在部署設定修改（不經管理介面）。Google 帳號任何人都能申請，所以必須設定 <see cref="AllowedDomains"/>
+/// 或 <see cref="AllowedEmails"/> 至少一項，否則拒絕啟動。
+/// </summary>
+public sealed class GoogleLoginOptions
+{
+    /// <summary>Google 的 OIDC issuer；只有測試與 Development 會改成 Fake OIDC 的 <c>{root}/google</c>。</summary>
+    public string Authority { get; set; } = GoogleLogin.Issuer;
+
+    public string? ClientId { get; set; }
+
+    /// <summary>只放在部署 secret（<c>deploy/api/.env</c>），不得進版控。</summary>
+    public string? ClientSecret { get; set; }
+
+    /// <summary>允許的 Google Workspace 網域，以 id_token 的 <c>hd</c> claim 比對（個人 Gmail 沒有 <c>hd</c>）。</summary>
+    public List<string> AllowedDomains { get; set; } = [];
+
+    /// <summary>個別允許的 Google 帳號 email（例如沒有 Workspace 的外部協作者）；必須是 Google 已驗證的 email。</summary>
+    public List<string> AllowedEmails { get; set; } = [];
+
+    /// <summary>這些 email 登入時為 Admin，其他人為 User；每次登入同步（與 Entra app role 相同的語意）。</summary>
+    public List<string> AdminEmails { get; set; } = [];
+
+    /// <summary>登入按鈕上的名稱。</summary>
+    public string DisplayName { get; set; } = "Google 帳號";
+
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(ClientId);
 }

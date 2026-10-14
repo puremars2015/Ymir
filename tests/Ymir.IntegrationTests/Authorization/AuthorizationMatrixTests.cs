@@ -219,6 +219,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "GET /api/branding",
         "GET /api/branding/favicon",
         "GET /api/auth/login",
+        "GET /api/auth/login/google",
         "POST /api/auth/password-login",
         "POST /api/dev/login",
         "GET /api/projects/",

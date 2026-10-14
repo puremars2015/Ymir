@@ -29,6 +29,10 @@ internal static class AuthEndpoints
         endpoints.MapGet("/api/auth/login", ChallengeOidcAsync).WithName("LoginWithOidc").WithTags("Auth").AllowAnonymous()
             .Produces(StatusCodes.Status302Found).Produces(StatusCodes.Status404NotFound).ExcludeFromDescription();
 
+        // Google 帳號 SSO（ADR-0023）：與企業帳號相同的整頁導向。
+        endpoints.MapGet("/api/auth/login/google", ChallengeGoogle).WithName("LoginWithGoogle").WithTags("Auth").AllowAnonymous()
+            .Produces(StatusCodes.Status302Found).Produces(StatusCodes.Status404NotFound).ExcludeFromDescription();
+
         endpoints.MapPost("/api/auth/password-login", PasswordLoginAsync).WithName("PasswordLogin").WithTags("Auth").AllowAnonymous()
             .RequireAntiforgeryHeader().RequireRateLimiting(AuthSetup.PasswordLoginRateLimit).Produces<MeResponse>();
 
@@ -63,8 +67,15 @@ internal static class AuthEndpoints
             settings.IsConfigured,
             settings.IsConfigured ? settings.DisplayName : null,
             options.Value.LocalAccounts.Enabled,
-            environment.IsDevelopment());
+            environment.IsDevelopment(),
+            options.Value.Google.IsConfigured,
+            options.Value.Google.IsConfigured ? options.Value.Google.DisplayName : null);
     }
+
+    private static IResult ChallengeGoogle(string? returnUrl, IOptions<YmirAuthOptions> options) =>
+        options.Value.Google.IsConfigured
+            ? Results.Challenge(new AuthenticationProperties { RedirectUri = SafeRedirect.LocalPathOrRoot(returnUrl) }, [GoogleLogin.Scheme])
+            : ApiProblem.Create(StatusCodes.Status404NotFound, "GOOGLE_NOT_CONFIGURED", "未設定 Google 帳號登入。");
 
     private static async Task<IResult> ChallengeOidcAsync(string? returnUrl, OidcSettingsProvider oidc, CancellationToken cancellationToken)
     {
@@ -137,7 +148,7 @@ internal static class AuthEndpoints
                 await SignInAsync(httpContext, user!, mustChangePassword: false);
                 return TypedResults.NoContent();
             case LocalAccountOutcome.NotLocalAccount:
-                return ApiProblem.Create(StatusCodes.Status400BadRequest, "NOT_LOCAL_ACCOUNT", "企業帳號請到公司的帳號系統變更密碼。");
+                return ApiProblem.Create(StatusCodes.Status400BadRequest, "NOT_LOCAL_ACCOUNT", "企業帳號或 Google 帳號請到原本的帳號系統變更密碼。");
             case LocalAccountOutcome.WeakPassword:
                 return ApiProblem.Create(StatusCodes.Status400BadRequest, "WEAK_PASSWORD", $"新密碼至少 {LocalAccounts.MinimumPasswordLength} 個字元，且不能與目前密碼相同。");
             default:
@@ -201,14 +212,16 @@ public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewP
 /// <param name="Oidc">是否可以用企業帳號（Entra ID）登入。</param>
 /// <param name="Password">是否可以用本機帳號密碼登入。</param>
 /// <param name="DevLogin">Development 的免密碼登入。</param>
-public sealed record LoginProvidersResponse(bool Oidc, string? OidcDisplayName, bool Password, bool DevLogin);
+/// <param name="Google">是否可以用 Google 帳號登入（ADR-0023）。</param>
+public sealed record LoginProvidersResponse(bool Oidc, string? OidcDisplayName, bool Password, bool DevLogin, bool Google, string? GoogleDisplayName);
 
-/// <summary>登入方式：企業帳號、本機帳號、開發登入。</summary>
+/// <summary>登入方式：企業帳號、本機帳號、開發登入、Google 帳號。</summary>
 public enum AuthMethod
 {
     Oidc = 0,
     Local = 1,
     Dev = 2,
+    Google = 3,
 }
 
 public sealed record MeResponse(
@@ -235,6 +248,7 @@ public sealed record MeResponse(
         {
             LocalAccounts.Issuer => AuthMethod.Local,
             AuthEndpoints.DevIssuer => AuthMethod.Dev,
+            GoogleLogin.Issuer => AuthMethod.Google,
             _ => AuthMethod.Oidc,
         };
     }

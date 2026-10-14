@@ -32,6 +32,9 @@ public sealed class FakeOidcServer : IAsyncDisposable
     /// <summary>給 Ymir 設定的 authority，格式同 Entra：<c>{root}/{tenant}/v2.0</c>。</summary>
     public string Authority => $"{RootUrl.ToString().TrimEnd('/')}/{Settings.TenantId}/v2.0";
 
+    /// <summary>模擬 Google 的 authority（ADR-0024），給 Ymir 的 <c>Ymir:Auth:Google:Authority</c>。</summary>
+    public string GoogleAuthority => $"{RootUrl.ToString().TrimEnd('/')}/google";
+
     /// <summary>Fake Microsoft Graph（OneDrive，ADR-0013），給 Ymir 的 <c>Ymir:Connectors:OneDrive:GraphBaseUrl</c>。</summary>
     public string GraphBaseUrl => $"{RootUrl.ToString().TrimEnd('/')}/graph/v1.0";
 

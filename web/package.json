@@ -27,7 +27,8 @@
     "e2e:mcp": "node e2e/mcp-flow.mjs",
     "e2e:knowledge": "node e2e/knowledge-flow.mjs",
     "e2e:sites": "node e2e/sites-flow.mjs",
-    "e2e:dm": "node e2e/direct-messages-flow.mjs"
+    "e2e:dm": "node e2e/direct-messages-flow.mjs",
+    "e2e:google": "node e2e/google-flow.mjs"
   },
   "private": true,
   "packageManager": "npm@11.19.0",

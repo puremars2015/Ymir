@@ -5,6 +5,7 @@ import {
   isLocalPath,
   loginErrorMessage,
   newPasswordProblem,
+  googleLoginUrl,
   oidcLoginUrl,
 } from './auth-rules';
 
@@ -12,6 +13,7 @@ describe('auth rules', () => {
   it('maps login error codes to messages', () => {
     expect(loginErrorMessage('disabled')).toContain('停用');
     expect(loginErrorMessage('failed')).toContain('失敗');
+    expect(loginErrorMessage('not_allowed')).toContain('Google');
     expect(loginErrorMessage(null)).toBeNull();
     expect(loginErrorMessage('other')).toBeNull();
   });
@@ -30,10 +32,16 @@ describe('auth rules', () => {
     expect(oidcLoginUrl(undefined)).toBe('/api/auth/login?returnUrl=%2F');
   });
 
+  it('builds the Google login url with an encoded local return path', () => {
+    expect(googleLoginUrl('/c/abc')).toBe('/api/auth/login/google?returnUrl=%2Fc%2Fabc');
+    expect(googleLoginUrl('//evil.example')).toBe('/api/auth/login/google?returnUrl=%2F');
+  });
+
   it('describes auth methods', () => {
     expect(describeAuthMethod('Oidc')).toBe('企業帳號');
     expect(describeAuthMethod('Local')).toBe('本機帳號');
     expect(describeAuthMethod('Dev')).toBe('開發登入');
+    expect(describeAuthMethod('Google')).toBe('Google 帳號');
   });
 
   it('does not let admins disable themselves', () => {

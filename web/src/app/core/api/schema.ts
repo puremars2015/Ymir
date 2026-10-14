@@ -1289,7 +1289,7 @@ export interface components {
     /** @enum {unknown} */
     AuditResult: 'Success' | 'Failure' | 'Denied';
     /** @enum {unknown} */
-    AuthMethod: 'Oidc' | 'Local' | 'Dev';
+    AuthMethod: 'Oidc' | 'Local' | 'Dev' | 'Google';
     BrandingResponse: {
       companyName: string;
       faviconUrl: null | string;
@@ -1479,6 +1479,8 @@ export interface components {
       oidcDisplayName: null | string;
       password: boolean;
       devLogin: boolean;
+      google: boolean;
+      googleDisplayName: null | string;
     };
     MakeTopicResponse: {
       /** Format: uuid */

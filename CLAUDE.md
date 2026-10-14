@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳號（Entra ID OIDC）或本機帳號密碼登入（ADR-0009）→ Chat → Agent（Pi）在每個使用者專屬的 Rootless Podman container（一人一個，ADR-0007）執行（正式部署時 API 在容器內，container 由主機上的 runtime host 管理，ADR-0008）；專案是 container 內的檔案群組 → 經 LiteLLM 呼叫模型 → SSE 即時串流回 Angular。
+Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳號（Entra ID OIDC）、Google 帳號（ADR-0024）或本機帳號密碼登入（ADR-0009）→ Chat → Agent（Pi）在每個使用者專屬的 Rootless Podman container（一人一個，ADR-0007）執行（正式部署時 API 在容器內，container 由主機上的 runtime host 管理，ADR-0008）；專案是 container 內的檔案群組 → 經 LiteLLM 呼叫模型 → SSE 即時串流回 Angular。
 本專案**全由 AI 開發**，請嚴格遵守下列規則；做任何架構相關的改動前，先讀相關 ADR。
 
 ## 必讀文件
@@ -9,7 +9,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 |---|---|
 | `docs/sa/vibe-maker-core-mvp-sa.md` | SA（需求、資料模型、API、SSE 契約、驗收條件），以章節編號引用，例如「SA §10」 |
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
-| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0023；索引見 `docs/adr/README.md`） |
+| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0024；索引見 `docs/adr/README.md`） |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
 | `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
@@ -34,7 +34,7 @@ tests/
   Ymir.IntegrationTests/             WebApplicationFactory + SQL Server（每個 fixture 獨立資料庫）+ 真實 Pi；含授權矩陣、OpenAPI 快照
   Ymir.Testing.FakeLlm/              OpenAI 相容假模型（[create-file] / [slow] / [fail] 腳本）
   Ymir.Testing.FakeMcp/              streamable HTTP 的 echo MCP server（gateway 測試用）
-  Ymir.Testing.FakeOidc/             模擬 Entra ID 的 OIDC 伺服器（tid / oid / pairwise sub / roles、PKCE、refresh token）與 Fake Graph（`/graph/v1.0`，OneDrive），測試與本機開發用
+  Ymir.Testing.FakeOidc/             模擬 Entra ID 的 OIDC 伺服器（tid / oid / pairwise sub / roles、PKCE、refresh token）、Google 模擬（`/google`，hd / email_verified）與 Fake Graph（`/graph/v1.0`，OneDrive），測試與本機開發用
 web/                                 Angular 22（standalone、signals、zoneless、Vitest、ESLint）；src/app/core/api/schema.ts 由 OpenAPI 產生；e2e/ Playwright 腳本
 runtime/agent/                       Agent runtime Containerfile
 deploy/cloudflared/                  cloudflared ingress 設定範本（指南 docs/guides/cloudflare-tunnel.md）
@@ -105,7 +105,7 @@ dotnet run --project src/Ymir.Api                    # http://localhost:5080（D
 cd web && npm start                                  # http://localhost:4200，/api 轉給 5080
 ```
 
-登入（ADR-0009）：企業帳號 `Ymir__Auth__Oidc__Authority` / `ClientId` / `ClientSecret`（Entra ID，設定值見 `docs/guides/entra-id.md`），或由 Admin 在「管理 → 系統設定」設定（ADR-0010：資料庫優先、不重啟生效；authority 由 `Ymir__Auth__Oidc__AuthorityHost` + Tenant ID 組成）；本機帳號 `Ymir__Auth__LocalAccounts__Enabled`（預設開啟，由 Admin 建立，第一個 Admin 可用 `dotnet Ymir.Api.dll create-local-admin <帳號>`）；Development 另有 `/api/dev/login`。
+登入（ADR-0009）：企業帳號 `Ymir__Auth__Oidc__Authority` / `ClientId` / `ClientSecret`（Entra ID，設定值見 `docs/guides/entra-id.md`），或由 Admin 在「管理 → 系統設定」設定（ADR-0010：資料庫優先、不重啟生效；authority 由 `Ymir__Auth__Oidc__AuthorityHost` + Tenant ID 組成）；本機帳號 `Ymir__Auth__LocalAccounts__Enabled`（預設開啟，由 Admin 建立，第一個 Admin 可用 `dotnet Ymir.Api.dll create-local-admin <帳號>`）；Google 帳號 SSO（ADR-0024，指南 `docs/guides/google-login.md`）`Ymir__Auth__Google__ClientId` / `ClientSecret`，只在部署設定，必須有 `AllowedDomains`（比對 `hd` claim，不看 email 字尾）或 `AllowedEmails` 白名單，否則拒絕啟動；`email_verified` 必須為 true，身分鍵 `iss`（固定存 `https://accounts.google.com`）+ `sub`，`AdminEmails` 每次登入同步角色，callback `/signin-google`；Development 另有 `/api/dev/login`。
 
 Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真正的 Pi：設定 `VibeMaker__Harness=Pi` 並啟動 Fake LLM。
 

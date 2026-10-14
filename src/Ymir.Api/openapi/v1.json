@@ -3286,7 +3286,8 @@
         "enum": [
           "Oidc",
           "Local",
-          "Dev"
+          "Dev",
+          "Google"
         ]
       },
       "BrandingResponse": {
@@ -4068,7 +4069,9 @@
           "oidc",
           "oidcDisplayName",
           "password",
-          "devLogin"
+          "devLogin",
+          "google",
+          "googleDisplayName"
         ],
         "type": "object",
         "properties": {
@@ -4086,6 +4089,15 @@
           },
           "devLogin": {
             "type": "boolean"
+          },
+          "google": {
+            "type": "boolean"
+          },
+          "googleDisplayName": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

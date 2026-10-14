@@ -70,8 +70,8 @@ internal static class AuthSetup
         services.AddSingleton<OidcSettingsTester>();
         services.AddSingleton<Ymir.VibeMaker.Application.Connectors.OneDrive.IOneDriveOAuthSettingsSource, Endpoints.OidcOneDriveSettingsSource>();
 
-        services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-            .AddCookie(options =>
+        var authentication = services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme);
+        authentication.AddCookie(options =>
             {
                 options.Cookie.Name = "ymir.auth";
                 options.Cookie.HttpOnly = true;
@@ -87,6 +87,12 @@ internal static class AuthSetup
                 // 每個請求確認帳號仍有效：Admin 停用後，既有 cookie 在下一個請求就失效（ADR-0009）。
                 options.Events.OnValidatePrincipal = CookiePrincipalValidator.ValidateAsync;
             });
+
+        // Google 帳號 SSO（ADR-0023）：只來自部署設定，設定了才註冊 scheme。
+        if (authOptions.Google.IsConfigured)
+        {
+            authentication.AddOpenIdConnect(GoogleLogin.Scheme, options => GoogleLogin.Configure(options, authOptions.Google, environment));
+        }
 
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
@@ -142,15 +148,17 @@ internal static class AuthSetup
     }
 
     /// <summary>
-    /// 至少要有一種登入方式；非 Development 的 OIDC authority 必須是 https（ADR-0009）。
+    /// 至少要有一種登入方式；非 Development 的 OIDC authority 必須是 https（ADR-0009）；Google 必須設定白名單（ADR-0023）。
     /// Development 另外有 dev 登入，所以兩者都關閉也可以啟動。
     /// </summary>
     internal static void ValidateLoginMethods(YmirAuthOptions options, IHostEnvironment environment)
     {
-        if (!environment.IsDevelopment() && !options.Oidc.IsConfigured && !options.LocalAccounts.Enabled)
+        if (!environment.IsDevelopment() && !options.Oidc.IsConfigured && !options.Google.IsConfigured && !options.LocalAccounts.Enabled)
         {
-            throw new InvalidOperationException("No login method is configured: set Ymir:Auth:Oidc or enable Ymir:Auth:LocalAccounts (ADR-0009).");
+            throw new InvalidOperationException("No login method is configured: set Ymir:Auth:Oidc or Ymir:Auth:Google, or enable Ymir:Auth:LocalAccounts (ADR-0009, ADR-0023).");
         }
+
+        GoogleLogin.Validate(options.Google, environment);
 
         if (options.Oidc.IsConfigured)
         {

@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-14 16:10 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-14 16:30 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -52,6 +52,7 @@
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
 | DM1 | 使用者之間的一對一訊息、右側成員面板（[ADR-0023](../adr/0023-user-direct-messages.md)） | ✅ | 使用者 2026-10-14 要求（簡易版 Teams）；SSE 即時、未讀／已讀、窄螢幕抽屜；分支 `claude/hopeful-ptolemy-4rodpw`，見 #064 |
+| G1 | **插單** Google 帳號 SSO 登入（[ADR-0024](../adr/0024-google-account-sso.md)） | ✅ | 部署設定白名單（`hd` 網域 / email）必填；實際連 Google 待使用者環境確認，見 #065 |
 | O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 📝 | ❓ADR 全文待使用者確認後才開始實作；決定事項已確認（刪除、移動、改名改為允許），見 #060 |
 | L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | ✅ | 已合併回 main（使用者 2026-10-13 要求）；管理 → 用量「依模型」卡片，模型名稱帶 provider；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058、#059 |
 | RAG2 | `/make` 新增「建立 RAG 知識庫」引導主題 | ✅ | 種子主題（管理員可調整／停用），引導到專案頁知識庫（每專案一份 SQLite），見 #061 |
@@ -106,6 +107,44 @@
 ---
 
 ## 💬 留言區
+
+### #066 · 七個分支版本整合驗證與重新部署準備
+
+> 👤 **Hermes（AI）** · 🕒 2026-10-14 · `🔬驗證`
+
+- 原盤點5分支已推送，後續同步取得DM與Google SSO，固定本輪整合範圍為7個tip；保留歷史、未刪分支、未force push。
+- 合併RAG引導種子、每模型用量、成員面板／私訊、Google登入；OneDrive ADR-0022仍為提議，不宣稱已實作。Google ADR改0024避免與DM的0023碰撞；保留e2e:dm與e2e:google，兩邊看板留言不刪除。
+- 最終驗證：後端build 0 warning/error，533單元、294整合全通過／0略過；前端lint、186 Vitest、build通過。Pi1.0.0＋Fake LLM／Fake OIDC，測試資料庫獨立暫時SQL完成後清理。
+- 正式站仍4b8a3af；下一步精確新版API及RuntimeHost、Platform DirectMessages／VibeMaker RagGuideMakeTopic審查SQL與備份後單次sudo部署。Google部署憑證不建立、不回傳、不自行啟用。
+
+---
+
+### #065 · Google 帳號 SSO 登入（ADR-0024）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-14 16:30 · `✅完成`
+
+- **需求**：新增一個登入方案，允許使用 Google 帳號做 SSO。
+- **做法**（細節見 [ADR-0024](../adr/0024-google-account-sso.md)、[指南](../guides/google-login.md)）：
+  - 與 Entra 相同的 Authorization Code + PKCE、後端換 token、不保存 IdP token；scheme `google`、callback `/signin-google`、入口 `GET /api/auth/login/google`。
+  - Google 帳號任何人都能申請：`Ymir:Auth:Google` 必須有 `AllowedDomains`（比對 `hd`，不看 email 字尾）或 `AllowedEmails`，否則拒絕啟動；`email_verified` 必須為 true；不符合時不建立使用者，導回 `/login?error=not_allowed`，稽核不記 email。
+  - 身分鍵 `iss`（固定存 `https://accounts.google.com`）+ `sub`；`AdminEmails` 每次登入同步角色；新 `AuthMethod.Google`（OneDrive 不會把它當成 Entra oid）。
+  - 只在部署設定（不做管理介面設定）；Fake OIDC 新增 `/google` 模擬；登入頁 Google 按鈕、設定頁說明。
+- **驗證**：
+  - `dotnet build Ymir.slnx` 0 警告；單元測試 533 通過（新增 `GoogleLoginTests` 10 個）。
+  - 整合測試全套 821 個：820 通過，`PiExecutionTests.SelectedModel_AndPersonalPlusProjectSystemPrompts_ReachTheModel` 在全套負載下失敗一次，單獨重跑 `PiExecutionTests` 3/3 通過（與登入無關的 Pi 測試）。新增 `GoogleLoginTests`（整合）13 個、授權矩陣加入新端點、OpenAPI 快照已更新。
+  - 前端 lint、179 Vitest、正式 build 通過。
+  - 端對端：Fake OIDC + API（Development）+ `npm start`，`npm run e2e:google` 三步通過，截圖 [登入頁](screenshots/google-login/01-login-google.png)、[登入後](screenshots/google-login/03-signed-in.png)、[未獲准](screenshots/google-login/04-not-allowed.png)。
+- **未驗證、待使用者環境確認**：實際連 Google（沙箱連不到）；需在 Google Cloud Console 建立 OAuth client、redirect URI 加 `https://<網域>/signin-google`，並在 `deploy/api/.env` 設定 client 與白名單。
+- **流程說明**：本 session 的指定開發分支為 `claude/jolly-fermat-rak1ja`，因此提交推送到該分支（未直接推 `main`）；需要時再合併回 `main`。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #064 · 使用者之間的一對一訊息（ADR-0023）
 

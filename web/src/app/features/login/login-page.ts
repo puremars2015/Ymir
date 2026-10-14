@@ -11,7 +11,12 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { LoginProviders, UserRole } from '../../core/api/api-types';
-import { isLocalPath, loginErrorMessage, oidcLoginUrl } from '../../core/auth/auth-rules';
+import {
+  googleLoginUrl,
+  isLocalPath,
+  loginErrorMessage,
+  oidcLoginUrl,
+} from '../../core/auth/auth-rules';
 import { AuthService } from '../../core/auth/auth.service';
 import { BrandingStore } from '../../core/branding/branding.store';
 import { PwaInstallService } from '../../core/pwa/pwa-install.service';
@@ -19,6 +24,7 @@ import { PwaInstallService } from '../../core/pwa/pwa-install.service';
 /**
  * 登入頁（ADR-0009）：依後端設定顯示
  * - 企業帳號（Entra ID）：整頁導向後端完成 OIDC，瀏覽器不持有任何 token（ADR-0002）；
+ * - Google 帳號（ADR-0024）：同樣整頁導向，後端只放行白名單內的網域 / email；
  * - 本機帳號密碼：給沒有企業帳號的人，由 Admin 建立；
  * - 開發登入：只在 Development。
  */
@@ -38,8 +44,14 @@ import { PwaInstallService } from '../../core/pwa/pwa-install.service';
           <a class="button primary sso" [href]="oidcUrl()">以{{ p.oidcDisplayName }}登入</a>
         }
 
+        @if (p.google) {
+          <a class="button sso google" [class.primary]="!p.oidc" [href]="googleUrl()">
+            以{{ p.googleDisplayName }}登入
+          </a>
+        }
+
         @if (p.password) {
-          @if (p.oidc) {
+          @if (p.oidc || p.google) {
             <p class="divider"><span>或使用 Ymir 帳號</span></p>
           }
           <form class="stack" (ngSubmit)="passwordLogin()">
@@ -72,7 +84,7 @@ import { PwaInstallService } from '../../core/pwa/pwa-install.service';
         }
 
         @if (p.devLogin) {
-          <details class="dev" [open]="!p.oidc && !p.password">
+          <details class="dev" [open]="!p.oidc && !p.google && !p.password">
             <summary>開發登入（只在 Development）</summary>
             <form class="stack" (ngSubmit)="devLogin()">
               <label>
@@ -144,6 +156,12 @@ import { PwaInstallService } from '../../core/pwa/pwa-install.service';
       text-decoration: none;
       padding: 0.75rem 1rem;
     }
+    /* 同時有企業帳號時，Google 是次要選項 */
+    .google:not(.primary) {
+      background: var(--surface-muted);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
     .divider {
       display: flex;
       align-items: center;
@@ -194,6 +212,7 @@ export class LoginPage implements OnInit {
 
   protected readonly queryError = computed(() => loginErrorMessage(this.error()));
   protected readonly oidcUrl = computed(() => oidcLoginUrl(this.returnUrl()));
+  protected readonly googleUrl = computed(() => googleLoginUrl(this.returnUrl()));
   protected readonly canSubmitPassword = computed(
     () => this.account().trim().length > 0 && this.password().length > 0,
   );
