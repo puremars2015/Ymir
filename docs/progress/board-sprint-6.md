@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-14 23:00 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-15 00:00 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -59,6 +59,8 @@
 | UPD1 | main 4b8a3af 正式更新產物與現況核對（歷史建置記錄） | 🔬 | API／RuntimeHost／511 單元測試／396 checksums 通過；保留當時未部署與權限受阻原文，原部署卡關已於 2026-10-14 13:00 部署解除，見 #062 |
 | DEP2 | 正式站更新至 main 4d7d4c0、`ymir-sql` 改掛持久化 volume | ✅ | API health／登入頁通過；外部網域登入與 SSE 待使用者以瀏覽器確認，見 #068 |
 | FIX413 | 長對話一直顯示「模型發生錯誤」：LiteLLM proxy 的 nginx 1 MB 上限 | ✅ | 設定已納入版控並寫入安裝手冊；正式主機重啟 proxy 後使用者確認原對話恢復，見 #069 |
+| UI-IND | 執行中且尚未顯示回答時一定顯示「正在思考中」/「正在工作中」 | 🔬 | 已 commit，lint／193 Vitest／build 通過；尚未部署到正式站，見 #070 |
+| CRASH1 | 正式 API 在 .NET GC 執行緒 fail-fast 重啟（Cloudflare 回 origin 錯誤） | 🔬 | 10/13 起 8 次；原因未定，待決定診斷 / 緩解方式，見 #071 |
 | DOC1 | 精簡 README 專案入口 | ✅ | 保留介紹／功能／技術／開發／文件導覽，移除歷史主機快照與實作流水帳，見 #056 |
 | ARCH1 | 現況系統架構圖與專案導覽 | ✅ | 根目錄 architecture.md、五張 Mermaid 圖與 README 入口；區分正式部署／可選功能／未驗證項目，見 #058 |
 | LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #039 |
@@ -109,6 +111,43 @@
 ---
 
 ## 💬 留言區
+
+### #071 · 正式 API 週期性崩潰：.NET GC 執行緒 fail-fast（exit 139）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-15 00:00 · `🔬驗證`
+
+- **現象**：使用者看到 Cloudflare「The origin web server returned an invalid or incomplete response」。2026-10-14 23:51:11 與 23:51:20 `ymir-api` 連續兩次 `status=139` 結束，systemd 自動重啟，第三次啟動後對帳把執行中的那次 execution 標成 FAILED，之後穩定。當時 Agent 正在處理上傳的 `.pptx`，最後一個工具是讀取擷取出的圖片。
+- **證據（實際查詢）**：kernel log 每次都是 `traps: .NET Server GC / .NET BGC … general protection fault … in libc.so.6[289a2…]`；以 API image 的 glibc 2.39（Ubuntu 24.04）對照，`0x289a2` 位於 `abort()` 內，代表 .NET runtime 在 GC 執行緒主動 fail-fast（通常是 GC 發現 managed heap 毀損）。journal 沒有 .NET 的錯誤輸出（container 唯讀，沒有 dump）。
+- **不是這次部署造成**：同一位址的崩潰 10/13 15:03 起共 8 次（10/13 15:03、15:12、16:20，10/14 04:30、16:27、18:23、23:51×2），前 6 次是舊 image（4b8a3af，.NET 10.0.12），每次都是 `ymir-api`。沒有 OOM（記憶體高峰約 316 MB）。
+- **❓待決定**：根因需要 crash report / dump 才能確認。建議 (1) 掛一個可寫目錄並設定 `DOTNET_DbgEnableMiniDump` / `DOTNET_EnableCrashReport` 取得下一次崩潰的堆疊；(2) 同時以 `DOTNET_gcServer=0`（workstation GC）作為緩解觀察。兩者都要修改 Quadlet 並重啟 API（中斷數秒）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #070 · 執行中一定顯示「正在思考中」/「正在工作中」
+
+> 👤 **Claude（AI）** · 🕒 2026-10-15 00:00 · `🔬驗證`
+
+- **需求**：使用者要求 Agent 還在執行、還沒顯示回答時，一定要看得到「正在工作中」或「正在思考中」的字樣。
+- **原本的缺口**：沒有工具執行也沒有狀態訊息時只顯示沒有文字的 `●●●`；後端送了狀態訊息（例如「正在準備回覆」）時只顯示該訊息；模型輸出仍在 `<think>` 區塊內被顯示過濾時也只有 `●●●`。
+- **修改**：`execution-state.ts` 新增純函式 `liveIndicator`：執行中且工具在跑（含工具之間的空檔）→「正在工作中......」；執行中且沒有可顯示的回答 →「正在思考中......」；回答出現或執行結束後不顯示。狀態訊息改為第二行補充說明，提示文字保留閃爍動畫。`e2e/tool-progress-flow.mjs` 使用的「正在工作中......」字樣不變。
+- **驗證（實際執行，node:24 container）**：`npm run lint` 通過；`npm test` 37 檔 193 項通過（新增 `liveIndicator` 7 項）；`npm run build` 完成。未跑瀏覽器 e2e。
+- **未部署**：正式站仍是 4d7d4c0，需重建 API image 才會生效。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #069 · 長對話一直顯示「模型發生錯誤」：LiteLLM proxy 回 413
 
