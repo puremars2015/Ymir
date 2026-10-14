@@ -28,7 +28,7 @@
 | [0022](0022-onedrive-linked-files.md) | 讓 Agent 處理使用者指定的 OneDrive 檔案（含刪除、移動、改名） | 提議中 |
 | [0023](0023-user-direct-messages.md) | 使用者之間的一對一訊息（右側成員名單、SSE 即時通知） | 已採納 |
 | [0024](0024-google-account-sso.md) | Google 帳號 SSO 登入 | 已採納 |
-| [0025](0025-ymir-resource-monitoring-and-reclamation.md) | Ymir 資源監控與安全自動回收 | 提議中（只管理 Ymir；主機權限邊界待確認） |
+| [0025](0025-ymir-resource-monitoring-and-reclamation.md) | Ymir 資源監控與安全自動回收 | 已採納 |
 
 新增 ADR 時複製以下格式：
 

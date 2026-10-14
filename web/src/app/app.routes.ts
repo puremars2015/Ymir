@@ -63,6 +63,12 @@ export const routes: Routes = [
         title: '系統設定 · Vibe Maker',
       },
       {
+        path: 'admin/resources',
+        canActivate: [adminGuard],
+        loadComponent: () => import('./features/admin/resources-page').then((m) => m.ResourcesPage),
+        title: '系統資源 · Vibe Maker',
+      },
+      {
         path: 'admin/usage',
         canActivate: [adminGuard],
         loadComponent: () => import('./features/admin/usage-page').then((m) => m.UsagePage),

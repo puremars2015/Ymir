@@ -3,8 +3,11 @@
 # API 在容器內不執行 Podman，也不掛載任何 container runtime socket：Agent runtime 由主機上的 runtime host 管理
 # （VibeMaker:Runtime:Provider=Remote），部署方式見 deploy/api/README.md。
 
+# 每個階段都標記 ymir.managed（ADR-0025 §2）：主機維護服務只把有這個 label 的 image（含建置留下的中間層）視為 Ymir 的。
+
 # ---- Angular ----
 FROM docker.io/library/node:24-bookworm-slim AS web
+LABEL ymir.managed="true"
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -13,6 +16,7 @@ RUN npm run build
 
 # ---- .NET publish ----
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS api
+LABEL ymir.managed="true"
 WORKDIR /src
 # .editorconfig 含分析器設定（警告視為錯誤），必須一起複製。
 COPY .editorconfig global.json nuget.config Directory.Build.props Directory.Packages.props ./
@@ -21,6 +25,7 @@ RUN dotnet publish src/Ymir.Api/Ymir.Api.csproj -c Release -o /out /p:UseAppHost
 
 # ---- runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
+LABEL ymir.managed="true"
 WORKDIR /app
 COPY --from=api /out ./
 COPY --from=web /src/web/dist/ymir-web/browser ./wwwroot

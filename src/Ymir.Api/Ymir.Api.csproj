@@ -8,6 +8,7 @@
     <ProjectReference Include="..\Ymir.Edge\Ymir.Edge.csproj" />
     <ProjectReference Include="..\Platform\Ymir.Platform.Infrastructure\Ymir.Platform.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\VibeMaker\Ymir.VibeMaker.Infrastructure\Ymir.VibeMaker.Infrastructure.csproj" />
+    <ProjectReference Include="..\Ymir.Maintenance\Ymir.Maintenance.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Ymir.UnitTests" />

@@ -9,7 +9,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 |---|---|
 | `docs/sa/vibe-maker-core-mvp-sa.md` | SA（需求、資料模型、API、SSE 契約、驗收條件），以章節編號引用，例如「SA §10」 |
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
-| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0024；索引見 `docs/adr/README.md`） |
+| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0025；索引見 `docs/adr/README.md`） |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
 | `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
@@ -25,6 +25,8 @@ src/
   Ymir.McpGateway/                   平台 MCP Gateway（ADR-0012 B）：驗證每人短期 token、依 deploy/mcp/servers.json 轉送到後端、rate limit、稽核
   Ymir.SiteHost/                     網站託管（ADR-0016）：依 Host（{slug}.{BaseDomain}）提供使用者發布的靜態網站，唯讀
   Ymir.RuntimeHost/                  主機服務（ADR-0008）：Unix socket + token，以 user id 管理 Agent container、WebSocket 轉送 stdio
+  Ymir.Maintenance/                  主機維護服務的協定、訊息、生命週期鎖（LifecycleLock）與 API 端 client（ADR-0025）
+  Ymir.MaintenanceHost/              主機維護服務（ADR-0025，root）：主機資源與 Ymir container / image 盤點、保護分類、門檻與安全自動回收
   Platform/Ymir.Platform[.Infrastructure]/         共用核心：使用者、本機帳號密碼（LocalCredential）、身份（ICurrentUser）、稽核；schema platform
   Modules/VibeMaker/Ymir.VibeMaker/                Domain/（實體、狀態機）+ Application/（Projects、Conversations、Executions 用例；IAgentHarness、IAgentRuntimeManager、IModelGateway）
   Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/ Persistence/（EF Core，schema vibemaker）、Executions/（背景 worker、事件 bus）、PiAgent/、Containers/（Podman / Docker）、Runtime/（Local，開發用；Remote/：呼叫 runtime host）、Dev/（Scripted harness）
@@ -43,6 +45,7 @@ deploy/api/                          API container：Linux 用 rootful Podman + 
 deploy/mcp/                          平台 MCP 服務目錄 servers.json（版控）、gateway 的 systemd unit 與設定範本
 deploy/sites/                        SiteHost 的 systemd unit、設定範本與網域 / Tunnel 說明
 deploy/runtime-host/                 runtime host 的 systemd unit、設定範本與安裝指南
+deploy/maintenance/                  主機維護服務（ADR-0025）的 systemd unit、鎖目錄 tmpfiles、設定範本與安裝指南；舊的 ymir-image-prune 人工工具
 spikes/pi-rpc-poc/                   技術驗證主控台程式
 ```
 
@@ -93,6 +96,8 @@ cd web && WORKSPACE_ROOT=<工作目錄根> CHROMIUM_PATH=/opt/pw-browsers/chromi
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:mcp -- <截圖目錄>
 # 知識庫（ADR-0014；Fake LLM + API 的 VibeMaker__Rag__EmbeddingModel 等，見 web/e2e/knowledge-flow.mjs 開頭）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:knowledge -- <截圖目錄>
+# 系統資源（ADR-0025；需要主機維護服務與 API 的 Ymir__Maintenance__*，見 web/e2e/resources-flow.mjs 開頭；只查詢與 dry run）
+cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:resources -- <截圖目錄> [baseUrl]
 # 使用者之間的訊息（ADR-0023；同 e2e 的前置，Scripted harness 即可）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:dm -- <截圖目錄>
 
@@ -138,6 +143,8 @@ OneDrive connector（ADR-0013）：管理員開放 `oneDrive` 能力後，使用
 RAG 知識庫（ADR-0014）：專案擁有者在專案頁上傳文件（`/api/projects/{id}/knowledge/*`），`KnowledgeIndexWorker` 背景擷取（TXT / Markdown / 文字型 PDF / DOCX）→ `TextChunker` 切段 → 經 LiteLLM `/v1/embeddings`（使用者 virtual key，模型 `VibeMaker:Rag:EmbeddingModel`，沒設定時停用）→ 寫入每專案一份 SQLite（`SqliteVectorStore`，暴力餘弦搜尋）。原始檔與 SQLite 放在 API 自己的 volume `Ymir:Knowledge:Root/<userId>/<projectId>/`（不是 Agent workspace、不掛給 Agent）；新版本索引成功才切換（filtered unique index：同檔名只一份 Ready），失敗保留舊版本，重啟時 `ReconcileAsync` 重做。問答 `POST /api/projects/{id}/knowledge/ask`（`KnowledgeQueryService`）：只在該專案、相同 embedding 模型的 Ready 版本中檢索，低於 `MinScore` 回「資料不足」且不呼叫模型；只有 `VibeMaker:Models:N:AllowKnowledgeBase=true` 的模型會收到片段（否則只回段落），片段放在 `<knowledge>` 資料區塊並要求以 `[n]` 標註。
 
 網站託管（ADR-0016，`deploy/sites/README.md`）：檔案面板「發布網站」選含 `index.html` 的目錄 → `SiteService` 經 `IWorkspaceFileReader` 複製到網站 volume `Ymir:Sites:Root/{siteId}/{versionId}/`（完整寫好才切換 `CurrentVersionId`，保留最近 3 版，失敗不影響目前版本）；`Ymir.SiteHost` 依 Host 找網站、只提供版本目錄內的檔案（路徑逐段檢查、SPA 模式無副檔名回 index.html、`nosniff`）。網站網域（`Ymir:Sites:BaseUrl`）必須與 Ymir 登入網域不同；API 不掛載 workspace，SiteHost 唯讀、不執行使用者程式。存取模式（`PUT /api/sites/{id}/access`）：公開 / 所有 Ymir 使用者 / 指定使用者（`vibemaker.site_shares`），擁有者與 Admin 一律可看（`SiteAccessRules.CanView`，API 與 SiteHost 共用）。私人網站：SiteHost 導向平台 `/site-access` → 前端 `POST /api/sites/{id}/ticket`（60 秒、一次性、只存雜湊）→ SiteHost `/.ymir/auth` 兌換成只限該 hostname、綁定網站的 `ymir_site` cookie；每個請求重新檢查帳號狀態與分享（快取 ≤ 30 秒）。平台 cookie 不得送到網站網域；導回路徑只接受站內相對路徑（`SafeReturnPath`）。
+
+系統資源與安全自動回收（ADR-0025，指南 `deploy/maintenance/README.md`）：獨立的 root 服務 `Ymir.MaintenanceHost`（Unix socket + token，端點只有資源 / 政策 / 紀錄 / dry run，不得新增接受路徑、store、image 或 container 參數的端點；改動時同步更新 `MaintenanceHostProtocolTests.ExposesOnlyTheReviewedEndpoints`）。只管理 Ymir：image 需在設定的 repository 且帶 `ymir.managed=true` label 或已登記，Agent container 需帶 `ymir.reclaimable=agent-runtime`；保護規則在 `Classifier`（純函式，fail closed），不得使用 `--force`、`system prune` 或全 store prune，不得停止任何 container。刪除前重新盤點並取生命週期鎖（`LifecycleLock`：runtime host 的 `VibeMaker:Runtime:LifecycleLockDirectory` 在建立 / 啟動 / 停止 / 刪除時持有 `user-<id>.lock`，部署以 `flock deploy.lock`）；鎖目錄不可用時只監控與 dry run。API `/api/admin/resources*`（Admin + XSRF），政策存 `platform.system_settings`（`maintenance.reclamation_policy`），`MaintenanceSyncWorker` 每分鐘同步並把有動作的回收寫入稽核 `maintenance.reclaim`；未設定 `Ymir:Maintenance:Endpoint` 時頁面顯示不支援。
 
 使用者之間的訊息（ADR-0023）：共用核心 `platform.direct_messages`、`IDirectMessageService` / `IDirectMessageHub`（程序內，只支援單一 API 程序）；端點 `/api/direct-messages`（`contacts`、`{peerId}`、`{peerId}/read`、SSE `events`），一律以目前使用者為其中一方，收件者不存在 / 停用 / 自己都回 404；訊息不寫稽核。前端 shell 右側 `app-people-panel`（`DirectMessageStore`，每次 SSE `ready` 重新讀取補齊），訊息只以文字綁定顯示。
 

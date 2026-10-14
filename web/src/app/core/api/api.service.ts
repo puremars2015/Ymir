@@ -38,7 +38,12 @@ import {
   SaveMcpServerAccessRequest,
   SaveUserExtensionsRequest,
   UserExtensions,
+  AdminDryRun,
+  AdminReclaimRuns,
+  AdminResources,
   AdminUsage,
+  ReclamationPolicy,
+  ReclamationPolicyResponse,
   ServiceHealth,
   WorkspaceFiles,
   AdminUser,
@@ -203,6 +208,27 @@ export class ApiService {
 
   adminResetRuntimePolicy(): Observable<RuntimePolicy> {
     return this.http.delete<RuntimePolicy>('/api/admin/settings/runtime');
+  }
+
+  /** 系統資源（ADR-0025）：主機資源與 Ymir 的 container / image。 */
+  adminGetResources(): Observable<AdminResources> {
+    return this.http.get<AdminResources>('/api/admin/resources');
+  }
+
+  adminGetReclamationPolicy(): Observable<ReclamationPolicyResponse> {
+    return this.http.get<ReclamationPolicyResponse>('/api/admin/resources/policy');
+  }
+
+  adminSaveReclamationPolicy(policy: ReclamationPolicy): Observable<ReclamationPolicyResponse> {
+    return this.http.put<ReclamationPolicyResponse>('/api/admin/resources/policy', policy);
+  }
+
+  adminGetReclaimRuns(): Observable<AdminReclaimRuns> {
+    return this.http.get<AdminReclaimRuns>('/api/admin/resources/runs');
+  }
+
+  adminReclaimDryRun(): Observable<AdminDryRun> {
+    return this.http.post<AdminDryRun>('/api/admin/resources/dry-run', null);
   }
 
   /** Agent 擴充能力的全域預設（ADR-0012）。 */

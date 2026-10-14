@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Ymir.Maintenance;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Domain;
 using Ymir.VibeMaker.Infrastructure.Processes;
@@ -33,6 +34,7 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
         // 同一使用者序列化，避免兩個 request 同時建立兩個 container（SA §14）。
         var userLock = _userLocks.GetOrAdd(userId, _ => new SemaphoreSlim(1, 1));
         await userLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        using var lifecycleLock = await AcquireLifecycleLockAsync(userId, cancellationToken).ConfigureAwait(false);
         try
         {
             var runtimeId = _runtimesByUser.TryGetValue(userId, out var known) ? known.RuntimeId : Guid.NewGuid();
@@ -91,6 +93,7 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
     public async Task StartAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
         var runtime = Find(runtimeId);
+        using var lifecycleLock = await AcquireLifecycleLockAsync(runtime.UserId, cancellationToken).ConfigureAwait(false);
         await RunContainerCliAsync(ContainerCommandBuilder.BuildStartArguments(runtime.UserId), cancellationToken).ConfigureAwait(false);
         _runtimesByUser[runtime.UserId] = runtime with { Status = RuntimeStatus.Running };
     }
@@ -105,6 +108,7 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
     public async Task DeleteAsync(Guid runtimeId, CancellationToken cancellationToken)
     {
         var runtime = Find(runtimeId);
+        using var lifecycleLock = await AcquireLifecycleLockAsync(runtime.UserId, cancellationToken).ConfigureAwait(false);
         // 只移除 container；使用者的 workspace 與 agent-state 目錄保留（SA §15）。
         await RunContainerCliAsync(ContainerCommandBuilder.BuildRemoveArguments(runtime.UserId), cancellationToken).ConfigureAwait(false);
         _runtimesByUser.TryRemove(runtime.UserId, out _);
@@ -134,6 +138,7 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
         // 與 EnsureRuntime 共用同一個 lock，避免停止到剛啟動、正要執行程序的 container。
         var userLock = _userLocks.GetOrAdd(userId, _ => new SemaphoreSlim(1, 1));
         await userLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        using var lifecycleLock = await AcquireLifecycleLockAsync(userId, cancellationToken).ConfigureAwait(false);
         try
         {
             var state = (await InspectAsync(userId, cancellationToken).ConfigureAwait(false))?.State;
@@ -185,6 +190,28 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
     }
 
     /// <summary>container 不存在時回傳 null。</summary>
+    /// <summary>
+    /// 跨程序的生命週期鎖（ADR-0025 §4）：主機維護服務刪除停止的 runtime 前會取同一把鎖，避免刪到正在建立或啟動的 container。
+    /// 未設定或目錄不存在時回傳 null（維護服務同樣因為鎖不可用而不會自動刪除，所以不需要拒絕執行）。
+    /// </summary>
+    private async Task<IDisposable?> AcquireLifecycleLockAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        if (_options.LifecycleLockDirectory is not { } directory)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await LifecycleLock.AcquireAsync(directory, LifecycleLock.UserLockFileName(userId), cancellationToken).ConfigureAwait(false);
+        }
+        catch (LifecycleLockUnavailableException ex)
+        {
+            logger.LogWarning(ex, "Lifecycle lock directory is unavailable; continuing with the in-process lock only");
+            return null;
+        }
+    }
+
     private async Task<(string State, string? NetworkLabel)?> InspectAsync(Guid userId, CancellationToken cancellationToken)
     {
         var (exitCode, output, _) = await ExecuteContainerCliAsync(ContainerCommandBuilder.BuildInspectStatusArguments(userId), cancellationToken)

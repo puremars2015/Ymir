@@ -190,6 +190,15 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         },
         ["DELETE /api/admin/settings/runtime"] = () => new HttpRequestMessage(HttpMethod.Delete, "/api/admin/settings/runtime"),
         ["GET /api/admin/usage"] = () => Get("/api/admin/usage?days=7"),
+        // 系統資源（ADR-0025）：只限 Admin，寫入需 XSRF。
+        ["GET /api/admin/resources/"] = () => Get("/api/admin/resources"),
+        ["GET /api/admin/resources/policy"] = () => Get("/api/admin/resources/policy"),
+        ["PUT /api/admin/resources/policy"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/resources/policy")
+        {
+            Content = JsonContent.Create(Ymir.Maintenance.ReclamationPolicy.Default),
+        },
+        ["GET /api/admin/resources/runs"] = () => Get("/api/admin/resources/runs"),
+        ["POST /api/admin/resources/dry-run"] = () => new HttpRequestMessage(HttpMethod.Post, "/api/admin/resources/dry-run"),
         ["GET /api/admin/settings/extensions"] = () => Get("/api/admin/settings/extensions"),
         ["PUT /api/admin/settings/extensions"] = () => new HttpRequestMessage(HttpMethod.Put, "/api/admin/settings/extensions")
         {

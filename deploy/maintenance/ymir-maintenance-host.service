@@ -1,0 +1,36 @@
+# Ymir 主機維護服務（ADR-0025）：資源監控與安全自動回收。安裝步驟見同目錄 README.md「主機維護服務」。
+# 複製到 /etc/systemd/system/ymir-maintenance-host.service。
+# 以 root 執行：需要讀取 root 的 Podman store，並以 runuser 查詢 ymir / itadmin 的 rootless store；
+# root 權限只在這個服務，runtime host 維持 rootless、API 不掛載 container runtime socket（ADR-0008）。
+[Unit]
+Description=Ymir maintenance host (resource monitoring and safe reclamation)
+After=network-online.target ymir-runtime-host.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+# socket 的 group：API 容器以這個 group 存取（socket 660、目錄 750）；與 runtime host 相同。
+Group=ymir-runtime
+UMask=0077
+RuntimeDirectory=ymir-maintenance
+RuntimeDirectoryMode=0750
+# API 容器以 bind mount 掛載這個目錄：服務重啟時保留目錄，避免 API 容器的掛載點失效。
+RuntimeDirectoryPreserve=yes
+# 觀測狀態、政策與回收紀錄：/var/lib/ymir-maintenance（700）。
+StateDirectory=ymir-maintenance
+StateDirectoryMode=0700
+WorkingDirectory=/opt/ymir/maintenance-host
+# Token 與 store 設定；權限 600，擁有者 root。範本：maintenance-host.env.example。
+EnvironmentFile=/etc/ymir/maintenance-host.env
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_CLI_TELEMETRY_OPTOUT=1
+ExecStart=/opt/ymir/maintenance-host/Ymir.MaintenanceHost
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

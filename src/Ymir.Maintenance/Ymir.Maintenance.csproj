@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ymir.MaintenanceHost" />
+    <InternalsVisibleTo Include="Ymir.Api" />
+    <InternalsVisibleTo Include="Ymir.UnitTests" />
+    <InternalsVisibleTo Include="Ymir.IntegrationTests" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+</Project>

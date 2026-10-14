@@ -5,6 +5,9 @@
 # 一個使用者一個長駐 container（CMD sleep infinity，ADR-0007），API 以 `podman exec -i` 啟動 `pi --mode rpc`。
 FROM docker.io/library/node:24-bookworm-slim
 
+# 主機維護服務只把有這個 label 的 image 視為 Ymir 的（ADR-0025 §2）。
+LABEL ymir.managed="true"
+
 # Pi 版本鎖定；升級時需同步更新 tests/Ymir.UnitTests/Fixtures/pi-rpc 並重跑整合測試。
 ARG PI_VERSION=1.0.0
 

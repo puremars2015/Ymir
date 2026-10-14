@@ -141,6 +141,16 @@ public class ContainerCommandBuilderTests
         Assert.Contains($"ymir.user-id={UserId:D}", ValuesAfter(args, "--label"));
     }
 
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public void Run_MarksAgentRuntimeAsYmirManagedAndReclaimable(RuntimeProvider provider)
+    {
+        // ADR-0025 §4：主機維護服務只回收同時有這兩個 label 的停止 Agent runtime。
+        var labels = ValuesAfter(RunArguments(provider), "--label");
+        Assert.Contains("ymir.managed=true", labels);
+        Assert.Contains("ymir.reclaimable=agent-runtime", labels);
+    }
+
     [Fact]
     public void Exec_UsesProjectWorkingDirectory()
     {

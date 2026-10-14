@@ -112,6 +112,8 @@ sudo systemctl restart ymir-api.service
 curl -f http://127.0.0.1:5080/health
 ```
 
+安裝主機維護服務（ADR-0025，[deploy/maintenance](../maintenance/README.md#主機維護服務ymir-maintenance-hostadr-0025)）後，建置與切換 image 的步驟要以部署鎖包住（`sudo flock /run/ymir-lifecycle/deploy.lock …`），維護服務在這段期間不會刪除 image。
+
 RuntimeHost 的更新需另外 publish 至 `/opt/ymir/runtime-host` 並重啟 `ymir-runtime-host.service`；先確認沒有執行中的 Agent 工作。
 
 更新時的注意事項（2026-10-14 實際部署時遇到）：

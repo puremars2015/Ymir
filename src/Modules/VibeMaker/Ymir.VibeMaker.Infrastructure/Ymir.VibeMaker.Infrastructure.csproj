@@ -9,6 +9,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Ymir.VibeMaker\Ymir.VibeMaker.csproj" />
     <ProjectReference Include="..\..\..\Platform\Ymir.Platform.Infrastructure\Ymir.Platform.Infrastructure.csproj" />
+    <!-- 與主機維護服務共用的生命週期鎖（ADR-0025） -->
+    <ProjectReference Include="..\..\..\Ymir.Maintenance\Ymir.Maintenance.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Ymir.UnitTests" />

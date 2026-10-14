@@ -1,6 +1,6 @@
 # ADR-0025：Ymir 資源監控與安全自動回收
 
-- 狀態：提議中（功能與範圍已確認；新增主機權限邊界待確認）
+- 狀態：已採納（使用者 2026-10-15 要求依此文件實作，含新增的主機權限邊界）
 - 日期：2026-10-15
 
 ## 背景
@@ -9,7 +9,7 @@
 
 正式 API／入口容器在 rootful Podman，Agent 在 `ymir` rootless Podman，開發建置可能在共用的 `itadmin` store。ADR-0008 的 RuntimeHost 沒有 root store 權限，也不能讓 API 直接掛載 Podman socket。現有 `deploy/maintenance/ymir-image-prune.sh` 是人工／timer 工具，其 store-wide dangling 清理不足以證明 Ymir 歸屬，不能直接作為新功能的自動刪除實作。
 
-## 決策（提議）
+## 決策
 
 ### 1. 管理範圍與介面
 
@@ -60,3 +60,13 @@
 ## 影響
 
 新增獨立主機管理信任邊界與部署服務；此 ADR 僅擴充資源盤點及受限回收能力，ADR-0008 的 RuntimeHost rootless、API 不接 engine socket、不接受任意主機參數等限制維持不變。CPU／RAM 監控是全主機資料，回收權限則僅限 Ymir。保護資料優先於強行達到資源門檻。
+
+## 實作（2026-10-15）
+
+- 專案：`src/Ymir.Maintenance`（協定、訊息、`LifecycleLock`、API 端的 `MaintenanceClient`）、`src/Ymir.MaintenanceHost`（root 服務：盤點、分類、門檻、回收、紀錄）。部署檔在 `deploy/maintenance/`（systemd unit、tmpfiles、env 範本、安裝步驟）。
+- 協定：Unix socket `/run/ymir-maintenance/maintenance.sock` + bearer token；端點只有 `GET /v1/resources`、`GET|PUT /v1/policy`、`GET /v1/runs?after=`、`POST /v1/dry-run`（`MaintenanceHostProtocolTests` 固定這份清單）。
+- 歸屬標記：image 的 `ymir.managed=true`（API 與 Agent Containerfile 每個階段）、Agent container 的 `ymir.managed=true` 與 `ymir.reclaimable=agent-runtime`（`ContainerCommandBuilder`）；既有物件以 `RegisteredImages` 登記。
+- 生命週期鎖：`/run/ymir-lifecycle/user-<id>.lock`（runtime host 的 `VibeMaker:Runtime:LifecycleLockDirectory`，建立 / 啟動 / 停止 / 刪除時持有）與 `deploy.lock`（部署腳本以 `flock` 持有）；advisory flock，維護服務以不等待方式取得，取不到就略過。
+- API：`/api/admin/resources`、`/policy`、`/runs`、`/dry-run`（Admin + XSRF）；政策存 `platform.system_settings` 的 `maintenance.reclamation_policy`，`MaintenanceSyncWorker` 每分鐘同步並把有動作的回收紀錄寫入稽核 `maintenance.reclaim`。前端「管理 → 系統資源」。
+- 驗證以假的 container CLI 與時間（單元）及真正的 Unix socket 服務（整合）完成；正式主機的安裝與啟用另行授權（實作與驗證順序第 6 步）。
+

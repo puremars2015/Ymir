@@ -22,6 +22,9 @@ EnvironmentFile=/etc/ymir/api.env
 # 主機上唯一需要的兩個資料夾；不掛載任何 container runtime socket 或使用者 workspace。
 Volume=/run/ymir-runtime:/run/ymir-runtime
 Volume=/srv/ymir/api/keys:/var/lib/ymir/keys
+# 主機維護服務（ADR-0025，系統資源頁）：安裝 deploy/maintenance 的 ymir-maintenance-host 之後才取消註解，
+# 並在 /etc/ymir/api.env 設定 Ymir__Maintenance__*。目錄不存在時 Podman 會拒絕啟動 API，所以不要提前加。
+#Volume=/run/ymir-maintenance:/run/ymir-maintenance
 # 讓容器內使用者（uid 1654）屬於 socket 的 group。用 PodmanArgs 以相容 Podman 4.x（5.x 也可改用 GroupAdd=）。
 PodmanArgs=--group-add=<ymir-runtime gid>
 

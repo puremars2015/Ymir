@@ -57,6 +57,12 @@ public sealed partial class RuntimeOptions
     /// <summary>閒置檢查間隔（秒）。</summary>
     public double IdleCheckIntervalSeconds { get; set; } = 60;
 
+    /// <summary>
+    /// 與主機維護服務、部署腳本共用的生命週期鎖目錄（ADR-0025 §4）：建立 / 啟動 / 停止 / 刪除使用者的 runtime 時持有該使用者的鎖，
+    /// 維護服務刪除停止的 runtime 前取同一把鎖。未設定時只用程序內的鎖（維護服務也不會自動刪除）。
+    /// </summary>
+    public string? LifecycleLockDirectory { get; set; }
+
     /// <summary>Container CLI；未設定時依 <see cref="Provider"/> 使用 <c>podman</c> 或 <c>docker</c>。</summary>
     public string? ContainerExecutable { get; set; }
 

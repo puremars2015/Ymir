@@ -3,6 +3,8 @@
     <Project Path="src/Ymir.Api/Ymir.Api.csproj" />
     <Project Path="src/Ymir.AppHost/Ymir.AppHost.csproj" />
     <Project Path="src/Ymir.Edge/Ymir.Edge.csproj" />
+    <Project Path="src/Ymir.Maintenance/Ymir.Maintenance.csproj" />
+    <Project Path="src/Ymir.MaintenanceHost/Ymir.MaintenanceHost.csproj" />
     <Project Path="src/Ymir.McpGateway/Ymir.McpGateway.csproj" />
     <Project Path="src/Ymir.RuntimeHost/Ymir.RuntimeHost.csproj" />
     <Project Path="src/Ymir.SiteHost/Ymir.SiteHost.csproj" />
@@ -12,6 +14,7 @@
     <Project Path="src/Platform/Ymir.Platform/Ymir.Platform.csproj" />
     <Project Path="src/Platform/Ymir.Platform.Infrastructure/Ymir.Platform.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/src/Modules/" />
   <Folder Name="/src/Modules/VibeMaker/">
     <Project Path="src/Modules/VibeMaker/Ymir.VibeMaker/Ymir.VibeMaker.csproj" />
     <Project Path="src/Modules/VibeMaker/Ymir.VibeMaker.Contracts/Ymir.VibeMaker.Contracts.csproj" />

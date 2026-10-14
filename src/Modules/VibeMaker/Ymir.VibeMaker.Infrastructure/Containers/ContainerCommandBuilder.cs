@@ -20,6 +20,14 @@ internal static class ContainerCommandBuilder
 
     public static string NetworkLabelValue(RuntimeNetworkAccess network) => network == RuntimeNetworkAccess.Restricted ? "restricted" : "internet";
 
+    /// <summary>
+    /// 主機維護服務的歸屬與回收標記（ADR-0025 §2、§4）：Agent runtime 可由 user id 重建、workspace 外置，
+    /// 停止後可被安全回收；沒有這兩個 label 的既有 container 不會被自動刪除。
+    /// </summary>
+    public const string ManagedLabel = "ymir.managed=true";
+
+    public const string ReclaimableLabel = "ymir.reclaimable=agent-runtime";
+
     /// <summary>沒有 label 的既有 container（A1b 之前建立）視為可以對外連線。</summary>
     public static RuntimeNetworkAccess NetworkOfLabel(string? value) =>
         value == "restricted" ? RuntimeNetworkAccess.Restricted : RuntimeNetworkAccess.Internet;
@@ -59,6 +67,8 @@ internal static class ContainerCommandBuilder
             "--label", $"ymir.user-id={userId:D}",
             "--label", $"ymir.runtime-id={runtimeId:D}",
             "--label", $"{NetworkLabel}={NetworkLabelValue(network)}",
+            "--label", ManagedLabel,
+            "--label", ReclaimableLabel,
             .. userMapping,
             "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges",

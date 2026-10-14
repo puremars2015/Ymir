@@ -1481,6 +1481,114 @@
         }
       }
     },
+    "/api/admin/resources": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetResources",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminResourcesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/resources/policy": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetReclamationPolicy",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReclamationPolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminSaveReclamationPolicy",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReclamationPolicy"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReclamationPolicyResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/resources/runs": {
+      "get": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminGetReclaimRuns",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminReclaimRunsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/resources/dry-run": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminReclaimDryRun",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminDryRunResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/settings/extensions": {
       "get": {
         "tags": [
@@ -2901,6 +3009,32 @@
   },
   "components": {
     "schemas": {
+      "AdminDryRunResponse": {
+        "required": [
+          "supported",
+          "available",
+          "result"
+        ],
+        "type": "object",
+        "properties": {
+          "supported": {
+            "type": "boolean"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/DryRunResult"
+              }
+            ]
+          }
+        }
+      },
       "AdminMakeTopicResponse": {
         "required": [
           "id",
@@ -2994,6 +3128,54 @@
             "items": {
               "$ref": "#/components/schemas/RuntimeSummaryResponse"
             }
+          }
+        }
+      },
+      "AdminReclaimRunsResponse": {
+        "required": [
+          "supported",
+          "available",
+          "runs"
+        ],
+        "type": "object",
+        "properties": {
+          "supported": {
+            "type": "boolean"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReclaimRun"
+            }
+          }
+        }
+      },
+      "AdminResourcesResponse": {
+        "required": [
+          "supported",
+          "available",
+          "snapshot"
+        ],
+        "type": "object",
+        "properties": {
+          "supported": {
+            "type": "boolean"
+          },
+          "available": {
+            "type": "boolean"
+          },
+          "snapshot": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ResourceSnapshot"
+              }
+            ]
           }
         }
       },
@@ -3345,6 +3527,87 @@
           }
         }
       },
+      "ContainerResource": {
+        "required": [
+          "store",
+          "name",
+          "shortId",
+          "image",
+          "isAgentRuntime",
+          "state",
+          "health",
+          "cpuPercent",
+          "memoryBytes",
+          "unusedSince",
+          "protection",
+          "retentionEligible"
+        ],
+        "type": "object",
+        "properties": {
+          "store": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "shortId": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "isAgentRuntime": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "health": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cpuPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "memoryBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "unusedSince": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "protection": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ProtectionReason"
+              }
+            ]
+          },
+          "retentionEligible": {
+            "type": "boolean"
+          }
+        }
+      },
       "ConversationOneDriveResponse": {
         "required": [
           "availability",
@@ -3563,6 +3826,14 @@
           }
         }
       },
+      "DataStatus": {
+        "enum": [
+          "Available",
+          "Stale",
+          "Failed",
+          "Unsupported"
+        ]
+      },
       "DevLoginRequest": {
         "required": [
           "account",
@@ -3730,6 +4001,43 @@
           }
         }
       },
+      "DryRunResult": {
+        "required": [
+          "generatedAt",
+          "reclaimState",
+          "retentionCandidates",
+          "emergencyCandidates",
+          "notes"
+        ],
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reclaimState": {
+            "$ref": "#/components/schemas/ReclaimState"
+          },
+          "retentionCandidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReclaimItem"
+            }
+          },
+          "emergencyCandidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReclaimItem"
+            }
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "ExecutionCountsResponse": {
         "required": [
           "running",
@@ -3845,6 +4153,227 @@
             "type": "boolean"
           },
           "oneDrive": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FilesystemDelta": {
+        "required": [
+          "id",
+          "availableBeforeBytes",
+          "availableAfterBytes"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "availableBeforeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "availableAfterBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "FilesystemResources": {
+        "required": [
+          "id",
+          "stores",
+          "totalBytes",
+          "availableBytes",
+          "availablePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "stores": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "totalBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "availableBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "availablePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "HostResources": {
+        "required": [
+          "status",
+          "sampledAt",
+          "cpuCount",
+          "cpuUsedPercent",
+          "cpuFreePercent",
+          "memoryTotalBytes",
+          "memoryAvailableBytes",
+          "memoryAvailablePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/DataStatus"
+          },
+          "sampledAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "cpuCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cpuUsedPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "cpuFreePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "memoryTotalBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "memoryAvailableBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "memoryAvailablePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "ImageResource": {
+        "required": [
+          "store",
+          "shortId",
+          "tags",
+          "sizeBytes",
+          "hasSharedLayers",
+          "containerReferences",
+          "created",
+          "unusedSince",
+          "protection",
+          "retentionEligible"
+        ],
+        "type": "object",
+        "properties": {
+          "store": {
+            "type": "string"
+          },
+          "shortId": {
+            "type": "string"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sizeBytes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "hasSharedLayers": {
+            "type": "boolean"
+          },
+          "containerReferences": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "created": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "unusedSince": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "protection": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ProtectionReason"
+              }
+            ]
+          },
+          "retentionEligible": {
             "type": "boolean"
           }
         }
@@ -4098,6 +4627,76 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "MaintenanceTiming": {
+        "required": [
+          "sampleIntervalSeconds",
+          "sustainMinutes",
+          "cooldownMinutes",
+          "recoveryMarginPercent",
+          "maxDeletionsPerRound",
+          "keepRecentVersions",
+          "retentionSweepMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "sampleIntervalSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "sustainMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cooldownMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "recoveryMarginPercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "maxDeletionsPerRound": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "keepRecentVersions": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "retentionSweepMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -4639,6 +5238,33 @@
           }
         }
       },
+      "PressureStatus": {
+        "required": [
+          "key",
+          "below",
+          "belowSince",
+          "triggered"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "below": {
+            "type": "boolean"
+          },
+          "belowSince": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "triggered": {
+            "type": "boolean"
+          }
+        }
+      },
       "ProjectResponse": {
         "required": [
           "id",
@@ -4676,6 +5302,23 @@
           }
         }
       },
+      "ProtectionReason": {
+        "enum": [
+          "Active",
+          "ServiceContainer",
+          "NotReclaimable",
+          "Excluded",
+          "WorkspaceUnverified",
+          "Referenced",
+          "Pinned",
+          "RecentVersion",
+          "ProtectedVersion",
+          "ForeignTag",
+          "OwnershipUnproven",
+          "StateUnknown",
+          null
+        ]
+      },
       "PublishSiteRequest": {
         "required": [
           "name",
@@ -4698,6 +5341,253 @@
           "spaMode": {
             "type": "boolean",
             "default": false
+          }
+        }
+      },
+      "ReclaimItem": {
+        "required": [
+          "store",
+          "kind",
+          "name",
+          "result",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "store": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "result": {
+            "$ref": "#/components/schemas/ReclaimItemResult"
+          },
+          "reason": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ReclaimItemResult": {
+        "enum": [
+          "Deleted",
+          "Failed",
+          "Skipped"
+        ]
+      },
+      "ReclaimRun": {
+        "required": [
+          "id",
+          "startedAt",
+          "finishedAt",
+          "trigger",
+          "candidates",
+          "protected",
+          "deleted",
+          "failed",
+          "filesystems",
+          "items",
+          "summary"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "trigger": {
+            "$ref": "#/components/schemas/ReclaimTrigger"
+          },
+          "candidates": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "protected": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "deleted": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "failed": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "filesystems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilesystemDelta"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReclaimItem"
+            }
+          },
+          "summary": {
+            "type": "string"
+          }
+        }
+      },
+      "ReclaimState": {
+        "enum": [
+          "Disabled",
+          "Active",
+          "LocksUnavailable"
+        ]
+      },
+      "ReclaimTrigger": {
+        "enum": [
+          "Retention",
+          "Cpu",
+          "Memory",
+          "Disk"
+        ]
+      },
+      "ReclamationPolicy": {
+        "required": [
+          "enabled",
+          "containerRetentionDays",
+          "imageRetentionDays",
+          "cpuMinFreePercent",
+          "memoryMinAvailableGb",
+          "memoryMinAvailablePercent",
+          "diskMinAvailableGb",
+          "diskMinAvailablePercent"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "containerRetentionDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "imageRetentionDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cpuMinFreePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "memoryMinAvailableGb": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "memoryMinAvailablePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "diskMinAvailableGb": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "diskMinAvailablePercent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "ReclamationPolicyResponse": {
+        "required": [
+          "policy",
+          "supported",
+          "updatedAt",
+          "updatedByName",
+          "synced"
+        ],
+        "type": "object",
+        "properties": {
+          "policy": {
+            "$ref": "#/components/schemas/ReclamationPolicy"
+          },
+          "supported": {
+            "type": "boolean"
+          },
+          "updatedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedByName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "synced": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },
@@ -4741,6 +5631,65 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "ResourceSnapshot": {
+        "required": [
+          "generatedAt",
+          "host",
+          "filesystems",
+          "stores",
+          "containers",
+          "images",
+          "pressure",
+          "reclaimState",
+          "timing"
+        ],
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "host": {
+            "$ref": "#/components/schemas/HostResources"
+          },
+          "filesystems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FilesystemResources"
+            }
+          },
+          "stores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoreStatus"
+            }
+          },
+          "containers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContainerResource"
+            }
+          },
+          "images": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImageResource"
+            }
+          },
+          "pressure": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PressureStatus"
+            }
+          },
+          "reclaimState": {
+            "$ref": "#/components/schemas/ReclaimState"
+          },
+          "timing": {
+            "$ref": "#/components/schemas/MaintenanceTiming"
           }
         }
       },
@@ -5588,6 +6537,43 @@
           },
           "reconnectionInterval": {
             "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "StoreStatus": {
+        "required": [
+          "name",
+          "status",
+          "sampledAt",
+          "filesystemId",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DataStatus"
+          },
+          "sampledAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "filesystemId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "message": {
             "type": [
               "null",
               "string"

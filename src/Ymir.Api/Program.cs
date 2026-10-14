@@ -32,6 +32,19 @@ builder.Services.AddVibeMakerInfrastructure(builder.Configuration, connectionStr
 builder.Services.Configure<RetentionOptions>(builder.Configuration.GetSection(RetentionOptions.SectionName));
 builder.Services.AddSingleton<DataRetentionWorker>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<DataRetentionWorker>());
+// 主機維護服務（ADR-0025）：只在部署設定了 Ymir:Maintenance:Endpoint 時連線；開發環境顯示不支援。
+var maintenance = builder.Configuration.GetSection(Ymir.Maintenance.MaintenanceClientOptions.SectionName).Get<Ymir.Maintenance.MaintenanceClientOptions>();
+if (string.IsNullOrWhiteSpace(maintenance?.Endpoint))
+{
+    builder.Services.AddSingleton<Ymir.Maintenance.IMaintenanceClient, Ymir.Maintenance.UnconfiguredMaintenanceClient>();
+}
+else
+{
+    builder.Services.AddSingleton<Ymir.Maintenance.IMaintenanceClient>(sp =>
+        new Ymir.Maintenance.MaintenanceClient(maintenance, sp.GetRequiredService<ILogger<Ymir.Maintenance.MaintenanceClient>>()));
+}
+
+builder.Services.AddHostedService<Ymir.Api.Maintenance.MaintenanceSyncWorker>();
 
 var app = builder.Build();
 
@@ -78,6 +91,7 @@ app.MapExecutionEndpoints();
 app.MapAdminEndpoints();
 app.MapAdminOverviewEndpoints();
 app.MapAdminRuntimeEndpoints();
+app.MapAdminResourceEndpoints();
 app.MapExtensionEndpoints();
 app.MapPlatformMcpEndpoints();
 app.MapKnowledgeEndpoints();

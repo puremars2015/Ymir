@@ -629,6 +629,70 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/resources': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetResources'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/resources/policy': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetReclamationPolicy'];
+    put: operations['AdminSaveReclamationPolicy'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/resources/runs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetReclaimRuns'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/resources/dry-run': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['AdminReclaimDryRun'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/settings/extensions': {
     parameters: {
       query?: never;
@@ -1194,6 +1258,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AdminDryRunResponse: {
+      supported: boolean;
+      available: boolean;
+      result: null | components['schemas']['DryRunResult'];
+    };
     AdminMakeTopicResponse: {
       /** Format: uuid */
       id: string;
@@ -1217,6 +1286,16 @@ export interface components {
       users: components['schemas']['UserCountsResponse'];
       executions: components['schemas']['ExecutionCountsResponse'];
       runtimes: components['schemas']['RuntimeSummaryResponse'][];
+    };
+    AdminReclaimRunsResponse: {
+      supported: boolean;
+      available: boolean;
+      runs: components['schemas']['ReclaimRun'][];
+    };
+    AdminResourcesResponse: {
+      supported: boolean;
+      available: boolean;
+      snapshot: null | components['schemas']['ResourceSnapshot'];
     };
     AdminUsageResponse: {
       /** Format: int32 */
@@ -1303,6 +1382,23 @@ export interface components {
       currentPassword: null | string;
       newPassword: null | string;
     };
+    ContainerResource: {
+      store: string;
+      name: string;
+      shortId: string;
+      image: string;
+      isAgentRuntime: boolean;
+      state: string;
+      health: null | string;
+      /** Format: double */
+      cpuPercent: null | number | string;
+      /** Format: int64 */
+      memoryBytes: null | number | string;
+      /** Format: date-time */
+      unusedSince: null | string;
+      protection: null | components['schemas']['ProtectionReason'];
+      retentionEligible: boolean;
+    };
     ConversationOneDriveResponse: {
       availability: components['schemas']['OneDriveAvailability'];
       rootPath: null | string;
@@ -1352,6 +1448,8 @@ export interface components {
       /** Format: int32 */
       failed: number | string;
     };
+    /** @enum {unknown} */
+    DataStatus: 'Available' | 'Stale' | 'Failed' | 'Unsupported';
     DevLoginRequest: {
       account: null | string;
       displayName: null | string;
@@ -1395,6 +1493,14 @@ export interface components {
       /** Format: int32 */
       count: number | string;
     };
+    DryRunResult: {
+      /** Format: date-time */
+      generatedAt: string;
+      reclaimState: components['schemas']['ReclaimState'];
+      retentionCandidates: components['schemas']['ReclaimItem'][];
+      emergencyCandidates: components['schemas']['ReclaimItem'][];
+      notes: string[];
+    };
     ExecutionCountsResponse: {
       /** Format: int32 */
       running: number | string;
@@ -1422,6 +1528,56 @@ export interface components {
       mcp: boolean;
       internet: boolean;
       oneDrive: boolean;
+    };
+    FilesystemDelta: {
+      id: string;
+      /** Format: int64 */
+      availableBeforeBytes: number | string;
+      /** Format: int64 */
+      availableAfterBytes: number | string;
+    };
+    FilesystemResources: {
+      id: string;
+      stores: string[];
+      /** Format: int64 */
+      totalBytes: number | string;
+      /** Format: int64 */
+      availableBytes: number | string;
+      /** Format: double */
+      availablePercent: number | string;
+    };
+    HostResources: {
+      status: components['schemas']['DataStatus'];
+      /** Format: date-time */
+      sampledAt: null | string;
+      /** Format: int32 */
+      cpuCount: number | string;
+      /** Format: double */
+      cpuUsedPercent: null | number | string;
+      /** Format: double */
+      cpuFreePercent: null | number | string;
+      /** Format: int64 */
+      memoryTotalBytes: number | string;
+      /** Format: int64 */
+      memoryAvailableBytes: number | string;
+      /** Format: double */
+      memoryAvailablePercent: number | string;
+    };
+    ImageResource: {
+      store: string;
+      shortId: string;
+      tags: string[];
+      /** Format: int64 */
+      sizeBytes: number | string;
+      hasSharedLayers: boolean;
+      /** Format: int32 */
+      containerReferences: number | string;
+      /** Format: date-time */
+      created: string;
+      /** Format: date-time */
+      unusedSince: null | string;
+      protection: null | components['schemas']['ProtectionReason'];
+      retentionEligible: boolean;
     };
     KnowledgeAnswerResponse: {
       answer: null | string;
@@ -1481,6 +1637,22 @@ export interface components {
       devLogin: boolean;
       google: boolean;
       googleDisplayName: null | string;
+    };
+    MaintenanceTiming: {
+      /** Format: int32 */
+      sampleIntervalSeconds: number | string;
+      /** Format: int32 */
+      sustainMinutes: number | string;
+      /** Format: int32 */
+      cooldownMinutes: number | string;
+      /** Format: double */
+      recoveryMarginPercent: number | string;
+      /** Format: int32 */
+      maxDeletionsPerRound: number | string;
+      /** Format: int32 */
+      keepRecentVersions: number | string;
+      /** Format: int32 */
+      retentionSweepMinutes: number | string;
     };
     MakeTopicResponse: {
       /** Format: uuid */
@@ -1608,6 +1780,13 @@ export interface components {
       name: string;
       description: string;
     };
+    PressureStatus: {
+      key: string;
+      below: boolean;
+      /** Format: date-time */
+      belowSince: null | string;
+      triggered: boolean;
+    };
     ProjectResponse: {
       /** Format: uuid */
       id: string;
@@ -1619,11 +1798,84 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    /** @enum {unknown} */
+    ProtectionReason:
+      | 'Active'
+      | 'ServiceContainer'
+      | 'NotReclaimable'
+      | 'Excluded'
+      | 'WorkspaceUnverified'
+      | 'Referenced'
+      | 'Pinned'
+      | 'RecentVersion'
+      | 'ProtectedVersion'
+      | 'ForeignTag'
+      | 'OwnershipUnproven'
+      | 'StateUnknown'
+      | null;
     PublishSiteRequest: {
       name: null | string;
       sourcePath: null | string;
       /** @default false */
       spaMode: boolean;
+    };
+    ReclaimItem: {
+      store: string;
+      kind: string;
+      name: string;
+      result: components['schemas']['ReclaimItemResult'];
+      reason: null | string;
+    };
+    /** @enum {unknown} */
+    ReclaimItemResult: 'Deleted' | 'Failed' | 'Skipped';
+    ReclaimRun: {
+      /** Format: int64 */
+      id: number | string;
+      /** Format: date-time */
+      startedAt: string;
+      /** Format: date-time */
+      finishedAt: string;
+      trigger: components['schemas']['ReclaimTrigger'];
+      /** Format: int32 */
+      candidates: number | string;
+      /** Format: int32 */
+      protected: number | string;
+      /** Format: int32 */
+      deleted: number | string;
+      /** Format: int32 */
+      failed: number | string;
+      filesystems: components['schemas']['FilesystemDelta'][];
+      items: components['schemas']['ReclaimItem'][];
+      summary: string;
+    };
+    /** @enum {unknown} */
+    ReclaimState: 'Disabled' | 'Active' | 'LocksUnavailable';
+    /** @enum {unknown} */
+    ReclaimTrigger: 'Retention' | 'Cpu' | 'Memory' | 'Disk';
+    ReclamationPolicy: {
+      enabled: boolean;
+      /** Format: int32 */
+      containerRetentionDays: number | string;
+      /** Format: int32 */
+      imageRetentionDays: number | string;
+      /** Format: double */
+      cpuMinFreePercent: number | string;
+      /** Format: double */
+      memoryMinAvailableGb: number | string;
+      /** Format: double */
+      memoryMinAvailablePercent: number | string;
+      /** Format: double */
+      diskMinAvailableGb: number | string;
+      /** Format: double */
+      diskMinAvailablePercent: number | string;
+    };
+    ReclamationPolicyResponse: {
+      policy: components['schemas']['ReclamationPolicy'];
+      supported: boolean;
+      /** Format: date-time */
+      updatedAt: null | string;
+      updatedByName: null | string;
+      synced: null | boolean;
     };
     RepublishSiteRequest: {
       /** Format: uuid */
@@ -1633,6 +1885,18 @@ export interface components {
     };
     ResetPasswordRequest: {
       newPassword: null | string;
+    };
+    ResourceSnapshot: {
+      /** Format: date-time */
+      generatedAt: string;
+      host: components['schemas']['HostResources'];
+      filesystems: components['schemas']['FilesystemResources'][];
+      stores: components['schemas']['StoreStatus'][];
+      containers: components['schemas']['ContainerResource'][];
+      images: components['schemas']['ImageResource'][];
+      pressure: components['schemas']['PressureStatus'][];
+      reclaimState: components['schemas']['ReclaimState'];
+      timing: components['schemas']['MaintenanceTiming'];
     };
     /** @enum {unknown} */
     RestrictedNetworkSupport: 'Configured' | 'NotConfigured' | 'Unknown' | 'NotEnforced';
@@ -1841,6 +2105,14 @@ export interface components {
       eventType?: null | string;
       eventId?: null | string;
       reconnectionInterval?: null | string;
+    };
+    StoreStatus: {
+      name: string;
+      status: components['schemas']['DataStatus'];
+      /** Format: date-time */
+      sampledAt: null | string;
+      filesystemId: null | string;
+      message: null | string;
     };
     /** Format: binary */
     Stream: string;
@@ -3101,6 +3373,110 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AdminUsageResponse'];
+        };
+      };
+    };
+  };
+  AdminGetResources: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminResourcesResponse'];
+        };
+      };
+    };
+  };
+  AdminGetReclamationPolicy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReclamationPolicyResponse'];
+        };
+      };
+    };
+  };
+  AdminSaveReclamationPolicy: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReclamationPolicy'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReclamationPolicyResponse'];
+        };
+      };
+    };
+  };
+  AdminGetReclaimRuns: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminReclaimRunsResponse'];
+        };
+      };
+    };
+  };
+  AdminReclaimDryRun: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminDryRunResponse'];
         };
       };
     };
