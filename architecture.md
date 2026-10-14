@@ -1,6 +1,6 @@
 # Ymir 系統架構
 
-> 更新日期：2026-10-13。本文描述目前程式結構與 Ubuntu 正式部署快照；不是新架構提案。架構決策以 [ADR 索引](docs/adr/README.md) 為準，驗證狀態見 [Sprint 6 看板](docs/progress/board-sprint-6.md)。Mermaid 圖可直接在 GitHub 閱讀。
+> 更新日期：2026-10-15（本次補充容器清單與實際模型代理路徑，其餘功能驗證狀態仍須參考最新看板）。本文描述目前程式結構與 Ubuntu 正式部署快照；不是新架構提案。架構決策以 [ADR 索引](docs/adr/README.md) 為準，驗證狀態見 [Sprint 6 看板](docs/progress/board-sprint-6.md)。Mermaid 圖可直接在 GitHub 閱讀。
 
 ## 1. 系統定位與全貌
 
@@ -33,19 +33,21 @@ flowchart LR
 flowchart TB
     Browser["瀏覽器"] -->|HTTPS| CF["Cloudflare"]
     subgraph Linux["Ubuntu 主機"]
-        Tunnel["cloudflared<br/>ymir-cloudflared-production.service"]
-        Nginx["ymir-web :80<br/>nginx／Angular 靜態檔<br/>ymir-origin-production.service"]
-        API["Ymir API :5080<br/>rootful Podman + Quadlet<br/>程序為非 root 使用者"]
+        Tunnel["容器：ymir-cloudflared-production<br/>rootful Podman／Cloudflare Tunnel"]
+        Nginx["容器：ymir-web :80<br/>rootful Podman／nginx + Angular"]
+        API["容器：ymir-api :5080<br/>rootful Podman + Quadlet<br/>程序為非 root 使用者"]
         Socket["/run/ymir-runtime/runtime.sock<br/>群組權限 + token"]
         RH["RuntimeHost 主機服務<br/>OS 帳號 ymir"]
         subgraph UserIsolation["ymir 帳號的 rootless Podman"]
-            A1["ymir-user-A<br/>Pi／工具"]
-            A2["ymir-user-B<br/>Pi／工具"]
+            A1["容器：ymir-user-{userId}<br/>Pi／工具，使用者 A 示意"]
+            A2["容器：ymir-user-{userId}<br/>Pi／工具，使用者 B 示意"]
+            LP["容器：ymir-litellm-proxy<br/>nginx／Agent 模型入口"]
         end
+        Bridge["主機程序：ymir-litellm-bridge<br/>socat／Unix socket → TCP"]
         WS["每人 workspace／agent-state<br/>持久化，不隨容器重建刪除"]
-        SQL["SQL Server"]
-        LLM["LiteLLM :4000<br/>itadmin rootless Podman<br/>OAuth 模式單 worker"]
-        PG["LiteLLM PostgreSQL"]
+        SQL["容器：ymir-sql<br/>itadmin rootless Podman／SQL Server"]
+        LLM["容器：litellm_litellm_1 :4000<br/>itadmin rootless Podman<br/>OAuth 模式單 worker"]
+        PG["容器：litellm_litellm-db_1<br/>itadmin rootless Podman／PostgreSQL"]
         Auth["ymir-chatgpt-auth volume<br/>私有且可寫，用於 token refresh"]
     end
     CF -->|"Tunnel"| Tunnel
@@ -58,12 +60,56 @@ flowchart TB
     A2 --- WS
     API --> SQL
     API --> LLM
-    A1 --> LLM
-    A2 --> LLM
+    A1 -->|"litellm:4000"| LP
+    A2 -->|"litellm:4000"| LP
+    LP -->|"Unix socket"| Bridge
+    Bridge -->|"127.0.0.1:4000"| LLM
     LLM --> PG
     LLM --- Auth
     LLM --> External["外部模型服務"]
+    classDef container fill:#e8f1ff,stroke:#2563eb,color:#111827
+    classDef hostProcess fill:#f3f4f6,stroke:#6b7280,color:#111827
+    class Tunnel,Nginx,API,A1,A2,LP,SQL,LLM,PG container
+    class RH,Bridge hostProcess
 ```
+
+**圖例：藍框是容器，灰框是主機程序**；socket、volume、外部服務不是容器。A／B 只是「每人一個」的示意，不代表目前恰好有兩個 Agent。
+
+### 目前容器清單（2026-10-15 快照）
+
+| Podman 管理帳號／儲存區 | 容器名稱 | 用途 | 現況／核對依據 |
+|---|---|---|---|
+| `root`（rootful） | `ymir-api` | Production API、背景 worker；容器內程序 UID 1654 | root 唯讀診斷確認，`ymir-api.service` active |
+| `root`（rootful） | `ymir-web` | 正式 nginx、Angular 靜態頁與 API／SSE 反向代理 | `ymir-origin-production.service` active，ExecStart 的 Podman 名稱核對 |
+| `root`（rootful） | `ymir-cloudflared-production` | 正式 Cloudflare Tunnel | `ymir-cloudflared-production.service` active，ExecStart 的 Podman 名稱核對 |
+| `itadmin`（rootless） | `ymir-sql` | SQL Server，Ymir 業務資料 | `podman ps -a` 確認 running；現已掛 `ymir-sql-data` 持久 volume，遷移記錄見看板 #068 |
+| `itadmin`（rootless） | `litellm_litellm_1` | LiteLLM 模型路由、virtual key、用量／預算 | `podman ps -a` 確認 running |
+| `itadmin`（rootless） | `litellm_litellm-db_1` | LiteLLM PostgreSQL | `podman ps -a` 確認 running／healthy |
+| `ymir`（rootless） | `ymir-litellm-proxy` | Agent 網路內的 nginx 模型入口，轉送主機 LiteLLM | 已部署的 proxy 與修復記錄見看板 #069；本次未直接取得 ymir 儲存區清單 |
+| `ymir`（rootless） | `ymir-user-{userId:N}` | 每位使用者的 Pi／工具 runtime；ID 為無連字號 GUID | 動態建立／閒置停止，數量及目前狀態需以 ymir 身份另查；不列出個人 ID |
+
+核心部署為 **7 個固定容器＋N 個使用者 Agent 容器**。這是上表的角色／名稱計數，不是本次全儲存區 `ps` 的實測總數；主機上其他專案的容器不屬於 Ymir。
+
+### 仍保留、但不在正式流量路徑上的舊容器
+
+以下皆在 `itadmin` 的 rootless 儲存區，本次 `podman ps -a` 確認已停止：
+
+| 容器名稱 | 性質 | 注意事項 |
+|---|---|---|
+| `ymir-sql-old` | SQL 持久化遷移前保留的舊容器 | 不是正式資料來源；是否刪除需另行確認備份與還原，不自動清除 |
+| `ymir-web` | 舊 rootless nginx 入口 | 與 root 儲存區的正式 `ymir-web` 同名，但不是同一容器 |
+| `cloudflared` | 舊 Tunnel 容器 | 正式入口改用 root 儲存區的 `ymir-cloudflared-production` |
+
+Podman 清單按 OS 帳號分開：單獨執行 `podman ps -a` 只看到目前帳號的儲存區，不會同時列出 root、itadmin 與 ymir 的全部容器。**同名不代表同一容器，service active 也不等於所有使用者容器均 running。** 本次僅更新文件，沒有停止、刪除或重建任何容器。
+
+### 不應標成容器的元件
+
+- `Ymir.RuntimeHost`：主機上的 .NET systemd 服務，使用 `ymir` 帳號；負責管理 Agent 容器。
+- `ymir-litellm-bridge.service`：主機上的 `socat` 程序，不是 LiteLLM 或 nginx 容器。
+- `ymir-retained-dependencies.service`：啟動既有依賴容器的 systemd oneshot unit，不是新容器。
+- Angular：正式靜態檔由 `ymir-web` 提供，沒有獨立的 Angular 開發伺服器容器。
+- `ymir-chatgpt-auth`、`ymir-sql-data`：named volume，不是容器；workspace／agent-state 也是儲存資料。
+- MCP Gateway／SiteHost：程式碼支援的可選服務，未在本次容器清單核對，不推定已部署。
 
 ### 服務責任與邊界
 
