@@ -2723,6 +2723,180 @@
           }
         }
       }
+    },
+    "/api/direct-messages/contacts": {
+      "get": {
+        "tags": [
+          "DirectMessages"
+        ],
+        "operationId": "ListDirectContacts",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DirectContactResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/direct-messages/events": {
+      "get": {
+        "tags": [
+          "DirectMessages"
+        ],
+        "summary": "SSE：新訊息（message）與已讀（read）通知；ready 表示已連線，ping 為心跳。",
+        "operationId": "StreamDirectMessageEvents",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/SseItemOfstring"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/direct-messages/{peerId}": {
+      "get": {
+        "tags": [
+          "DirectMessages"
+        ],
+        "operationId": "ListDirectMessages",
+        "parameters": [
+          {
+            "name": "peerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectMessagePageResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "DirectMessages"
+        ],
+        "operationId": "SendDirectMessage",
+        "parameters": [
+          {
+            "name": "peerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendDirectMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectMessageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/direct-messages/{peerId}/read": {
+      "post": {
+        "tags": [
+          "DirectMessages"
+        ],
+        "operationId": "MarkDirectMessagesRead",
+        "parameters": [
+          {
+            "name": "peerId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DirectMessagesReadResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -3417,6 +3591,141 @@
                 "$ref": "#/components/schemas/UserRole"
               }
             ]
+          }
+        }
+      },
+      "DirectContactResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "accountName",
+          "department",
+          "unreadCount",
+          "lastMessageAt"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "department": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "unreadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lastMessageAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "DirectMessagePageResponse": {
+        "required": [
+          "messages",
+          "hasMore"
+        ],
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectMessageResponse"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "DirectMessageResponse": {
+        "required": [
+          "id",
+          "senderId",
+          "recipientId",
+          "body",
+          "createdAt",
+          "readAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "recipientId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "readAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "DirectMessagesReadResponse": {
+        "required": [
+          "readerId",
+          "peerId",
+          "readAt",
+          "count"
+        ],
+        "type": "object",
+        "properties": {
+          "readerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "peerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -4846,6 +5155,20 @@
           }
         }
       },
+      "SendDirectMessageRequest": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "SendMessageRequest": {
         "required": [
           "content",
@@ -5227,6 +5550,36 @@
           "redirectUrl": {
             "type": "string",
             "format": "uri"
+          }
+        }
+      },
+      "SseItemOfstring": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eventType": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "eventId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "reconnectionInterval": {
+            "pattern": "^-?(\\d+\\.)?\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,7})?$",
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -5909,6 +6262,9 @@
     },
     {
       "name": "Connectors"
+    },
+    {
+      "name": "DirectMessages"
     }
   ]
 }

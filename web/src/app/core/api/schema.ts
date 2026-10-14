@@ -1125,6 +1125,71 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/direct-messages/contacts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListDirectContacts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/direct-messages/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** SSE：新訊息（message）與已讀（read）通知；ready 表示已連線，ping 為心跳。 */
+    get: operations['StreamDirectMessageEvents'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/direct-messages/{peerId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListDirectMessages'];
+    put?: never;
+    post: operations['SendDirectMessage'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/direct-messages/{peerId}/read': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['MarkDirectMessagesRead'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1291,6 +1356,44 @@ export interface components {
       account: null | string;
       displayName: null | string;
       role: null | components['schemas']['UserRole'];
+    };
+    DirectContactResponse: {
+      /** Format: uuid */
+      userId: string;
+      displayName: string;
+      accountName: null | string;
+      department: null | string;
+      /** Format: int32 */
+      unreadCount: number | string;
+      /** Format: date-time */
+      lastMessageAt: null | string;
+    };
+    DirectMessagePageResponse: {
+      messages: components['schemas']['DirectMessageResponse'][];
+      hasMore: boolean;
+    };
+    DirectMessageResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      senderId: string;
+      /** Format: uuid */
+      recipientId: string;
+      body: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      readAt: null | string;
+    };
+    DirectMessagesReadResponse: {
+      /** Format: uuid */
+      readerId: string;
+      /** Format: uuid */
+      peerId: string;
+      /** Format: date-time */
+      readAt: string;
+      /** Format: int32 */
+      count: number | string;
     };
     ExecutionCountsResponse: {
       /** Format: int32 */
@@ -1632,6 +1735,9 @@ export interface components {
         [key: string]: boolean;
       };
     };
+    SendDirectMessageRequest: {
+      text: null | string;
+    };
     SendMessageRequest: {
       content: string;
       /** Format: uuid */
@@ -1727,6 +1833,12 @@ export interface components {
     SiteTicketResponse: {
       /** Format: uri */
       redirectUrl: string;
+    };
+    SseItemOfstring: {
+      data?: null | string;
+      eventType?: null | string;
+      eventId?: null | string;
+      reconnectionInterval?: null | string;
     };
     /** Format: binary */
     Stream: string;
@@ -3977,6 +4089,121 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  ListDirectContacts: {
+    parameters: {
+      query?: {
+        q?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DirectContactResponse'][];
+        };
+      };
+    };
+  };
+  StreamDirectMessageEvents: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/event-stream': components['schemas']['SseItemOfstring'];
+        };
+      };
+    };
+  };
+  ListDirectMessages: {
+    parameters: {
+      query?: {
+        before?: string;
+        take?: number | string;
+      };
+      header?: never;
+      path: {
+        peerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DirectMessagePageResponse'];
+        };
+      };
+    };
+  };
+  SendDirectMessage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        peerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SendDirectMessageRequest'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DirectMessageResponse'];
+        };
+      };
+    };
+  };
+  MarkDirectMessagesRead: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        peerId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DirectMessagesReadResponse'];
+        };
       };
     };
   };

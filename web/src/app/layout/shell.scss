@@ -337,7 +337,8 @@ svg {
   box-sizing: border-box;
 }
 
-.sidebar-toggle {
+.sidebar-toggle,
+.people-toggle {
   display: grid;
   place-items: center;
   width: 2.625rem;
@@ -419,11 +420,13 @@ svg {
     display: inline-block;
   }
 
-  .drawer-open {
-    .sidebar {
-      transform: none;
-    }
+  .drawer-open .sidebar {
+    transform: none;
+  }
 
+  /* 左側抽屜與右側成員抽屜共用遮罩 */
+  .drawer-open,
+  .people-open {
     .backdrop {
       display: block;
       position: fixed;
@@ -442,6 +445,26 @@ svg {
     min-height: calc(4.25rem + env(safe-area-inset-top));
     padding-top: env(safe-area-inset-top);
   }
+}
+
+/* 右側成員面板的開關（面板本身的版面在 people-panel.scss，ADR-0023） */
+.people-toggle {
+  position: relative;
+  margin-left: auto;
+}
+
+.people-badge {
+  position: absolute;
+  top: -0.375rem;
+  right: -0.375rem;
+  min-width: 1.125rem;
+  padding: 0 0.3125rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.5;
 }
 
 @media (prefers-reduced-motion: reduce) {

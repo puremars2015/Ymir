@@ -80,6 +80,10 @@ export type SiteShare = Schemas['SiteShareResponse'];
 export type SharedSite = Schemas['SharedSiteResponse'];
 export type UserSearchResult = Schemas['UserSearchResult'];
 export type SiteTicket = Schemas['SiteTicketResponse'];
+export type DirectContact = Schemas['DirectContactResponse'];
+export type DirectMessage = Schemas['DirectMessageResponse'];
+export type DirectMessagePage = Schemas['DirectMessagePageResponse'];
+export type DirectMessagesRead = Schemas['DirectMessagesReadResponse'];
 
 /** ProblemDetails 的 `code`（SA §13）。 */
 export interface ApiProblem {

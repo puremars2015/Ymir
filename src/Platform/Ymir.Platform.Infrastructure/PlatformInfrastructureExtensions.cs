@@ -4,9 +4,11 @@ using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Infrastructure.Auditing;
 using Ymir.Platform.Infrastructure.Identity;
+using Ymir.Platform.Infrastructure.Messaging;
 using Ymir.Platform.Infrastructure.Persistence;
 using Ymir.Platform.Infrastructure.Settings;
 using Ymir.Platform.Infrastructure.Users;
+using Ymir.Platform.Messaging;
 using Ymir.Platform.Settings;
 using Ymir.Platform.Users;
 
@@ -23,6 +25,8 @@ public static class PlatformInfrastructureExtensions
         services.AddScoped<ISystemSettingsStore, SystemSettingsStore>();
         services.AddScoped<IUserDirectory, UserDirectory>();
         services.AddScoped<ILocalAccountService, LocalAccountService>();
+        services.AddSingleton<IDirectMessageHub, InMemoryDirectMessageHub>();
+        services.AddScoped<IDirectMessageService, DirectMessageService>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
         services.AddSingleton(TimeProvider.System);

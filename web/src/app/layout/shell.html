@@ -2,6 +2,8 @@
   class="shell"
   [class.drawer-open]="drawerOpen()"
   [class.sidebar-collapsed]="sidebarCollapsed()"
+  [class.people-open]="peopleDrawerOpen()"
+  [class.people-collapsed]="peopleCollapsed()"
 >
   <aside
     id="main-sidebar"
@@ -250,7 +252,7 @@
     }
   </aside>
 
-  <div class="backdrop" (click)="closeDrawer()" aria-hidden="true"></div>
+  <div class="backdrop" (click)="closeDrawers()" aria-hidden="true"></div>
 
   <main class="content">
     <header class="shell-bar">
@@ -267,7 +269,40 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
       </button>
       <div class="workspace-label"><small>工作空間</small><span>Vibe Maker</span></div>
+      <button
+        type="button"
+        class="icon people-toggle"
+        (click)="togglePeople()"
+        [attr.aria-label]="
+          (peopleVisible() ? '收合成員面板' : '開啟成員面板') +
+          (messages.unreadTotal() > 0 ? '，' + messages.unreadTotal() + ' 則未讀訊息' : '')
+        "
+        [attr.title]="peopleVisible() ? '收合成員面板' : '成員與訊息'"
+        aria-controls="people-panel"
+        [attr.aria-expanded]="peopleVisible()"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path
+            d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"
+          />
+        </svg>
+        @if (messages.unreadTotal() > 0) {
+          <span class="people-badge" aria-hidden="true">{{
+            messages.unreadTotal() > 99 ? '99+' : messages.unreadTotal()
+          }}</span>
+        }
+      </button>
     </header>
     <router-outlet />
   </main>
+
+  <!-- 右側成員名單與一對一訊息（ADR-0023）；版面樣式在 people-panel.scss -->
+  <app-people-panel
+    id="people-panel"
+    role="complementary"
+    aria-label="成員與訊息"
+    [inert]="!peopleVisible()"
+    [attr.aria-hidden]="!peopleVisible()"
+    (closed)="closePeople()"
+  />
 </div>

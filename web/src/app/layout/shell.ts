@@ -4,6 +4,7 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   ElementRef,
   inject,
   Injector,
@@ -19,16 +20,18 @@ import { filter, map, Observable } from 'rxjs';
 import { describeApiError } from '../core/api/api.service';
 import { AuthService } from '../core/auth/auth.service';
 import { BrandingStore } from '../core/branding/branding.store';
+import { DirectMessageStore } from '../core/messaging/direct-message.store';
 import { NavigationStore } from '../core/navigation/navigation.store';
 import { normalizeTitle } from '../core/navigation/navigation-edits';
 import { parseActiveRoute } from './active-route';
 import { ThemeSwitcher } from '../shared/theme-switcher';
+import { PeoplePanel } from './people-panel';
 
 type ItemKind = 'conversation' | 'project';
 
 /**
- * 登入後的主畫面（ChatGPT 式版面）：左側欄（新對話、專案、聊天、使用者），右側為對話內容。
- * 窄螢幕時側欄改為抽屜。
+ * 登入後的主畫面（ChatGPT 式版面）：左側欄（新對話、專案、聊天、使用者），中間為對話內容，
+ * 右側為成員名單與使用者之間的訊息（ADR-0023）。窄螢幕時兩側都改為抽屜。
  */
 @Component({
   selector: 'app-shell',
@@ -39,6 +42,7 @@ type ItemKind = 'conversation' | 'project';
     FormsModule,
     NgTemplateOutlet,
     ThemeSwitcher,
+    PeoplePanel,
   ],
   host: {
     '(document:click)': 'closeMenu($event)',
@@ -53,6 +57,7 @@ export class Shell implements OnInit {
   protected readonly auth = inject(AuthService);
   protected readonly branding = inject(BrandingStore);
   protected readonly store = inject(NavigationStore);
+  protected readonly messages = inject(DirectMessageStore);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -67,6 +72,13 @@ export class Shell implements OnInit {
   );
 
   protected readonly drawerOpen = signal(false);
+  /** 右側成員面板：桌面預設展開（可收合並記住），窄螢幕為抽屜、預設關閉。 */
+  protected readonly peopleCollapsed = signal(readPeopleCollapsed());
+  protected readonly peopleDrawerOpen = signal(false);
+  protected readonly peopleVisible = computed(() =>
+    this.mobile() ? this.peopleDrawerOpen() : !this.peopleCollapsed(),
+  );
+  private readonly pageVisible = signal(globalThis.document?.visibilityState !== 'hidden');
   protected readonly creatingProject = signal(false);
   protected readonly projectName = signal('');
   protected readonly error = signal<string | null>(null);
@@ -97,6 +109,16 @@ export class Shell implements OnInit {
     return conversation?.projectId ?? null;
   });
 
+  constructor() {
+    // 登入後連上訊息通知；換帳號時重新連線。
+    effect(() => {
+      const user = this.auth.user();
+      if (user) this.messages.connect(user.id);
+    });
+    // 面板看不到（收合或分頁在背景）時，新訊息不自動標為已讀。
+    effect(() => this.messages.setVisible(this.peopleVisible() && this.pageVisible()));
+  }
+
   ngOnInit(): void {
     // 手機鍵盤可能只縮小 visual viewport；不要讓輸入區留在鍵盤後方。
     const viewport = globalThis.window?.visualViewport;
@@ -114,15 +136,19 @@ export class Shell implements OnInit {
     const onResize = () => {
       this.mobile.set(this.mobileQuery?.matches ?? false);
       this.drawerOpen.set(false);
+      this.peopleDrawerOpen.set(false);
       this.menu.set(null);
       syncViewport();
     };
     syncViewport();
+    const onVisibility = () => this.pageVisible.set(document.visibilityState !== 'hidden');
+    globalThis.document?.addEventListener('visibilitychange', onVisibility);
     viewport?.addEventListener('resize', syncViewport);
     viewport?.addEventListener('scroll', syncViewport);
     this.mobileQuery?.addEventListener('change', onResize);
     this.destroyRef.onDestroy(() => {
       this.mobileQuery?.removeEventListener('change', onResize);
+      globalThis.document?.removeEventListener('visibilitychange', onVisibility);
       viewport?.removeEventListener('resize', syncViewport);
       viewport?.removeEventListener('scroll', syncViewport);
     });
@@ -133,12 +159,16 @@ export class Shell implements OnInit {
         filter((e) => e instanceof NavigationEnd),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe(() => this.drawerOpen.set(false));
+      .subscribe(() => {
+        this.drawerOpen.set(false);
+        this.peopleDrawerOpen.set(false);
+      });
   }
 
   protected toggleSidebar(): void {
     this.menu.set(null);
     if (this.mobile()) {
+      this.peopleDrawerOpen.set(false);
       if (this.drawerOpen()) {
         this.closeDrawer();
       } else {
@@ -158,6 +188,39 @@ export class Shell implements OnInit {
     }
   }
 
+  protected togglePeople(): void {
+    this.menu.set(null);
+    if (this.mobile()) {
+      this.drawerOpen.set(false);
+      this.peopleDrawerOpen.update((open) => !open);
+      return;
+    }
+    this.setPeopleCollapsed(!this.peopleCollapsed());
+  }
+
+  protected closePeople(): void {
+    if (this.mobile()) {
+      this.peopleDrawerOpen.set(false);
+    } else {
+      this.setPeopleCollapsed(true);
+    }
+  }
+
+  private setPeopleCollapsed(collapsed: boolean): void {
+    this.peopleCollapsed.set(collapsed);
+    try {
+      localStorage.setItem('ymir.peopleCollapsed', String(collapsed));
+    } catch {
+      /* 儲存不可用時仍可正常收合。 */
+    }
+  }
+
+  /** 窄螢幕點遮罩：關閉開著的抽屜（左側欄或成員面板）。 */
+  protected closeDrawers(): void {
+    if (this.peopleDrawerOpen()) this.peopleDrawerOpen.set(false);
+    if (this.drawerOpen()) this.closeDrawer();
+  }
+
   protected closeDrawer(): void {
     this.drawerOpen.set(false);
     this.sidebarToggle()?.nativeElement.focus();
@@ -166,6 +229,7 @@ export class Shell implements OnInit {
   protected closeOverlays(): void {
     if (this.menu()) this.menu.set(null);
     else if (this.drawerOpen()) this.closeDrawer();
+    else if (this.peopleDrawerOpen()) this.peopleDrawerOpen.set(false);
   }
 
   protected trapDrawerFocus(event: Event): void {
@@ -323,8 +387,17 @@ export class Shell implements OnInit {
   protected logout(): void {
     this.auth.logout().subscribe(() => {
       this.store.clear();
+      this.messages.disconnect();
       void this.router.navigate(['/login']);
     });
+  }
+}
+
+function readPeopleCollapsed(): boolean {
+  try {
+    return localStorage.getItem('ymir.peopleCollapsed') === 'true';
+  } catch {
+    return false;
   }
 }
 

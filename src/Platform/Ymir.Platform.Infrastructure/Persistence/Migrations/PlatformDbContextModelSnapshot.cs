@@ -89,6 +89,49 @@ namespace Ymir.Platform.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_log", "platform");
                 });
 
+            modelBuilder.Entity("Ymir.Platform.Messaging.DirectMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("ReadAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("read_at");
+
+                    b.Property<Guid>("RecipientId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("recipient_id");
+
+                    b.Property<Guid>("SenderId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("sender_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_direct_messages");
+
+                    b.HasIndex("RecipientId", "ReadAt")
+                        .HasDatabaseName("ix_direct_messages_recipient_id_read_at");
+
+                    b.HasIndex("RecipientId", "SenderId", "CreatedAt")
+                        .HasDatabaseName("ix_direct_messages_recipient_id_sender_id_created_at");
+
+                    b.HasIndex("SenderId", "RecipientId", "CreatedAt")
+                        .HasDatabaseName("ix_direct_messages_sender_id_recipient_id_created_at");
+
+                    b.ToTable("direct_messages", "platform");
+                });
+
             modelBuilder.Entity("Ymir.Platform.Settings.SystemSetting", b =>
                 {
                     b.Property<string>("Key")
@@ -227,6 +270,23 @@ namespace Ymir.Platform.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_users_issuer_subject");
 
                     b.ToTable("users", "platform");
+                });
+
+            modelBuilder.Entity("Ymir.Platform.Messaging.DirectMessage", b =>
+                {
+                    b.HasOne("Ymir.Platform.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_direct_messages_users_recipient_id");
+
+                    b.HasOne("Ymir.Platform.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_direct_messages_users_sender_id");
                 });
 
             modelBuilder.Entity("Ymir.Platform.Users.LocalCredential", b =>
