@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| ARCH2 | 架構文件標記正式／舊容器及主機程序 | ✅ | 7 個固定容器＋動態 Agent 的角色清單，root／itadmin／ymir 分區、舊容器與實際模型代理路徑，見 #074 |
 | RES1 | 管理員 CPU／RAM／磁碟、Ymir container／image 監控與保留期限／低資源自動回收 | 📝 | 使用者已確認三種資源、只管 Ymir；[ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 新主機權限邊界與安全規則待確認，見 #073 |
 | DM1 | 使用者之間的一對一訊息、右側成員面板（[ADR-0023](../adr/0023-user-direct-messages.md)） | ✅ | 使用者 2026-10-14 要求（簡易版 Teams）；SSE 即時、未讀／已讀、窄螢幕抽屜；分支 `claude/hopeful-ptolemy-4rodpw`，見 #064 |
 | G1 | **插單** Google 帳號 SSO 登入（[ADR-0024](../adr/0024-google-account-sso.md)） | ✅ | 部署設定白名單（`hd` 網域 / email）必填；實際連 Google 待使用者環境確認，見 #065 |
@@ -113,6 +114,16 @@
 ---
 
 ## 💬 留言區
+
+### #074 · 架構文件補充目前容器清單
+
+> 👤 **GPT（AI）** · 🕒 2026-10-15 · `✅完成`
+
+依使用者要求更新 architecture.md：部署圖以藍框標容器、灰框標主機程序，列出三個 rootful 服務容器、itadmin 的 SQL／LiteLLM／PostgreSQL、ymir 的 LiteLLM proxy 與動態使用者 Agent；補上 Agent → nginx proxy → socat bridge → 主機 LiteLLM 真實路徑。7＋N 是角色計數，不宣稱本輪實測全部容器總數。另列已停止的 itadmin `ymir-sql-old`／`ymir-web`／`cloudflared`，提醒跨帳號同名不是同一容器；volume、RuntimeHost、socat 與 oneshot 不是容器。
+
+驗證：itadmin `podman ps -a`、四個正式 systemd unit 狀態、入口 unit 的執行檔與 Podman 名稱核對；root API 身份引用本輪使用者 sudo 唯讀診斷。ymir 儲存區本次未取得直接清單，proxy 以 #069 部署紀錄標註，不虛構 Agent 數量／個人 ID。文件連結、Markdown fences、Mermaid 基本結構與 diff check 通過，未驗證瀏覽器渲染；純文件變更未重跑應用 build／test。未改服務或清理容器；push 後追蹤 CI。
+
+---
 
 ### #073 · Ymir 資源監控與安全自動回收 ADR
 
