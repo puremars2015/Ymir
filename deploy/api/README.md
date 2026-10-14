@@ -114,6 +114,11 @@ curl -f http://127.0.0.1:5080/health
 
 RuntimeHost 的更新需另外 publish 至 `/opt/ymir/runtime-host` 並重啟 `ymir-runtime-host.service`；先確認沒有執行中的 Agent 工作。
 
+更新時的注意事項（2026-10-14 實際部署時遇到）：
+
+- **Quadlet 以 image ID 固定版本時**（`Image=<64 碼 ID>`），重建 tag 不會換版；以新 commit 為 tag 建置後，把 `Image=` 換成 `sudo podman image inspect localhost/ymir/api:<commit> --format '{{.Id}}'` 的值，再 `sudo systemctl daemon-reload` 並重啟。先備份原 Quadlet，失敗時還原即可回到舊版。
+- **主機上沒有 .NET SDK 可用於 root 時**，可改以 `dotnet ef migrations script --idempotent --project <模組 Infrastructure 專案> --context <DbContext> -o <檔名>.sql` 產生 SQL（不連資料庫），在 SQL Server container 內用 `sqlcmd ... -b -I -d ymir -i <檔名>.sql` 套用。**必須加 `-I`**（`QUOTED_IDENTIFIER ON`）：資料表有 filtered index，少了它 `INSERT` / `DELETE` 會失敗（Msg 1934）。history 資料表是 `platform.__ef_migrations_history` 與 `vibemaker.__ef_migrations_history`。
+
 ### 公開入口與故障檢查
 
 API 與前端同源，由容器提供，不需另外啟動 Angular dev server 或 nginx。API 預設只監聽 `127.0.0.1:5080`；外部瀏覽器需經 [Cloudflare Tunnel](../../docs/guides/cloudflare-tunnel.md)。Linux 的 Tunnel origin 設為 `http://127.0.0.1:5080`；使用 rootless cloudflared Quadlet 時，依 [RuntimeHost Tunnel 安裝步驟](../runtime-host/README.md#cloudflare-tunnel-由管理介面設定adr-0010) 設定 user service、token 與 hostname。

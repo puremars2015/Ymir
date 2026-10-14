@@ -22,6 +22,6 @@ nginx 由 `ymir-origin-production.service` 管理，容器名稱為 `ymir-web`�
 
 錯誤時腳本嘗試恢復原 Quadlet、原 systemd 遮罩及原 API 啟動狀態；已啟動的依賴服務保留。Cloudflare Dashboard 改動不在自動回復範圍，必要時手動將來源改回原本 `http://ymir-web:80`（舊入口原先已停止，恢復設定不表示網站可用）。
 
-設定備份位於 `/var/backups/ymir/production-*`，**內含密鑰，不要貼出或提交版本庫**。這不是資料庫備份。SQL 目前無持久化 volume，仍需另行安排 SQL 原生備份、還原驗證與持久化遷移；在完成前不要刪除或重建 `ymir-sql`。
+設定備份位於 `/var/backups/ymir/production-*`，**內含密鑰，不要貼出或提交版本庫**。這不是資料庫備份。`ymir-sql`（itadmin 的 rootless Podman）自 2026-10-14 起將 `/var/opt/mssql` 掛在 named volume `ymir-sql-data`，容器重建不會遺失資料；建立時加 `--stop-timeout 60`，讓 SQL Server 有時間正常關閉（預設 10 秒會被 SIGKILL）。搬移前的容器保留為已停止的 `ymir-sql-old`，確認無誤後可刪除。volume 只防止容器重建遺失資料，不是備份：仍需安排 SQL 原生備份（見 [備份與還原](../../docs/guides/backup-restore.md)）與還原驗證。
 
 已驗證 Bash／內嵌 Python 語法、說明入口、拒絕非 root 執行、Quadlet 轉換重複執行一致性，並以隔離的 nginx:alpine 容器通過 `nginx -t`（非 root、唯讀、NET_BIND_SERVICE）。腳本會另外以既有正式 nginx 映像執行隔離設定檢查。實際 sudo 部署、Cloudflare 與登入驗證待主機執行。
