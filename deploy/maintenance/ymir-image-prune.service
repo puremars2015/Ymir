@@ -1,0 +1,15 @@
+# Ymir image 回收（見同目錄 README.md）。安裝：
+#   sudo install -m 755 deploy/maintenance/ymir-image-prune.sh /usr/local/sbin/ymir-image-prune
+#   sudo install -m 644 deploy/maintenance/ymir-image-prune.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now ymir-image-prune.timer
+[Unit]
+Description=Prune old Ymir container images (keep in-use, pinned and newest N)
+After=ymir-api.service ymir-runtime-host.service
+
+[Service]
+Type=oneshot
+# 每個 localhost/ymir/* repository 保留的最新 image 數（不含使用中與正式設定指向的 image）
+Environment=YMIR_IMAGE_KEEP=3
+ExecStart=/usr/local/sbin/ymir-image-prune --apply
+Nice=10
+IOSchedulingClass=idle
