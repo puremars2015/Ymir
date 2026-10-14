@@ -117,7 +117,7 @@
 - **現象**：使用者回報一直顯示「模型發生錯誤，請稍後再試」。API log 三次都是同一個對話，`ended with model error: 413 <html>…Request Entity Too Large…nginx/1.31.5`；LiteLLM 沒有對應的 `/chat/completions` 紀錄。20:45 的兩次發生在今天重新部署（20:51）之前，與部署無關。
 - **原因**：Agent → `litellm:4000` 實際是 `ymir` 帳號的 `ymir-litellm-proxy`（nginx Quadlet）→ `ymir-litellm-bridge`（socat Unix socket）→ 主機 LiteLLM。nginx 設定沒有 `client_max_body_size`，預設 1 MB；每次模型呼叫都送完整對話歷史，超過後該對話每則都 413。這兩段只在主機上手動建立、不在版控。
 - **處理**：新增 `deploy/runtime-host/litellm-proxy/`（bridge unit、proxy Quadlet、nginx 設定 `client_max_body_size 100m` + `proxy_request_buffering off`），`deploy/runtime-host/README.md` 補上安裝步驟、413 的判斷方式與既有主機的修正指令。範例設定以 `nginx:1.27-alpine` 的 `nginx -t` 驗證通過。
-- **正式主機已修正**（使用者授權並輸入 sudo 密碼）：備份原設定後加入兩行，`nginx -t` 通過、`nginx -s reload` 完成，服務未中斷。待使用者在原對話重送一則訊息確認。proxy Quadlet 範本的 `Image=` 需填入主機實際的 nginx 映像。
+- **正式主機已修正**（使用者授權並輸入 sudo 密碼）：備份原設定後加入兩行。第一次只做 `nginx -s reload`，使用者重送仍 413（proxy log：`client intended to send too large body: 1279075 bytes`）：設定檔是單一檔案 bind mount，`sed -i` 換了 inode，container 內仍是舊檔。改為重啟 `ymir-litellm-proxy`，確認 container 內已有 `client_max_body_size 100m`；README 的修正指令同步改為重啟。待使用者在原對話重送確認。proxy Quadlet 範本的 `Image=` 需填入主機實際的 nginx 映像。
 
 <details>
 <summary>💬 回覆（0）</summary>

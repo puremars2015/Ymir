@@ -170,13 +170,14 @@ Agent ─http://litellm:4000─> ymir-litellm-proxy（nginx，ymir 帳號，接 
 
 **`client_max_body_size` 必須保留**：Agent 每次呼叫模型都送出完整對話歷史（含 base64 圖片），nginx 預設上限只有 1 MB。沒有這行時，對話一超過 1 MB 就**每則都失敗**，使用者只看到「模型發生錯誤，請稍後再試」，API log 為 `ended with model error: 413 <html>…Request Entity Too Large…nginx`，而 LiteLLM 的 log 沒有對應的請求（2026-10-14 正式主機實際發生）。設定 `100m`：附件單檔上限 50 MB，base64 後約 1.33 倍。
 
-既有主機補上設定（先備份，`nginx -s reload` 不中斷服務）：
+既有主機補上設定（先備份）。設定檔是以**單一檔案** bind mount 進 container，`sed -i` 會換成新檔案（新 inode），container 內仍看到舊檔，`nginx -s reload` **不會生效**；必須重啟 container（模型呼叫中斷數秒），並確認 container 內的設定：
 
 ```bash
-sudo bash -c 'cd /tmp; F=/home/ymir/.config/ymir/litellm-nginx.conf; P="sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) podman"
+sudo bash -c 'cd /tmp; F=/home/ymir/.config/ymir/litellm-nginx.conf
 cp -a $F $F.bak-$(date +%Y%m%d-%H%M%S)
 grep -q client_max_body_size $F || sed -i "0,/access_log off;/s//access_log off;\n client_max_body_size 100m;\n proxy_request_buffering off;/" $F
-$P exec ymir-litellm-proxy nginx -t && $P exec ymir-litellm-proxy nginx -s reload'
+U="sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir)"; $U systemctl --user restart ymir-litellm-proxy
+$U podman exec ymir-litellm-proxy grep -n client_max_body_size /etc/nginx/nginx.conf'
 ```
 
 ## Cloudflare Tunnel 由管理介面設定（ADR-0010）
