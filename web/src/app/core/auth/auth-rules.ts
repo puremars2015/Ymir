@@ -3,13 +3,15 @@ import { AdminUser, AuthMethod, Me } from '../api/api-types';
 /** 與後端 `LocalAccounts.MinimumPasswordLength` 一致（ADR-0009）。 */
 export const PASSWORD_MIN_LENGTH = 12;
 
-/** 登入頁 `?error=` 的訊息（OIDC callback 失敗時由後端導回）。 */
+/** 登入頁 `?error=` 的訊息（企業帳號 / Google 的 callback 失敗時由後端導回）。 */
 export function loginErrorMessage(code: string | null | undefined): string | null {
   switch (code) {
     case 'disabled':
       return '帳號已停用，請聯絡管理員。';
     case 'failed':
-      return '企業帳號登入失敗，請再試一次。';
+      return '登入失敗，請再試一次。';
+    case 'not_allowed':
+      return '此 Google 帳號未獲准使用，請改用公司網域的帳號或聯絡管理員。';
     default:
       return null;
   }
@@ -26,12 +28,20 @@ export function oidcLoginUrl(returnUrl: string | null | undefined): string {
   return `/api/auth/login?returnUrl=${encodeURIComponent(target)}`;
 }
 
+/** Google 帳號登入（ADR-0023）：同樣整頁導向後端。 */
+export function googleLoginUrl(returnUrl: string | null | undefined): string {
+  const target = isLocalPath(returnUrl) ? returnUrl : '/';
+  return `/api/auth/login/google?returnUrl=${encodeURIComponent(target)}`;
+}
+
 export function describeAuthMethod(method: AuthMethod): string {
   switch (method) {
     case 'Oidc':
       return '企業帳號';
     case 'Local':
       return '本機帳號';
+    case 'Google':
+      return 'Google 帳號';
     default:
       return '開發登入';
   }

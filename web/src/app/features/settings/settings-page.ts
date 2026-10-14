@@ -102,6 +102,8 @@ import { isSystemPromptTooLong, SYSTEM_PROMPT_MAX_LENGTH } from '../../core/mode
         </form>
       } @else if (auth.user()?.authMethod === 'Oidc') {
         <p class="muted password">企業帳號的密碼請到公司的帳號系統變更。</p>
+      } @else if (auth.user()?.authMethod === 'Google') {
+        <p class="muted password">Google 帳號的密碼請到 Google 帳戶設定變更。</p>
       }
 
       <app-my-extensions-card />

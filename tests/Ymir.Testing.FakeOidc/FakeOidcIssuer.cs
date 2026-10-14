@@ -61,7 +61,8 @@ public sealed class FakeOidcIssuer : IDisposable
             }
         }
 
-        return new RedeemResult(CreateIdToken(pending.Login, request.Nonce, issuer), IssueTokens(pending.Login.Account, request.Scope));
+        var idToken = pending.Login.Google is { } google ? CreateGoogleIdToken(pending.Login, google, request.Nonce, issuer) : CreateIdToken(pending.Login, request.Nonce, issuer);
+        return new RedeemResult(idToken, IssueTokens(pending.Login.Account, request.Scope));
     }
 
     /// <summary>refresh token 換發（每次輪替）；已撤銷或 client 不符時回傳 null（Entra 回 <c>invalid_grant</c>）。</summary>
@@ -159,6 +160,48 @@ public sealed class FakeOidcIssuer : IDisposable
         });
     }
 
+    /// <summary>
+    /// 模擬 Google 的 id_token（ADR-0023）：<c>sub</c> 是帳號不變的數字識別（不分應用程式）、<c>email_verified</c>，
+    /// Workspace 帳號另有 <c>hd</c>（個人 Gmail 沒有）；沒有 <c>oid</c>、<c>tid</c>、<c>roles</c>。
+    /// </summary>
+    private string CreateGoogleIdToken(FakeLogin login, FakeGoogleAccount google, string? nonce, string issuer)
+    {
+        var email = google.Email.ToLowerInvariant();
+        var claims = new Dictionary<string, object>
+        {
+            ["sub"] = GoogleSubject(email),
+            ["email"] = email,
+            ["email_verified"] = google.EmailVerified,
+            ["name"] = login.DisplayName,
+            ["azp"] = _settings.ClientId,
+        };
+        if (google.HostedDomain is { } hd)
+        {
+            claims["hd"] = hd;
+        }
+
+        if (nonce is not null)
+        {
+            claims["nonce"] = nonce;
+        }
+
+        var now = DateTime.UtcNow;
+        return new JsonWebTokenHandler().CreateToken(new SecurityTokenDescriptor
+        {
+            Issuer = issuer,
+            Audience = _settings.ClientId,
+            IssuedAt = now,
+            NotBefore = now,
+            Expires = now.AddHours(1),
+            Claims = claims,
+            SigningCredentials = new SigningCredentials(SigningKey, SecurityAlgorithms.RsaSha256),
+        });
+    }
+
+    /// <summary>Google 的 <c>sub</c> 是 21 位數字；以 email 推導固定值，同一帳號每次登入相同。</summary>
+    public static string GoogleSubject(string email) =>
+        "1" + string.Concat(SHA256.HashData(Encoding.UTF8.GetBytes("google:" + email.ToLowerInvariant())).Take(10).Select(b => (b % 100).ToString("D2", System.Globalization.CultureInfo.InvariantCulture)));
+
     private sealed record PendingCode(FakeLogin Login, AuthorizeRequest Request, DateTimeOffset ExpiresAt);
 
     private sealed record AccessGrant(string Account, DateTimeOffset ExpiresAt);
@@ -170,6 +213,9 @@ public sealed record FakeTokens(string AccessToken, string? RefreshToken, string
 
 public sealed record RedeemResult(string IdToken, FakeTokens Tokens);
 
-public sealed record FakeLogin(string Account, string DisplayName, bool IsAdmin);
+public sealed record FakeLogin(string Account, string DisplayName, bool IsAdmin, FakeGoogleAccount? Google = null);
+
+/// <param name="HostedDomain">Workspace 網域（<c>hd</c>）；個人 Gmail 為 <c>null</c>。</param>
+public sealed record FakeGoogleAccount(string Email, string? HostedDomain, bool EmailVerified);
 
 public sealed record AuthorizeRequest(string ClientId, string RedirectUri, string State, string? Nonce, string? CodeChallenge, string Scope = "openid profile");

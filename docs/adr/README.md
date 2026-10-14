@@ -26,6 +26,7 @@
 | [0020](0020-admin-model-access.md) | 管理員控制開放模型（原誤用 0016，2026-10-13 改號） | 已採納（個人權限由 ADR-0019 延伸） |
 | [0021](0021-per-user-model-usage.md) | 每人每模型用量（讀 LiteLLM model_groups，Ymir 不保存） | 已採納 |
 | [0022](0022-onedrive-linked-files.md) | 讓 Agent 處理使用者指定的 OneDrive 檔案（含刪除、移動、改名） | 提議中 |
+| [0023](0023-google-account-sso.md) | Google 帳號 SSO 登入 | 已採納 |
 
 新增 ADR 時複製以下格式：
 

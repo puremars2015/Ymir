@@ -28,7 +28,120 @@ public static class FakeOidcEndpoints
         endpoints.MapPost("/{tenant}/oauth2/v2.0/authorize", AuthorizePostAsync).DisableAntiforgery();
         endpoints.MapPost("/{tenant}/oauth2/v2.0/token", TokenAsync).DisableAntiforgery();
         endpoints.MapFakeGraph();
+        endpoints.MapFakeGoogle();
         return endpoints;
+    }
+
+    /// <summary>測試用：Google 的 <c>login_hint</c> 加上此後綴時，id_token 的 <c>email_verified</c> 為 false。</summary>
+    public const string UnverifiedHintSuffix = ";unverified";
+
+    /// <summary>
+    /// 模擬 Google 的 OIDC（ADR-0023），issuer 為 <c>{root}/google</c>：<c>login_hint=email</c> 直接通過；
+    /// 網域不是 <c>gmail.com</c> 時視為 Workspace 帳號，id_token 帶 <c>hd</c>。
+    /// </summary>
+    private static void MapFakeGoogle(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapGet("/google/.well-known/openid-configuration", (HttpRequest request) =>
+        {
+            var root = $"{Root(request)}/google";
+            return Results.Json(new Dictionary<string, object>
+            {
+                ["issuer"] = root,
+                ["authorization_endpoint"] = $"{root}/o/oauth2/v2/auth",
+                ["token_endpoint"] = $"{root}/token",
+                ["jwks_uri"] = $"{root}/oauth2/v3/certs",
+                ["response_types_supported"] = s_code,
+                ["subject_types_supported"] = s_publicSubject,
+                ["id_token_signing_alg_values_supported"] = s_algorithms,
+                ["scopes_supported"] = s_googleScopes,
+                ["token_endpoint_auth_methods_supported"] = s_authMethods,
+                ["code_challenge_methods_supported"] = s_pkceMethods,
+                ["claims_supported"] = s_googleClaims,
+            });
+        });
+        endpoints.MapGet("/google/oauth2/v3/certs", (FakeOidcIssuer issuer) => Results.Json(new { keys = new[] { issuer.PublicJwk() } }));
+        endpoints.MapGet("/google/o/oauth2/v2/auth", GoogleAuthorizeGet);
+        endpoints.MapPost("/google/o/oauth2/v2/auth", GoogleAuthorizePostAsync).DisableAntiforgery();
+        endpoints.MapPost("/google/token", GoogleTokenAsync).DisableAntiforgery();
+    }
+
+    private static readonly string[] s_publicSubject = ["public"];
+    private static readonly string[] s_googleScopes = ["openid", "email", "profile"];
+    private static readonly string[] s_googleClaims = ["aud", "email", "email_verified", "exp", "hd", "iat", "iss", "name", "sub", "nonce"];
+
+    private static IResult GoogleAuthorizeGet(HttpRequest request, FakeOidcSettings settings, FakeOidcIssuer issuer)
+    {
+        var query = request.Query;
+        // Ymir 對 Google 省略 response_mode（授權碼預設就以 query 回傳，ADR-0023）；出現時拒絕，讓測試確認省略有生效。
+        if (query.ContainsKey("response_mode"))
+        {
+            return Results.BadRequest("Parameter not allowed for this message type: response_mode");
+        }
+
+        var (authorize, error) = ParseAuthorize(settings.TenantId, settings, query["client_id"], query["redirect_uri"], query["state"], query["nonce"], query["code_challenge"], query["code_challenge_method"], query["response_type"], query["scope"]);
+        if (authorize is null)
+        {
+            return Results.BadRequest(error);
+        }
+
+        if (query["login_hint"] is { Count: > 0 } hints && hints[^1] is { Length: > 0 } hint)
+        {
+            return RedirectWithCode(issuer, authorize, GoogleLoginFor(hint, displayName: null));
+        }
+
+        return Results.Content(GoogleLoginForm(authorize), "text/html; charset=utf-8");
+    }
+
+    private static async Task<IResult> GoogleAuthorizePostAsync(HttpRequest request, FakeOidcSettings settings, FakeOidcIssuer issuer)
+    {
+        var form = await request.ReadFormAsync();
+        var (authorize, error) = ParseAuthorize(settings.TenantId, settings, form["client_id"], form["redirect_uri"], form["state"], form["nonce"], form["code_challenge"], form["code_challenge_method"], "code", form["scope"]);
+        var email = form["email"].ToString().Trim();
+        if (authorize is null || !email.Contains('@', StringComparison.Ordinal))
+        {
+            return Results.BadRequest(error ?? "email is required");
+        }
+
+        return RedirectWithCode(issuer, authorize, GoogleLoginFor(email, form["display_name"].ToString().Trim()));
+    }
+
+    private static FakeLogin GoogleLoginFor(string hint, string? displayName)
+    {
+        var unverified = hint.EndsWith(UnverifiedHintSuffix, StringComparison.Ordinal);
+        var email = (unverified ? hint[..^UnverifiedHintSuffix.Length] : hint).ToLowerInvariant();
+        var domain = email[(email.IndexOf('@', StringComparison.Ordinal) + 1)..];
+        var account = email[..email.IndexOf('@', StringComparison.Ordinal)];
+        return new FakeLogin(account, string.IsNullOrEmpty(displayName) ? account : displayName, false, new FakeGoogleAccount(email, domain == "gmail.com" ? null : domain, !unverified));
+    }
+
+    private static async Task<IResult> GoogleTokenAsync(HttpRequest request, FakeOidcIssuer issuer)
+    {
+        if (!request.HasFormContentType)
+        {
+            return Results.BadRequest(new { error = "invalid_request" });
+        }
+
+        var form = await request.ReadFormAsync();
+        var (clientId, clientSecret) = ClientCredentials(request, form);
+        if (form["grant_type"] != "authorization_code")
+        {
+            return Results.BadRequest(new { error = "unsupported_grant_type" });
+        }
+
+        var redeemed = issuer.Redeem(form["code"].ToString(), clientId, clientSecret, form["redirect_uri"].ToString(), form["code_verifier"], $"{Root(request)}/google");
+        return redeemed is null ? Results.BadRequest(new { error = "invalid_grant" }) : Results.Json(TokenResponse(redeemed.Tokens, redeemed.IdToken));
+    }
+
+    /// <summary>client_secret_post 或 client_secret_basic。</summary>
+    private static (string ClientId, string ClientSecret) ClientCredentials(HttpRequest request, IFormCollection form)
+    {
+        if (request.Headers.Authorization.ToString() is { } header && header.StartsWith("Basic ", StringComparison.Ordinal))
+        {
+            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(header["Basic ".Length..])).Split(':', 2);
+            return (WebUtility.UrlDecode(decoded[0]), decoded.Length > 1 ? WebUtility.UrlDecode(decoded[1]) : string.Empty);
+        }
+
+        return (form["client_id"].ToString(), form["client_secret"].ToString());
     }
 
     private static string Root(HttpRequest request) => $"{request.Scheme}://{request.Host}";
@@ -41,8 +154,8 @@ public static class FakeOidcEndpoints
     private static readonly string[] s_algorithms = ["RS256"];
     private static readonly string[] s_scopes = ["openid", "profile", "email", "offline_access", "Files.ReadWrite", "User.Read"];
 
-    /// <summary>模擬 Entra 應用程式註冊的 redirect URI：登入與 OneDrive connector（ADR-0013）。</summary>
-    private static readonly string[] s_registeredRedirectPaths = ["/signin-oidc", "/api/connectors/onedrive/callback"];
+    /// <summary>模擬已註冊的 redirect URI：Entra 登入、Google 登入（ADR-0023）與 OneDrive connector（ADR-0013）。</summary>
+    private static readonly string[] s_registeredRedirectPaths = ["/signin-oidc", "/signin-google", "/api/connectors/onedrive/callback"];
     private static readonly string[] s_authMethods = ["client_secret_post", "client_secret_basic"];
     private static readonly string[] s_pkceMethods = ["S256"];
     private static readonly string[] s_claims = ["sub", "iss", "aud", "exp", "iat", "nonce", "name", "preferred_username", "email", "oid", "tid", "roles"];
@@ -115,15 +228,7 @@ public static class FakeOidcEndpoints
         }
 
         var form = await request.ReadFormAsync();
-        var clientId = form["client_id"].ToString();
-        var clientSecret = form["client_secret"].ToString();
-        // client_secret_basic
-        if (request.Headers.Authorization.ToString() is { } header && header.StartsWith("Basic ", StringComparison.Ordinal))
-        {
-            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(header["Basic ".Length..])).Split(':', 2);
-            clientId = WebUtility.UrlDecode(decoded[0]);
-            clientSecret = decoded.Length > 1 ? WebUtility.UrlDecode(decoded[1]) : string.Empty;
-        }
+        var (clientId, clientSecret) = ClientCredentials(request, form);
 
         if (form["grant_type"] == "refresh_token")
         {
@@ -213,6 +318,36 @@ public static class FakeOidcEndpoints
     {
         var code = issuer.IssueCode(login, request);
         return Results.Redirect(QueryHelpers.AddQueryString(request.RedirectUri, new Dictionary<string, string?> { ["code"] = code, ["state"] = request.State }));
+    }
+
+    private static string GoogleLoginForm(AuthorizeRequest request)
+    {
+        static string E(string? value) => WebUtility.HtmlEncode(value ?? string.Empty);
+        return $$"""
+            <!doctype html>
+            <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Fake Google 登入</title>
+            <style>
+              body { font-family: system-ui, sans-serif; background: #f1f3f4; display: grid; place-items: center; min-height: 100vh; margin: 0; }
+              form { background: #fff; padding: 32px; width: min(360px, 90vw); border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.3); display: grid; gap: 12px; }
+              h1 { font-size: 20px; margin: 0; } .note { color: #a4262c; font-size: 13px; }
+              input[type=text], input[type=email] { padding: 8px; font-size: 15px; } button { padding: 10px; background: #1a73e8; color: #fff; border: 0; border-radius: 4px; font-size: 15px; }
+            </style></head>
+            <body><form method="post">
+              <h1>登入（Fake Google）</h1>
+              <p class="note">開發 / 測試用的模擬登入頁，不會驗證密碼。gmail.com 以外的網域視為 Workspace 帳號（帶 hd）。</p>
+              <label>Email <input type="email" name="email" required autofocus></label>
+              <label>顯示名稱 <input type="text" name="display_name"></label>
+              <input type="hidden" name="client_id" value="{{E(request.ClientId)}}">
+              <input type="hidden" name="redirect_uri" value="{{E(request.RedirectUri)}}">
+              <input type="hidden" name="state" value="{{E(request.State)}}">
+              <input type="hidden" name="nonce" value="{{E(request.Nonce)}}">
+              <input type="hidden" name="code_challenge" value="{{E(request.CodeChallenge)}}">
+              <input type="hidden" name="code_challenge_method" value="S256">
+              <input type="hidden" name="scope" value="{{E(request.Scope)}}">
+              <button type="submit">登入</button>
+            </form></body></html>
+            """;
     }
 
     private static string LoginForm(AuthorizeRequest request)

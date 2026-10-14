@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Ymir.Platform.Auditing;
+using Ymir.Platform.Identity;
 using Ymir.Platform.Infrastructure.Identity;
 using Ymir.Platform.Users;
 
@@ -22,11 +23,21 @@ internal static class OidcSignIn
         options.Authority = settings.Authority;
         options.ClientId = settings.ClientId;
         options.ClientSecret = settings.ClientSecret;
+        options.CallbackPath = CallbackPath;
+        ApplyCommon(options, environment);
+        options.Events.OnTokenValidated = OnTokenValidatedAsync;
+    }
+
+    /// <summary>
+    /// Entra 與 Google（ADR-0023）共用的流程設定：Authorization Code + PKCE、query response mode、不保存 token、
+    /// 保留原始 claim 名稱；callback 失敗一律導回 <c>/login?error=failed</c>。
+    /// </summary>
+    internal static void ApplyCommon(OpenIdConnectOptions options, IHostEnvironment environment)
+    {
         options.ResponseType = OpenIdConnectResponseType.Code;
         options.UsePkce = true;
         // query 而非 form_post：callback 是一般的 GET 導向，cookie 用 SameSite=Lax 即可，http://localhost 開發也能用。
         options.ResponseMode = OpenIdConnectResponseMode.Query;
-        options.CallbackPath = CallbackPath;
         options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
         options.SaveTokens = false;
         options.MapInboundClaims = false;
@@ -43,7 +54,6 @@ internal static class OidcSignIn
         options.CorrelationCookie.SecurePolicy = secure;
         options.NonceCookie.SecurePolicy = secure;
 
-        options.Events.OnTokenValidated = OnTokenValidatedAsync;
         options.Events.OnRemoteFailure = OnRemoteFailureAsync;
         options.Events.OnAccessDenied = context =>
         {
@@ -56,13 +66,7 @@ internal static class OidcSignIn
     /// <summary>id_token 驗證通過：upsert 使用者、同步角色，把 principal 換成 Ymir 自己的 claims。</summary>
     private static async Task OnTokenValidatedAsync(TokenValidatedContext context)
     {
-        var services = context.HttpContext.RequestServices;
-        var provider = services.GetRequiredService<EntraIdentityProvider>();
-        var users = services.GetRequiredService<IUserDirectory>();
-        var auditLog = services.GetRequiredService<IAuditLog>();
-        var now = services.GetRequiredService<TimeProvider>().GetUtcNow();
-        var cancellationToken = context.HttpContext.RequestAborted;
-
+        var provider = context.HttpContext.RequestServices.GetRequiredService<EntraIdentityProvider>();
         var identity = context.Principal is null ? null : provider.Resolve(context.Principal);
         if (identity is null)
         {
@@ -70,21 +74,36 @@ internal static class OidcSignIn
             return;
         }
 
-        var user = await users.UpsertOnLoginAsync(identity, provider.ResolveRole(context.Principal!), cancellationToken, roleManagedByIdentityProvider: true);
+        await CompleteSignInAsync(context, identity, provider.ResolveRole(context.Principal!), "auth.login.oidc");
+    }
+
+    /// <summary>
+    /// 外部 IdP 驗證通過後共用的步驟：upsert 使用者（角色每次登入同步）、停用帳號導回 <c>/login?error=disabled</c>、
+    /// principal 換成 Ymir 自己的 claims，並寫稽核。
+    /// </summary>
+    internal static async Task CompleteSignInAsync(TokenValidatedContext context, ExternalIdentity identity, UserRole role, string auditAction)
+    {
+        var services = context.HttpContext.RequestServices;
+        var users = services.GetRequiredService<IUserDirectory>();
+        var auditLog = services.GetRequiredService<IAuditLog>();
+        var now = services.GetRequiredService<TimeProvider>().GetUtcNow();
+        var cancellationToken = context.HttpContext.RequestAborted;
+
+        var user = await users.UpsertOnLoginAsync(identity, role, cancellationToken, roleManagedByIdentityProvider: true);
         if (user.Status == UserStatus.Disabled)
         {
-            await auditLog.WriteAsync(new AuditEntry($"user:{user.Id:D}", "auth.login.oidc", "user", user.Id.ToString("D"), AuditResult.Denied, now, null), cancellationToken);
+            await auditLog.WriteAsync(new AuditEntry($"user:{user.Id:D}", auditAction, "user", user.Id.ToString("D"), AuditResult.Denied, now, null), cancellationToken);
             context.HandleResponse();
             context.Response.Redirect("/login?error=disabled");
             return;
         }
 
         context.Principal = YmirClaims.CreatePrincipal(user, CookieAuthenticationDefaults.AuthenticationScheme);
-        await auditLog.WriteAsync(new AuditEntry($"user:{user.Id:D}", "auth.login.oidc", "user", user.Id.ToString("D"), AuditResult.Success, now, null), cancellationToken);
+        await auditLog.WriteAsync(new AuditEntry($"user:{user.Id:D}", auditAction, "user", user.Id.ToString("D"), AuditResult.Success, now, null), cancellationToken);
     }
 
     /// <summary>state / nonce / token 驗證失敗等：細節只寫 server log，瀏覽器只看到「登入失敗」（SA §12）。</summary>
-    private static Task OnRemoteFailureAsync(RemoteFailureContext context)
+    internal static Task OnRemoteFailureAsync(RemoteFailureContext context)
     {
         var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(OidcSignIn));
         logger.LogWarning(context.Failure, "OIDC sign-in failed");
