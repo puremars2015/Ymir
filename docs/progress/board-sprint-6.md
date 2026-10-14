@@ -54,6 +54,7 @@
 | O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 📝 | ❓ADR 全文待使用者確認後才開始實作；決定事項已確認（刪除、移動、改名改為允許），見 #060 |
 | L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | ✅ | 已合併回 main（使用者 2026-10-13 要求）；管理 → 用量「依模型」卡片，模型名稱帶 provider；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058、#059 |
 | RAG2 | `/make` 新增「建立 RAG 知識庫」引導主題 | ✅ | 種子主題（管理員可調整／停用），引導到專案頁知識庫（每專案一份 SQLite），見 #061 |
+| UPD1 | main 4b8a3af 正式更新產物與現況核對（歷史建置記錄） | 🔬 | API／RuntimeHost／511 單元測試／396 checksums 通過；保留當時未部署與權限受阻原文，原部署卡關已於 2026-10-14 13:00 部署解除，見 #062 |
 | DOC1 | 精簡 README 專案入口 | ✅ | 保留介紹／功能／技術／開發／文件導覽，移除歷史主機快照與實作流水帳，見 #056 |
 | ARCH1 | 現況系統架構圖與專案導覽 | ✅ | 根目錄 architecture.md、五張 Mermaid 圖與 README 入口；區分正式部署／可選功能／未驗證項目，見 #058 |
 | LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #039 |
@@ -104,6 +105,18 @@
 ---
 
 ## 💬 留言區
+
+### #063 · 現存分支整合回 main（含 RAG 引導）與重新部署準備
+
+> 👤 **Hermes（AI）** · 🕒 2026-10-14 · `🔬驗證`
+
+- 依使用者要求盤點全部現存分支，5 個分支 tip 的祖先檢查皆包含於本機 main；只有 `claude/eloquent-cray-dc7fvl` 尚未合併的 RAG 引導內容需新 merge，提交 `9f363c4`。不刪分支，不重寫共享歷史。
+- 保留每模型用量功能及 ADR-0022 提議（沒有把未採納提議當成已實作）；RAG 新 migration `20261013153602_RagGuideMakeTopic` 加入固定主題。看板衝突保留兩方完整紀錄，RAG 留言編為 #061、舊建置紀錄 #062。
+- 實際驗證：後端 build 0 警告／0 錯誤、523 單元測試通過；整合測試首次與重試捕捉 OIDC 共用 fixture 的殘留設定，補上還原初始狀態後 275 全通過、0 略過（Pi 1.0.0＋Fake LLM，不呼叫付費模型）。測試用獨立暫時 SQL Server，完成後移除，沒有操作正式 DB。
+- 前端 lint、178 Vitest、正式 build 通過。原本本機 compose／proxy／opencode 變更及安全 stash 保留，不混入本輪程式提交。
+- 正式環境仍為 4b8a3af；新版需精確產物、RAG 種子 transaction/history/schema 審查與單次 sudo 表單後再切換，不重跑舊 installer、不宣稱已部署。
+
+---
 
 ### #061 · /make 新增「建立 RAG 知識庫」引導主題
 
@@ -212,6 +225,29 @@
   1. 這個分支要合併回 main 嗎？
   2. 是否需要 Ymir 自己保存用量歷史？例如本地時區換日、LiteLLM 資料庫遺失後仍保留歷史、依對話或專案拆分。這需要新 ADR 推翻 ADR-0004 補充。
   3. 是否要讓成員看到自己的用量，或提供 CSV 匯出？
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
+### #062 · main 4b8a3af 正式建置產物完成，尚未部署
+
+> 👤 **Hermes（AI）** · 🕒 2026-10-13 21:34 · `🔬驗證` `⛔卡關`
+
+- 上層已完成 main `63e15b7` → `4b8a3af729a2d3f4cd83e5c840d9423145be9d68` fast-forward。本輪 API build、linux-x64 self-contained RuntimeHost publish、API docker-archive save 皆 exit 0；unique tag `localhost/ymir/api:4b8a3af` 在 itadmin rootless store，不覆寫正式 tag。
+- 產物：`/home/itadmin/ymir-production-install/update-4b8a3af/runtime-host/`，包含 publish、`ymir-api-4b8a3af.tar`、`SHA256SUMS`；396 個檔案 hash 核對 exit 0，archive manifest／image ID／API DLL／Angular index／PWA 檔案通過。tar SHA-256 `790bae6575fd3aea5cfaff3e18ff9587761e8b9e8bc728fac7c5cc53bd17c4e2`。安裝 RuntimeHost 時排除 tar／checksum。
+- 實跑 `dotnet test --project tests/Ymir.UnitTests -c Release` 重跑 exit 0：511 通過、0 失敗、0 略過。首次與本機 publish 平行共用 bin／obj 發生 MSB4018／MSB3026，改為順序重跑成功，原失敗日誌保留。未執行 integration tests 或付費模型。
+- 最新唯讀現況：正式 API／RuntimeHost／origin-production／cloudflared-production／LiteLLM bridge active/running，retained-dependencies active/exited success；舊 itadmin user API failed/disabled。SQL／LiteLLM／PostgreSQL running，本機 API health 200 Healthy、nginx login 200、公開 login/providers 200、公開 health/alive 404；OIDC challenge 302 callback 正確為 `https://ymir.thetainformation.com/signin-oidc`，不等於真登入成功。上述正式單元目前不是 masked，不套用過去 checkpoint。
+- **卡關**：`sudo -n true`／`sudo -n /usr/local/sbin/ymir-diagnose` 均 exit 1，無非互動 root 权限；root／ymir Podman、正式 keyring 與 schema history 未完整核對。SQL mounts=[]，切換前需 SQL 原生備份，禁止重建 SQL。需要管理者先執行已檢閱的唯讀診斷，再另外核准受限正式切換，不能直接重跑舊 installer。
+- 三份既有 compose／nginx／opencode 本機變更 SHA-256 一致保留；未部署、未停止／啟動服務、未改資料庫／secret／Data Protection keys、未跑舊 install/resume/finish、未 commit/push。AGENTS.md 處理紀錄寫入被工具安全政策拒絕，未改用其他工具繞過；待解除該特定檔案寫入限制。
+- 詳細證據與權限 gate：耐久目錄 `BUILD-REPORT.md`、`verification.json`、去機密現況摘要與私有 `logs/`。真 Entra 登入、Agent/SSE 及新版上線未驗證。
+
+> **歷史建置記錄補註**：以上保留 2026-10-13 當時原文；原部署卡關已於 2026-10-14 13:00 正式部署解除，不代表目前仍未部署。
 
 <details>
 <summary>💬 回覆（0）</summary>

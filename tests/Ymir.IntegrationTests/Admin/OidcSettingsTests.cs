@@ -44,6 +44,8 @@ public class OidcSettingsTests(DatabaseOidcApiFactory factory) : IClassFixture<D
     public async Task EntraSettings_TakeEffectWithoutRestart_AndTheSecretIsNeverReturned()
     {
         using var admin = await factory.LoginAsync($"oidc-admin-{Guid.NewGuid():N}", UserRole.Admin);
+        // 同一 fixture 的其他測試可能留下停用的資料庫設定；先還原，避免執行順序影響來源斷言。
+        await ResetWithoutLockoutAsync(admin);
         var before = await admin.GetFromJsonAsync<OidcSettingsResponse>("/api/admin/settings/oidc", JsonDefaults.Options, Ct);
         Assert.False(before!.Configured);
         Assert.Equal(OidcSettingsSource.None, before.Source);

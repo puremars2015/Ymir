@@ -2,6 +2,13 @@
 
 完整架構、驗證與交付規則見 [CLAUDE.md](CLAUDE.md)。所有開發代理均需遵守，並在工作前閱讀 `docs/progress/` 的目前 Sprint 看板。
 
+## 處理紀錄
+
+| 日期 | 內容 | 備註 |
+|---|---|---|
+| 2026-10-14 | 將目前 5 個其他分支的提交整合／驗證包含於 main；新增 RAG 引導主題 migration，保留 OneDrive ADR 提議與每模型用量功能。修正 OIDC 整合測試的共用 fixture 狀態殘留；後端 build 無警告、523 單元測試、275 整合測試全通過；前端 lint、178 測試與 build 通過。 | RAG merge 9f363c4；SQL 測試使用獨立暫時容器，測完清理；正式環境仍4b8a3af，重新部署尚待新版產物／migration 審查及單次 sudo 授權。原有本機變更與 stash 保留。 |
+| 2026-10-14 13:00 CST | 經 Telegram 單次 sudo 授權完成 4b8a3af 正式更新：API image 948fdadbc6196548465fb4e3373d384e22dd710af45caa340954fb91c0d8485f，RuntimeHost /opt/ymir/releases/4b8a3af/runtime-host。root 更新器確認 SQL/keyring/workspaces 備份、migration history/schema gate、有效 ENV、精確 image、健康與開機設定；後續讀回四個正式 unit active、公開 /login HTTP 200、Quadlet image 與 RuntimeHost 工作目錄一致。 | 備份 /var/backups/ymir/4b8a3af；未回復；單次表單及臨時 tunnel 已清理。真 Entra 登入、既有加密資料解密與真 Pi SSE 尚待人工驗收。保留既有未提交工作樹變更，未宣稱整站全部功能驗收完成。 |
+
 ## Git（使用者決定：2026-10-12）
 
 - 直接在 `main` 工作；除非使用者明確要求，不建立工作分支、額外 worktree 或 PR。
