@@ -47,6 +47,11 @@ internal static class AuthSetup
     /// <summary>帳號密碼登入的 rate limit policy（每個來源 IP）。</summary>
     public const string PasswordLoginRateLimit = "password-login";
 
+    /// <summary>使用者之間的訊息：每人每分鐘的送出上限（ADR-0023），避免程式化洗版。</summary>
+    public const string DirectMessageRateLimit = "direct-message";
+
+    internal const int DirectMessagesPerMinute = 60;
+
     public static IServiceCollection AddYmirAuth(this IServiceCollection services, IHostEnvironment environment, IConfiguration configuration)
     {
         var section = configuration.GetSection(YmirAuthOptions.SectionName);
@@ -94,6 +99,9 @@ internal static class AuthSetup
             options.AddPolicy(PasswordLoginRateLimit, context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, authOptions.LocalAccounts.LoginAttemptsPerMinute), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(DirectMessageRateLimit, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirst(YmirClaims.UserId)?.Value ?? "anonymous",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = DirectMessagesPerMinute, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
         });
 
         services.AddAntiforgery(options =>

@@ -234,6 +234,12 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "GET /api/connectors/onedrive/callback",
         "PUT /api/connectors/onedrive/root",
         "DELETE /api/connectors/onedrive/",
+        // 使用者之間的訊息（ADR-0023）：路徑上的 id 是「對方」，一律只讀寫目前使用者參與的訊息；隱私在 DirectMessageTests 驗證。
+        "GET /api/direct-messages/contacts",
+        "GET /api/direct-messages/events",
+        "GET /api/direct-messages/{peerId:guid}",
+        "POST /api/direct-messages/{peerId:guid}",
+        "POST /api/direct-messages/{peerId:guid}/read",
     ];
 
     private sealed record OwnedResources(Guid ProjectId, Guid ConversationId, Guid ExecutionId);

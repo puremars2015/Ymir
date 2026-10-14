@@ -25,6 +25,10 @@ import {
   SiteAccessMode,
   SiteTicket,
   UserSearchResult,
+  DirectContact,
+  DirectMessage,
+  DirectMessagePage,
+  DirectMessagesRead,
   Site,
   Sites,
   KnowledgeBase,
@@ -492,6 +496,24 @@ export class ApiService {
 
   searchUsers(query: string): Observable<UserSearchResult[]> {
     return this.http.get<UserSearchResult[]>('/api/users/search', { params: { q: query } });
+  }
+
+  /** 使用者之間的訊息（ADR-0023）。 */
+  listDirectContacts(): Observable<DirectContact[]> {
+    return this.http.get<DirectContact[]>('/api/direct-messages/contacts');
+  }
+
+  listDirectMessages(peerId: string, before?: string): Observable<DirectMessagePage> {
+    const params: Record<string, string> = before ? { before } : {};
+    return this.http.get<DirectMessagePage>(`/api/direct-messages/${peerId}`, { params });
+  }
+
+  sendDirectMessage(peerId: string, text: string): Observable<DirectMessage> {
+    return this.http.post<DirectMessage>(`/api/direct-messages/${peerId}`, { text });
+  }
+
+  markDirectMessagesRead(peerId: string): Observable<DirectMessagesRead> {
+    return this.http.post<DirectMessagesRead>(`/api/direct-messages/${peerId}/read`, null);
   }
 
   cancelExecution(executionId: string): Observable<CancelExecutionResponse> {

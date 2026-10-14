@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Ymir.Platform.Messaging;
 using Ymir.Platform.Settings;
 using Ymir.Platform.Users;
 
@@ -16,6 +17,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     internal DbSet<AuditLogRecord> AuditLog => Set<AuditLogRecord>();
 
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+
+    public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -71,6 +74,22 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             setting.Property(s => s.Key).HasMaxLength(SystemSetting.KeyMaxLength);
             setting.Property(s => s.Value).HasMaxLength(SystemSetting.ValueMaxLength).IsRequired();
             setting.Property(s => s.UpdatedBy).HasMaxLength(200).IsRequired();
+        });
+
+        // 使用者之間的訊息（ADR-0023）；同一模組內，可以建 FK。兩個 FK 都指向 users，SQL Server 不允許兩條串聯刪除路徑，所以不串聯
+        //（使用者只會停用、不會刪除）。
+        modelBuilder.Entity<DirectMessage>(message =>
+        {
+            message.ToTable("direct_messages");
+            message.HasKey(m => m.Id);
+            message.Property(m => m.Id).ValueGeneratedNever();
+            message.Property(m => m.Body).HasMaxLength(DirectMessage.BodyMaxLength).IsRequired();
+            message.HasOne<User>().WithMany().HasForeignKey(m => m.SenderId).OnDelete(DeleteBehavior.NoAction);
+            message.HasOne<User>().WithMany().HasForeignKey(m => m.RecipientId).OnDelete(DeleteBehavior.NoAction);
+            // 兩人之間的歷史（兩個方向各用一個索引）與未讀數。
+            message.HasIndex(m => new { m.SenderId, m.RecipientId, m.CreatedAt });
+            message.HasIndex(m => new { m.RecipientId, m.SenderId, m.CreatedAt });
+            message.HasIndex(m => new { m.RecipientId, m.ReadAt });
         });
 
         modelBuilder.ApplySnakeCaseNames();

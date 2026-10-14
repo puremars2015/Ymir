@@ -32,6 +32,9 @@ const conversations = [
 await context.route('**/api/**', async (route) => {
   if (route.request().method() !== 'GET') throw new Error('Unexpected API mutation');
   const path = new URL(route.request().url()).pathname.replace(/\/$/, '');
+  // 成員面板（ADR-0023）：名單為空、即時通知回 204（EventSource 不再重連）。
+  if (path === '/api/direct-messages/events') return route.fulfill({ status: 204 });
+  if (path === '/api/direct-messages/contacts') return route.fulfill({ json: [] });
   const data =
     path === '/api/me'
       ? {

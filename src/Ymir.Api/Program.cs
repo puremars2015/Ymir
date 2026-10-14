@@ -87,6 +87,7 @@ app.MapAdminSettingsEndpoints();
 app.MapBrandingEndpoints();
 app.MapAdminModelEndpoints();
 app.MapMakeTopicEndpoints();
+app.MapDirectMessageEndpoints();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();
