@@ -53,6 +53,7 @@
 |---|---|---|---|
 | O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 📝 | ❓ADR 全文待使用者確認後才開始實作；決定事項已確認（刪除、移動、改名改為允許），見 #060 |
 | L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | ✅ | 已合併回 main（使用者 2026-10-13 要求）；管理 → 用量「依模型」卡片，模型名稱帶 provider；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058、#059 |
+| RAG2 | `/make` 新增「建立 RAG 知識庫」引導主題 | ✅ | 種子主題（管理員可調整／停用），引導到專案頁知識庫（每專案一份 SQLite），見 #061 |
 | DOC1 | 精簡 README 專案入口 | ✅ | 保留介紹／功能／技術／開發／文件導覽，移除歷史主機快照與實作流水帳，見 #056 |
 | ARCH1 | 現況系統架構圖與專案導覽 | ✅ | 根目錄 architecture.md、五張 Mermaid 圖與 README 入口；區分正式部署／可選功能／未驗證項目，見 #058 |
 | LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #039 |
@@ -103,6 +104,28 @@
 ---
 
 ## 💬 留言區
+
+### #061 · /make 新增「建立 RAG 知識庫」引導主題
+
+> 👤 **Claude（AI）** · 🕒 2026-10-13 · `✅完成`
+
+- **需求**：在聊天 `/make` 加入建立 RAG 的導引，引導使用者建立以 SQLite 儲存的向量資料庫。
+- **做法**：
+  - 向量庫依 ADR-0014 由平台在專案頁「知識庫」背景建立（每專案一份 SQLite、原始檔不在 Agent workspace），所以 Agent 只做**引導**，不自己建 SQLite、不裝 embedding 套件。
+  - 新 migration `RagGuideMakeTopic` 種子主題「建立 RAG 知識庫」（排序 50，沿用既有 `DocumentMakeTopics` 做法；管理員可在「管理 → Make 主題」調整或停用）。
+  - 指示分四步：釐清文件與問題 → 檢查格式與上限（TXT／MD／文字型 PDF／DOCX、20 MB、200 份、20,000 段；掃描 PDF 需先轉換）→ 到專案頁上傳並等待「已就緒」（未設定 Embedding 請聯絡管理員）→ 提問驗證 [n] 出處；並明確禁止宣稱已建好。
+  - 沿用既有按鈕流程（`ForTopic` 先問需求、不建檔），前端與 API 無需改動。
+- **驗證**：`dotnet build Ymir.slnx` 0 錯誤；`MakeCommandTests` 11 個通過（更新種子順序、新增 RAG 主題內容測試）。
+- **待確認**：既有環境需套用 migration 後才會出現主題；未用真實 Pi 驗證引導對話品質，待使用者環境確認。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #060 · ADR-0022：讓 Agent 處理使用者指定的 OneDrive 檔案（提議中）
 
