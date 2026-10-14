@@ -58,7 +58,7 @@
 | RAG2 | `/make` 新增「建立 RAG 知識庫」引導主題 | ✅ | 種子主題（管理員可調整／停用），引導到專案頁知識庫（每專案一份 SQLite），見 #061 |
 | UPD1 | main 4b8a3af 正式更新產物與現況核對（歷史建置記錄） | 🔬 | API／RuntimeHost／511 單元測試／396 checksums 通過；保留當時未部署與權限受阻原文，原部署卡關已於 2026-10-14 13:00 部署解除，見 #062 |
 | DEP2 | 正式站更新至 main 4d7d4c0、`ymir-sql` 改掛持久化 volume | ✅ | API health／登入頁通過；外部網域登入與 SSE 待使用者以瀏覽器確認，見 #068 |
-| FIX413 | 長對話一直顯示「模型發生錯誤」：LiteLLM proxy 的 nginx 1 MB 上限 | 🔬 | 設定已納入版控並寫入安裝手冊；正式主機的 `client_max_body_size` 待使用者執行修正指令，見 #069 |
+| FIX413 | 長對話一直顯示「模型發生錯誤」：LiteLLM proxy 的 nginx 1 MB 上限 | 🔬 | 設定已納入版控並寫入安裝手冊；正式主機已套用並 reload；待使用者在原對話重送確認，見 #069 |
 | DOC1 | 精簡 README 專案入口 | ✅ | 保留介紹／功能／技術／開發／文件導覽，移除歷史主機快照與實作流水帳，見 #056 |
 | ARCH1 | 現況系統架構圖與專案導覽 | ✅ | 根目錄 architecture.md、五張 Mermaid 圖與 README 入口；區分正式部署／可選功能／未驗證項目，見 #058 |
 | LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #039 |
@@ -117,7 +117,7 @@
 - **現象**：使用者回報一直顯示「模型發生錯誤，請稍後再試」。API log 三次都是同一個對話，`ended with model error: 413 <html>…Request Entity Too Large…nginx/1.31.5`；LiteLLM 沒有對應的 `/chat/completions` 紀錄。20:45 的兩次發生在今天重新部署（20:51）之前，與部署無關。
 - **原因**：Agent → `litellm:4000` 實際是 `ymir` 帳號的 `ymir-litellm-proxy`（nginx Quadlet）→ `ymir-litellm-bridge`（socat Unix socket）→ 主機 LiteLLM。nginx 設定沒有 `client_max_body_size`，預設 1 MB；每次模型呼叫都送完整對話歷史，超過後該對話每則都 413。這兩段只在主機上手動建立、不在版控。
 - **處理**：新增 `deploy/runtime-host/litellm-proxy/`（bridge unit、proxy Quadlet、nginx 設定 `client_max_body_size 100m` + `proxy_request_buffering off`），`deploy/runtime-host/README.md` 補上安裝步驟、413 的判斷方式與既有主機的修正指令。範例設定以 `nginx:1.27-alpine` 的 `nginx -t` 驗證通過。
-- **未完成**：正式主機修改 `/home/ymir/.config/ymir/litellm-nginx.conf` 被工具權限擋下，待使用者執行 README 中的修正指令後，在原對話重送一則訊息確認。proxy Quadlet 範本的 `Image=` 需填入主機實際的 nginx 映像。
+- **正式主機已修正**（使用者授權並輸入 sudo 密碼）：備份原設定後加入兩行，`nginx -t` 通過、`nginx -s reload` 完成，服務未中斷。待使用者在原對話重送一則訊息確認。proxy Quadlet 範本的 `Image=` 需填入主機實際的 nginx 映像。
 
 <details>
 <summary>💬 回覆（0）</summary>
