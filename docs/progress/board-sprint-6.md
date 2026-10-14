@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-15 00:00 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-15 01:00 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -61,6 +61,7 @@
 | FIX413 | 長對話一直顯示「模型發生錯誤」：LiteLLM proxy 的 nginx 1 MB 上限 | ✅ | 設定已納入版控並寫入安裝手冊；正式主機重啟 proxy 後使用者確認原對話恢復，見 #069 |
 | UI-IND | 執行中且尚未顯示回答時一定顯示「正在思考中」/「正在工作中」 | 🔬 | 已部署（0e16583）；待使用者在正式站確認顯示，見 #070 |
 | CRASH1 | 正式 API 在 .NET GC 執行緒 fail-fast 重啟（Cloudflare 回 origin 錯誤） | 🔬 | 10/13 起 8 次；已改 workstation GC 並開啟 crash report／dump，觀察中，見 #071 |
+| IMG1 | container image 回收機制（腳本 + 每週 timer） | 🔬 | 已 commit；正式主機 dry run 可回收約 3.1 GB；timer 待使用者決定是否安裝，見 #072 |
 | DOC1 | 精簡 README 專案入口 | ✅ | 保留介紹／功能／技術／開發／文件導覽，移除歷史主機快照與實作流水帳，見 #056 |
 | ARCH1 | 現況系統架構圖與專案導覽 | ✅ | 根目錄 architecture.md、五張 Mermaid 圖與 README 入口；區分正式部署／可選功能／未驗證項目，見 #058 |
 | LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #039 |
@@ -111,6 +112,25 @@
 ---
 
 ## 💬 留言區
+
+### #072 · Container image 回收機制
+
+> 👤 **Claude（AI）** · 🕒 2026-10-15 01:00 · `🔬驗證`
+
+- **需求**：使用者指出 container 會自動回收（`--rm`），但 image 不會，要規劃回收機制。
+- **現況（實際查詢）**：image 分散在三個 store：root（rootful：正式 API、nginx、Tunnel）、`ymir`（rootless：Agent runtime、LiteLLM proxy）、`itadmin`（rootless：開發建置，**與其他專案共用**）。每次部署 API 新增約 360 MB 的 `localhost/ymir/api:<commit>`，建置另留下沒有 tag 的中間層（SDK 階段約 1.8 GB）。主機磁碟目前 32%，不急迫。
+- **做法**：`deploy/maintenance/ymir-image-prune.sh`（預設 dry run，`--apply` 才刪除）＋ `ymir-image-prune.service` / `.timer`（每週日 04:00）＋ README。只處理 `localhost/ymir/*`；一律保留 container 使用中（含已停止）的 image、正式設定指向的 image（API Quadlet `Image=`、runtime host 的 `VibeMaker__Runtime__Image`）與每個 repository 最新 3 個；dangling 只清 root 與 `ymir` store。`podman rmi` 不加 `-f`。
+- **驗證（實際執行）**：`bash -n`、`systemd-analyze verify` 通過；`itadmin` store 以 `KEEP=1` dry run 確認刪除候選正確；正式主機三個 store 以 sudo dry run：保留正式 API（pinned）與最新 3 個、Agent image（pinned），可回收 3 個 dangling 建置中間層約 3.1 GB，其他專案的 image 未列入。尚未實際刪除。
+- **❓待決定**：是否在正式主機安裝 timer（README「每週自動執行」）。刪除建置中間層後，下一次 API 建置會較慢（需重新下載 / 建置 SDK 階段）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #071 · 正式 API 週期性崩潰：.NET GC 執行緒 fail-fast（exit 139）
 
