@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-14 16:30 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-14 21:20 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -57,6 +57,7 @@
 | L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | ✅ | 已合併回 main（使用者 2026-10-13 要求）；管理 → 用量「依模型」卡片，模型名稱帶 provider；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058、#059 |
 | RAG2 | `/make` 新增「建立 RAG 知識庫」引導主題 | ✅ | 種子主題（管理員可調整／停用），引導到專案頁知識庫（每專案一份 SQLite），見 #061 |
 | UPD1 | main 4b8a3af 正式更新產物與現況核對（歷史建置記錄） | 🔬 | API／RuntimeHost／511 單元測試／396 checksums 通過；保留當時未部署與權限受阻原文，原部署卡關已於 2026-10-14 13:00 部署解除，見 #062 |
+| DEP2 | 正式站更新至 main 4d7d4c0、`ymir-sql` 改掛持久化 volume | ✅ | API health／登入頁通過；外部網域登入與 SSE 待使用者以瀏覽器確認，見 #068 |
 | DOC1 | 精簡 README 專案入口 | ✅ | 保留介紹／功能／技術／開發／文件導覽，移除歷史主機快照與實作流水帳，見 #056 |
 | ARCH1 | 現況系統架構圖與專案導覽 | ✅ | 根目錄 architecture.md、五張 Mermaid 圖與 README 入口；區分正式部署／可選功能／未驗證項目，見 #058 |
 | LD1 | Ubuntu 統一 Linux 正式架構 | 🔬 | 正式 API／nginx／Tunnel 已啟動，本機通過；公開探測回 Cloudflare 403，登入與 SSE 待驗證，見 #039 |
@@ -107,6 +108,30 @@
 ---
 
 ## 💬 留言區
+
+### #068 · 正式站重新部署 4d7d4c0 與 ymir-sql 持久化 volume
+
+> 👤 **Claude（AI）** · 🕒 2026-10-14 21:20 · `✅完成`
+
+- **前置確認**：`git fetch --all --prune` 後本機 `main` 與 `origin/main` 一致（4d7d4c0），7 個 `claude/*` 遠端分支皆已合併（`git branch -a --no-merged main` 為空）。
+- **部署**（使用者以圖形 sudo 視窗輸入密碼）：正式站原為 4b8a3af；與其相比只有 API／前端變動，RuntimeHost 與 Agent image 不需更新。
+  - 套用前備份 `ymir` 資料庫與 Quadlet 至 `/var/backups/ymir/redeploy-20261014-184902/`、`redeploy-20261014-205030/`（600，root）。
+  - 以 `dotnet ef migrations script --idempotent` 產生 SQL，在 `ymir-sql` 內以 sqlcmd 套用 `DirectMessages`、`RagGuideMakeTopic`。第一次少了 `-I` 失敗（Msg 1934，filtered index 需要 `QUOTED_IDENTIFIER ON`），交易回復、未留下部分變更，加 `-I` 後成功。
+  - rootful 建置 `localhost/ymir/api:4d7d4c0`；Quadlet `Image=` 是固定 image ID，改成新 ID 後 daemon-reload 並重啟。
+  - 驗證（實際執行）：`/health` Healthy、`/login` 200、`/api/auth/providers` 200；api／runtime-host／origin／cloudflared 皆 active。
+- **ymir-sql 持久化**（使用者要求）：正常 SHUTDOWN 後把 `/var/opt/mssql` 複製到 named volume `ymir-sql-data`，以同一 image、host network、hostname `ub01`、`--stop-timeout 60` 重建 `ymir-sql`（SA 密碼以暫時 env file 傳入，用完即刪）。舊容器保留為已停止的 `ymir-sql-old`。搬移前後筆數一致（使用者 4／對話 10／訊息 66／execution 事件 7057）；重啟容器後資料仍在、API 自動重連。`ymir-retained-dependencies.service` 以名稱啟動，不需修改。
+- **文件**：`deploy/api/LINUX-PRODUCTION-SWITCH.md` 更新 SQL 持久化現況；`deploy/api/README.md` 補上 Quadlet 以 image ID 固定時的換版方式與 sqlcmd `-I`。
+- **未驗證、待使用者確認**：從外部網域開首頁、實際登入、送訊息與 SSE、成員面板私訊。Google 登入未設定，維持停用。
+- **❓待決定**：確認無誤後是否刪除 `ymir-sql-old`；SQL 原生備份排程與異地保存仍未建立。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #067 · 新版部署產物安全相依套件修補
 
