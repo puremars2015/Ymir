@@ -25,9 +25,9 @@ import {
 } from '../../core/api/api-types';
 import {
   applyExecutionEvent,
-  hasRunningTools,
   ExecutionView,
   initialExecutionView,
+  liveIndicator,
 } from '../../core/executions/execution-state';
 import { ExecutionStreamService } from '../../core/executions/execution-stream.service';
 import { resumeTurnFrom } from '../../core/executions/resume-turn';
@@ -86,10 +86,7 @@ export class ChatPage {
   protected readonly conversation = signal<Conversation | null>(null);
   protected readonly messages = signal<ChatMessage[]>([]);
   protected readonly live = signal<LiveTurn | null>(null);
-  protected readonly working = computed(() => {
-    const turn = this.live();
-    return turn !== null && hasRunningTools(turn.view);
-  });
+  protected readonly liveIndicator = liveIndicator;
   protected readonly error = signal<string | null>(null);
   /** 送出前正在上傳附件（顯示進度、輸入框暫停）。 */
   protected readonly uploading = signal<string | null>(null);

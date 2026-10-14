@@ -1,5 +1,12 @@
 import { ExecutionEvent } from './execution-events';
-import { applyExecutionEvent, hasRunningTools, initialExecutionView } from './execution-state';
+import {
+  applyExecutionEvent,
+  hasRunningTools,
+  initialExecutionView,
+  liveIndicator,
+  THINKING_LABEL,
+  WORKING_LABEL,
+} from './execution-state';
 
 const run = (events: ExecutionEvent[]) =>
   events.reduce(applyExecutionEvent, initialExecutionView());
@@ -98,4 +105,45 @@ describe('applyExecutionEvent', () => {
     expect(view.tools[0].state).toBe('failed');
     expect(view.status).toBe('cancelled');
   });
+});
+
+describe('liveIndicator', () => {
+  it('shows thinking while running with no visible answer', () => {
+    expect(liveIndicator(initialExecutionView(), false)).toBe(THINKING_LABEL);
+    const withStatus = run([{ type: 'status', data: { text: '正在準備回覆......' } }]);
+    expect(liveIndicator(withStatus, false)).toBe(THINKING_LABEL);
+  });
+
+  it('keeps thinking while the model output is still hidden (e.g. inside <think>)', () => {
+    const view = run([{ type: 'assistant.delta', data: { text: '<think>規劃中' } }]);
+    expect(liveIndicator(view, false)).toBe(THINKING_LABEL);
+  });
+
+  it('shows working while tools run, even after some answer text', () => {
+    const view = run([
+      { type: 'assistant.delta', data: { text: '先看一下檔案' } },
+      { type: 'tool.started', data: { tool: 'read', callId: 'c1', summary: 'a.md' } },
+    ]);
+    expect(liveIndicator(view, true)).toBe(WORKING_LABEL);
+    expect(liveIndicator(view, false)).toBe(WORKING_LABEL);
+  });
+
+  it('hides once the answer is visible and no tool is running', () => {
+    const view = run([{ type: 'assistant.delta', data: { text: '答案' } }]);
+    expect(liveIndicator(view, true)).toBeNull();
+  });
+
+  it.each(['execution.completed', 'execution.failed', 'execution.cancelled'] as const)(
+    'hides after %s',
+    (type) => {
+      const view = run([
+        type === 'execution.failed'
+          ? { type, data: { code: 'AGENT_RUNTIME_ERROR', message: '無法完成工作' } }
+          : type === 'execution.completed'
+            ? { type, data: { executionId: 'e1', messageId: null } }
+            : { type, data: { executionId: 'e1' } },
+      ]);
+      expect(liveIndicator(view, false)).toBeNull();
+    },
+  );
 });

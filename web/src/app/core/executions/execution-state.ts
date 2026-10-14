@@ -40,6 +40,24 @@ export function hasRunningTools(view: ExecutionView): boolean {
   return view.status === 'running' && view.toolBusy;
 }
 
+export const WORKING_LABEL = '正在工作中......';
+export const THINKING_LABEL = '正在思考中......';
+
+/**
+ * 執行中的文字提示：工具執行中（含工具之間的空檔）顯示「工作中」；尚未有可顯示的回答時顯示「思考中」。
+ * 只要還在執行且畫面上沒有回答，就一定有文字提示，使用者不會只看到空白或沒有文字的動畫
+ * （例如模型輸出仍在 <think> 區塊內、被顯示過濾掉時）。執行結束後不顯示。
+ */
+export function liveIndicator(view: ExecutionView, hasVisibleText: boolean): string | null {
+  if (view.status !== 'running') {
+    return null;
+  }
+  if (hasRunningTools(view)) {
+    return WORKING_LABEL;
+  }
+  return hasVisibleText ? null : THINKING_LABEL;
+}
+
 /** 純函式：套用一個事件並回傳新的狀態（不修改輸入）。 */
 export function applyExecutionEvent(view: ExecutionView, event: ExecutionEvent): ExecutionView {
   switch (event.type) {
