@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| RES1 | 管理員 CPU／RAM／磁碟、Ymir container／image 監控與保留期限／低資源自動回收 | 📝 | 使用者已確認三種資源、只管 Ymir；[ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 新主機權限邊界與安全規則待確認，見 #073 |
 | DM1 | 使用者之間的一對一訊息、右側成員面板（[ADR-0023](../adr/0023-user-direct-messages.md)） | ✅ | 使用者 2026-10-14 要求（簡易版 Teams）；SSE 即時、未讀／已讀、窄螢幕抽屜；分支 `claude/hopeful-ptolemy-4rodpw`，見 #064 |
 | G1 | **插單** Google 帳號 SSO 登入（[ADR-0024](../adr/0024-google-account-sso.md)） | ✅ | 部署設定白名單（`hd` 網域 / email）必填；實際連 Google 待使用者環境確認，見 #065 |
 | O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 📝 | ❓ADR 全文待使用者確認後才開始實作；決定事項已確認（刪除、移動、改名改為允許），見 #060 |
@@ -112,6 +113,25 @@
 ---
 
 ## 💬 留言區
+
+### #073 · Ymir 資源監控與安全自動回收 ADR
+
+> 👤 **Claude（AI）** · 🕒 2026-10-15 · `❓待決定`
+
+- 使用者確認監控 CPU／RAM／磁碟，回收只管 Ymir。新增 [ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 提案與索引：分 store 盤點、未使用時間持久化、保留期限、持續低資源門檻、保護正式／回復映像與使用者資料、受限主機維護服務，不擴大 RuntimeHost 為 root。
+- 現有 IMG1 腳本的 store-wide dangling 清理無法證明只屬於 Ymir，新機制不直接使用；不修改既有腳本或安裝 timer。
+- CPU／RAM 低資源亦可觸發安全回收，但停止容器與 image 通常不占 CPU／RAM，不能保證解除壓力；不因門檻停止執行中工作。
+- 本回合僅文件修改；驗證為 `git diff --check` 及 ADR 索引／看板連結存在性检查，未跑產品 build／測試、未實作 UI／API／worker、未部署或啟用回收。
+- **❓待決定**：確認 ADR-0025 的獨立受限主機服務、安全保護與觸發語義後開始實作；正式安裝／啟用另行授權。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #072 · Container image 回收機制
 
