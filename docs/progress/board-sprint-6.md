@@ -122,6 +122,7 @@
 - 現有 IMG1 腳本的 store-wide dangling 清理無法證明只屬於 Ymir，新機制不直接使用；不修改既有腳本或安裝 timer。
 - CPU／RAM 低資源亦可觸發安全回收，但停止容器與 image 通常不占 CPU／RAM，不能保證解除壓力；不因門檻停止執行中工作。
 - 本回合僅文件修改；驗證為 `git diff --check` 及 ADR 索引／看板連結存在性检查，未跑產品 build／測試、未實作 UI／API／worker、未部署或啟用回收。
+- 文件已以 `3e6754e` 推送 main；CI 追蹤受阻：主機沒有 `gh`（`gh run list` 回 command not found），未確認 CI 結果。
 - **❓待決定**：確認 ADR-0025 的獨立受限主機服務、安全保護與觸發語義後開始實作；正式安裝／啟用另行授權。
 
 <details>
