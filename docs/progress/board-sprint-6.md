@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-15 01:00 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-15 02:30 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -52,7 +52,7 @@
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
 | ARCH2 | 架構文件標記正式／舊容器及主機程序 | ✅ | 7 個固定容器＋動態 Agent 的角色清單，root／itadmin／ymir 分區、舊容器與實際模型代理路徑，見 #074 |
-| RES1 | 管理員 CPU／RAM／磁碟、Ymir container／image 監控與保留期限／低資源自動回收 | 📝 | 使用者已確認三種資源、只管 Ymir；[ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 新主機權限邊界與安全規則待確認，見 #073 |
+| RES1 | 管理員 CPU／RAM／磁碟、Ymir container／image 監控與保留期限／低資源自動回收 | 🔬 | [ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 已採納並實作（維護服務、鎖、API、系統資源頁）；測試與瀏覽器驗證通過；正式主機安裝與啟用待使用者授權，見 #074 |
 | DM1 | 使用者之間的一對一訊息、右側成員面板（[ADR-0023](../adr/0023-user-direct-messages.md)） | ✅ | 使用者 2026-10-14 要求（簡易版 Teams）；SSE 即時、未讀／已讀、窄螢幕抽屜；分支 `claude/hopeful-ptolemy-4rodpw`，見 #064 |
 | G1 | **插單** Google 帳號 SSO 登入（[ADR-0024](../adr/0024-google-account-sso.md)） | ✅ | 部署設定白名單（`hd` 網域 / email）必填；實際連 Google 待使用者環境確認，見 #065 |
 | O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 📝 | ❓ADR 全文待使用者確認後才開始實作；決定事項已確認（刪除、移動、改名改為允許），見 #060 |
@@ -122,6 +122,35 @@
 依使用者要求更新 architecture.md：部署圖以藍框標容器、灰框標主機程序，列出三個 rootful 服務容器、itadmin 的 SQL／LiteLLM／PostgreSQL、ymir 的 LiteLLM proxy 與動態使用者 Agent；補上 Agent → nginx proxy → socat bridge → 主機 LiteLLM 真實路徑。7＋N 是角色計數，不宣稱本輪實測全部容器總數。另列已停止的 itadmin `ymir-sql-old`／`ymir-web`／`cloudflared`，提醒跨帳號同名不是同一容器；volume、RuntimeHost、socat 與 oneshot 不是容器。
 
 驗證：itadmin `podman ps -a`、四個正式 systemd unit 狀態、入口 unit 的執行檔與 Podman 名稱核對；root API 身份引用本輪使用者 sudo 唯讀診斷。ymir 儲存區本次未取得直接清單，proxy 以 #069 部署紀錄標註，不虛構 Agent 數量／個人 ID。文件連結、Markdown fences、Mermaid 基本結構與 diff check 通過，未驗證瀏覽器渲染；純文件變更未重跑應用 build／test。未改服務或清理容器；push 後追蹤 CI。
+
+---
+
+### #074 · ADR-0025 實作：系統資源監控與安全自動回收
+
+> 👤 **Claude（AI）** · 🕒 2026-10-15 02:30 · `🔬驗證`
+
+- **需求**：使用者要求依 [ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 實作並合併到 main（依開發規則直接在 main 開發）。ADR 狀態改為已採納（含新增的主機權限邊界），並補上「實作」一節。
+- **主機維護服務**（`src/Ymir.MaintenanceHost`，root，Unix socket + token）：
+  - 端點只有 `GET /v1/resources`、`GET|PUT /v1/policy`、`GET /v1/runs?after=`、`POST /v1/dry-run`；沒有 shell／exec／任意刪除；store、帳號、repository、正式設定檔只來自部署設定。
+  - 主機 CPU（/proc/stat 差值）、記憶體（MemAvailable）、各 store 所在檔案系統（同一檔案系統去重，只回代號不回路徑）；container 狀態／健康／CPU／記憶體、image 大小／共用 layer／引用數；部分查詢失敗標示失敗，不當作零。
+  - 保護規則（`Classifier`，純函式、fail closed）：執行中／暫停／建立中、服務 container、排除清單、沒有 `ymir.reclaimable` label、workspace 非外置或不可存取、任何 container 引用、正式設定指向（Quadlet `Image=`、runtime host `VibeMaker__Runtime__Image`）、每個 repository 最新 3 版、保護版本、其他專案 tag、無法證明歸屬（沒有 `ymir.managed` label 也沒登記）。不用 `--force`、不用 prune。
+  - 未使用時間持久化（重啟不重設、再使用後重新起算）；保留天數（0 = 不依期限）；門檻持續 5 分鐘才觸發、冷卻 10 分鐘、回復門檻 +5%、每輪最多 10 項；磁碟壓力只看受壓檔案系統並逐項重新量測；CPU／記憶體壓力沒有安全候選時只留紀錄。每輪紀錄含候選／保護／刪除／失敗數與實測前後可用量。
+- **生命週期鎖**（`src/Ymir.Maintenance/LifecycleLock`，advisory flock）：runtime host 在建立／啟動／停止／刪除時持有 `user-<id>.lock`（`VibeMaker:Runtime:LifecycleLockDirectory`）；維護服務刪除前以不等待方式取鎖並重新確認狀態；刪 image 期間持有 `deploy.lock`。鎖目錄不可用時只監控與 dry run。
+- **標記**：API 與 Agent Containerfile 每個階段 `LABEL ymir.managed="true"`；Agent container 加 `ymir.managed=true`、`ymir.reclaimable=agent-runtime`（`ContainerCommandBuilderTests` 兩種 engine 都驗證）。既有 image 需在 `RegisteredImages` 登記才可能回收。
+- **API / 前端**：`/api/admin/resources`、`/policy`、`/runs`、`/dry-run`（Admin + XSRF，已加入授權矩陣）；政策存 `platform.system_settings`（`maintenance.reclamation_policy`），儲存寫稽核 `admin.settings.reclamation.update`；`MaintenanceSyncWorker` 每分鐘同步政策，並把有刪除／失敗或由門檻觸發的回收寫入稽核 `maintenance.reclaim`。前端「管理 → 系統資源」（主機資源、containers、images、政策、dry run、回收紀錄），未設定維護服務時顯示不支援。
+- **部署檔**：`deploy/maintenance/`（systemd unit、鎖目錄 tmpfiles、env 範本、安裝步驟、部署鎖用法）；API Quadlet 範本的 `/run/ymir-maintenance` 掛載預設註解（服務未安裝時目錄不存在會讓 API 無法啟動）；runtime host env 範本加鎖目錄。舊的 `ymir-image-prune` timer 啟用新機制前必須停用（安裝步驟第 1 步）。
+- **驗證（實際執行）**：
+  - `dotnet build Ymir.slnx` 0 警告；`dotnet format --verify-no-changes` 通過；維護服務單元測試 74 項（保護規則、重啟、競態、鎖、部署鎖、門檻遲滯、磁碟回復即停、不使用 --force、設定拒絕）；整合測試（真正的 Unix socket 服務 + 假 CLI：端點清單、token、任意指令／刪除目標不存在、不合法政策、無 host 路徑；API 未設定／已連線、政策同步、稽核匯入、授權矩陣）；OpenAPI 快照與前端 schema 更新（既有 path／schema 無變動）；全套 `dotnet test --solution Ymir.slnx`（Pi 1.0.0 安裝在使用者目錄）920 通過、0 失敗、0 略過。整合測試使用獨立的暫時 SQL container（port 14333），未使用正式 `ymir-sql`。
+  - 前端 `npm run lint`、`npm test`（38 檔 198 項）、`npm run build` 通過。
+  - 瀏覽器（Playwright Chromium，`npm run e2e:resources`）：本機以目前帳號的 rootless store 執行維護服務（只查詢與 dry run）＋ Development API：主機資源、containers／images、不顯示 host 路徑、政策驗證與儲存、dry run、回收紀錄、一般使用者不可進入、手機寬度無水平捲動全部通過；修正儲存後狀態未更新的問題。測試服務已停止，store 內 image 全部保留（唯一一筆紀錄：0 候選、6 保護、0 刪除）。
+- **未完成 / 待授權**：正式主機安裝維護服務、runtime host 加鎖目錄並重新部署、API 掛載 socket、既有 image 盤點登記、先 dry run 再開啟自動回收（ADR 第 6 步，需使用者授權）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
 
 ---
 
