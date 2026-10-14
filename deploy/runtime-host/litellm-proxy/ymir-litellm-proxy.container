@@ -1,0 +1,31 @@
+# Agent network 上的 LiteLLM 入口（ADR-0012 A.8）：同時接 ymir-agents-net 與 --internal 的 ymir-agents，名稱 litellm，
+# 只轉送到 ymir-litellm-bridge 的 Unix socket。Agent 的模型位址固定為 http://litellm:4000/v1（API 的 VibeMaker__Pi__ModelBaseUrl）。
+# 安裝（ymir 帳號的 rootless Quadlet）：複製到 /home/ymir/.config/containers/systemd/ymir-litellm-proxy.container（600，擁有者 ymir），
+# nginx 設定複製到 /home/ymir/.config/ymir/litellm-nginx.conf，然後以 ymir 帳號 systemctl --user daemon-reload && systemctl --user start ymir-litellm-proxy
+[Unit]
+Description=Agent-network proxy to LiteLLM only
+
+[Container]
+# 必改：已在 ymir 帳號拉取的 nginx 映像（建議以 image ID 固定），映像內需有 /usr/sbin/nginx
+Image=<nginx image>
+Pull=never
+ContainerName=ymir-litellm-proxy
+Network=ymir-agents-net
+Network=ymir-agents
+NetworkAlias=litellm
+ReadOnly=true
+DropCapability=ALL
+NoNewPrivileges=true
+UserNS=keep-id:uid=10001,gid=10001
+User=10001:10001
+Tmpfs=/tmp:rw,size=64m,mode=1777
+Volume=/home/ymir/.config/ymir/litellm-nginx.conf:/etc/nginx/nginx.conf:ro
+Volume=/run/ymir-litellm:/bridge:ro
+Entrypoint=/usr/sbin/nginx
+Exec=-g "daemon off;"
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

@@ -126,7 +126,7 @@ sudo bash deploy/runtime-host/update-linux-scope-wrapper.sh
    sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) podman network connect ymir-agents-net litellm
    sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) podman network connect ymir-agents litellm
    ```
-   如果 LiteLLM 原本用 `deploy/litellm` 的 compose 在其他帳號或主機上執行，需要改成在 `ymir` 帳號以 container 執行，或在兩個 network 上放一個只轉送到 LiteLLM 的 proxy container。
+   如果 LiteLLM 原本用 `deploy/litellm` 的 compose 在其他帳號或主機上執行，需要改成在 `ymir` 帳號以 container 執行，或在兩個 network 上放一個只轉送到 LiteLLM 的 proxy container（見下方「LiteLLM 在其他帳號執行」，目前正式主機採用這種做法）。
 3. `/etc/ymir/runtime-host.env`：
    ```bash
    VibeMaker__Runtime__Network=ymir-agents-net
@@ -143,6 +143,41 @@ sudo bash deploy/runtime-host/update-linux-scope-wrapper.sh
 - `--internal` network 的閘道 IP（host 端）上聽 `0.0.0.0` 的服務也連得到：主機上的服務請只綁需要的介面，或另設防火牆。
 - 管理員變更政策不會中斷執行中的 Agent；在成員的下一次執行前才重建 container。
 - 沙箱（root Podman）已實測：受限時 Agent 連得到 LiteLLM、連不到外網，Pi session 在重建後保留；**rootless Podman 的實際行為未驗證，待使用者環境確認**。
+
+### LiteLLM 在其他帳號執行：Unix socket bridge + proxy container
+
+LiteLLM 以 `deploy/litellm` 的 compose 在其他帳號（例如 `itadmin`）執行、只聽主機 `127.0.0.1:4000` 時，Agent container 連不到它。做法是兩段轉送，檔案在 [`litellm-proxy/`](litellm-proxy/)：
+
+```
+Agent ─http://litellm:4000─> ymir-litellm-proxy（nginx，ymir 帳號，接 ymir-agents-net + ymir-agents）
+      ─/run/ymir-litellm/litellm.sock─> ymir-litellm-bridge（socat，systemd）─> 127.0.0.1:4000 LiteLLM
+```
+
+1. Bridge（root，需要 `socat`）：
+   ```bash
+   sudo install -m 644 deploy/runtime-host/litellm-proxy/ymir-litellm-bridge.service /etc/systemd/system/
+   sudo systemctl daemon-reload && sudo systemctl enable --now ymir-litellm-bridge
+   ```
+2. Proxy（`ymir` 帳號的 rootless Quadlet）：先以 `ymir` 帳號拉取 nginx 映像，把 `ymir-litellm-proxy.container` 的 `Image=` 換成它的 image ID。
+   ```bash
+   sudo install -d -o ymir -g ymir -m 700 /home/ymir/.config/ymir /home/ymir/.config/containers/systemd
+   sudo install -o ymir -g ymir -m 600 deploy/runtime-host/litellm-proxy/litellm-nginx.conf /home/ymir/.config/ymir/litellm-nginx.conf
+   sudo install -o ymir -g ymir -m 600 deploy/runtime-host/litellm-proxy/ymir-litellm-proxy.container /home/ymir/.config/containers/systemd/
+   sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) systemctl --user daemon-reload
+   sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) systemctl --user start ymir-litellm-proxy
+   ```
+3. API 的 `VibeMaker__Pi__ModelBaseUrl=http://litellm:4000/v1`（同上方第 3 步）。
+
+**`client_max_body_size` 必須保留**：Agent 每次呼叫模型都送出完整對話歷史（含 base64 圖片），nginx 預設上限只有 1 MB。沒有這行時，對話一超過 1 MB 就**每則都失敗**，使用者只看到「模型發生錯誤，請稍後再試」，API log 為 `ended with model error: 413 <html>…Request Entity Too Large…nginx`，而 LiteLLM 的 log 沒有對應的請求（2026-10-14 正式主機實際發生）。設定 `100m`：附件單檔上限 50 MB，base64 後約 1.33 倍。
+
+既有主機補上設定（先備份，`nginx -s reload` 不中斷服務）：
+
+```bash
+sudo bash -c 'cd /tmp; F=/home/ymir/.config/ymir/litellm-nginx.conf; P="sudo -u ymir XDG_RUNTIME_DIR=/run/user/$(id -u ymir) podman"
+cp -a $F $F.bak-$(date +%Y%m%d-%H%M%S)
+grep -q client_max_body_size $F || sed -i "0,/access_log off;/s//access_log off;\n client_max_body_size 100m;\n proxy_request_buffering off;/" $F
+$P exec ymir-litellm-proxy nginx -t && $P exec ymir-litellm-proxy nginx -s reload'
+```
 
 ## Cloudflare Tunnel 由管理介面設定（ADR-0010）
 

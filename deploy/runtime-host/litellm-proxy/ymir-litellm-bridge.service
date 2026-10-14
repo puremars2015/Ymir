@@ -1,0 +1,24 @@
+# LiteLLM 在其他帳號（例如 itadmin 的 rootless compose）執行時，把主機 127.0.0.1:4000 轉成只有 ymir 帳號讀得到的 Unix socket，
+# 讓 ymir 帳號的 ymir-litellm-proxy container 掛載 socket 轉送，Agent 不必連主機網路（ADR-0012 A.8）。
+# 安裝：複製到 /etc/systemd/system/ymir-litellm-bridge.service，然後 systemctl daemon-reload && systemctl enable --now ymir-litellm-bridge
+[Unit]
+Description=Fixed Unix socket bridge to localhost LiteLLM
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ymir
+Group=ymir
+RuntimeDirectory=ymir-litellm
+RuntimeDirectoryMode=0700
+ExecStart=/usr/bin/socat UNIX-LISTEN:/run/ymir-litellm/litellm.sock,fork,mode=0600 TCP:127.0.0.1:4000
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX AF_INET
+
+[Install]
+WantedBy=multi-user.target
