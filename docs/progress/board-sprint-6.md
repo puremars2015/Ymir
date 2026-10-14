@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-14 10:30 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-14 16:10 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| DM1 | 使用者之間的一對一訊息、右側成員面板（[ADR-0023](../adr/0023-user-direct-messages.md)） | ✅ | 使用者 2026-10-14 要求（簡易版 Teams）；SSE 即時、未讀／已讀、窄螢幕抽屜；分支 `claude/hopeful-ptolemy-4rodpw`，見 #061 |
 | O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 📝 | ❓ADR 全文待使用者確認後才開始實作；決定事項已確認（刪除、移動、改名改為允許），見 #060 |
 | L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | ✅ | 已合併回 main（使用者 2026-10-13 要求）；管理 → 用量「依模型」卡片，模型名稱帶 provider；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058、#059 |
 | DOC1 | 精簡 README 專案入口 | ✅ | 保留介紹／功能／技術／開發／文件導覽，移除歷史主機快照與實作流水帳，見 #056 |
@@ -103,6 +104,32 @@
 ---
 
 ## 💬 留言區
+
+### #061 · 使用者之間的一對一訊息（ADR-0023）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-14 16:10 · `✅完成`
+
+- **需求**：使用者要求讓 user 之間可以聊天，類似簡易版 Microsoft Teams；UI 在右邊新增一排使用者名單。
+- **設計**（[ADR-0023](../adr/0023-user-direct-messages.md)）：
+  - 放在共用核心（Platform），資料表 `platform.direct_messages`（migration `DirectMessages`）；
+  - `/api/direct-messages`：`contacts`（未停用的其他使用者 + 未讀數 + 最後往來時間，不回 email）、`{peerId}`（分頁）、送出（1～4000 字、每人每分鐘 60 則）、`{peerId}/read`；
+  - SSE `events`：`ready` / `message` / `read` / 25 秒 `ping`（每次心跳重新確認帳號狀態）；通知只在單一 API 程序內傳遞，前端每次 `ready` 重新讀取補齊；
+  - 一律以目前使用者為其中一方；收件者不存在、停用、自己都回 404；訊息不寫稽核、不清理。
+- **前端**：shell 右側 `app-people-panel`（搜尋、未讀徽章、一對一聊天、已讀標示、Enter 送出 / Shift+Enter 換行），工具列成員按鈕顯示未讀總數；桌面可收合並記住，窄螢幕為右側抽屜（與左側欄共用遮罩）；訊息只以文字綁定顯示。
+- **驗證（實際執行）**：
+  - `dotnet build Ymir.slnx`：0 警告；`dotnet test --solution Ymir.slnx`：803 通過（含新的 `DirectMessageTests` 6 項、授權矩陣、OpenAPI 快照）；
+  - `npm run lint`、`npm test`（185 通過，含 `direct-message-state.spec.ts`）、`npm run build`（無預算警告）；
+  - `npm run e2e:dm`（真實 API + ng serve，兩個瀏覽器帳號）：名單、即時未讀、已讀、回覆、HTML 不被解譯、收合記憶、手機抽屜全部通過；截圖見 [screenshots/direct-messages](screenshots/direct-messages/)；
+  - `e2e:model-picker` 通過；`e2e:sidebar`、`e2e:mobile-composer` 在**改動前**就因缺 `/api/branding` fixture 而失敗（既有問題，未在本次修正），已補上新端點的 fixture。
+- **分支**：本次 session 指定在 `claude/hopeful-ptolemy-4rodpw` 開發並推送，尚未合併回 main。
+- **❓待決定**：是否合併回 main；後續是否需要群組聊天、在線狀態、桌面通知或附件。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
 
 ### #060 · ADR-0022：讓 Agent 處理使用者指定的 OneDrive 檔案（提議中）
 
