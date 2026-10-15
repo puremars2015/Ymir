@@ -57,6 +57,7 @@ internal sealed class PersonalMcpProbe(HttpClient http) : IPersonalMcpProbe
             return b[0] is not (0 or 10 or 127) && b[0] < 224
                 && !(b[0] == 100 && b[1] is >= 64 and <= 127)
                 && !(b[0] == 169 && b[1] == 254)
+                && !(b[0] == 168 && b[1] == 63 && b[2] == 129 && b[3] == 16)
                 && !(b[0] == 172 && b[1] is >= 16 and <= 31)
                 && !(b[0] == 192 && (b[1] is 0 or 168 || b[1] == 88 && b[2] == 99))
                 && !(b[0] == 198 && (b[1] is 18 or 19 || b[1] == 51 && b[2] == 100))
@@ -125,6 +126,7 @@ internal sealed class PersonalMcpProbe(HttpClient http) : IPersonalMcpProbe
                 && root.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.Number && id.TryGetInt32(out var number) && number == 1
                 && root.TryGetProperty("result", out var result) && result.ValueKind == JsonValueKind.Object
                 && result.TryGetProperty("protocolVersion", out var protocol) && protocol.ValueKind == JsonValueKind.String
+                && protocol.GetString() == "2025-03-26"
                 && result.TryGetProperty("capabilities", out var capabilities) && capabilities.ValueKind == JsonValueKind.Object
                 && result.TryGetProperty("serverInfo", out var info) && info.ValueKind == JsonValueKind.Object;
         }

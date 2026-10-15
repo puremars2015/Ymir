@@ -12,6 +12,7 @@ public class PersonalMcpTests
     [InlineData("127.0.0.1", false)]
     [InlineData("10.0.0.1", false)]
     [InlineData("169.254.169.254", false)]
+    [InlineData("168.63.129.16", false)]
     [InlineData("100.100.100.200", false)]
     [InlineData("172.16.1.1", false)]
     [InlineData("192.168.1.1", false)]
@@ -104,6 +105,7 @@ public class PersonalMcpTests
     [InlineData("{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"message\":\"secret error\"}}")]
     [InlineData("[]")]
     [InlineData("not json")]
+    [InlineData("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"unsupported\",\"capabilities\":{},\"serverInfo\":{}}}")]
     public async Task Probe_RejectsInvalidOrErrorResponses(string body)
     {
         using var handler = new ReplyHandler(body, false);
