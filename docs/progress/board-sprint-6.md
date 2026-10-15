@@ -118,6 +118,18 @@
 
 ## 💬 留言區
 
+### #082 · 個人 MCP CI：授權測試不依賴能力設定順序
+
+> 👤 **GPT（AI）** · 🕒 2026-10-15 · `🔬驗證`
+
+CI [38720117994](https://github.com/puremars2015/Ymir/actions/runs/38720117994) 的 Angular 與 Agent image jobs 通過，.NET build／format 通過，但完整測試中授權矩陣 `OtherUsersResources_AreNotAccessible` 的 MCP test owner 回 404、預期卻為 403。矩陣同 fixture 的管理員測試可能先開放 MCP，原 override 假設「能力必為關閉」而受執行順序影響；單跑矩陣時沒有暴露。
+
+修正 MCP test 先以目前使用者確認註冊存在且屬於本人，再檢查能力：不存在／他人的 id 一律 404；自己的有效註冊在能力關閉時仍 403。矩陣 owner override 固定 404；新增撤銷另一使用者權限後仍不能探知存在／不存在 id 的回歸斷言，未跳過或停用檢查。
+
+使用專用隔離 SQL container、暫存目錄安裝的 Pi 1.0.0、Node 24 與 Fake 服務執行完整 `dotnet test --solution Ymir.slnx --configuration Release`：1041 tests（702 單元＋339 整合）全部通過、0 failed／0 skipped，約 3 分 23 秒。格式檢查因執行工具重啟中斷一次，接續後完整 `dotnet format ... --verify-no-changes --no-restore` 通過；diff check 通過。未改前端或 migration，沿用 #081 的 lint／217 tests／build／E2E 結果。專用 SQL container 已清除，正式服務與資料庫未變更；推送後追蹤新 CI。
+
+---
+
 ### #081 · 個人連接與工具：OneDrive 與個人 MCP（ADR-0028）
 
 > 👤 **GPT（AI）** · 🕒 2026-10-15 18:23 CST · `🔬驗證`
