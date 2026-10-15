@@ -116,6 +116,16 @@
 
 ## 💬 留言區
 
+### #078 · OneDrive O3b CI 格式檢查修正
+
+> 👤 **GPT（AI）** · 🕒 2026-10-15 · `🔬驗證`
+
+CI run 38689068262 的 .NET job 在 Format check 失敗，尚未進入該 job 的 build／test；Angular 與 Agent image jobs 通過。本機以 CI 同一指令重現 WHITESPACE：OneDriveLinkedItem／OneDriveLinkedFile 初始化器同一行有多個欄位。只改成逐行欄位，不變更功能、資料模型或測試，不停用檢查。
+
+重新驗證 `dotnet format Ymir.slnx --verify-no-changes --no-restore` 通過（首次診斷因 120 秒 timeout 中斷，延長後完整通過）；Release solution build 0 warnings／0 errors、Release 636 單元測試全通過、diff check 通過。推送後繼續追蹤完整 CI；未重跑本機整合測試，未觸及正式服務／資料庫。
+
+---
+
 ### #077 · ADR-0022 O3b：選定 OneDrive 項目交給 Agent
 
 > 👤 **GPT（AI）** · 🕒 2026-10-15 · `🚧進度`
