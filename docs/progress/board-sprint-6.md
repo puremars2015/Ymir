@@ -51,7 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
-| DEP3 | 所有遠端分支核對、main 同步與新版正式部署 | 🚧 | 7 個遠端分支均已在 main；隔離 SQL 發現並修正 MakeTools idempotent script 的欄位解析問題；正式切換待本機 sudo，見 #085 |
+| DEP3 | 所有遠端分支核對、main 同步與新版正式部署 | ✅ | 7 個遠端分支均已在 main；修正 MakeTools idempotent SQL 後，經本機 sudo 授權完成 e7cf9f9 正式部署，四個 unit／health／公開登入頁通過；真登入與 Pi SSE 待人工驗收，見 #085 |
 | TOOL1 | 左側「小工具」：/make 小工具自動發布，在 Ymir 內以 iframe 開啟 | 🔬 | [ADR-0029](../adr/0029-make-tools-sidebar.md)；後端、前端、測試與瀏覽器 e2e 通過；正式站需部署 SiteHost 與網站網域並套 VibeMaker migration `MakeTools`，見 #083、#084 |
 | CONN1 | 個人「連接與工具」：OneDrive 與 HTTP MCP 註冊管理 | 🔬 | [ADR-0028](../adr/0028-personal-connections-and-tools.md)；入口、加密註冊／測試／啟停／移除、權限與群組隔離、桌面／手機 E2E 通過；尚未正式部署，見 #081 |
 | USR1 | 管理 → 使用者：改名、變更角色、刪除帳號，新增訪客角色 | 🔬 | [ADR-0027](../adr/0027-admin-user-management-and-guest-role.md)；後端、前端與測試通過；未做瀏覽器 e2e，正式站需套 Platform migration `UserAdminManagement`，見 #080 |
@@ -130,6 +130,8 @@
 - **固定正式目標**：修正提交 `e7cf9f992d800863b63fcf5a2116aab6d7e115b5` 已推送，CI [38755368552](https://github.com/puremars2015/Ymir/actions/runs/38755368552) 全數通過。新版含 Angular 的 API image 已建置，主機專用產物與授權入口位於 `/home/itadmin/ymir-production-install/update-e7cf9f9/`；本次紀錄提交僅更新文件，正式程式目標仍固定該修正提交。
 - **正式站尚未切換**：四個正式 unit active，本機 health Healthy、公開 `/login` HTTP 200。API 當前 `NRestarts=3`，不宣稱先前 GC 問題已解決。主機專用部署器沿用上輪備份／校驗／migration history／安全設定比對／失敗回復流程，固定三筆待套 migration（`UserAdminManagement`、`PersonalMcpServers`、`MakeTools`）。準備完成後需使用者在本機終端授權 sudo，不在聊天提供密碼。
 - **保留邊界**：不新增 DNS、不擅自啟用 SiteHost、維護服務或未配置的 Google SSO；小工具的正式網站網域與 SiteHost 仍待配置。真登入、加密資料解密、Pi SSE、Graph／第三方 MCP 仍需人工驗收。
+- **正式部署完成（本機終端 sudo 授權後）**：固定程式 `e7cf9f9`、API image `7f67554477963434ef15efe2b3e2114a056608ce2a270520d3a1663a75707a74`、RuntimeHost `/opt/ymir/releases/e7cf9f9/runtime-host`。部署器完成無執行中工作檢查、SQL COPY_ONLY／CHECKSUM／RESTORE VERIFYONLY、金鑰／workspace／設定備份與校驗，備份 `/var/backups/ymir/e7cf9f9`；三筆 migration 與完整 history／新表欄位驗證通過。精確 image、有效 ENV、mount／安全設定均保留。部署結果 success、狀態碼 0，未觸發回復。
+- **部署後獨立讀回**：四個正式 unit 全部 active／running、NRestarts 0、ExecMainStatus 0；RuntimeHost 工作目錄正確，本機 `/health` Healthy，公開 `https://ymir.thetainformation.com/login` HTTP 200。文件提交 `1920e22` 的 CI [38756223571](https://github.com/puremars2015/Ymir/actions/runs/38756223571) 全通過；本次後續提交只記錄部署結果，不改正式程式版本。保留上述人工驗收與 SiteHost 待配置限制，不宣稱全站功能已驗收。
 
 ---
 
