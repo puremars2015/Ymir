@@ -129,7 +129,7 @@
 - **面板寬度**：新元件 `app-panel-resizer`（面板左緣、寬 0，以偽元素擴大可拖曳範圍），拖曳、聚焦後左右鍵 / Home / End 調整、雙擊還原預設 18rem；寬度（256～640 px）記在 `localStorage` 的 `ymir.peopleWidth`，CSS 再以 `100vw - 40rem` 限制，保留中間對話區。窄螢幕的抽屜不變。純函式在 `panel-width.ts` 並有 Vitest。
 - **群組附件**（ADR-0026 補充）：`POST /api/chat-groups/{id}/attachments`（成員才可，非成員 404）經 `AttachmentService.UploadForGroupAsync` 寫進群組 Agent 對話的 `uploads/`（runtime 擁有者 = 群組 id，與 @bot 共用 `GroupConversations.GetOrCreateAsync`）。`SendGroupMessageRequest.AttachmentIds` 只能隨 @bot 送出、只能綁定自己上傳且未送出的附件；送出前先檢查，群組訊息本文附上「📎 檔名」。綁定後與個人附件相同（路徑附加到 prompt、圖片經 Pi `images`）。前端：迴紋針按鈕、拖放、貼上；有附件時自動補 `@bot`，沒有輸入問題時用預設說明；依序上傳後才送出。上傳的暫存檔處理抽成 `AttachmentEndpoints.ReceiveAsync` 共用。
 - **驗證（實際執行）**：`dotnet build` 0 警告、`dotnet format --verify-no-changes` 通過；單元測試 712 通過；整合測試 `ChatGroupTests`（新增群組附件：非成員 404、檔案在群組 workspace、一般訊息帶附件 400、其他成員不能用別人的附件、Agent 收到路徑、不能重複使用）、`AttachmentTests`、`AuthorizationMatrixTests`、`OpenApiSnapshotTests` 共 20 項通過；OpenAPI 快照與 `schema.ts` 已更新。前端 lint、`ng test`（44 檔 225 項）、build 通過。瀏覽器 e2e `e2e:groups`（`group-chat-flow.mjs` 新增附件與面板寬度步驟：拖曳變寬、重新整理後記住、Home 縮到最小、雙擊還原）全數通過並截圖確認。整合測試全套未重跑。
-- **分支**：本 session 指定在 `claude/trusting-ritchie-al9xjk` 開發並推送（與 CLAUDE.md「直接在 main」規則不同，依 session 指示），使用者要求整合回 main：rebase 到最新 main（含 #087、#088）後重新驗證並推送 main。
+- **分支**：本 session 指定在 `claude/trusting-ritchie-al9xjk` 開發並推送（與 CLAUDE.md「直接在 main」規則不同，依 session 指示），使用者要求整合回 main：rebase 到最新 main（含 #087、#088）後重新驗證並推送 main。main CI [38767849702](https://github.com/puremars2015/Ymir/actions/runs/38767849702)（`958e947`）.NET、Angular、Agent image 全數通過。
 - **部署**：無 migration；正式站需重建 API image（含 Angular）才會生效。
 
 <details>
