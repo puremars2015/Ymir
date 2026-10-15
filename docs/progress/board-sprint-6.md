@@ -56,7 +56,7 @@
 | GRP1 | 群組聊天與 @bot（每個群組一個 Agent container） | 🔬 | [ADR-0026](../adr/0026-group-chat-and-group-agent.md)；後端、前端、測試與瀏覽器驗證通過；正式站尚未部署，見 #076 |
 | DM1 | 使用者之間的一對一訊息、右側成員面板（[ADR-0023](../adr/0023-user-direct-messages.md)） | ✅ | 使用者 2026-10-14 要求（簡易版 Teams）；SSE 即時、未讀／已讀、窄螢幕抽屜；分支 `claude/hopeful-ptolemy-4rodpw`，見 #064 |
 | G1 | **插單** Google 帳號 SSO 登入（[ADR-0024](../adr/0024-google-account-sso.md)） | ✅ | 部署設定白名單（`hd` 網域 / email）必填；實際連 Google 待使用者環境確認，見 #065 |
-| O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 🚧 | 使用者已要求實作；O3a 自己整個 drive 瀏覽／搜尋與設定頁入口通過測試，檔案連結／下載／寫回／刪除保護尚未完成，未部署，見 #075 |
+| O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 🚧 | O3a 瀏覽／搜尋、O3b 連結管理／執行前下載與 Agent 路徑通過測試；O4 雲端寫回／O5 雙向變更與刪除保護未完成，未部署，見 #077 |
 | L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | ✅ | 已合併回 main（使用者 2026-10-13 要求）；管理 → 用量「依模型」卡片，模型名稱帶 provider；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058、#059 |
 | RAG2 | `/make` 新增「建立 RAG 知識庫」引導主題 | ✅ | 種子主題（管理員可調整／停用），引導到專案頁知識庫（每專案一份 SQLite），見 #061 |
 | UPD1 | main 4b8a3af 正式更新產物與現況核對（歷史建置記錄） | 🔬 | API／RuntimeHost／511 單元測試／396 checksums 通過；保留當時未部署與權限受阻原文，原部署卡關已於 2026-10-14 13:00 部署解除，見 #062 |
@@ -115,6 +115,22 @@
 ---
 
 ## 💬 留言區
+
+### #077 · ADR-0022 O3b：選定 OneDrive 項目交給 Agent
+
+> 👤 **GPT（AI）** · 🕒 2026-10-15 · `🚧進度`
+
+新增 `onedrive_linked_items` 與獨立 `onedrive_linked_files` 基準表、OneDriveLinkedItems migration、scope 擁有者限定的 GET／POST／PATCH／DELETE API。使用者從對話檔案面板瀏覽／搜尋後連結檔案或資料夾，可切唯讀／取消連結；專案共用、獨立對話隔離。不要求原同步 root，但會確認能力／連線、自己的 drive 與 ancestry，拒絕 root、原同步根及其上下重疊範圍、相互包含連結、remoteItem／跨 drive。管理者關閉能力後停止下載，仍可取消連結；不刪雲端或本機副本。稽核以 target type 記唯讀設定、target id 記 Graph item id，不記檔名／路徑。
+
+執行前經 reader／writer 下載到 `onedrive/<id8>-<安全名稱>`，以 JSON path 與本階段限制附加 Agent prompt；token 不離開 API。基準為 eTag＋本機 SHA-256，未寫回修改不會被無聲覆蓋，衝突副本目前僅保存在本機。唯讀恢復雲端對應內容前亦保留修改，不是 OS 唯讀掛載。加入預設 20 links／scope、500 files／folder、100 MB／file、遞迴與 metadata budget；長路徑基準使用 SHA-256 path key 作唯一索引，避免 SQL index key 超限。原 ADR-0013 同步排除頂層 onedrive/（不分大小寫），不重複同步。FakeGraph 補齊 parent:/{name} 的既有子項目查詢，修正測試替身先前把既有同步 root 判成不存在。
+
+驗證：solution build 0 warnings／0 errors，628 單元測試通過；隔離 SQL（14335，非正式資料庫）OneDriveLinks 8、既有 OneDriveSync 7、OneDriveConnection 12、授權矩陣 4、OpenAPI 快照 1 均通過，無略過。涵蓋實際 Scripted execution 下載與 prompt、專案共用／跨 scope 拒絕、root／重疊排除、唯讀切換、symlink／超大本機檔案保護、連結／檔數上限、撤銷能力、取消連結保留資料、原同步 namespace 排除。首次測試因隔離 SQL 尚未就緒而 pre-login 失敗，確認 sqlcmd readiness 後重跑；未切到正式 SQL。EF has-pending-model-changes 確認無遺漏 migration。前端 lint、205 tests、build 通過，包含選取／取消、權限關閉、失敗唯讀 checkbox、不讓舊對話的請求結果污染新對話。未執行真 Graph／Entra、瀏覽器 E2E 或正式部署。
+
+Push 前 rebase 遠端群組聊天更新（#076），保留其功能與留言；OpenAPI／TypeScript 產生檔衝突由合併後 API 重新產生解決。本留言改為 #077。整合後再次驗證 636 單元、OneDriveLinks 8／授權矩陣 4／ChatGroup 4／OpenAPI snapshot 1，以及前端 lint／210 tests／build 通過。群組執行的 OneDrive 禁用邊界保留，不把個人連結帶入共用 workspace。
+
+**部署／剩餘**：正式站需先備份並套 OneDriveLinkedItems migration，再更新 API／前端；若部署完整 main，亦須套其他待套 migration（包括 Platform ChatGroups）。本 OneDrive 切片不需要換 RuntimeHost／Agent image。O4 雲端寫回／雲端衝突副本、O5 刪除／移動／改名與大量刪除確認仍未啟用；入口目前在檔案面板，輸入區附件選單待後續。不可宣稱已能修改整個雲端 OneDrive。
+
+---
 
 ### #076 · 群組聊天與 @bot（ADR-0026）
 

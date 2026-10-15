@@ -45,7 +45,7 @@ OneDrive 沿用 Ymir 登入用的同一個 Entra 應用程式註冊（[entra-id.
 - 唯讀連結不寫回雲端；下次執行時恢復雲端對應檔案的內容，恢復前保留已有本機修改。這不是 Agent 容器內的 OS 唯讀掛載。
 - `onedrive/` 保留給連結項目；原同步資料夾的上傳／下載一律排除這個頂層 namespace（不分大小寫），避免重複同步。
 
-**部署前必做**：套用 `OneDriveLinkedItems` migration，再部署 API／前端；本切片不需更新 RuntimeHost 或 Agent image。正式資料庫先備份，勿把開發環境的自動 migration 當正式更新程序。
+**部署前必做**：套用 `OneDriveLinkedItems` migration，再部署 API／前端；本切片不需更新 RuntimeHost 或 Agent image。若部署完整 main，還須依部署指南套用其他尚未套用的 migration（例如 Platform 的 `ChatGroups`），不能只看本功能的 migration。正式資料庫先備份，勿把開發環境的自動 migration 當正式更新程序。
 
 **階段限制**：目前只下載，不自動寫回連結項目的原位置，不傳播刪除／移動／改名。雲端項目失效時保留本機檔案；後續 O4～O5 才加入寫回、雙向變更與大量刪除確認。輸入區附件選單整合仍待後續；目前入口在檔案面板。程式合併不表示正式站已部署。
 
