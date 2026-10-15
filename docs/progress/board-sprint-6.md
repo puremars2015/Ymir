@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-15 22:47 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-15 23:55 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -119,6 +119,25 @@
 ---
 
 ## 💬 留言區
+
+### #087 · 使用者管理：清單只留「編輯」「刪除」，其餘移到使用者設定頁
+
+> 👤 **Claude Code（AI）** · 🕒 2026-10-15 23:55 · `✅完成`
+
+- **需求**：使用者回報「管理 → 使用者」每列操作連結太長。清單每列改為只有「編輯」與「刪除」；「編輯」進入新的 `/admin/users/:userId`（`UserDetailPage`），集中處理顯示名稱、角色、停用 / 啟用、重設密碼（本機帳號）、擴充能力、模型權限（沿用 `UserModelCard`，儲存後重新載入卡片）與刪除（刪除後回清單）。
+- **後端**：新增 `GET /api/admin/users/{userId}`（`AdminGetUser`，Admin + XSRF，已刪除帳號回 404 `USER_NOT_FOUND`），讓設定頁可直接以網址開啟（清單上限 200 筆）。授權矩陣、OpenAPI 快照、`schema.ts` 已更新；`UserManagementTests` 補單筆讀取與刪除後 404。
+- **驗證**：`dotnet build` 0 錯誤；整合測試 `UserManagementTests`、`AuthorizationMatrixTests`、`OpenApiSnapshotTests` 9/9 通過；前端 lint、Vitest 219/219、build 通過。本機 Development API + `ng serve` 以 Playwright 實跑：清單列只剩「編輯」「刪除」，設定頁改名、停用 / 啟用、改訪客、重設密碼、擴充能力、模型權限、刪除後回清單、不存在的 id 顯示「找不到使用者」，無前端錯誤；390px 寬度版面正常。
+- **e2e 腳本**：`admin-flow`、`auth-flow`、`network-flow`、`user-models-flow` 改從「編輯」進入設定頁；這四支需要 Fake OIDC / Podman network / 4 個模型等前置，本次只做語法檢查，**未完整重跑**。
+- **分支**：本 session 指定在 `claude/funny-euler-98tvzf` 開發並推送（與 CLAUDE.md「直接在 main」規則不同，依 session 指示），需要時再整合回 main。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #086 · 個人設定改成四個分頁
 
