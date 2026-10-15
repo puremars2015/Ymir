@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| TOOL1 | 左側「小工具」：/make 小工具自動發布，在 Ymir 內以 iframe 開啟 | 🔬 | [ADR-0029](../adr/0029-make-tools-sidebar.md)；後端、前端、測試與瀏覽器 e2e 通過；正式站需部署 SiteHost 與網站網域並套 VibeMaker migration `MakeTools`，見 #083 |
 | CONN1 | 個人「連接與工具」：OneDrive 與 HTTP MCP 註冊管理 | 🔬 | [ADR-0028](../adr/0028-personal-connections-and-tools.md)；入口、加密註冊／測試／啟停／移除、權限與群組隔離、桌面／手機 E2E 通過；尚未正式部署，見 #081 |
 | USR1 | 管理 → 使用者：改名、變更角色、刪除帳號，新增訪客角色 | 🔬 | [ADR-0027](../adr/0027-admin-user-management-and-guest-role.md)；後端、前端與測試通過；未做瀏覽器 e2e，正式站需套 Platform migration `UserAdminManagement`，見 #080 |
 | ARCH2 | 架構文件標記正式／舊容器及主機程序 | ✅ | 7 個固定容器＋動態 Agent 的角色清單，root／itadmin／ymir 分區、舊容器與實際模型代理路徑，見 #074 |
@@ -118,6 +119,27 @@
 
 ## 💬 留言區
 
+### #083 · 左側「小工具」（ADR-0029）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-15 18:50 · `🔬驗證`
+
+- **需求**：左側選單新增「小工具」區塊，放 `/make 小工具架設` 產生的頁面連結。使用者補充：產生的主要是前端網頁，點開後以 iframe 嵌入；之後才提供統一的後端服務；一開始只顯示自己的，之後再讓開發者指定分享給特定的人。另確認 #080 的「聊天系統」就是右側成員之間的訊息（實作不需調整）。
+- **決定**：詳見 [ADR-0029](../adr/0029-make-tools-sidebar.md)。Agent 產生的 HTML 不能在 Ymir 網域執行，所以沿用網站託管（ADR-0016）的獨立網站網域：小工具自動發布成只有擁有者能看的網站，Ymir 以一次性票據在 iframe 內開啟。
+- **後端**：`make_topics.produces_tool`（預設「小工具架設」= true，Admin 可勾選）、`conversations.makes_tool`、`sites.is_tool`（migration `MakeTools`）；產生小工具的主題附加平台規定（成果放 `tool/index.html`）；`ExecutionRunner` 在個人對話執行成功、寫完成事件前呼叫 `SiteService.PublishToolAsync`（best effort，沒有 `tool/index.html` 時略過、不留失敗紀錄），之後重新發布同一個網站；`GET /api/tools`；Ymir CSP 加網站網域的 `frame-src`；SiteHost 加 `frame-ancestors 'self' <PlatformUrl>`，網站 cookie 在 https／`*.localhost` 改為 `SameSite=None; Secure; Partitioned`（iframe 跨 site 才能登入）。
+- **前端**：側邊欄「小工具」區塊（網站託管已設定或已有小工具時顯示）、`/tools/:siteId` iframe 頁（回到對話修改、開新分頁）、`ToolStore` 在登入與每次執行結束時重新讀取；`toolFrameUrl` 只接受網站網域的 http(s) 網址；Admin「Make 主題」新增「產生小工具」勾選與標籤。新增 `npm run e2e:tools`。
+- **驗證（實際執行）**：
+  - `dotnet build` 0 警告、`dotnet format --verify-no-changes` 通過；單元測試 660 通過（新增 `ToolRulesTests`）。
+  - 整合測試（獨立暫時 SQL container，port 14339，未使用正式 `ymir-sql`）：新增 `ToolTests`（問需求階段不發布、`tool/index.html` 出現後自動發布為私人網站、之後重新發布同一個網站、他人看不到也拿不到票據、一般對話不發布、Ymir CSP 與 SiteHost frame-ancestors）；授權矩陣、OpenAPI 快照更新。全套 334 項第一次跑時有 7 項在 1 分鐘逾時（主機剩約 2 GB 記憶體），單獨重跑這 7 個類別與網站 / 小工具 / 授權矩陣共 46 項全部通過。
+  - 前端（Node 24.15）lint、`ng test`（42 檔 215 項）、build 通過。
+  - 瀏覽器 e2e（`e2e:tools`，獨立的 API 5081 / SiteHost 5300 / Angular 4201，正式服務未受影響）：空白提示 → `/make` 問需求階段不發布 → 寫入 `tool/index.html` 後下一次完成即出現在左側 → 點開以 iframe 從 `*.sites.localhost` 載入、腳本可執行（私人網站票據 + Partitioned cookie）→ 其他使用者看不到也打不開 → 手機寬度正常。
+- **未驗證 / 部署前提**：正式站目前沒有部署 SiteHost 與網站網域；要使用小工具需先設定萬用字元 DNS / TLS / Tunnel、`Ymir__Sites__*` 與 SiteHost（`PlatformUrl` 必須是正式 Ymir 網址），並備份後套 VibeMaker migration `MakeTools`。未以真實模型測試 Agent 是否確實把成果放在 `tool/index.html`（使用示範 harness）。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
 ### #082 · 個人 MCP CI：授權測試不依賴能力設定順序
 
 > 👤 **GPT（AI）** · 🕒 2026-10-15 · `🔬驗證`
