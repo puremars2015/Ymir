@@ -16,6 +16,7 @@ import {
   formatPercent,
   freedBytes,
   isEligible,
+  pressureAlerts,
   pressureKeyLabel,
   reclaimStateLabel,
   ReclamationDraft,
@@ -75,6 +76,17 @@ import { AdminTabs } from './admin-tabs';
             <p class="error">目前無法連線到主機維護服務；稍後再重新整理。</p>
           </article>
         }
+      }
+
+      @if (alerts().length > 0) {
+        <article class="card stack alert" role="alert">
+          <h2>資源不足告警</h2>
+          <ul class="plain">
+            @for (a of alerts(); track a.key) {
+              <li class="error">{{ a.message }}</li>
+            }
+          </ul>
+        </article>
       }
 
       @if (snapshot(); as s) {
@@ -569,6 +581,9 @@ import { AdminTabs } from './admin-tabs';
     .ok {
       color: var(--accent);
     }
+    .alert {
+      border-color: var(--danger);
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -598,6 +613,10 @@ export class ResourcesPage implements OnInit {
   protected readonly message = signal<string | null>(null);
 
   protected readonly snapshot = computed(() => this.resources()?.snapshot ?? null);
+  protected readonly alerts = computed(() => {
+    const s = this.snapshot();
+    return s ? pressureAlerts(s) : [];
+  });
   protected readonly problem = computed(() => reclamationDraftProblem(this.draft()));
   protected readonly summary = computed(() => {
     const p = this.policy();

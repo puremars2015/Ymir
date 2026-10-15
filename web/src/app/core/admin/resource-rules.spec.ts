@@ -1,9 +1,10 @@
-import { ContainerResource, ReclamationPolicy } from '../api/api-types';
+import { ContainerResource, ReclamationPolicy, ResourceSnapshot } from '../api/api-types';
 import {
   eligibilityLabel,
   formatBytes,
   formatPercent,
   freedBytes,
+  pressureAlerts,
   pressureKeyLabel,
   reclamationDraftFrom,
   reclamationDraftProblem,
@@ -93,5 +94,96 @@ describe('resource-rules', () => {
     expect(summary).toContain('執行環境不依期限回收');
     expect(summary).toContain('image 30 天後回收');
     expect(summary).toContain('磁碟 < 10%');
+  });
+
+  describe('pressureAlerts', () => {
+    const snapshot = (patch: Partial<ResourceSnapshot>): ResourceSnapshot => ({
+      generatedAt: '2026-10-15T00:00:00Z',
+      host: {
+        status: 'Available',
+        sampledAt: '2026-10-15T00:00:00Z',
+        cpuCount: 4,
+        cpuUsedPercent: 95,
+        cpuFreePercent: 5,
+        memoryTotalBytes: 16e9,
+        memoryAvailableBytes: 8e9,
+        memoryAvailablePercent: 50,
+      },
+      filesystems: [
+        { id: 'fs-a', stores: ['root'], totalBytes: 100, availableBytes: 5, availablePercent: 5 },
+        { id: 'fs-b', stores: ['ymir'], totalBytes: 100, availableBytes: 50, availablePercent: 50 },
+      ],
+      stores: [],
+      containers: [],
+      images: [],
+      pressure: [],
+      reclaimState: 'Active',
+      timing: {
+        sampleIntervalSeconds: 30,
+        sustainMinutes: 5,
+        cooldownMinutes: 10,
+        recoveryMarginPercent: 5,
+        maxDeletionsPerRound: 10,
+        keepRecentVersions: 3,
+        retentionSweepMinutes: 60,
+      },
+      ...patch,
+    });
+    const below = (key: string, triggered: boolean) => ({
+      key,
+      below: true,
+      belowSince: '2026-10-14T23:50:00Z',
+      triggered,
+    });
+
+    it('does not alert when nothing is below or the sustain period has not elapsed', () => {
+      expect(pressureAlerts(snapshot({}))).toEqual([]);
+      expect(
+        pressureAlerts(
+          snapshot({
+            pressure: [{ key: 'cpu', below: false, belowSince: null, triggered: false }],
+          }),
+        ),
+      ).toEqual([]);
+      expect(pressureAlerts(snapshot({ pressure: [below('cpu', false)] }))).toEqual([]);
+    });
+
+    it('warns that nothing happens automatically when reclaim is not active', () => {
+      const [alert] = pressureAlerts(
+        snapshot({ reclaimState: 'LocksUnavailable', pressure: [below('memory', false)] }),
+      );
+      expect(alert.message).toContain('記憶體低於門檻');
+      expect(alert.message).toContain('不會自動處理');
+    });
+
+    it('says CPU pressure persists without safe candidates and running work is not stopped', () => {
+      const [alert] = pressureAlerts(
+        snapshot({
+          pressure: [below('cpu', true)],
+          containers: [container({ protection: 'Active' })],
+        }),
+      );
+      expect(alert.message).toContain('已沒有可安全回收的項目');
+      expect(alert.message).toContain('不會停止執行中的工作');
+    });
+
+    it('counts remaining disk candidates only on the pressured filesystem', () => {
+      const alerts = pressureAlerts(
+        snapshot({
+          pressure: [below('disk:fs-a', true)],
+          containers: [container({ store: 'ymir' }), container({ store: 'root' })],
+        }),
+      );
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0].message).toContain('還有 1 個可回收項目');
+
+      const none = pressureAlerts(
+        snapshot({
+          pressure: [below('disk:fs-a', true)],
+          containers: [container({ store: 'ymir' })],
+        }),
+      );
+      expect(none[0].message).toContain('已沒有可安全回收的項目');
+    });
   });
 });

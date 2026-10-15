@@ -6,6 +6,7 @@ import {
   ReclaimState,
   ReclaimTrigger,
   ReclamationPolicy,
+  ResourceSnapshot,
 } from '../api/api-types';
 
 /** 系統資源（ADR-0025）的顯示規則：全部是純函式。 */
@@ -207,4 +208,47 @@ export function reclamationSummary(policy: ReclamationPolicy): string {
     thresholds.length > 0 ? `資源不足時緊急回收（${thresholds.join('、')}）` : '未設定資源門檻',
   );
   return parts.join('；') + '。';
+}
+
+/**
+ * 資源不足告警（ADR-0025 §3「無安全候選或資源仍不足時顯示告警」）。
+ * 只看低於門檻的項目：自動回收沒有運作時提醒不會自動處理；已觸發緊急回收卻仍不足時，
+ * 說明是否還有安全候選，並明示 Ymir 不會停止執行中的工作來達到門檻。還在等待持續時間的項目不告警。
+ */
+export function pressureAlerts(snapshot: ResourceSnapshot): { key: string; message: string }[] {
+  const alerts: { key: string; message: string }[] = [];
+  for (const p of snapshot.pressure) {
+    if (!p.below) continue;
+    const label = pressureKeyLabel(p.key);
+    if (snapshot.reclaimState !== 'Active') {
+      alerts.push({
+        key: p.key,
+        message: `${label}低於門檻，但${reclaimStateLabel(snapshot.reclaimState)}，不會自動處理；請人工檢查。`,
+      });
+      continue;
+    }
+    if (!p.triggered) continue;
+
+    // 磁碟只看位於受壓檔案系統上的 store；CPU / 記憶體看全部（與維護服務的候選範圍相同）。
+    const stores = p.key.startsWith('disk:')
+      ? (snapshot.filesystems.find((f) => f.id === p.key.slice(5))?.stores ?? [])
+      : null;
+    const inScope = (item: ContainerResource | ImageResource) =>
+      stores === null || stores.includes(item.store);
+    const remaining = [...snapshot.containers, ...snapshot.images].filter(
+      (i) => isEligible(i) && inScope(i),
+    ).length;
+    const tail =
+      p.key === 'cpu' || p.key === 'memory'
+        ? 'Ymir 不會停止執行中的工作來達到門檻，請人工檢查主機負載。'
+        : '請人工檢查磁碟用量（Ymir 不刪 volume、workspace 或受保護的 image）。';
+    alerts.push({
+      key: p.key,
+      message:
+        remaining === 0
+          ? `${label}在緊急回收後仍低於門檻，且已沒有可安全回收的項目。${tail}`
+          : `${label}在緊急回收後仍低於門檻；還有 ${remaining} 個可回收項目，會在下一輪繼續。${tail}`,
+    });
+  }
+  return alerts;
 }
