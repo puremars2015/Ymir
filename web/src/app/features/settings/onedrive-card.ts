@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Observable } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { OneDriveStatus } from '../../core/api/api-types';
+import { OneDriveBrowser } from './onedrive-browser';
 import {
   ONEDRIVE_CONNECT_URL,
   onedriveResultMessage,
@@ -17,7 +18,7 @@ import {
  */
 @Component({
   selector: 'app-onedrive-card',
-  imports: [DatePipe, FormsModule],
+  imports: [DatePipe, FormsModule, OneDriveBrowser],
   template: `
     @if (status(); as s) {
       @if (s.allowed || s.state !== 'NotConnected') {
@@ -57,6 +58,12 @@ import {
               </label>
               <button type="submit" [disabled]="busy() || !rootPath().trim()">儲存</button>
             </form>
+            <button type="button" class="secondary" (click)="browserOpen.set(!browserOpen())">
+              {{ browserOpen() ? '關閉 OneDrive 瀏覽' : '瀏覽整個自己的 OneDrive' }}
+            </button>
+            @if (browserOpen()) {
+              <app-onedrive-browser />
+            }
           }
 
           <div class="row">
@@ -117,6 +124,7 @@ export class OneDriveCard implements OnInit {
   protected readonly status = signal<OneDriveStatus | null>(null);
   protected readonly rootPath = signal('/Ymir');
   protected readonly busy = signal(false);
+  protected readonly browserOpen = signal(false);
   protected readonly message = signal<{ text: string; error: boolean } | null>(null);
 
   ngOnInit(): void {
@@ -175,6 +183,7 @@ export class OneDriveCard implements OnInit {
 
   private apply(status: OneDriveStatus): void {
     this.status.set(status);
+    if (!status.allowed || status.state !== 'Connected') this.browserOpen.set(false);
     if (status.rootPath) {
       this.rootPath.set(status.rootPath);
     }

@@ -104,6 +104,55 @@ public class OneDriveConnectionTests(OneDriveApiFactory factory) : IClassFixture
         client.GetFromJsonAsync<OneDriveStatusResponse>("/api/connectors/onedrive", JsonDefaults.Options, Ct);
 
     [Fact]
+    public async Task BrowseAndSearch_WholeOwnDrive_WithoutSyncRoot_AndNoTokens()
+    {
+        var account = $"od-browser-{Guid.NewGuid():N}";
+        using var client = await factory.LoginWithOidcAsync(account);
+        await AllowOneDriveAsync(await UserIdAsync(client));
+        Assert.Equal("/settings?onedrive=connected", await OneDriveApiFactory.ConnectOneDriveAsync(client, account));
+        factory.Oidc.Graph.DriveOf(account).WriteFile("/Documents/O'Brien budget.txt", "budget"u8.ToArray());
+        var root = await client.GetFromJsonAsync<OneDriveBrowserPage>("/api/connectors/onedrive/browse", JsonDefaults.Options, Ct);
+        var folder = Assert.Single(root!.Items, item => item.Name == "Documents");
+        var page = await client.GetFromJsonAsync<OneDriveBrowserPage>($"/api/connectors/onedrive/browse?itemId={folder.Id}", JsonDefaults.Options, Ct);
+        Assert.Equal("O'Brien budget.txt", Assert.Single(page!.Items).Name);
+        var body = await client.GetStringAsync("/api/connectors/onedrive/search?q=O%27Brien", Ct);
+        var found = JsonSerializer.Deserialize<OneDriveBrowserItem[]>(body, JsonDefaults.Options)!;
+        Assert.Equal("O'Brien budget.txt", Assert.Single(found).Name);
+        Assert.DoesNotContain("fake-at-", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("downloadUrl", body, StringComparison.OrdinalIgnoreCase);
+        Assert.Null((await StatusAsync(client))!.RootPath);
+    }
+
+    [Fact]
+    public async Task BrowseAndSearch_RequireCapabilityAndConnection()
+    {
+        using var client = await factory.LoginWithOidcAsync($"od-not-ready-{Guid.NewGuid():N}");
+        using var denied = await client.GetAsync(new Uri("/api/connectors/onedrive/browse", UriKind.Relative), Ct);
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        await AllowOneDriveAsync(await UserIdAsync(client));
+        using var unconnected = await client.GetAsync(new Uri("/api/connectors/onedrive/browse", UriKind.Relative), Ct);
+        Assert.Equal(HttpStatusCode.Conflict, unconnected.StatusCode);
+        using var invalid = await client.GetAsync(new Uri("/api/connectors/onedrive/search?q=", UriKind.Relative), Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
+    }
+
+    [Fact]
+    public async Task Browse_RejectsAnotherUsersFolderId()
+    {
+        var first = $"od-first-{Guid.NewGuid():N}";
+        var second = $"od-second-{Guid.NewGuid():N}";
+        using var alice = await factory.LoginWithOidcAsync(first);
+        using var bob = await factory.LoginWithOidcAsync(second);
+        await AllowOneDriveAsync(await UserIdAsync(alice));
+        await AllowOneDriveAsync(await UserIdAsync(bob));
+        await OneDriveApiFactory.ConnectOneDriveAsync(alice, first);
+        await OneDriveApiFactory.ConnectOneDriveAsync(bob, second);
+        var root = await alice.GetFromJsonAsync<OneDriveBrowserPage>("/api/connectors/onedrive/browse", JsonDefaults.Options, Ct);
+        using var refused = await bob.GetAsync(new Uri($"/api/connectors/onedrive/browse?itemId={root!.FolderId}", UriKind.Relative), Ct);
+        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
+    }
+
+    [Fact]
     public async Task Connect_SetRoot_Disconnect_WithoutEverExposingTokens()
     {
         using var client = await factory.LoginWithOidcAsync("od-alice");

@@ -45,7 +45,8 @@ public interface IOneDriveOAuthClient
 
 public sealed record GraphUser(string Id, string UserPrincipalName);
 
-public sealed record DriveItemInfo(string Id, string Name, bool IsFolder, string? ETag, long Size, DateTimeOffset LastModified);
+public sealed record DriveItemInfo(string Id, string Name, bool IsFolder, string? ETag, long Size, DateTimeOffset LastModified,
+    string? DriveId = null, string? ParentItemId = null, bool IsRemote = false);
 
 /// <summary>Microsoft Graph 的 OneDrive 操作（只在後端呼叫，Agent 拿不到 token，ADR-0013 §5）。</summary>
 public interface IOneDriveClient
@@ -63,6 +64,9 @@ public interface IOneDriveClient
 
     /// <summary>資料夾內的子項目（會跟著分頁的 <c>@odata.nextLink</c> 讀完）。</summary>
     Task<IReadOnlyList<DriveItemInfo>> ListChildrenAsync(string accessToken, string folderId, CancellationToken cancellationToken);
+
+    /// <summary>搜尋目前使用者自己的 drive，最多 50 筆；不得回傳預授權下載網址。</summary>
+    Task<IReadOnlyList<DriveItemInfo>> SearchAsync(string accessToken, string query, CancellationToken cancellationToken);
 
     /// <summary>以名稱取得子項目；不存在時回傳 null。</summary>
     Task<DriveItemInfo?> GetChildAsync(string accessToken, string parentId, string name, CancellationToken cancellationToken);

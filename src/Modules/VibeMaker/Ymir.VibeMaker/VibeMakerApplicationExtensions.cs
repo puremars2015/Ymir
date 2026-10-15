@@ -35,6 +35,7 @@ public static class VibeMakerApplicationExtensions
         services.AddScoped<Application.Connectors.OneDrive.OneDriveConnectionService>();
         services.AddSingleton<Application.Connectors.OneDrive.OneDriveAccessTokenCache>();
         services.AddScoped<Application.Connectors.OneDrive.OneDriveSyncService>();
+        services.AddScoped<Application.Connectors.OneDrive.OneDriveBrowser>();
         services.AddSingleton<Application.Connectors.OneDrive.OneDriveSyncSignal>();
         services.AddScoped<Application.PlatformMcp.PlatformMcpService>();
         services.AddScoped<Application.Knowledge.KnowledgeBaseService>();

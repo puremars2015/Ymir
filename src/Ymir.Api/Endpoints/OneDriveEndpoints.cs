@@ -33,6 +33,8 @@ internal static class OneDriveEndpoints
         group.MapGet("/callback", CallbackAsync).WithName("OneDriveCallback").ExcludeFromDescription();
         group.MapPut("/root", SetRootAsync).WithName("SetOneDriveRoot").RequireAntiforgeryHeader();
         group.MapDelete("/", DisconnectAsync).WithName("DisconnectOneDrive").RequireAntiforgeryHeader();
+        group.MapGet("/browse", BrowseAsync).WithName("BrowseOneDrive").Produces<OneDriveBrowserPage>().RequireAntiforgeryHeader();
+        group.MapGet("/search", SearchAsync).WithName("SearchOneDrive").Produces<IReadOnlyList<OneDriveBrowserItem>>().RequireAntiforgeryHeader();
 
         // 對話（工作目錄）的雲端保存狀態與手動同步（ADR-0013 §4）：只能存取自己的對話（SA §12）。
         var conversations = endpoints.MapGroup("/api/conversations/{conversationId:guid}/onedrive").WithTags("Conversations").RequireAntiforgeryHeader();
@@ -40,6 +42,37 @@ internal static class OneDriveEndpoints
         conversations.MapPost("/sync", SyncConversationAsync).WithName("SyncConversationOneDrive");
         return endpoints;
     }
+
+    private static async Task<IResult> BrowseAsync(string? itemId, ICurrentUser currentUser, OneDriveBrowser browser, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return TypedResults.Ok(await browser.BrowseAsync(currentUser.UserId, itemId, cancellationToken));
+        }
+        catch (OneDriveException exception)
+        {
+            return BrowserProblem(exception);
+        }
+    }
+
+    private static async Task<IResult> SearchAsync(string? q, ICurrentUser currentUser, OneDriveBrowser browser, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return TypedResults.Ok(await browser.SearchAsync(currentUser.UserId, q, cancellationToken));
+        }
+        catch (OneDriveException exception)
+        {
+            return BrowserProblem(exception);
+        }
+    }
+
+    private static IResult BrowserProblem(OneDriveException exception) => exception switch
+    {
+        OneDriveNotAllowedException => NotAllowed(),
+        OneDriveItemInvalidException => ApiProblem.Create(StatusCodes.Status400BadRequest, "ONEDRIVE_ITEM_INVALID", exception.Message),
+        _ => ApiProblem.Create(StatusCodes.Status409Conflict, "ONEDRIVE_NOT_READY", "OneDrive 尚未就緒，請檢查連線或重新授權。"),
+    };
 
     private static async Task<Results<Ok<ConversationOneDriveResponse>, NotFound>> GetConversationStatusAsync(
         Guid conversationId,

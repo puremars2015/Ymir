@@ -2241,6 +2241,67 @@
         }
       }
     },
+    "/api/connectors/onedrive/browse": {
+      "get": {
+        "tags": [
+          "Connectors"
+        ],
+        "operationId": "BrowseOneDrive",
+        "parameters": [
+          {
+            "name": "itemId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OneDriveBrowserPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/connectors/onedrive/search": {
+      "get": {
+        "tags": [
+          "Connectors"
+        ],
+        "operationId": "SearchOneDrive",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OneDriveBrowserItem"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/conversations/{conversationId}/onedrive": {
       "get": {
         "tags": [
@@ -5120,6 +5181,64 @@
           "NoRoot",
           "Ready"
         ]
+      },
+      "OneDriveBrowserItem": {
+        "required": [
+          "id",
+          "name",
+          "isFolder",
+          "size",
+          "lastModified"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "isFolder": {
+            "type": "boolean"
+          },
+          "size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "lastModified": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "OneDriveBrowserPage": {
+        "required": [
+          "folderId",
+          "parentItemId",
+          "items"
+        ],
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "type": "string"
+          },
+          "parentItemId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OneDriveBrowserItem"
+            }
+          }
+        }
       },
       "OneDriveLinkState": {
         "enum": [

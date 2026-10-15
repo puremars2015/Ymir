@@ -8,6 +8,33 @@ namespace Ymir.UnitTests.Connectors;
 public class OneDriveRulesTests
 {
     [Theory]
+    [InlineData("own", false, true)]
+    [InlineData("other", false, false)]
+    [InlineData("own", true, false)]
+    [InlineData(null, false, false)]
+    public void Browser_OnlyAcceptsOwnDriveAndRejectsRemoteShortcuts(string? driveId, bool remote, bool expected)
+    {
+        var item = new DriveItemInfo("item", "file", false, null, 1, DateTimeOffset.UtcNow, driveId, "parent", remote);
+        Assert.Equal(expected, OneDriveBrowser.BelongsToDrive(item, "own"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("item\n")]
+    public void Browser_RejectsInvalidIds(string itemId) =>
+        Assert.Throws<OneDriveItemInvalidException>(() => OneDriveBrowser.ValidateItemId(itemId));
+
+    [Fact]
+    public void GraphMetadata_HandlesMissingParentAndDetectsRemoteItems()
+    {
+        using var document = System.Text.Json.JsonDocument.Parse("""{"id":"item","parentReference":null,"remoteItem":{"id":"foreign"}}""");
+        var item = GraphOneDriveClient.ToItem(document.RootElement);
+        Assert.Null(item.DriveId);
+        Assert.True(item.IsRemote);
+    }
+
+    [Theory]
     [InlineData("/Ymir", "/Ymir")]
     [InlineData(" Ymir / Work ", "/Ymir/Work")]
     [InlineData("Ymir//專案", "/Ymir/專案")]

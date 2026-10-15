@@ -132,6 +132,15 @@ internal sealed partial class GraphOneDriveClient(HttpClient http, IOptions<OneD
     public Task<DriveItemInfo?> GetChildAsync(string accessToken, string parentId, string name, CancellationToken cancellationToken) =>
         GetChildByNameAsync(accessToken, parentId, name, cancellationToken);
 
+    public async Task<IReadOnlyList<DriveItemInfo>> SearchAsync(string accessToken, string query, CancellationToken cancellationToken)
+    {
+        // OData 字串先處理單引號，再 URL encode；查詢不能變成額外的 OData 運算式。
+        var escaped = Uri.EscapeDataString(query.Replace("'", "''", StringComparison.Ordinal));
+        using var document = await GetJsonAsync(accessToken, $"/me/drive/root/search(q='{escaped}')?$top=50", cancellationToken).ConfigureAwait(false)
+            ?? throw new OneDriveException("搜尋 OneDrive 失敗。");
+        return document.RootElement.GetProperty("value").EnumerateArray().Take(50).Select(ToItem).ToArray();
+    }
+
     public async Task<Stream> OpenDownloadAsync(string accessToken, string itemId, CancellationToken cancellationToken)
     {
         // Graph 回 302 導向預先授權的下載網址；HttpClient 跟隨導向時不會帶上 Authorization。
@@ -349,7 +358,10 @@ internal sealed partial class GraphOneDriveClient(HttpClient http, IOptions<OneD
         json.TryGetProperty("size", out var size) && size.TryGetInt64(out var bytes) ? bytes : 0,
         json.TryGetProperty("lastModifiedDateTime", out var modified) && modified.GetString() is { } text
             ? DateTimeOffset.Parse(text, CultureInfo.InvariantCulture)
-            : DateTimeOffset.MinValue);
+            : DateTimeOffset.MinValue,
+        json.TryGetProperty("parentReference", out var parent) && parent.ValueKind == JsonValueKind.Object && parent.TryGetProperty("driveId", out var driveId) ? driveId.GetString() : null,
+        json.TryGetProperty("parentReference", out var parentReference) && parentReference.ValueKind == JsonValueKind.Object && parentReference.TryGetProperty("id", out var parentId) ? parentId.GetString() : null,
+        json.TryGetProperty("remoteItem", out _));
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Microsoft Graph returned {StatusCode}; retrying after {Seconds} seconds")]
     private static partial void LogThrottled(ILogger logger, int statusCode, double seconds);

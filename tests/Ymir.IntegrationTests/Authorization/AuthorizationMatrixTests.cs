@@ -240,6 +240,8 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "PUT /api/me/settings/",
         "GET /api/extensions",
         "GET /api/connectors/onedrive/",
+        "GET /api/connectors/onedrive/browse",
+        "GET /api/connectors/onedrive/search",
         "GET /api/connectors/onedrive/connect",
         "GET /api/connectors/onedrive/callback",
         "PUT /api/connectors/onedrive/root",

@@ -171,6 +171,14 @@ public sealed class FakeDrive
         }
     }
 
+    internal IReadOnlyList<FakeItem> Search(string query)
+    {
+        lock (_lock)
+        {
+            return _items.Values.Where(item => item.ParentId is not null && item.Name.Contains(query, StringComparison.OrdinalIgnoreCase)).Take(50).ToArray();
+        }
+    }
+
     internal FakeItem? Child(string parentId, string name)
     {
         lock (_lock)
@@ -361,6 +369,12 @@ internal static class FakeGraphEndpoints
             return ItemResult(drive, drive.Get(drive.RootId)!);
         }
 
+        if (rest.StartsWith("root/search(q='", StringComparison.Ordinal) && rest.EndsWith("')", StringComparison.Ordinal) && method == "GET")
+        {
+            var query = Uri.UnescapeDataString(rest["root/search(q='".Length..^2]).Replace("''", "'", StringComparison.Ordinal);
+            return Results.Json(new { value = drive.Search(query).Select(item => ItemJson(drive, item)) });
+        }
+
         if (rest.StartsWith("root:", StringComparison.Ordinal) && method == "GET")
         {
             var path = Uri.UnescapeDataString(rest["root:".Length..].TrimEnd(':'));
@@ -519,7 +533,7 @@ internal static class FakeGraphEndpoints
             ["cTag"] = item.ETag.Replace("\"{", "\"c:{", StringComparison.Ordinal),
             ["size"] = item.IsFolder ? 0 : item.Content.Length,
             ["lastModifiedDateTime"] = item.Modified,
-            ["parentReference"] = item.ParentId is null ? null : new { id = item.ParentId, driveId = drive.DriveId },
+            ["parentReference"] = new { id = item.ParentId, driveId = drive.DriveId },
         };
         if (item.IsFolder)
         {

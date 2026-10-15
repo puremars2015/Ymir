@@ -981,6 +981,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/connectors/onedrive/browse': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['BrowseOneDrive'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/connectors/onedrive/search': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['SearchOneDrive'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/conversations/{conversationId}/onedrive': {
     parameters: {
       query?: never;
@@ -1754,6 +1786,20 @@ export interface components {
     };
     /** @enum {unknown} */
     OneDriveAvailability: 'NotAllowed' | 'NotConnected' | 'NeedsReauth' | 'NoRoot' | 'Ready';
+    OneDriveBrowserItem: {
+      id: string;
+      name: string;
+      isFolder: boolean;
+      /** Format: int64 */
+      size: number | string;
+      /** Format: date-time */
+      lastModified: string;
+    };
+    OneDriveBrowserPage: {
+      folderId: string;
+      parentItemId: null | string;
+      items: components['schemas']['OneDriveBrowserItem'][];
+    };
     /** @enum {unknown} */
     OneDriveLinkState: 'NotConnected' | 'Connected' | 'NeedsReauth';
     OneDriveStatusResponse: {
@@ -3970,6 +4016,50 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  BrowseOneDrive: {
+    parameters: {
+      query?: {
+        itemId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OneDriveBrowserPage'];
+        };
+      };
+    };
+  };
+  SearchOneDrive: {
+    parameters: {
+      query?: {
+        q?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OneDriveBrowserItem'][];
+        };
       };
     };
   };

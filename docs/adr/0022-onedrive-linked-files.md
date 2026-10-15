@@ -1,6 +1,6 @@
 # ADR-0022：讓 Agent 處理使用者指定的 OneDrive 檔案（後端下載、寫回原位置，含刪除、移動、改名）
 
-- 狀態：提議中（決定事項已由使用者 2026-10-14 確認，全文待使用者確認後採納）
+- 狀態：已採納（使用者 2026-10-15 要求實作；依 O3～O5 分階段驗證，未完成階段不得宣稱已啟用）
 - 日期：2026-10-14
 - 依據：使用者要求「讓使用者可以指定 Agent 去操作使用者自己 OneDrive 上的任何文件」；延伸 [ADR-0013](0013-onedrive-connector.md)（OneDrive connector），沿用 [ADR-0012](0012-agent-extensions-and-platform-mcp.md) 的能力開關。
 

@@ -18,6 +18,8 @@ import {
   ExtensionValues,
   MyExtensions,
   OneDriveStatus,
+  OneDriveBrowserPage,
+  OneDriveBrowserItem,
   ConversationOneDrive,
   KnowledgeAnswer,
   PublishSiteRequest,
@@ -254,6 +256,18 @@ export class ApiService {
   /** OneDrive 連結狀態（ADR-0013）；不含任何 token。 */
   getOneDriveStatus(): Observable<OneDriveStatus> {
     return this.http.get<OneDriveStatus>('/api/connectors/onedrive');
+  }
+
+  browseOneDrive(itemId?: string): Observable<OneDriveBrowserPage> {
+    return this.http.get<OneDriveBrowserPage>('/api/connectors/onedrive/browse', {
+      params: itemId ? { itemId } : {},
+    });
+  }
+
+  searchOneDrive(q: string): Observable<OneDriveBrowserItem[]> {
+    return this.http.get<OneDriveBrowserItem[]>('/api/connectors/onedrive/search', {
+      params: { q },
+    });
   }
 
   setOneDriveRoot(path: string): Observable<OneDriveStatus> {
