@@ -105,6 +105,12 @@ public class PersonalMcpManagementTests(PersonalMcpFactory factory) : IClassFixt
         Assert.Equal(HttpStatusCode.NotFound, toggle.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, test.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, remove.StatusCode);
+        // 不依賴全域能力或測試順序：撤銷另一使用者能力後仍不能得知註冊是否存在。
+        await GrantAsync(other, false);
+        using var deniedOther = await other.PostAsJsonAsync($"/api/connections/mcp/{item.Id}/test", new { }, Ct);
+        using var missing = await other.PostAsJsonAsync($"/api/connections/mcp/{Guid.NewGuid()}/test", new { }, Ct);
+        Assert.Equal(HttpStatusCode.NotFound, deniedOther.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         using var ownTest = await owner.PostAsJsonAsync($"/api/connections/mcp/{item.Id}/test", new { }, Ct);
         ownTest.EnsureSuccessStatusCode();
         Assert.Equal("private-fixture-token", factory.Probe.LastToken);

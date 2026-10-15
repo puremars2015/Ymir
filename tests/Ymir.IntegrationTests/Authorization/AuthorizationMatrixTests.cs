@@ -113,7 +113,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     {
         ["PATCH /api/connections/mcp/{id:guid}"] = HttpStatusCode.NotFound,
         ["DELETE /api/connections/mcp/{id:guid}"] = HttpStatusCode.NotFound,
-        ["POST /api/connections/mcp/{id:guid}/test"] = HttpStatusCode.Forbidden,
+        ["POST /api/connections/mcp/{id:guid}/test"] = HttpStatusCode.NotFound,
         ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = HttpStatusCode.Conflict,
         ["POST /api/conversations/{conversationId:guid}/onedrive/links"] = HttpStatusCode.Forbidden,
         ["PATCH /api/conversations/{conversationId:guid}/onedrive/links/{linkId:guid}"] = HttpStatusCode.NotFound,

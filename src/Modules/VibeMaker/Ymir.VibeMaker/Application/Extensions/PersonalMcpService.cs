@@ -108,8 +108,8 @@ public sealed partial class PersonalMcpService(
 
     public async Task<PersonalMcpTestResult> TestAsync(Guid userId, string actor, Guid id, CancellationToken ct)
     {
-        await RequireAllowedAsync(userId, ct).ConfigureAwait(false);
         var item = await FindAsync(userId, id, ct).ConfigureAwait(false);
+        await RequireAllowedAsync(userId, ct).ConfigureAwait(false);
         var success = await probe.TestAsync(new Uri(item.Url), item.ProtectedToken is { } ciphertext ? secrets.Unprotect(userId, ciphertext) : null, ct).ConfigureAwait(false);
         await audit.WriteAsync(new AuditEntry(actor, "personal_mcp.test", "personal_mcp", id.ToString("D"), success ? AuditResult.Success : AuditResult.Failure, clock.GetUtcNow(), null), ct).ConfigureAwait(false);
         return new(success, success ? "MCP initialize 連線測試成功，未呼叫任何工具。" : "連線測試失敗；請檢查服務、憑證與公開網路設定。");
