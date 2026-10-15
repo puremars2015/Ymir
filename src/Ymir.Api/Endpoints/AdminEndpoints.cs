@@ -20,6 +20,7 @@ internal static class AdminEndpoints
         var group = endpoints.MapGroup("/api/admin/users").WithTags("Admin").RequireAuthorization(AuthSetup.AdminPolicy).RequireAntiforgeryHeader();
 
         group.MapGet("/", ListAsync).WithName("AdminListUsers").Produces<List<AdminUserResponse>>();
+        group.MapGet("/{userId:guid}", GetAsync).WithName("AdminGetUser").Produces<AdminUserResponse>();
         group.MapPost("/", CreateLocalAsync).WithName("AdminCreateLocalUser").Produces<AdminUserResponse>(StatusCodes.Status201Created);
         group.MapPost("/{userId:guid}/disable", DisableAsync).WithName("AdminDisableUser").Produces<AdminUserResponse>();
         group.MapPost("/{userId:guid}/enable", EnableAsync).WithName("AdminEnableUser").Produces<AdminUserResponse>();
@@ -35,6 +36,16 @@ internal static class AdminEndpoints
 
     private static async Task<List<AdminUserResponse>> ListAsync(string? search, IUserDirectory users, CancellationToken cancellationToken) =>
         [.. (await users.ListAsync(search, 200, cancellationToken)).Select(AdminUserResponse.From)];
+
+    /// <summary>
+    /// 單一使用者：使用者管理的「編輯」頁直接以網址開啟，不依賴清單（清單最多 200 筆）。
+    /// 已刪除的帳號與清單一致，視為不存在。
+    /// </summary>
+    private static async Task<IResult> GetAsync(Guid userId, IUserDirectory users, CancellationToken cancellationToken)
+    {
+        var user = await users.FindAsync(userId, cancellationToken);
+        return user is null || user.Status == UserStatus.Deleted ? UserNotFound() : TypedResults.Ok(AdminUserResponse.From(user));
+    }
 
     private static async Task<IResult> CreateLocalAsync(
         CreateLocalUserRequest request,

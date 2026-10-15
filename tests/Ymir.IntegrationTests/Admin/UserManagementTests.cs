@@ -104,6 +104,9 @@ public class UserManagementTests(ApiFactory factory) : IClassFixture<ApiFactory>
         using var login = await LocalAccountTests.PasswordLoginAsync(client, "um-delete-local", "initial-password-123");
         Assert.Equal(HttpStatusCode.OK, login.StatusCode);
 
+        var single = await admin.GetFromJsonAsync<AdminUserResponse>($"/api/admin/users/{created.Id}", JsonDefaults.Options, Ct);
+        Assert.Equal("um-delete-local", single!.AccountName);
+
         using var deleted = await admin.DeleteAsync(new Uri($"/api/admin/users/{created.Id}", UriKind.Relative), Ct);
         Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
 
@@ -119,6 +122,8 @@ public class UserManagementTests(ApiFactory factory) : IClassFixture<ApiFactory>
         // 已刪除視為不存在
         using var again = await admin.DeleteAsync(new Uri($"/api/admin/users/{created.Id}", UriKind.Relative), Ct);
         Assert.Equal(HttpStatusCode.NotFound, again.StatusCode);
+        using var gone = await admin.GetAsync(new Uri($"/api/admin/users/{created.Id}", UriKind.Relative), Ct);
+        Assert.Equal(HttpStatusCode.NotFound, gone.StatusCode);
         using var enable = await admin.PostAsync(new Uri($"/api/admin/users/{created.Id}/enable", UriKind.Relative), null, Ct);
         Assert.Equal(HttpStatusCode.NotFound, enable.StatusCode);
 

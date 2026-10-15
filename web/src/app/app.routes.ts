@@ -119,6 +119,13 @@ export const routes: Routes = [
         title: '使用者管理 · Vibe Maker',
       },
       {
+        path: 'admin/users/:userId',
+        canActivate: [adminGuard],
+        loadComponent: () =>
+          import('./features/admin/user-detail-page').then((m) => m.UserDetailPage),
+        title: '使用者設定 · Vibe Maker',
+      },
+      {
         path: 'admin/make-topics',
         canActivate: [adminGuard],
         loadComponent: () =>

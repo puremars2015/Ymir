@@ -72,10 +72,12 @@ await admin.goto(`${baseUrl}/admin/users`);
 await admin.fill('app-users-page input[name=search]', account);
 await admin.click('app-users-page .search button');
 const row = admin.locator(`app-users-page tr:has-text("${account}")`).first();
-await row.locator('button:has-text("擴充能力")').click();
-await admin.locator('app-users-page .extension-form select[name=internet]').selectOption('Deny');
-await admin.locator('app-users-page .extension-form button:has-text("儲存")').click();
-await admin.locator('app-users-page [role=status]:has-text("擴充能力")').waitFor();
+await row.locator('a:has-text("編輯")').click();
+await admin
+  .locator('app-user-detail-page .extension-form select[name=internet]')
+  .selectOption('Deny');
+await admin.locator('app-user-detail-page .extension-form button:has-text("儲存")').click();
+await admin.locator('app-user-detail-page [role=status]:has-text("擴充能力")').waitFor();
 await admin.goto(`${baseUrl}/admin/settings`);
 await admin.locator('app-extension-settings-card input[name=internet]').waitFor();
 await admin

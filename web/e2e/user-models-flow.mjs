@@ -40,6 +40,24 @@ async function change(page, url, method, data) {
   );
   assert.equal(response.status, 200, response.body);
 }
+// 使用者清單每列只有「編輯」與「刪除」；模型權限在「編輯」進入的使用者設定頁
+async function openModels(page, target) {
+  await page.goto(`${baseUrl}/admin/users`);
+  await page
+    .locator('tbody tr')
+    .filter({ hasText: target.accountName })
+    .getByRole('link', { name: '編輯', exact: true })
+    .click();
+  const card = page.locator('app-user-model-card');
+  await card
+    .getByRole('heading', { name: `${target.displayName} 的模型權限`, exact: true })
+    .waitFor();
+  await card.getByRole('combobox').first().waitFor();
+  return card;
+}
+async function savedModels(page) {
+  await page.locator('app-user-detail-page [role=status]:has-text("模型權限")').waitFor();
+}
 try {
   const stamp = Date.now();
   const admin = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
@@ -65,10 +83,7 @@ try {
     enabledModelIds: [a.id, b.id, d.id],
     defaultModelId: a.id,
   });
-  await admin.goto(`${baseUrl}/admin/users`);
-  const row = admin.locator('tbody tr').filter({ hasText: user.accountName });
-  await row.getByRole('button', { name: '模型權限', exact: true }).click();
-  const card = admin.locator('app-user-model-card');
+  let card = await openModels(admin, user);
   await card
     .getByRole('combobox', { name: `${label(c)} 模型權限`, exact: true })
     .selectOption('Allow');
@@ -77,7 +92,7 @@ try {
     .selectOption('Deny');
   await card.screenshot({ path: `${outDir}/01-user-model-overrides.png` });
   await card.getByRole('button', { name: '儲存模型權限', exact: true }).click();
-  await card.waitFor({ state: 'detached' });
+  await savedModels(admin);
   assert.deepEqual(
     (await (await alice.request.get(`${baseUrl}/api/models`)).json()).map((m) => m.id),
     [a.id, b.id, c.id],
@@ -87,24 +102,12 @@ try {
     [a.id, b.id, d.id],
   );
   const bobUser = await (await bob.request.get(`${baseUrl}/api/me`)).json();
-  await admin
-    .locator('tbody tr')
-    .filter({ hasText: bobUser.accountName })
-    .getByRole('button', { name: '模型權限', exact: true })
-    .click();
-  await card
-    .getByRole('heading', { name: `${bobUser.displayName} 的模型權限`, exact: true })
-    .waitFor();
-  await card.getByRole('combobox').first().waitFor();
+  card = await openModels(admin, bobUser);
   assert.equal(
     await card.getByRole('combobox', { name: `${label(c)} 模型權限`, exact: true }).inputValue(),
     'Inherit',
   );
-  await row.getByRole('button', { name: '模型權限', exact: true }).click();
-  await card
-    .getByRole('heading', { name: `${user.displayName} 的模型權限`, exact: true })
-    .waitFor();
-  await card.getByRole('combobox').first().waitFor();
+  card = await openModels(admin, user);
   assert.equal(
     await card.getByRole('combobox', { name: `${label(c)} 模型權限`, exact: true }).inputValue(),
     'Allow',
@@ -125,9 +128,7 @@ try {
       [a, b, c].some((m) => m.provider && n.includes(`(${m.provider})`)),
     ),
   );
-  await admin.reload();
-  await row.getByRole('button', { name: '模型權限', exact: true }).click();
-  await card.getByRole('combobox', { name: `${label(c)} 模型權限`, exact: true }).waitFor();
+  card = await openModels(admin, user);
   assert.equal(
     await card.getByRole('combobox', { name: `${label(c)} 模型權限`, exact: true }).inputValue(),
     'Allow',
@@ -137,7 +138,7 @@ try {
     'Deny',
   );
   await card.getByRole('button', { name: '全部依系統設定', exact: true }).click();
-  await card.waitFor({ state: 'detached' });
+  await savedModels(admin);
   await change(admin, '/api/admin/settings/models', 'PUT', {
     enabledModelIds: [b.id, c.id],
     defaultModelId: b.id,
@@ -146,15 +147,13 @@ try {
     (await (await alice.request.get(`${baseUrl}/api/models`)).json()).map((m) => m.id),
     [b.id, c.id],
   );
-  await row.getByRole('button', { name: '模型權限', exact: true }).click();
-  await card.getByRole('combobox').first().waitFor();
+  card = await openModels(admin, user);
   for (const select of await card.getByRole('combobox').all()) await select.selectOption('Deny');
   await card.getByText('沒有可使用的模型，這位使用者將無法送出新訊息。').waitFor();
   await card.getByRole('button', { name: '儲存模型權限', exact: true }).click();
-  await card.waitFor({ state: 'detached' });
+  await savedModels(admin);
   assert.deepEqual(await (await alice.request.get(`${baseUrl}/api/models`)).json(), []);
-  await row.getByRole('button', { name: '模型權限', exact: true }).click();
-  await card.getByRole('combobox').first().waitFor();
+  card = await openModels(admin, user);
   await admin.setViewportSize({ width: 390, height: 844 });
   await admin.waitForFunction(
     () => document.querySelector('.sidebar').getBoundingClientRect().right <= 1,

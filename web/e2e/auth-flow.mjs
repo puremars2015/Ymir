@@ -69,9 +69,11 @@ step('local account had to change the initial password, then entered the app');
 // 5. Admin 停用本機帳號 → 對方下一個請求就被登出
 admin.on('dialog', (dialog) => void dialog.accept());
 await admin.reload();
-const row = admin.locator('tr', { hasText: localAccount });
-await row.locator('button:has-text("停用")').click();
-await row.locator('.danger-text:has-text("已停用")').waitFor();
+// 使用者清單每列只有「編輯」與「刪除」；停用 / 啟用在使用者設定頁
+await admin.locator('tr', { hasText: localAccount }).locator('a:has-text("編輯")').click();
+const detail = admin.locator('app-user-detail-page');
+await detail.locator('button:has-text("停用帳號")').click();
+await detail.locator('.head .danger-text:has-text("已停用")').waitFor();
 await admin.screenshot({ path: `${outDir}/05-disabled.png` });
 await local.click('.user a:has-text("設定")');
 await local.waitForURL(/\/login/);
@@ -82,8 +84,8 @@ await local.fill('input[name=account]', localAccount);
 await local.fill('input[name=password]', newPassword);
 await local.click('form button[type=submit]:has-text("登入")');
 await local.waitForSelector('.error:has-text("停用")');
-await row.locator('button:has-text("啟用")').click();
-await row.locator('td:has-text("啟用中")').waitFor();
+await detail.locator('button:has-text("啟用帳號")').click();
+await detail.locator('.head:has-text("啟用中")').waitFor();
 await local.fill('input[name=password]', newPassword);
 await local.click('form button[type=submit]:has-text("登入")');
 // 被登出時登入頁記住了原本要去的設定頁（returnUrl）

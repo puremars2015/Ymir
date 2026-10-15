@@ -260,15 +260,15 @@ await admin.click('app-admin-tabs a:has-text("使用者")');
 await admin.fill('app-users-page input[name=search]', workerAccount);
 await admin.click('app-users-page .search button');
 const workerUserRow = admin.locator(`app-users-page tr:has-text("${workerAccount}")`).first();
-await workerUserRow.locator('button:has-text("擴充能力")').click();
-const extensionForm = admin.locator('app-users-page .extension-form');
+await workerUserRow.locator('a:has-text("編輯")').click();
+const extensionForm = admin.locator('app-user-detail-page .extension-form');
 await extensionForm
   .locator('select[name=skills] option:has-text("依全域預設（允許）")')
   .waitFor({ state: 'attached' });
 await extensionForm.locator('select[name=mcp]').selectOption('Allow');
 await admin.screenshot({ path: `${outDir}/12-user-extensions.png`, fullPage: true });
 await extensionForm.locator('button:has-text("儲存")').click();
-await admin.locator('app-users-page [role=status]:has-text("擴充能力")').waitFor();
+await admin.locator('app-user-detail-page [role=status]:has-text("擴充能力")').waitFor();
 await worker.goto(`${baseUrl}/settings/tools`);
 await worker
   .locator('app-my-extensions-card li:has-text("自建 skill") strong:has-text("已開放")')

@@ -501,6 +501,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/users/{userId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['AdminGetUser'];
+    put?: never;
+    post?: never;
+    delete: operations['AdminDeleteUser'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/users/{userId}/disable': {
     parameters: {
       query?: never;
@@ -576,22 +592,6 @@ export interface paths {
     put: operations['AdminChangeUserRole'];
     post?: never;
     delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/admin/users/{userId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post?: never;
-    delete: operations['AdminDeleteUser'];
     options?: never;
     head?: never;
     patch?: never;
@@ -3622,6 +3622,48 @@ export interface operations {
       };
     };
   };
+  AdminGetUser: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminUserResponse'];
+        };
+      };
+    };
+  };
+  AdminDeleteUser: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
   AdminDisableUser: {
     parameters: {
       query?: never;
@@ -3739,26 +3781,6 @@ export interface operations {
         content: {
           'application/json': components['schemas']['AdminUserResponse'];
         };
-      };
-    };
-  };
-  AdminDeleteUser: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        userId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description No Content */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
       };
     };
   };

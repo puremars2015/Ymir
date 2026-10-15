@@ -175,6 +175,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         {
             Content = JsonContent.Create(new ChangeUserRoleRequest(UserRole.Admin)),
         },
+        ["GET /api/admin/users/{userId:guid}"] = () => Get($"/api/admin/users/{Guid.NewGuid()}"),
         ["DELETE /api/admin/users/{userId:guid}"] = () => new HttpRequestMessage(HttpMethod.Delete, $"/api/admin/users/{Guid.NewGuid()}"),
         ["GET /api/admin/make-topics/"] = () => Get("/api/admin/make-topics"),
         ["POST /api/admin/make-topics/"] = () => new HttpRequestMessage(HttpMethod.Post, "/api/admin/make-topics")

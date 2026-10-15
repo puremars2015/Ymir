@@ -380,6 +380,10 @@ export class ApiService {
     return this.http.get<AdminUser[]>('/api/admin/users', { params });
   }
 
+  adminGetUser(userId: string): Observable<AdminUser> {
+    return this.http.get<AdminUser>(`/api/admin/users/${userId}`);
+  }
+
   adminCreateLocalUser(request: CreateLocalUserRequest): Observable<AdminUser> {
     return this.http.post<AdminUser>('/api/admin/users', request);
   }
