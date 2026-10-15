@@ -86,6 +86,12 @@ internal sealed class PiAgentHarness(
             environment[PiExtensionConfig.PlatformMcpTokenEnvironmentVariable] = platform.Token;
         }
 
+        if (request.Extensions is { Mcp: true, Internet: true })
+        {
+            foreach (var personal in request.PersonalMcp ?? [])
+                if (personal.Token is { } token) environment[personal.TokenVariable] = token;
+        }
+
         return environment;
     }
 
@@ -265,7 +271,7 @@ internal sealed class PiAgentHarness(
     {
         var extensions = request.Extensions ?? EffectiveExtensions.None;
         var userMcp = await ReadUserMcpConfigAsync(request.RuntimeId, cancellationToken).ConfigureAwait(false);
-        var mcpJson = PiExtensionConfig.BuildMcpConfig(userMcp, extensions.Mcp, out var invalid, request.PlatformMcp?.Servers);
+        var mcpJson = PiExtensionConfig.BuildMcpConfig(userMcp, extensions.Mcp, out var invalid, request.PlatformMcp?.Servers, extensions.Internet ? request.PersonalMcp : []);
         if (invalid)
         {
             logger.LogWarning("Ignoring invalid {File} for execution {ExecutionId}", PiRuntimeLayout.UserMcpFileName, request.ExecutionId);

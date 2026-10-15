@@ -10,6 +10,7 @@ namespace Ymir.VibeMaker.Application.Persistence;
 /// </summary>
 public interface IVibeMakerDbContext
 {
+    DbSet<PersonalMcpServer> PersonalMcpServers { get; }
     DbSet<ExecutionArtifact> ExecutionArtifacts { get; }
 
     DbSet<Project> Projects { get; }

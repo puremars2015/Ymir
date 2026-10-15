@@ -58,7 +58,7 @@ internal static class PiExtensionConfig
     /// 平台 MCP 服務（<paramref name="platformServers"/>）最後合併，名稱相同時覆蓋使用者項目（ADR-0012 B.6），
     /// 只寫 gateway 位址與 <c>Authorization: Bearer ${YMIR_MCP_TOKEN}</c>（Pi 在連線時才從環境變數展開），檔案裡沒有 token 值。
     /// </summary>
-    public static string BuildMcpConfig(string? userMcpJson, bool allowUserServers, out bool invalid, IReadOnlyList<PlatformMcpServer>? platformServers = null)
+    public static string BuildMcpConfig(string? userMcpJson, bool allowUserServers, out bool invalid, IReadOnlyList<PlatformMcpServer>? platformServers = null, IReadOnlyList<PersonalMcpGrant>? personalServers = null)
     {
         invalid = false;
         var servers = new JsonObject();
@@ -84,6 +84,17 @@ internal static class PiExtensionConfig
             catch (JsonException)
             {
                 invalid = true;
+            }
+        }
+
+        if (allowUserServers)
+        {
+            foreach (var personal in personalServers ?? [])
+            {
+                var entry = new JsonObject { ["url"] = personal.Url, ["exposure"] = "direct" };
+                if (personal.Token is not null)
+                    entry["headers"] = new JsonObject { ["Authorization"] = $"Bearer ${{{personal.TokenVariable}}}" };
+                servers[personal.ServerName] = entry;
             }
         }
 

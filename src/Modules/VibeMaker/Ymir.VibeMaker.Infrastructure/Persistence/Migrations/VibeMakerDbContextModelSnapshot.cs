@@ -940,6 +940,51 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                     b.ToTable("onedrive_sync_scopes", "vibemaker");
                 });
 
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.PersonalMcpServer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("bit")
+                        .HasColumnName("enabled");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ProtectedToken")
+                        .HasMaxLength(8192)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("protected_token");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)")
+                        .HasColumnName("url");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_personal_mcp_servers");
+
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_personal_mcp_servers_user_id_name");
+
+                    b.ToTable("personal_mcp_servers", "vibemaker");
+                });
+
             modelBuilder.Entity("Ymir.VibeMaker.Domain.Project", b =>
                 {
                     b.Property<Guid>("Id")

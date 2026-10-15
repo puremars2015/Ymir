@@ -9,6 +9,7 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence;
 public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> options) : DbContext(options), IVibeMakerDbContext
 {
     public const string Schema = "vibemaker";
+    public DbSet<PersonalMcpServer> PersonalMcpServers => Set<PersonalMcpServer>();
 
     public DbSet<ExecutionArtifact> ExecutionArtifacts => Set<ExecutionArtifact>();
 
@@ -57,6 +58,16 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
+        modelBuilder.Entity<PersonalMcpServer>(server =>
+        {
+            server.ToTable("personal_mcp_servers");
+            server.HasKey(s => s.Id);
+            server.Property(s => s.Id).ValueGeneratedNever();
+            server.Property(s => s.Name).HasMaxLength(40).IsRequired();
+            server.Property(s => s.Url).HasMaxLength(2048).IsRequired();
+            server.Property(s => s.ProtectedToken).HasMaxLength(8192);
+            server.HasIndex(s => new { s.UserId, s.Name }).IsUnique();
+        });
         modelBuilder.Entity<ExecutionArtifact>(artifact =>
         {
             artifact.ToTable("execution_artifacts");

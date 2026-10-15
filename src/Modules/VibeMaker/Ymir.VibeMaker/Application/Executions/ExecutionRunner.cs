@@ -33,6 +33,7 @@ public sealed class ExecutionRunner(
     OneDriveSyncService oneDrive,
     OneDriveLinks oneDriveLinks,
     PlatformMcpService platformMcp,
+    Ymir.VibeMaker.Application.Extensions.PersonalMcpService personalMcp,
     IAuditLog auditLog,
     VibeMakerTelemetry telemetry,
     TimeProvider timeProvider,
@@ -209,7 +210,8 @@ public sealed class ExecutionRunner(
                 await GetAttachmentsAsync(execution, stoppingToken).ConfigureAwait(false),
                 execution.ThinkingLevel,
                 // 平台 MCP（ADR-0012 B）：目錄 ∩ 存取清單，token 期限涵蓋這次執行。
-                await platformMcp.PrepareRunAsync(execution.UserId, policy.ExecutionTimeout, runToken).ConfigureAwait(false));
+                await platformMcp.PrepareRunAsync(execution.UserId, policy.ExecutionTimeout, runToken).ConfigureAwait(false),
+                IsGroupRun(execution) ? [] : await personalMcp.PrepareRunAsync(execution.UserId, runToken).ConfigureAwait(false));
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
             {
                 if (agentEvent is AgentCompleted or AgentFailed or AgentCancelled)

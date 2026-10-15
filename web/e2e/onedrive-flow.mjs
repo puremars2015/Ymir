@@ -43,7 +43,7 @@ step('admin enabled OneDrive for everyone');
 // 2. 使用者連結 OneDrive（整頁導向 Fake OIDC，login_hint 自動通過）
 const user = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
 await devLogin(user, `od-user-${stamp}`, 'User');
-await user.goto(`${baseUrl}/settings`);
+await user.goto(`${baseUrl}/settings/connections`);
 const onedrive = user.locator('app-onedrive-card');
 await onedrive.locator('text=尚未連結').waitFor();
 await user.screenshot({ path: `${outDir}/02-not-connected.png`, fullPage: true });
@@ -78,7 +78,7 @@ await cloud.locator('text=已同步到 OneDrive').waitFor({ timeout: 30000 });
 step('conversation synced to OneDrive after the run; manual sync works');
 
 // 5. 解除連結
-await user.goto(`${baseUrl}/settings`);
+await user.goto(`${baseUrl}/settings/connections`);
 user.once('dialog', (d) => d.accept());
 await onedrive.locator('button:has-text("解除連結")').click();
 await onedrive.locator('text=尚未連結').waitFor();

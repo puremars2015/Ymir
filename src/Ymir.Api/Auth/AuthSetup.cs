@@ -106,6 +106,9 @@ internal static class AuthSetup
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddPolicy("personal-mcp-probe", context => RateLimitPartition.GetFixedWindowLimiter(
+                context.User.FindFirst(YmirClaims.UserId)?.Value ?? "anonymous",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = 6, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
             options.AddPolicy(PasswordLoginRateLimit, context => RateLimitPartition.GetFixedWindowLimiter(
                 context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, authOptions.LocalAccounts.LoginAttemptsPerMinute), Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));

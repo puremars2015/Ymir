@@ -10,14 +10,13 @@ import { FormsModule } from '@angular/forms';
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { newPasswordProblem, PASSWORD_MIN_LENGTH } from '../../core/auth/auth-rules';
-import { MyExtensionsCard } from './my-extensions-card';
-import { OneDriveCard } from './onedrive-card';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { isSystemPromptTooLong, SYSTEM_PROMPT_MAX_LENGTH } from '../../core/models/model-selection';
 
 /** 個人設定：個人 global system prompt，套用到自己所有的對話（專案的 prompt 會接在後面）。 */
 @Component({
   selector: 'app-settings-page',
-  imports: [FormsModule, MyExtensionsCard, OneDriveCard],
+  imports: [FormsModule, RouterLink],
   template: `
     <section class="settings">
       <h1>個人設定</h1>
@@ -106,8 +105,11 @@ import { isSystemPromptTooLong, SYSTEM_PROMPT_MAX_LENGTH } from '../../core/mode
         <p class="muted password">Google 帳號的密碼請到 Google 帳戶設定變更。</p>
       }
 
-      <app-my-extensions-card />
-      <app-onedrive-card />
+      <section class="stack password">
+        <h2>連接與工具</h2>
+        <p class="muted">連接 OneDrive 帳號、新增個人 MCP，查看管理員開放的能力。</p>
+        <a routerLink="/settings/connections">管理連接與工具 →</a>
+      </section>
     </section>
   `,
   styles: `
@@ -148,6 +150,8 @@ import { isSystemPromptTooLong, SYSTEM_PROMPT_MAX_LENGTH } from '../../core/mode
 })
 export class SettingsPage implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   protected readonly auth = inject(AuthService);
   protected readonly maxLength = SYSTEM_PROMPT_MAX_LENGTH;
 
@@ -169,6 +173,15 @@ export class SettingsPage implements OnInit {
   protected readonly passwordError = signal<string | null>(null);
 
   ngOnInit(): void {
+    // 相容先前已啟動的 OneDrive OAuth：保留結果代碼，交給新頁面的卡片處理。
+    const result = this.route.snapshot.queryParamMap.get('onedrive');
+    if (result !== null) {
+      void this.router.navigate(['/settings/connections'], {
+        queryParams: { onedrive: result },
+        replaceUrl: true,
+      });
+      return;
+    }
     this.api.getSettings().subscribe({
       next: (settings) => {
         this.draft.set(settings.systemPrompt ?? '');

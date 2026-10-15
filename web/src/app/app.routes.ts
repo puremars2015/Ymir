@@ -50,6 +50,12 @@ export const routes: Routes = [
         title: '個人設定 · Vibe Maker',
       },
       {
+        path: 'settings/connections',
+        loadComponent: () =>
+          import('./features/settings/connections-page').then((m) => m.ConnectionsPage),
+        title: '連接與工具 · Vibe Maker',
+      },
+      {
         path: 'admin',
         pathMatch: 'full',
         canActivate: [adminGuard],

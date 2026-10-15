@@ -10,6 +10,21 @@ namespace Ymir.UnitTests.PiAgent;
 /// <summary>ADR-0004：Agent 程序只拿到使用者的 virtual key，而且只透過環境變數（不在程序參數）。</summary>
 public class PiProcessSpecTests
 {
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, false)]
+    public void PersonalMcpToken_IsOnlyInjectedWhenBothCapabilitiesAllow(bool mcp, bool internet, bool expected)
+    {
+        var grant = new Ymir.VibeMaker.Application.Extensions.PersonalMcpGrant(Guid.NewGuid(), "https://tools.example.com/mcp", "personal-fixture-secret");
+        var harness = new PiAgentHarness(null!, Options.Create(new PiAgentOptions()), Catalog, null!, NullLogger<PiAgentHarness>.Instance);
+        var request = Request with { Extensions = new(false, mcp, internet), PersonalMcp = [grant] };
+        var spec = harness.BuildProcessSpec(request);
+        Assert.Equal(expected, spec.Environment!.ContainsKey(grant.TokenVariable));
+        Assert.DoesNotContain(spec.Arguments, arg => arg.Contains("personal-fixture-secret", StringComparison.Ordinal));
+        Assert.DoesNotContain("personal-fixture-secret", request.ToString(), StringComparison.Ordinal);
+    }
+
     private static readonly AgentRunRequest Request = new(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "hello", RuntimePaths.Workspace, "sk-virtual-user-key", "minimax", ["PERSONAL-PROMPT", "PROJECT-PROMPT"]);
 
     private static readonly ModelCatalog Catalog = new([new ModelDescriptor("minimax", "MiniMax")], "minimax");

@@ -1695,6 +1695,148 @@
         }
       }
     },
+    "/api/connections/mcp": {
+      "get": {
+        "tags": [
+          "PersonalConnections"
+        ],
+        "operationId": "GetPersonalMcpServers",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalMcpList"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "PersonalConnections"
+        ],
+        "operationId": "AddPersonalMcpServer",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPersonalMcpRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalMcpInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/connections/mcp/{id}": {
+      "patch": {
+        "tags": [
+          "PersonalConnections"
+        ],
+        "operationId": "SetPersonalMcpEnabled",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetPersonalMcpEnabledRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalMcpInfo"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "PersonalConnections"
+        ],
+        "operationId": "RemovePersonalMcpServer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/connections/mcp/{id}/test": {
+      "post": {
+        "tags": [
+          "PersonalConnections"
+        ],
+        "operationId": "TestPersonalMcpServer",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonalMcpTestResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/admin/settings/extensions": {
       "get": {
         "tags": [
@@ -3747,6 +3889,27 @@
           "readOnly": {
             "type": "boolean",
             "default": false
+          }
+        }
+      },
+      "AddPersonalMcpRequest": {
+        "required": [
+          "name",
+          "url"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "bearerToken": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -6381,6 +6544,72 @@
           }
         }
       },
+      "PersonalMcpInfo": {
+        "required": [
+          "id",
+          "name",
+          "url",
+          "enabled",
+          "hasCredential",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "hasCredential": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PersonalMcpList": {
+        "required": [
+          "allowed",
+          "servers"
+        ],
+        "type": "object",
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PersonalMcpInfo"
+            }
+          }
+        }
+      },
+      "PersonalMcpTestResult": {
+        "required": [
+          "success",
+          "message"
+        ],
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
       "PlatformMcpServersResponse": {
         "required": [
           "enabled",
@@ -7527,6 +7756,17 @@
           }
         }
       },
+      "SetPersonalMcpEnabledRequest": {
+        "required": [
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
       "SetPublicHostnameRequest": {
         "required": [
           "hostname"
@@ -8524,6 +8764,9 @@
     },
     {
       "name": "Admin"
+    },
+    {
+      "name": "PersonalConnections"
     },
     {
       "name": "Knowledge"

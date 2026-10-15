@@ -741,6 +741,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/connections/mcp': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetPersonalMcpServers'];
+    put?: never;
+    post: operations['AddPersonalMcpServer'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/connections/mcp/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations['RemovePersonalMcpServer'];
+    options?: never;
+    head?: never;
+    patch: operations['SetPersonalMcpEnabled'];
+    trace?: never;
+  };
+  '/api/connections/mcp/{id}/test': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['TestPersonalMcpServer'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/settings/extensions': {
     parameters: {
       query?: never;
@@ -1491,6 +1539,11 @@ export interface components {
       /** @default false */
       readOnly: boolean;
     };
+    AddPersonalMcpRequest: {
+      name: string;
+      url: string;
+      bearerToken?: null | string;
+    };
     AdminDryRunResponse: {
       supported: boolean;
       available: boolean;
@@ -2116,6 +2169,24 @@ export interface components {
       account: null | string;
       password: null | string;
     };
+    PersonalMcpInfo: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      url: string;
+      enabled: boolean;
+      hasCredential: boolean;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    PersonalMcpList: {
+      allowed: boolean;
+      servers: components['schemas']['PersonalMcpInfo'][];
+    };
+    PersonalMcpTestResult: {
+      success: boolean;
+      message: string;
+    };
     PlatformMcpServersResponse: {
       enabled: boolean;
       servers: components['schemas']['McpServerAccessResponse'][];
@@ -2397,6 +2468,9 @@ export interface components {
     };
     SetOneDriveRootRequest: {
       path: null | string;
+    };
+    SetPersonalMcpEnabledRequest: {
+      enabled: boolean;
     };
     SetPublicHostnameRequest: {
       hostname: null | string;
@@ -3912,6 +3986,118 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AdminDryRunResponse'];
+        };
+      };
+    };
+  };
+  GetPersonalMcpServers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PersonalMcpList'];
+        };
+      };
+    };
+  };
+  AddPersonalMcpServer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AddPersonalMcpRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PersonalMcpInfo'];
+        };
+      };
+    };
+  };
+  RemovePersonalMcpServer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SetPersonalMcpEnabled: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetPersonalMcpEnabledRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PersonalMcpInfo'];
+        };
+      };
+    };
+  };
+  TestPersonalMcpServer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PersonalMcpTestResult'];
         };
       };
     };

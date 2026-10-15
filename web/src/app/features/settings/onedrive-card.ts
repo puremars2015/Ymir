@@ -21,69 +21,71 @@ import {
   imports: [DatePipe, FormsModule, OneDriveBrowser],
   template: `
     @if (status(); as s) {
-      @if (s.allowed || s.state !== 'NotConnected') {
-        <section class="stack onedrive">
-          <h2>OneDrive</h2>
-          <p>
-            <strong>{{ stateLabel(s) }}</strong>
-            @if (s.account) {
-              <span class="muted">（{{ s.account }}）</span>
-            }
-          </p>
-          @if (s.connectedAt) {
-            <p class="muted hint">連結時間：{{ s.connectedAt | date: 'yyyy-MM-dd HH:mm' }}</p>
+      <section class="stack onedrive">
+        <h2>OneDrive</h2>
+        <p>
+          <strong>{{ stateLabel(s) }}</strong>
+          @if (s.account) {
+            <span class="muted">（{{ s.account }}）</span>
           }
-          <p class="muted hint">
-            執行 Agent
-            前會從這個資料夾下載檔案，執行後把新增或修改的檔案上傳；兩邊同時修改時會保留兩份。Agent
-            本身拿不到你的 OneDrive 授權。
+        </p>
+        @if (s.connectedAt) {
+          <p class="muted hint">連結時間：{{ s.connectedAt | date: 'yyyy-MM-dd HH:mm' }}</p>
+        }
+        <p class="muted hint">
+          執行 Agent
+          前會從這個資料夾下載檔案，執行後把新增或修改的檔案上傳；兩邊同時修改時會保留兩份。Agent
+          本身拿不到你的 OneDrive 授權。
+        </p>
+
+        @if (!s.available) {
+          <p class="error">企業帳號登入尚未設定，暫時無法連結 OneDrive。</p>
+        } @else if (!s.allowed) {
+          <p class="muted">
+            管理員尚未開放 OneDrive 連結，請洽管理員；若已有連結，同步已停止，仍可解除連結。
           </p>
+        }
 
-          @if (!s.available) {
-            <p class="error">企業帳號登入尚未設定，暫時無法連結 OneDrive。</p>
-          } @else if (!s.allowed) {
-            <p class="muted">管理員已關閉 OneDrive 連結，同步已停止；你可以解除連結。</p>
+        @if (s.state === 'Connected' && s.allowed) {
+          <form class="row" (ngSubmit)="saveRoot()">
+            <label class="grow"
+              >同步資料夾
+              <input
+                name="rootPath"
+                [ngModel]="rootPath()"
+                (ngModelChange)="rootPath.set($event)"
+                placeholder="/Ymir"
+              />
+            </label>
+            <button type="submit" [disabled]="busy() || !rootPath().trim()">儲存</button>
+          </form>
+          <button type="button" class="secondary" (click)="browserOpen.set(!browserOpen())">
+            {{ browserOpen() ? '關閉 OneDrive 瀏覽' : '瀏覽整個自己的 OneDrive' }}
+          </button>
+          @if (browserOpen()) {
+            <app-onedrive-browser />
           }
+        }
 
-          @if (s.state === 'Connected' && s.allowed) {
-            <form class="row" (ngSubmit)="saveRoot()">
-              <label class="grow"
-                >同步資料夾
-                <input
-                  name="rootPath"
-                  [ngModel]="rootPath()"
-                  (ngModelChange)="rootPath.set($event)"
-                  placeholder="/Ymir"
-                />
-              </label>
-              <button type="submit" [disabled]="busy() || !rootPath().trim()">儲存</button>
-            </form>
-            <button type="button" class="secondary" (click)="browserOpen.set(!browserOpen())">
-              {{ browserOpen() ? '關閉 OneDrive 瀏覽' : '瀏覽整個自己的 OneDrive' }}
+        <div class="row">
+          @if (s.allowed && s.available) {
+            <button type="button" [disabled]="busy()" (click)="connect()">
+              {{ s.state === 'NotConnected' ? '連結 OneDrive' : '重新連結' }}
             </button>
-            @if (browserOpen()) {
-              <app-onedrive-browser />
-            }
           }
-
-          <div class="row">
-            @if (s.allowed && s.available) {
-              <button type="button" [disabled]="busy()" (click)="connect()">
-                {{ s.state === 'NotConnected' ? '連結 OneDrive' : '重新連結' }}
-              </button>
-            }
-            @if (s.state !== 'NotConnected') {
-              <button type="button" class="secondary" [disabled]="busy()" (click)="disconnect()">
-                解除連結
-              </button>
-            }
-          </div>
-
-          @if (message(); as m) {
-            <p [class.error]="m.error" [class.muted]="!m.error" role="status">{{ m.text }}</p>
+          @if (s.state !== 'NotConnected') {
+            <button type="button" class="secondary" [disabled]="busy()" (click)="disconnect()">
+              解除連結
+            </button>
           }
-        </section>
-      }
+        </div>
+
+        @if (message(); as m) {
+          <p [class.error]="m.error" [class.muted]="!m.error" role="status">{{ m.text }}</p>
+        }
+      </section>
+    } @else {
+      <p role="status">{{ message()?.text ?? '正在讀取 OneDrive 連線狀態…' }}</p>
     }
   `,
   styles: `

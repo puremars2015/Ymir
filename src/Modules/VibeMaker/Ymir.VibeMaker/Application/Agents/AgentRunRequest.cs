@@ -20,7 +20,8 @@ public sealed record AgentRunRequest(
     Extensions.EffectiveExtensions? Extensions = null,
     IReadOnlyList<AgentAttachment>? Attachments = null,
     string? ThinkingLevel = null,
-    PlatformMcp.PlatformMcpGrant? PlatformMcp = null)
+    PlatformMcp.PlatformMcpGrant? PlatformMcp = null,
+    IReadOnlyList<Extensions.PersonalMcpGrant>? PersonalMcp = null)
 {
     public IReadOnlyList<AgentAttachment> Attachments { get; init; } = Attachments ?? [];
 

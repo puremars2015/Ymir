@@ -1,7 +1,8 @@
 import { ConversationOneDrive, OneDriveStatus } from '../api/api-types';
 
 /** 連結 OneDrive 的整頁導向（瀏覽器導到 Microsoft 再回來；不經 HttpClient，前端不接觸任何 token）。 */
-export const ONEDRIVE_CONNECT_URL = '/api/connectors/onedrive/connect?returnUrl=%2Fsettings';
+export const ONEDRIVE_CONNECT_URL =
+  '/api/connectors/onedrive/connect?returnUrl=%2Fsettings%2Fconnections';
 
 /** callback 導回時的 `?onedrive=` 結果代碼 → 給使用者看的訊息。 */
 export function onedriveResultMessage(

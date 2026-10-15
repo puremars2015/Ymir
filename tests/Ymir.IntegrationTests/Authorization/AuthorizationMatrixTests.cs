@@ -26,6 +26,9 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     /// <summary>以「另一個使用者的資源」呼叫，必須得到 404（或 403）。</summary>
     private static readonly Dictionary<string, Func<OwnedResources, HttpRequestMessage>> ResourceRequests = new()
     {
+        ["PATCH /api/connections/mcp/{id:guid}"] = r => new HttpRequestMessage(HttpMethod.Patch, $"/api/connections/mcp/{r.ExecutionId}") { Content = JsonContent.Create(new SetPersonalMcpEnabledRequest(false)) },
+        ["DELETE /api/connections/mcp/{id:guid}"] = r => new HttpRequestMessage(HttpMethod.Delete, $"/api/connections/mcp/{r.ExecutionId}"),
+        ["POST /api/connections/mcp/{id:guid}/test"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/connections/mcp/{r.ExecutionId}/test"),
         ["GET /api/projects/{projectId:guid}"] = r => Get($"/api/projects/{r.ProjectId}"),
         ["PATCH /api/projects/{projectId:guid}"] = r => new HttpRequestMessage(HttpMethod.Patch, $"/api/projects/{r.ProjectId}")
         {
@@ -108,6 +111,9 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     /// </summary>
     private static readonly Dictionary<string, HttpStatusCode> OwnerStatusOverrides = new()
     {
+        ["PATCH /api/connections/mcp/{id:guid}"] = HttpStatusCode.NotFound,
+        ["DELETE /api/connections/mcp/{id:guid}"] = HttpStatusCode.NotFound,
+        ["POST /api/connections/mcp/{id:guid}/test"] = HttpStatusCode.Forbidden,
         ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = HttpStatusCode.Conflict,
         ["POST /api/conversations/{conversationId:guid}/onedrive/links"] = HttpStatusCode.Forbidden,
         ["PATCH /api/conversations/{conversationId:guid}/onedrive/links/{linkId:guid}"] = HttpStatusCode.NotFound,
@@ -261,6 +267,8 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "GET /api/me/settings/",
         "PUT /api/me/settings/",
         "GET /api/extensions",
+        "GET /api/connections/mcp/",
+        "POST /api/connections/mcp/",
         "GET /api/connectors/onedrive/",
         "GET /api/connectors/onedrive/browse",
         "GET /api/connectors/onedrive/search",

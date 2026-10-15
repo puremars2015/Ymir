@@ -20,6 +20,7 @@ internal static class ExtensionEndpoints
 {
     public static IEndpointRouteBuilder MapExtensionEndpoints(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapPersonalMcpEndpoints();
         endpoints.MapGet("/api/extensions", GetMineAsync).WithName("GetMyExtensions").WithTags("Extensions").RequireAntiforgeryHeader();
 
         var admin = endpoints.MapGroup("/api/admin").WithTags("Admin").RequireAuthorization(AuthSetup.AdminPolicy).RequireAntiforgeryHeader();

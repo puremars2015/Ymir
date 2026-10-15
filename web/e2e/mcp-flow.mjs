@@ -46,8 +46,10 @@ step('admin enabled the echo platform service for everyone');
 // 2. 成員在設定頁看到可用的平台服務
 const user = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
 await devLogin(user, `mcp-user-${stamp}`, 'User');
-await user.goto(`${baseUrl}/settings`);
-await user.locator('app-my-extensions-card li:has-text("平台服務：") strong:has-text("echo")').waitFor();
+await user.goto(`${baseUrl}/settings/connections`);
+await user
+  .locator('app-my-extensions-card li:has-text("平台服務：") strong:has-text("echo")')
+  .waitFor();
 step('member sees the platform service');
 
 // 3. Agent 經 gateway 呼叫 echo
