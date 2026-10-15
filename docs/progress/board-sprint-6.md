@@ -129,6 +129,7 @@
 - **驗證**：`dotnet build` 0 錯誤；整合測試 `UserManagementTests`、`AuthorizationMatrixTests`、`OpenApiSnapshotTests` 9/9 通過；前端 lint、Vitest 219/219、build 通過。本機 Development API + `ng serve` 以 Playwright 實跑：清單列只剩「編輯」「刪除」，設定頁改名、停用 / 啟用、改訪客、重設密碼、擴充能力、模型權限、刪除後回清單、不存在的 id 顯示「找不到使用者」，無前端錯誤；390px 寬度版面正常。
 - **e2e 腳本**：`admin-flow`、`auth-flow`、`network-flow`、`user-models-flow` 改從「編輯」進入設定頁；這四支需要 Fake OIDC / Podman network / 4 個模型等前置，本次只做語法檢查，**未完整重跑**。
 - **分支**：本 session 指定在 `claude/funny-euler-98tvzf` 開發並推送（與 CLAUDE.md「直接在 main」規則不同，依 session 指示），需要時再整合回 main。
+- **整合回 main（使用者要求）**：rebase 到含 `5ea2098`（個人設定拆成四個分頁）的最新 main，解決 `admin-flow.mjs` 衝突（保留 `/settings/tools` 與新的設定頁 selector）；重跑 build、上述 9 個整合測試、前端 lint／Vitest 219／build 全部通過後 fast-forward 推送 main。
 
 <details>
 <summary>💬 回覆（0）</summary>
