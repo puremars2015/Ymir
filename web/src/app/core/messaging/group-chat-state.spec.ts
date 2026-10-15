@@ -3,6 +3,8 @@ import {
   applyGroupMessage,
   botRequestOf,
   clearGroupUnread,
+  GROUP_ATTACHMENT_PROMPT,
+  groupSubmissionText,
   isBotCommand,
   mergeGroupMessages,
   normalizeGroupName,
@@ -96,5 +98,19 @@ describe('group-chat-state', () => {
     expect(senderLabel(message({ senderKind: 'Bot', invokedByName: 'Alice' }))).toBe(
       '@bot · 回覆 Alice',
     );
+  });
+});
+
+describe('groupSubmissionText', () => {
+  it('keeps plain messages without attachments', () => {
+    expect(groupSubmissionText('  大家好 ', 0)).toBe('大家好');
+    expect(groupSubmissionText('   ', 0)).toBeNull();
+  });
+
+  it('turns messages with attachments into @bot requests', () => {
+    expect(groupSubmissionText('幫我看這份', 1)).toBe('@bot 幫我看這份');
+    expect(groupSubmissionText('@BOT 幫我看這份', 2)).toBe('@bot 幫我看這份');
+    expect(groupSubmissionText('', 1)).toBe(`@bot ${GROUP_ATTACHMENT_PROMPT}`);
+    expect(groupSubmissionText('@bot', 1)).toBe(`@bot ${GROUP_ATTACHMENT_PROMPT}`);
   });
 });

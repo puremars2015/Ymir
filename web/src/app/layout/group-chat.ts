@@ -22,10 +22,12 @@ import {
   normalizeDirectMessage,
 } from '../core/messaging/direct-message-state';
 import { DirectMessageStore } from '../core/messaging/direct-message.store';
+import { addAttachments } from '../core/attachments/attachment-rules';
+import { formatSize } from '../core/files/workspace-files';
 import {
-  botRequestOf,
   GROUP_MAX_MEMBERS,
   GROUP_NAME_MAX_LENGTH,
+  groupSubmissionText,
   isBotCommand,
   normalizeGroupName,
   senderLabel,
@@ -69,12 +71,24 @@ export class GroupChat {
   protected readonly selected = signal<ReadonlySet<string>>(new Set());
   protected readonly renameText = signal('');
   protected readonly confirmArchive = signal(false);
+  /** 要給 @bot 的附件（送出時才上傳到群組 Agent 的工作目錄）。 */
+  protected readonly files = signal<readonly File[]>([]);
+  protected readonly dragging = signal(false);
 
   protected readonly myId = computed(() => this.auth.user()?.id ?? null);
-  protected readonly isBot = computed(() => isBotCommand(this.draft()));
+  /** 有附件時一定會送給 @bot（`groupSubmissionText` 自動補上）。 */
+  protected readonly isBot = computed(() => this.files().length > 0 || isBotCommand(this.draft()));
+  protected readonly submission = computed(() =>
+    groupSubmissionText(this.draft(), this.files().length),
+  );
   protected readonly canSend = computed(() => {
-    const text = normalizeDirectMessage(this.draft());
-    return !this.sending() && text !== null && botRequestOf(text) !== '';
+    const text = this.submission();
+    return (
+      !this.sending() &&
+      text !== null &&
+      normalizeDirectMessage(text) !== null &&
+      (!isBotCommand(text) || text.trim().length > '@bot'.length)
+    );
   });
   protected readonly memberIds = computed(
     () => new Set(this.store.detail()?.members.map((m) => m.userId) ?? []),
@@ -151,6 +165,7 @@ export class GroupChat {
   protected openGroup(groupId: string): void {
     this.lastCount = 0;
     this.draft.set('');
+    this.files.set([]);
     this.notice.set(null);
     this.actionError.set(null);
     this.store.open(groupId);
@@ -243,14 +258,57 @@ export class GroupChat {
     }
   }
 
+  protected size(file: File): string {
+    return formatSize(file.size);
+  }
+
+  protected onFilesChosen(input: HTMLInputElement): void {
+    this.addFiles([...(input.files ?? [])]);
+    input.value = ''; // 同一個檔案移除後可以再選一次
+  }
+
+  protected removeFile(index: number): void {
+    this.files.update((files) => files.filter((_, i) => i !== index));
+  }
+
+  protected onDragOver(event: DragEvent): void {
+    if (event.dataTransfer?.types.includes('Files')) {
+      event.preventDefault();
+      this.dragging.set(true);
+    }
+  }
+
+  protected onDrop(event: DragEvent): void {
+    this.dragging.set(false);
+    if (!event.dataTransfer?.files.length) return;
+    event.preventDefault();
+    this.addFiles([...event.dataTransfer.files]);
+  }
+
+  /** 貼上圖片（例如截圖）也當作附件；貼上文字照常。 */
+  protected onPaste(event: ClipboardEvent): void {
+    const pasted = [...(event.clipboardData?.files ?? [])];
+    if (pasted.length === 0) return;
+    event.preventDefault();
+    this.addFiles(pasted);
+  }
+
+  private addFiles(incoming: File[]): void {
+    if (incoming.length === 0 || this.sending()) return;
+    const result = addAttachments(this.files(), incoming);
+    this.files.set(result.files);
+    this.notice.set(result.rejected.length ? `已略過：${result.rejected.join('、')}` : null);
+  }
+
   protected send(): void {
-    const text = normalizeDirectMessage(this.draft());
+    const text = this.submission();
     if (!text || !this.canSend()) return;
     this.sending.set(true);
     this.notice.set(null);
-    this.store.send(text).subscribe({
+    this.store.send(text, this.files()).subscribe({
       next: (result) => {
         this.draft.set('');
+        this.files.set([]);
         this.sending.set(false);
         // 訊息已送出，但 @bot 無法執行（忙碌、配額、模型）：顯示原因。
         this.notice.set(result.botProblem ?? null);

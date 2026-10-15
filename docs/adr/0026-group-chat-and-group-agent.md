@@ -65,3 +65,11 @@ ADR-0023 只有一對一訊息。使用者要求：
 - 管理介面的執行環境清單會出現群組擁有的 runtime（以群組名稱顯示）。
 - 單一 API 程序的假設不變（ADR-0023 §3）。
 - 之後可延伸：群組檔案面板、在群組中分享 Agent 產出的網站、`@bot` 以外的其他機器人。
+
+## 補充（2026-10-15）：群組附件給 @bot
+
+使用者要求群組聊天也能上傳檔案給 Agent。延續本 ADR 的 runtime 擁有者規則，不改 runtime host 協定：
+
+- `POST /api/chat-groups/{id}/attachments?fileName=`（成員才可，非成員 404，body 即檔案、上限與個人附件相同）經 `AttachmentService.UploadForGroupAsync` 寫進**群組 Agent 對話**的工作目錄 `uploads/`（runtime 擁有者 = 群組 id；對話不存在時先建立，與 @bot 共用 `GroupConversations`）。`message_attachments.user_id` 記上傳者。
+- 附件只能隨 **@bot** 訊息送出（`SendGroupMessageRequest.AttachmentIds`；一般訊息帶附件回 400），而且只能綁定**自己**上傳、尚未送出的附件——其他成員不能拿別人的附件 id 讓 Agent 讀取。綁定後與個人對話相同：路徑附加到 `AgentPrompt`、支援圖片的模型另以 Pi RPC `images` 送出。
+- 群組訊息本文附上「📎 檔名」讓其他成員知道這次附了哪些檔案；仍然只以文字顯示。第一階段仍不提供群組檔案清單 / 下載（§4）。

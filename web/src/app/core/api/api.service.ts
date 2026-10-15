@@ -654,10 +654,20 @@ export class ApiService {
     groupId: string,
     text: string,
     clientRequestId: string,
+    attachmentIds: string[] = [],
   ): Observable<SendGroupMessageResult> {
     return this.http.post<SendGroupMessageResult>(`/api/chat-groups/${groupId}/messages`, {
       text,
       clientRequestId,
+      attachmentIds,
+    });
+  }
+
+  /** 上傳檔案給群組的 Agent（ADR-0026）：與個人對話附件相同的格式；id 只能隨自己的 @bot 訊息送出。 */
+  uploadGroupAttachment(groupId: string, file: File): Observable<Attachment> {
+    return this.http.post<Attachment>(`/api/chat-groups/${groupId}/attachments`, file, {
+      params: { fileName: file.name },
+      headers: { 'Content-Type': 'application/octet-stream' },
     });
   }
 

@@ -17,6 +17,20 @@ export function botRequestOf(text: string): string | null {
   return match ? text.trimStart().slice(4).trim() : null;
 }
 
+/** 只附檔案、沒有輸入問題時送給 @bot 的內容。 */
+export const GROUP_ATTACHMENT_PROMPT = '請看看我附加的檔案。';
+
+/**
+ * 送出的群組訊息文字。附件是給 Agent 的（後端只接受隨 @bot 送出），
+ * 所以有附件時自動補上 @bot；沒有問題時用預設的說明。沒有可送出的內容時回傳 null。
+ */
+export function groupSubmissionText(text: string, attachmentCount: number): string | null {
+  const trimmed = text.trim();
+  if (attachmentCount === 0) return trimmed.length > 0 ? trimmed : null;
+  const request = botRequestOf(trimmed) ?? trimmed;
+  return `@bot ${request || GROUP_ATTACHMENT_PROMPT}`;
+}
+
 export function normalizeGroupName(name: string): string | null {
   const text = name.trim();
   return text.length === 0 || text.length > GROUP_NAME_MAX_LENGTH ? null : text;

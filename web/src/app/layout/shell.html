@@ -4,6 +4,8 @@
   [class.sidebar-collapsed]="sidebarCollapsed()"
   [class.people-open]="peopleDrawerOpen()"
   [class.people-collapsed]="peopleCollapsed()"
+  [class.people-resizing]="resizingPeople()"
+  [style.--people-width.px]="peopleWidth()"
 >
   <aside
     id="main-sidebar"
@@ -330,6 +332,16 @@
 
   <!-- 右側成員名單與一對一訊息（ADR-0023）；版面樣式在 people-panel.scss -->
   @if (auth.canUseMessaging()) {
+    @if (!mobile() && peopleVisible()) {
+      <!-- 拖曳（或聚焦後按左右鍵）調整右側面板寬度；雙擊回到預設寬度 -->
+      <app-panel-resizer
+        aria-controls="people-panel"
+        [width]="peopleWidth()"
+        (resized)="peopleWidth.set($event)"
+        (committed)="savePeopleWidth($event)"
+        (resizing)="resizingPeople.set($event)"
+      />
+    }
     <app-people-panel
       id="people-panel"
       role="complementary"

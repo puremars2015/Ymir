@@ -3825,6 +3825,55 @@
         }
       }
     },
+    "/api/chat-groups/{groupId}/attachments": {
+      "post": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "summary": "上傳檔案給群組的 Agent（body 即檔案內容）；回傳的 id 放進 @bot 訊息的 attachmentIds。",
+        "operationId": "UploadChatGroupAttachment",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "fileName",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "$ref": "#/components/schemas/Stream"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chat-groups/{groupId}/read": {
       "post": {
         "tags": [
@@ -7638,6 +7687,16 @@
               "string"
             ],
             "format": "uuid"
+          },
+          "attachmentIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },

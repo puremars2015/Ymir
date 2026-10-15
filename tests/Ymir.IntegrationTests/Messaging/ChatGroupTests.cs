@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
@@ -7,6 +8,7 @@ using Ymir.Api.Endpoints;
 using Ymir.Api.Infrastructure;
 using Ymir.IntegrationTests.Api;
 using Ymir.Platform.Messaging;
+using Ymir.VibeMaker.Contracts.Attachments;
 using Ymir.VibeMaker.Contracts.Conversations;
 using Ymir.VibeMaker.Infrastructure.Runtime;
 
@@ -204,5 +206,91 @@ public class ChatGroupTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var conversations = await alice.GetFromJsonAsync<List<ConversationResponse>>("/api/conversations", JsonDefaults.Options, Ct);
         Assert.DoesNotContain(conversations!, c => c.Title == "Bot 小組");
         Assert.True(Directory.Exists(UserDirectories.For(factory.WorkspaceRoot, group.Id).Workspace));
+    }
+
+    [Fact]
+    public async Task Attachments_AreWrittenToTheGroupWorkspace_AndOnlyTheUploaderCanSendThemWithBot()
+    {
+        using var alice = await factory.LoginAsync($"grp-att-alice-{Guid.NewGuid():N}");
+        using var bob = await factory.LoginAsync($"grp-att-bob-{Guid.NewGuid():N}");
+        using var eve = await factory.LoginAsync($"grp-att-eve-{Guid.NewGuid():N}");
+        var bobId = await UserIdAsync(bob);
+        var group = await CreateAsync(alice, "附件小組", bobId);
+
+        static async Task<HttpResponseMessage> UploadAsync(HttpClient client, Guid groupId, string fileName, byte[] content)
+        {
+            using var body = new ByteArrayContent(content);
+            body.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+            return await client.PostAsync($"/api/chat-groups/{groupId}/attachments?fileName={Uri.EscapeDataString(fileName)}", body, Ct);
+        }
+
+        // 非成員不能上傳（不透露群組存在）。
+        using (var outsider = await UploadAsync(eve, group.Id, "x.txt", "hi"u8.ToArray()))
+        {
+            Assert.Equal(HttpStatusCode.NotFound, outsider.StatusCode);
+        }
+
+        AttachmentResponse uploaded;
+        using (var response = await UploadAsync(alice, group.Id, "../報告.txt", "季報草稿"u8.ToArray()))
+        {
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            uploaded = (await response.Content.ReadFromJsonAsync<AttachmentResponse>(JsonDefaults.Options, Ct))!;
+        }
+
+        Assert.Equal("報告.txt", uploaded.FileName);
+        Assert.StartsWith("uploads/", uploaded.Path, StringComparison.Ordinal);
+
+        // 檔案在群組（不是上傳者）的工作目錄。
+        var groupDirectories = UserDirectories.For(factory.WorkspaceRoot, group.Id);
+        Assert.Single(Directory.GetFiles(groupDirectories.Workspace, "*-報告.txt", SearchOption.AllDirectories));
+
+        // 附件只能隨 @bot；其他成員不能用別人上傳的附件。
+        using (var plain = await alice.PostAsJsonAsync($"/api/chat-groups/{group.Id}/messages", new SendGroupMessageRequest("看一下", Guid.NewGuid(), [uploaded.Id]), Ct))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, plain.StatusCode);
+        }
+
+        using (var stolen = await bob.PostAsJsonAsync($"/api/chat-groups/{group.Id}/messages", new SendGroupMessageRequest("@bot 看一下", Guid.NewGuid(), [uploaded.Id]), Ct))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, stolen.StatusCode);
+        }
+
+        using (var response = await alice.PostAsJsonAsync($"/api/chat-groups/{group.Id}/messages", new SendGroupMessageRequest("@bot 幫我看這份檔案", Guid.NewGuid(), [uploaded.Id]), Ct))
+        {
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            var sent = (await response.Content.ReadFromJsonAsync<SendGroupMessageResponse>(JsonDefaults.Options, Ct))!;
+            Assert.Null(sent.BotProblem);
+            Assert.Equal("@bot 幫我看這份檔案\n📎 報告.txt", sent.Message.Body);
+        }
+
+        // Scripted harness 回顯送給 Agent 的內容：附件路徑在 prompt 中。
+        var worker = factory.Services.GetServices<IHostedService>().OfType<GroupBotWorker>().Single();
+        await WaitForBotAsync(bob, group.Id, worker);
+        var reply = (await bob.GetFromJsonAsync<GroupMessagePageResponse>($"/api/chat-groups/{group.Id}/messages", JsonDefaults.Options, Ct))!
+            .Messages.Single(m => m.SenderKind == GroupSenderKind.Bot);
+        Assert.Contains(uploaded.Path, reply.Body, StringComparison.Ordinal);
+
+        // 同一個附件不能再送一次。
+        using (var again = await alice.PostAsJsonAsync($"/api/chat-groups/{group.Id}/messages", new SendGroupMessageRequest("@bot 再看一次", Guid.NewGuid(), [uploaded.Id]), Ct))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, again.StatusCode);
+        }
+    }
+
+    private static async Task WaitForBotAsync(HttpClient member, Guid groupId, GroupBotWorker worker)
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            await worker.CompletePendingAsync(Ct);
+            var messages = (await member.GetFromJsonAsync<GroupMessagePageResponse>($"/api/chat-groups/{groupId}/messages", JsonDefaults.Options, Ct))!.Messages;
+            if (messages.Any(m => m.SenderKind == GroupSenderKind.Bot && m.BotStatus != BotReplyStatus.Pending))
+            {
+                return;
+            }
+
+            await Task.Delay(100, Ct);
+        }
+
+        Assert.Fail("@bot 沒有在時間內完成。");
     }
 }

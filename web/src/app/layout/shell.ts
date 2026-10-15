@@ -28,6 +28,8 @@ import { parseActiveRoute } from './active-route';
 import { ThemeSwitcher } from '../shared/theme-switcher';
 import { PeoplePanel } from './people-panel';
 import { ToolStore } from '../core/tools/tool.store';
+import { parseStoredPanelWidth, PEOPLE_PANEL_DEFAULT_WIDTH } from './panel-width';
+import { PanelResizer } from './panel-resizer';
 
 type ItemKind = 'conversation' | 'project';
 
@@ -45,6 +47,7 @@ type ItemKind = 'conversation' | 'project';
     NgTemplateOutlet,
     ThemeSwitcher,
     PeoplePanel,
+    PanelResizer,
   ],
   host: {
     '(document:click)': 'closeMenu($event)',
@@ -83,6 +86,9 @@ export class Shell implements OnInit {
       this.auth.canUseMessaging() &&
       (this.mobile() ? this.peopleDrawerOpen() : !this.peopleCollapsed()),
   );
+  /** 桌面版右側面板寬度（px），拖曳左緣的分隔線調整並記住；窄螢幕的抽屜不套用。 */
+  protected readonly peopleWidth = signal(readPeopleWidth());
+  protected readonly resizingPeople = signal(false);
   private readonly pageVisible = signal(globalThis.document?.visibilityState !== 'hidden');
   protected readonly creatingProject = signal(false);
   protected readonly projectName = signal('');
@@ -223,6 +229,15 @@ export class Shell implements OnInit {
       localStorage.setItem('ymir.peopleCollapsed', String(collapsed));
     } catch {
       /* 儲存不可用時仍可正常收合。 */
+    }
+  }
+
+  protected savePeopleWidth(width: number): void {
+    this.peopleWidth.set(width);
+    try {
+      localStorage.setItem('ymir.peopleWidth', String(width));
+    } catch {
+      /* 儲存不可用時仍可調整，只是不會記住。 */
     }
   }
 
@@ -401,6 +416,14 @@ export class Shell implements OnInit {
       this.messages.disconnect();
       void this.router.navigate(['/login']);
     });
+  }
+}
+
+function readPeopleWidth(): number {
+  try {
+    return parseStoredPanelWidth(localStorage.getItem('ymir.peopleWidth'));
+  } catch {
+    return PEOPLE_PANEL_DEFAULT_WIDTH;
   }
 }
 

@@ -294,6 +294,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "DELETE /api/chat-groups/{groupId:guid}/members/{userId:guid}",
         "GET /api/chat-groups/{groupId:guid}/messages",
         "POST /api/chat-groups/{groupId:guid}/messages",
+        "POST /api/chat-groups/{groupId:guid}/attachments",
         "POST /api/chat-groups/{groupId:guid}/read",
         "GET /api/chat-groups/{groupId:guid}/executions/{executionId:guid}/events",
     ];

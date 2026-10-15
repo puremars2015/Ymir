@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { Observable, Subscription, tap } from 'rxjs';
+import { concatMap, from, Observable, of, Subscription, switchMap, tap, toArray } from 'rxjs';
 import { ApiService, describeApiError } from '../api/api.service';
 import {
   ChatGroup,
@@ -146,10 +146,26 @@ export class GroupChatStore {
     });
   }
 
-  send(text: string): Observable<SendGroupMessageResult> {
+  /** 送出訊息；有附件時先依序上傳到群組 Agent 的工作目錄，再隨 @bot 訊息送出。 */
+  send(text: string, files: readonly File[] = []): Observable<SendGroupMessageResult> {
     const groupId = this.requireOpen();
     this.error.set(null);
-    return this.api.sendGroupMessage(groupId, text, crypto.randomUUID()).pipe(
+    // 依序上傳（不同時寫入同一個 runtime），全部成功才送出訊息。
+    const uploads = files.length
+      ? from(files).pipe(
+          concatMap((file) => this.api.uploadGroupAttachment(groupId, file)),
+          toArray(),
+        )
+      : of([]);
+    return uploads.pipe(
+      switchMap((attachments) =>
+        this.api.sendGroupMessage(
+          groupId,
+          text,
+          crypto.randomUUID(),
+          attachments.map((a) => a.id),
+        ),
+      ),
       tap((result) => {
         this.onMessage(result.message);
         if (result.bot) this.onMessage(result.bot);

@@ -24,7 +24,13 @@ internal static class AttachmentEndpoints
         return endpoints;
     }
 
-    private static async Task<IResult> UploadAsync(Guid conversationId, string? fileName, HttpContext context, AttachmentService service, CancellationToken cancellationToken)
+    private static Task<IResult> UploadAsync(Guid conversationId, string? fileName, HttpContext context, AttachmentService service, CancellationToken cancellationToken) =>
+        ReceiveAsync(context, temp => service.UploadAsync(conversationId, fileName, temp, cancellationToken), ConversationEndpoints.NotFound, cancellationToken);
+
+    /// <summary>
+    /// 接收上傳內容並交給 <paramref name="store"/>：個人對話與群組（ADR-0026）的附件共用同一套大小限制與暫存檔處理。
+    /// </summary>
+    internal static async Task<IResult> ReceiveAsync(HttpContext context, Func<Stream, Task<AttachmentUploadResult>> store, Func<IResult> notFound, CancellationToken cancellationToken)
     {
         if (context.Request.ContentLength > AttachmentRules.MaxFileBytes)
         {
@@ -59,13 +65,13 @@ internal static class AttachmentEndpoints
                 return TooLarge();
             }
 
-            var result = await service.UploadAsync(conversationId, fileName, temp, cancellationToken);
+            var result = await store(temp);
             return result.Outcome switch
             {
                 AttachmentUploadOutcome.Uploaded => TypedResults.Created((string?)null, result.Attachment),
                 AttachmentUploadOutcome.TooLarge => TooLarge(),
                 AttachmentUploadOutcome.Invalid => ApiProblem.Create(StatusCodes.Status400BadRequest, ExecutionErrorCodes.AttachmentInvalid, "無法上傳這個檔案（檔名不合法或是空檔案）。"),
-                _ => ConversationEndpoints.NotFound(),
+                _ => notFound(),
             };
         }
     }

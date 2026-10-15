@@ -1510,6 +1510,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/chat-groups/{groupId}/attachments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 上傳檔案給群組的 Agent（body 即檔案內容）；回傳的 id 放進 @bot 訊息的 attachmentIds。 */
+    post: operations['UploadChatGroupAttachment'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/chat-groups/{groupId}/read': {
     parameters: {
       query?: never;
@@ -2448,6 +2465,7 @@ export interface components {
       text: null | string;
       /** Format: uuid */
       clientRequestId?: null | string;
+      attachmentIds?: null | string[];
     };
     SendGroupMessageResponse: {
       message: components['schemas']['GroupMessageResponse'];
@@ -5626,6 +5644,34 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SendGroupMessageResponse'];
+        };
+      };
+    };
+  };
+  UploadChatGroupAttachment: {
+    parameters: {
+      query?: {
+        fileName?: string;
+      };
+      header?: never;
+      path: {
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/octet-stream': components['schemas']['Stream'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AttachmentResponse'];
         };
       };
     };

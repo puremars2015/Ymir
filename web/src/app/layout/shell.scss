@@ -453,6 +453,12 @@ svg {
   margin-left: auto;
 }
 
+/* 拖曳中：不選取文字、游標一致、面板寬度不做動畫 */
+.people-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
 .people-badge {
   position: absolute;
   top: -0.375rem;

@@ -5,8 +5,11 @@ using Ymir.Api.Auth;
 using Ymir.Api.Problems;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Messaging;
+using Ymir.VibeMaker.Application.Attachments;
 using Ymir.VibeMaker.Application.Executions;
 using Ymir.VibeMaker.Application.Groups;
+using Ymir.VibeMaker.Contracts.Attachments;
+using Ymir.VibeMaker.Contracts.Executions;
 
 namespace Ymir.Api.Endpoints;
 
@@ -33,6 +36,11 @@ internal static class ChatGroupEndpoints
             .WithName("SendChatGroupMessage")
             .RequireRateLimiting(AuthSetup.DirectMessageRateLimit)
             .Produces<SendGroupMessageResponse>(StatusCodes.Status201Created);
+        group.MapPost("/{groupId:guid}/attachments", UploadAttachmentAsync)
+            .WithName("UploadChatGroupAttachment")
+            .WithSummary("上傳檔案給群組的 Agent（body 即檔案內容）；回傳的 id 放進 @bot 訊息的 attachmentIds。")
+            .Accepts<Stream>("application/octet-stream")
+            .Produces<AttachmentResponse>(StatusCodes.Status201Created);
         group.MapPost("/{groupId:guid}/read", MarkReadAsync).WithName("MarkChatGroupRead").Produces<GroupReadResponse>();
         group.MapGet("/{groupId:guid}/executions/{executionId:guid}/events", StreamBotEventsAsync)
             .WithName("StreamChatGroupBotEvents")
@@ -76,6 +84,7 @@ internal static class ChatGroupEndpoints
         ICurrentUser currentUser,
         IChatGroupService groups,
         ExecutionService executions,
+        AttachmentService attachments,
         CancellationToken cancellationToken)
     {
         var text = request.Text ?? string.Empty;
@@ -83,6 +92,29 @@ internal static class ChatGroupEndpoints
         if (botRequest is { Length: 0 })
         {
             return ApiProblem.Create(StatusCodes.Status400BadRequest, "GROUP_BOT_REQUEST_REQUIRED", "請在 @bot 後面輸入要問的內容。");
+        }
+
+        // 附件是給 Agent 的：只能隨 @bot 訊息送出。先確認都可用，群組訊息才寫上檔名。
+        var attachmentIds = request.AttachmentIds ?? [];
+        if (attachmentIds.Count > 0)
+        {
+            if (botRequest is null)
+            {
+                return ApiProblem.Create(StatusCodes.Status400BadRequest, "GROUP_ATTACHMENT_REQUIRES_BOT", "附件只能隨 @bot 訊息送給 Agent。");
+            }
+
+            if (!await groups.IsMemberAsync(currentUser.UserId, groupId, cancellationToken))
+            {
+                return GroupNotFound();
+            }
+
+            var fileNames = await attachments.FindPendingGroupFileNamesAsync(groupId, attachmentIds, cancellationToken);
+            if (fileNames is null)
+            {
+                return ApiProblem.Create(StatusCodes.Status400BadRequest, ExecutionErrorCodes.AttachmentNotAvailable, "附加的檔案無法使用，請重新選擇檔案。");
+            }
+
+            text = GroupAttachmentNote.Append(text, fileNames, DirectMessage.BodyMaxLength);
         }
 
         // 送出前先取背景，不含這次的訊息本身。
@@ -114,7 +146,7 @@ internal static class ChatGroupEndpoints
             callerName,
             botRequest,
             [.. context.Select(m => new GroupContextLine(m.SenderKind == GroupSenderKind.Bot ? "@bot" : m.SenderName ?? "成員", m.Body, m.CreatedAt, m.SenderKind == GroupSenderKind.Bot))]);
-        var result = await executions.SubmitForGroupAsync(groupId, detail.Name, $"{callerName}：{botRequest}", prompt, request.ClientRequestId ?? Guid.NewGuid(), cancellationToken);
+        var result = await executions.SubmitForGroupAsync(groupId, detail.Name, $"{callerName}：{botRequest}", prompt, request.ClientRequestId ?? Guid.NewGuid(), attachmentIds, cancellationToken);
         if (result.Outcome != SubmitMessageOutcome.Accepted)
         {
             var problem = result.Outcome switch
@@ -122,6 +154,7 @@ internal static class ChatGroupEndpoints
                 SubmitMessageOutcome.Conflict => "@bot 正在回覆其他人的請求，請稍候再試。",
                 SubmitMessageOutcome.QuotaExceeded => result.Message ?? "已達使用上限。",
                 SubmitMessageOutcome.ModelNotAvailable => "目前沒有可用的模型，請洽管理員。",
+                SubmitMessageOutcome.AttachmentNotAvailable => "附加的檔案無法使用，請重新選擇檔案。",
                 _ => "無法呼叫 @bot。",
             };
             return TypedResults.Created((string?)null, new SendGroupMessageResponse(message, null, problem));
@@ -129,6 +162,31 @@ internal static class ChatGroupEndpoints
 
         var bot = await groups.AddBotPendingAsync(groupId, currentUser.UserId, result.Response!.ExecutionId, cancellationToken);
         return TypedResults.Created((string?)null, new SendGroupMessageResponse(message, GroupMessageResponse.From(bot), null));
+    }
+
+    /// <summary>
+    /// 成員上傳檔案給群組的 Agent：寫進群組 Agent 對話的工作目錄（runtime 擁有者 = 群組 id），只有上傳者能在自己的 @bot 訊息使用。
+    /// 非成員、不存在、已封存一律 404（先確認成員資格才讀取 body）。
+    /// </summary>
+    private static async Task<IResult> UploadAttachmentAsync(
+        Guid groupId,
+        string? fileName,
+        HttpContext context,
+        ICurrentUser currentUser,
+        IChatGroupService groups,
+        AttachmentService attachments,
+        CancellationToken cancellationToken)
+    {
+        if (await groups.GetAsync(currentUser.UserId, groupId, cancellationToken) is not { } detail)
+        {
+            return GroupNotFound();
+        }
+
+        return await AttachmentEndpoints.ReceiveAsync(
+            context,
+            temp => attachments.UploadForGroupAsync(groupId, detail.Name, fileName, temp, cancellationToken),
+            GroupNotFound,
+            cancellationToken);
     }
 
     private static async Task<IResult> MarkReadAsync(Guid groupId, ICurrentUser currentUser, IChatGroupService groups, CancellationToken cancellationToken) =>
@@ -219,7 +277,29 @@ public sealed record RenameChatGroupRequest(string? Name);
 public sealed record AddChatGroupMembersRequest(IReadOnlyList<Guid>? UserIds);
 
 /// <param name="ClientRequestId">@bot 的冪等鍵（重送不重複執行）；一般訊息可省略。</param>
-public sealed record SendGroupMessageRequest(string? Text, Guid? ClientRequestId = null);
+/// <param name="AttachmentIds">經 <c>/api/chat-groups/{id}/attachments</c> 上傳、要給 Agent 的檔案；只能隨 @bot 訊息送出。</param>
+public sealed record SendGroupMessageRequest(string? Text, Guid? ClientRequestId = null, IReadOnlyList<Guid>? AttachmentIds = null);
+
+/// <summary>群組訊息附上的檔名（給其他成員看到這次 @bot 附了哪些檔案；也會成為之後 @bot 的群組背景）。</summary>
+internal static class GroupAttachmentNote
+{
+    public static string Append(string text, IReadOnlyList<string> fileNames, int maxLength)
+    {
+        if (fileNames.Count == 0)
+        {
+            return text;
+        }
+
+        var note = "\n📎 " + string.Join("、", fileNames);
+        var room = maxLength - text.TrimEnd().Length;
+        if (room <= 3)
+        {
+            return text;
+        }
+
+        return text.TrimEnd() + (note.Length <= room ? note : string.Concat(note.AsSpan(0, room - 1), "…"));
+    }
+}
 
 public sealed record ChatGroupSummaryResponse(Guid Id, string Name, Guid OwnerId, ChatGroupRole Role, int MemberCount, int UnreadCount, DateTimeOffset? LastMessageAt, DateTimeOffset UpdatedAt)
 {

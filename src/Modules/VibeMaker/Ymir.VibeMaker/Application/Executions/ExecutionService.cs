@@ -3,6 +3,7 @@ using Ymir.Platform.Auditing;
 using Ymir.Platform.Identity;
 using Ymir.Platform.Users;
 using Ymir.VibeMaker.Application.Attachments;
+using Ymir.VibeMaker.Application.Groups;
 using Ymir.VibeMaker.Application.Make;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
@@ -256,12 +257,14 @@ public sealed class ExecutionService(
     /// </summary>
     /// <param name="displayText">保存在群組 Agent 對話中的使用者訊息（「名稱：內容」）。</param>
     /// <param name="agentPrompt">實際送給 Agent 的內容（含群組背景）。</param>
+    /// <param name="attachmentIds">目前使用者經群組附件端點上傳的檔案（已在群組 Agent 的工作目錄）。</param>
     public async Task<SubmitMessageResult> SubmitForGroupAsync(
         Guid groupId,
         string groupName,
         string displayText,
         string agentPrompt,
         Guid clientRequestId,
+        IReadOnlyList<Guid>? attachmentIds,
         CancellationToken cancellationToken)
     {
         if (clientRequestId == Guid.Empty || groupId == Guid.Empty)
@@ -298,12 +301,30 @@ public sealed class ExecutionService(
             return quota;
         }
 
-        var conversation = await GetOrCreateGroupConversationAsync(groupId, groupName, now, cancellationToken).ConfigureAwait(false);
+        var conversation = await GroupConversations.GetOrCreateAsync(db, groupId, groupName, now, cancellationToken).ConfigureAwait(false);
+
+        // 群組附件：必須是目前使用者上傳到這個群組 Agent 對話、尚未送出的（其他成員的附件也不能拿來用）。
+        var attachments = await FindPendingAttachmentsAsync(userId, conversation.Id, attachmentIds, cancellationToken).ConfigureAwait(false);
+        if (attachments is null)
+        {
+            return SubmitMessageResult.AttachmentNotAvailable;
+        }
+
+        if (attachments.Count > 0)
+        {
+            agentPrompt = AttachmentRules.AppendToPrompt(agentPrompt, attachments);
+        }
+
         var nextSequence = await db.Messages.Where(m => m.ConversationId == conversation.Id)
             .MaxAsync(m => (long?)m.SequenceNo, cancellationToken).ConfigureAwait(false) ?? 0;
         var text = displayText.Length > Message.ContentMaxLength ? displayText[..Message.ContentMaxLength] : displayText;
         var message = Message.CreateUser(conversation.Id, text, nextSequence + 1, now);
         var execution = AgentExecution.Queue(conversation, message, clientRequestId, now, models.Resolve(null), agentPrompt, thinkingLevel: null, invokedBy: userId);
+        foreach (var attachment in attachments)
+        {
+            attachment.AttachTo(message.Id);
+        }
+
         conversation.Touch(now);
         db.Messages.Add(message);
         db.AgentExecutions.Add(execution);
@@ -345,26 +366,6 @@ public sealed class ExecutionService(
             ExecutionStatus.Cancelled => (string.IsNullOrWhiteSpace(reply) ? "已取消。" : reply, false),
             _ => (string.IsNullOrWhiteSpace(reply) ? "Agent 無法完成這次請求。" : reply, true),
         };
-    }
-
-    private async Task<Conversation> GetOrCreateGroupConversationAsync(Guid groupId, string groupName, DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        // 同時兩個第一次呼叫可能各建一個對話：一律使用最早的那個，多出來的空對話不影響。
-        var existing = await db.Conversations
-            .Where(c => c.UserId == groupId && c.Status == ConversationStatus.Active)
-            .OrderBy(c => c.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-        if (existing is not null)
-        {
-            return existing;
-        }
-
-        var title = string.IsNullOrWhiteSpace(groupName) ? "群組 Agent" : groupName.Trim();
-        var conversation = Conversation.Create(groupId, null, title.Length > Conversation.TitleMaxLength ? title[..Conversation.TitleMaxLength] : title, now);
-        db.Conversations.Add(conversation);
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return conversation;
     }
 
     private async Task<SubmitMessageResult?> FindExistingAsync(Guid userId, Guid clientRequestId, CancellationToken cancellationToken)

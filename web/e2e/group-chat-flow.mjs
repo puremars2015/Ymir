@@ -79,6 +79,60 @@ assert.ok(
 step('@bot replied in the group (caller and other members see it)');
 await alice.page.screenshot({ path: `${outDir}/group-bot.png` });
 
+// 4b. 附件給 @bot：選檔後不必輸入 @bot（自動補上），訊息顯示檔名，Agent 收到檔案路徑
+await panel.locator('input[type=file]').setInputFiles({
+  name: '季報草稿.txt',
+  mimeType: 'text/plain',
+  buffer: Buffer.from('營收成長 12%'),
+});
+await panel.locator('.pending-files li:has-text("季報草稿.txt")').waitFor();
+await panel.locator('.hint:has-text("檔案會連同訊息交給群組的 Agent")').waitFor();
+await alice.page.fill('textarea[aria-label="群組訊息"]', '幫我摘要這份檔案');
+await alice.page.screenshot({ path: `${outDir}/group-attachment-pending.png` });
+const botsBefore = await panel.locator('.message.bot').count();
+await alice.page.press('textarea[aria-label="群組訊息"]', 'Enter');
+await panel.locator('.bubble:has-text("📎 季報草稿.txt")').waitFor({ timeout: 15000 });
+await panel.locator('.pending-files').waitFor({ state: 'detached', timeout: 15000 });
+await alice.page.waitForFunction(
+  (count) =>
+    document.querySelectorAll('app-people-panel .message.bot .bubble:not(.pending)').length > count,
+  botsBefore,
+  { timeout: 60000 },
+);
+const fileReply = await panel.locator('.message.bot .bubble').last().innerText();
+assert.ok(fileReply.includes('uploads/'), `bot should receive the attachment path: ${fileReply}`);
+await bobPanel.locator('.bubble:has-text("📎 季報草稿.txt")').waitFor({ timeout: 15000 });
+step('attachments are sent to @bot and other members see the file name');
+await alice.page.screenshot({ path: `${outDir}/group-attachment.png` });
+
+// 4c. 拖曳右側面板左緣調整寬度，重新整理後仍記住
+const widthOf = () => panel.evaluate((element) => element.getBoundingClientRect().width);
+const before = await widthOf();
+const handle = await alice.page.locator('app-panel-resizer').boundingBox();
+await alice.page.mouse.move(handle.x + 1, handle.y + 300);
+await alice.page.mouse.down();
+await alice.page.mouse.move(handle.x - 120, handle.y + 300, { steps: 6 });
+await alice.page.mouse.up();
+await alice.page.waitForTimeout(300);
+const widened = await widthOf();
+assert.ok(widened > before + 100, `panel should widen (${before} → ${widened})`);
+await alice.page.screenshot({ path: `${outDir}/group-panel-wide.png` });
+await alice.page.reload();
+await panel.waitFor();
+await alice.page.waitForTimeout(500);
+assert.ok(Math.abs((await widthOf()) - widened) < 2, 'panel width is remembered');
+await alice.page.locator('app-panel-resizer').focus();
+await alice.page.keyboard.press('Home');
+await alice.page.waitForTimeout(300);
+assert.ok((await widthOf()) < before, 'Home narrows the panel to the minimum');
+const narrowHandle = await alice.page.locator('app-panel-resizer').boundingBox();
+await alice.page.mouse.dblclick(narrowHandle.x + 1, narrowHandle.y + 300);
+await alice.page.waitForTimeout(300);
+assert.ok(Math.abs((await widthOf()) - before) < 2, 'double click resets the width');
+await panel.locator('.tabs button:has-text("群組")').click();
+await panel.locator(`.contact:has-text("${groupName}")`).click();
+step('people panel is resizable by drag and keyboard, and remembers its width');
+
 // 5. 管理：Bob 不是擁有者看不到移除按鈕；Alice 改名；Bob 退出後群組從清單消失
 await bobPanel.locator('button[aria-label="群組成員與設定"]').click();
 assert.equal(await bobPanel.locator('.member button:has-text("移除")').count(), 0);
@@ -91,7 +145,11 @@ await bobPanel.locator('.contacts').waitFor();
 await bob.page.waitForTimeout(500);
 assert.equal(await bobPanel.locator(`.contact:has-text("${groupName}")`).count(), 0);
 await panel.locator('.member').first().waitFor();
-await alice.page.waitForFunction(() => document.querySelectorAll('app-people-panel .member').length === 1, null, { timeout: 15000 });
+await alice.page.waitForFunction(
+  () => document.querySelectorAll('app-people-panel .member').length === 1,
+  null,
+  { timeout: 15000 },
+);
 step('only the owner manages; member left and lost the group');
 await alice.page.screenshot({ path: `${outDir}/group-manage.png` });
 
