@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| USR1 | 管理 → 使用者：改名、變更角色、刪除帳號，新增訪客角色 | 🔬 | [ADR-0027](../adr/0027-admin-user-management-and-guest-role.md)；後端、前端與測試通過；未做瀏覽器 e2e，正式站需套 Platform migration `UserAdminManagement`，見 #080 |
 | ARCH2 | 架構文件標記正式／舊容器及主機程序 | ✅ | 7 個固定容器＋動態 Agent 的角色清單，root／itadmin／ymir 分區、舊容器與實際模型代理路徑，見 #074 |
 | RES1 | 管理員 CPU／RAM／磁碟、Ymir container／image 監控與保留期限／低資源自動回收 | 🔬 | [ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 已採納並實作（維護服務、鎖、API、系統資源頁）；測試與瀏覽器驗證通過；正式主機安裝與啟用待使用者授權，見 #074 |
 | GRP1 | 群組聊天與 @bot（每個群組一個 Agent container） | 🔬 | [ADR-0026](../adr/0026-group-chat-and-group-agent.md)；後端、前端、測試與瀏覽器驗證通過；3855dd6 已部署，真 Pi SSE／群組操作待人工驗收，見 #076、#079 |
@@ -115,6 +116,34 @@
 ---
 
 ## 💬 留言區
+
+### #080 · 使用者管理：改名、角色、刪除與訪客（ADR-0027）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-15 17:40 · `🔬驗證`
+
+- **需求**：使用者要求「管理 → 使用者」可以設定名稱、刪除帳號、變更權限等級，並新增角色「訪客」：與使用者相同，但不能使用聊天系統，也沒有群組系統。
+- **解讀**：「聊天系統」指使用者之間的一對一訊息（ADR-0023），「群組系統」指群組聊天與 @bot（ADR-0026）；訪客仍可以和 Agent 對話。若原意是連 Agent 對話也不能用，需要再調整。
+- **決定**：詳見 [ADR-0027](../adr/0027-admin-user-management-and-guest-role.md)。
+  - 企業帳號 / Google 帳號的 IdP 只同步「是否為 Admin」；Ymir 對這些帳號只能在使用者與訪客之間切換（授予或拿掉 Admin 仍由 Entra app role / `AdminEmails` 設定）。本機帳號可設定任何角色。不能改自己的角色、不能刪除自己。
+  - 刪除是標示刪除：歷史紀錄保留名稱；外部身分與本機密碼釋放，同一帳號可重新建立成新使用者；與停用一樣立即登出並清理執行中的工作、模型 key、runtime。
+  - Admin 設定的顯示名稱之後登入不被 IdP 覆寫。
+- **後端**：`UserRole.Guest`、`UserStatus.Deleted`、`users.display_name_overridden`（migration `UserAdminManagement`）；`PUT /api/admin/users/{id}/display-name`、`PUT .../role`、`DELETE /api/admin/users/{id}`（稽核 `admin.user.rename` / `admin.user.role.<role>` / `admin.user.delete`）；`MessagingPolicy` 套在 `/api/direct-messages`、`/api/chat-groups`；訪客不在聯絡人、不能收訊息、不能被加入群組；帳號有效的檢查改為 `Status == Active`。
+- **前端**：使用者頁角色欄改為下拉選單（依 `canChangeAdminRole` 限制選項）、新增「改名」「刪除」，建立本機帳號可選訪客；訪客不顯示成員面板、不連訊息 SSE。
+- **驗證（實際執行）**：
+  - `dotnet build Ymir.slnx` 0 警告；`dotnet format --verify-no-changes` 通過。
+  - 單元測試 651 通過（新增 `UserManagementRulesTests`）。
+  - 整合測試 331 項：307 通過、0 失敗、24 略過（本機未安裝 Pi CLI 的測試）；新增 `UserManagementTests`（改名後重新登入仍保留、訪客 403 與聯絡人 / 訊息 / 群組限制、改回使用者恢復、Dev 帳號升 Admin、不能改自己、刪除後 cookie 失效 / 不能登入 / 不在清單 / 帳號名稱可重建、不能刪自己）；授權矩陣加入三個端點；OpenAPI 快照與前端 schema 更新。整合測試使用獨立的暫時 SQL container（port 14339），未使用正式 `ymir-sql`。
+  - 前端（Node 24.15）`ng lint`、`ng test`（41 檔 213 項）、`ng build` 通過。
+- **未驗證**：未做瀏覽器 e2e；Pi 相關整合測試在本機略過，由 CI 執行。正式站尚未部署，需先備份並套 Platform migration `UserAdminManagement`。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #079 · main 同步與 3855dd6 正式部署
 
