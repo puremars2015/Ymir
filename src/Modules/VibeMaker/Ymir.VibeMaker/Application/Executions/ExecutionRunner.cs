@@ -9,6 +9,7 @@ using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Application.PlatformMcp;
 using Ymir.VibeMaker.Application.Runtime;
+using Ymir.VibeMaker.Application.Sites;
 using Ymir.VibeMaker.Contracts.Executions;
 using Ymir.VibeMaker.Domain;
 
@@ -34,6 +35,7 @@ public sealed class ExecutionRunner(
     OneDriveLinks oneDriveLinks,
     PlatformMcpService platformMcp,
     Ymir.VibeMaker.Application.Extensions.PersonalMcpService personalMcp,
+    SiteService sites,
     IAuditLog auditLog,
     VibeMakerTelemetry telemetry,
     TimeProvider timeProvider,
@@ -246,6 +248,12 @@ public sealed class ExecutionRunner(
             partialText = cancelled.PartialText;
         }
 
+        if (terminal is AgentCompleted && !IsGroupRun(execution))
+        {
+            // 在終止事件之前發布：前端收到完成事件時，左側「小工具」已經可以重新讀取（ADR-0029）。
+            await PublishToolAsync(execution, stoppingToken).ConfigureAwait(false);
+        }
+
         await FinishAsync(execution, terminal, stoppingToken, partialText).ConfigureAwait(false);
         if (IsGroupRun(execution))
         {
@@ -255,6 +263,45 @@ public sealed class ExecutionRunner(
         if (oneDriveActive)
         {
             await EnqueueOneDriveUploadAsync(execution, stoppingToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// <c>/make</c> 小工具的對話（ADR-0029）：<c>tool/index.html</c> 存在就自動發布成只有擁有者能看的網站。
+    /// best effort：失敗只送出摘要狀態事件並寫 server log，不影響這次執行的結果。
+    /// </summary>
+    private async Task PublishToolAsync(AgentExecution execution, CancellationToken stoppingToken)
+    {
+        try
+        {
+            var makesTool = await db.Conversations.AsNoTracking()
+                .Where(c => c.Id == execution.ConversationId)
+                .Select(c => c.MakesTool)
+                .SingleAsync(stoppingToken).ConfigureAwait(false);
+            if (!makesTool || !sites.IsEnabled)
+            {
+                return;
+            }
+
+            var (_, error) = await sites.PublishToolAsync(execution.UserId, execution.ConversationId, $"user:{execution.UserId:D}", stoppingToken).ConfigureAwait(false);
+            var status = error switch
+            {
+                SitePublishError.None => "小工具已更新，可以從左側選單的「小工具」開啟。",
+                SitePublishError.MissingIndex or SitePublishError.Disabled or SitePublishError.NotFound => null,
+                SitePublishError.TooManySites => "網站數量已達上限，小工具沒有自動發布；請先刪除不用的網站。",
+                SitePublishError.TooLarge => "小工具的檔案太大，沒有自動發布。",
+                _ => "小工具自動發布失敗，請稍後再試。",
+            };
+            if (status is not null)
+            {
+                await AppendAsync(execution.Id, new StatusEvent(status), stoppingToken).ConfigureAwait(false);
+            }
+        }
+#pragma warning disable CA1031 // best effort：見方法說明。
+        catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+#pragma warning restore CA1031
+        {
+            logger.LogWarning(ex, "Publishing the tool of conversation {ConversationId} failed", execution.ConversationId);
         }
     }
 

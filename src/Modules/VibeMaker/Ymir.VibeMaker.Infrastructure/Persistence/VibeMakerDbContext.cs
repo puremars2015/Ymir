@@ -325,6 +325,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             site.Property(s => s.Status).HasConversion<UpperSnakeCaseEnumConverter<SiteStatus>>().HasMaxLength(30);
             site.HasIndex(s => s.Slug).IsUnique();
             site.HasIndex(s => s.UserId);
+            // 一個對話最多一個自動發布的小工具（ADR-0029）；同時完成的執行由唯一索引擋下重複建立。
+            site.HasIndex(s => s.ConversationId).IsUnique().HasFilter("[is_tool] = 1");
         });
 
         modelBuilder.Entity<SiteVersion>(version =>

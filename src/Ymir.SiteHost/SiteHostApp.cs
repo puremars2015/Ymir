@@ -59,6 +59,13 @@ public static class SiteHostApp
         builder.Services.AddScoped<SiteRequestHandler>();
 
         var app = builder.Build();
+        // 網站只能被自己或 Ymir 前端嵌入（左側「小工具」，ADR-0029）；其他網站不能把私人網站框起來誘騙點擊。
+        var frameAncestors = FrameAncestors(options.PlatformUrl);
+        app.Use((context, next) =>
+        {
+            context.Response.Headers.ContentSecurityPolicy = frameAncestors;
+            return next(context);
+        });
         app.MapGet("/.ymir/health", () => Results.Ok(new { status = "ok" }));
         app.MapGet("/.ymir/auth", (HttpContext context, SiteRequestHandler handler) => handler.HandleTicketAsync(context));
         // 用 fallback 端點而不是 app.Run：terminal middleware 會在端點執行前攔下所有請求（包含上面的 /.ymir/*）。
@@ -66,4 +73,7 @@ public static class SiteHostApp
         app.MapFallback("{**path}", (HttpContext context, SiteRequestHandler handler) => handler.HandleAsync(context));
         return app;
     }
+
+    internal static string FrameAncestors(Uri? platformUrl) =>
+        platformUrl is null ? "frame-ancestors 'self'" : $"frame-ancestors 'self' {platformUrl.GetLeftPart(UriPartial.Authority)}";
 }

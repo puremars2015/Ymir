@@ -241,6 +241,10 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset")
                         .HasColumnName("created_at");
 
+                    b.Property<bool>("MakesTool")
+                        .HasColumnType("bit")
+                        .HasColumnName("makes_tool");
+
                     b.Property<string>("ModelId")
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)")
@@ -459,6 +463,10 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)")
                         .HasColumnName("name");
+
+                    b.Property<bool>("ProducesTool")
+                        .HasColumnType("bit")
+                        .HasColumnName("produces_tool");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int")
@@ -1053,6 +1061,10 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier")
                         .HasColumnName("current_version_id");
 
+                    b.Property<bool>("IsTool")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_tool");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -1095,6 +1107,11 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_sites");
+
+                    b.HasIndex("ConversationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_sites_conversation_id")
+                        .HasFilter("[is_tool] = 1");
 
                     b.HasIndex("Slug")
                         .IsUnique()

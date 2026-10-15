@@ -98,6 +98,7 @@ app.MapExtensionEndpoints();
 app.MapPlatformMcpEndpoints();
 app.MapKnowledgeEndpoints();
 app.MapSiteEndpoints();
+app.MapToolEndpoints();
 app.MapOneDriveEndpoints();
 app.MapAdminSettingsEndpoints();
 app.MapBrandingEndpoints();

@@ -54,6 +54,12 @@ public sealed class Site
 
     public SiteAccessMode AccessMode { get; private set; }
 
+    /// <summary>
+    /// 由 <c>/make</c> 小工具自動發布（ADR-0029）：列在左側「小工具」，在 Ymir 內以 iframe 開啟。
+    /// 建立時只有擁有者可以看（<see cref="SiteAccessMode.SelectedUsers"/>、沒有分享對象）。
+    /// </summary>
+    public bool IsTool { get; private set; }
+
     public SiteStatus Status { get; private set; }
 
     public Guid? CurrentVersionId { get; private set; }
@@ -64,14 +70,15 @@ public sealed class Site
 
     public DateTimeOffset? PublishedAt { get; private set; }
 
-    public static Site Create(Guid id, Guid userId, string slug, string name, Guid conversationId, string sourcePath, bool spaMode, DateTimeOffset now)
+    public static Site Create(Guid id, Guid userId, string slug, string name, Guid conversationId, string sourcePath, bool spaMode, DateTimeOffset now, bool isTool = false)
     {
         var site = new Site
         {
             Id = id,
             UserId = userId,
             Slug = slug.Length == SlugLength ? slug : throw new DomainValidationException("slug is invalid."),
-            AccessMode = SiteAccessMode.Public,
+            IsTool = isTool,
+            AccessMode = isTool ? SiteAccessMode.SelectedUsers : SiteAccessMode.Public,
             Status = SiteStatus.Unpublished,
             CreatedAt = now,
         };

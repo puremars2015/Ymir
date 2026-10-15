@@ -41,6 +41,9 @@ public sealed partial class SiteService(
 {
     public const string IndexFile = "index.html";
 
+    /// <summary><c>/make</c> 小工具的固定來源目錄（ADR-0029，與 <see cref="Make.MakePromptBuilder.ToolInstruction"/> 一致）。</summary>
+    public const string ToolSourcePath = "tool";
+
     private readonly SiteOptions _options = options.Value;
 
     public bool IsEnabled => _options.IsEnabled;
@@ -69,6 +72,58 @@ public sealed partial class SiteService(
         return Summary(site, version);
     }
 
+    /// <summary>左側「小工具」（ADR-0029）：自己的、已發布的小工具網站。</summary>
+    public async Task<IReadOnlyList<SiteSummary>> ListToolsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var sites = await db.Sites.AsNoTracking()
+            .Where(s => s.UserId == userId && s.IsTool && s.Status == SiteStatus.Published)
+            .OrderBy(s => s.Name)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        return [.. sites.Select(s => Summary(s, null))];
+    }
+
+    /// <summary>
+    /// <c>/make</c> 小工具的對話執行成功後呼叫（ADR-0029）：<c>tool/index.html</c> 存在時，第一次建立只有擁有者能看的網站，之後重新發布同一個網站。
+    /// 還沒有成果（例如 Agent 還在問需求）時回傳 <see cref="SitePublishError.MissingIndex"/>，不留下失敗紀錄。
+    /// </summary>
+    public async Task<(SiteSummary? Site, SitePublishError Error)> PublishToolAsync(Guid userId, Guid conversationId, string actor, CancellationToken cancellationToken)
+    {
+        if (!IsEnabled)
+        {
+            return (null, SitePublishError.Disabled);
+        }
+
+        var conversation = await db.Conversations.AsNoTracking()
+            .Where(c => c.Id == conversationId && c.UserId == userId && c.Status == ConversationStatus.Active)
+            .Select(c => new { c.Id, c.ProjectId, c.Title })
+            .SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        if (conversation is null)
+        {
+            return (null, SitePublishError.NotFound);
+        }
+
+        var workingDirectory = RuntimePaths.WorkingDirectoryFor(conversation.Id, conversation.ProjectId);
+        var entries = await reader.ListDirectoryAsync(userId, workingDirectory, ToolSourcePath, _options.MaxFiles, cancellationToken).ConfigureAwait(false);
+        if (!entries.Any(e => e.Path == IndexFile))
+        {
+            return (null, SitePublishError.MissingIndex);
+        }
+
+        var existing = await db.Sites.AsNoTracking()
+            .Where(s => s.UserId == userId && s.ConversationId == conversationId && s.IsTool)
+            .Select(s => (Guid?)s.Id)
+            .SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        if (existing is { } siteId)
+        {
+            var (updated, updateError, _) = await RepublishAsync(userId, siteId, null, ToolSourcePath, null, actor, cancellationToken).ConfigureAwait(false);
+            return (updated, updateError);
+        }
+
+        var title = conversation.Title.Length > Site.NameMaxLength ? conversation.Title[..Site.NameMaxLength] : conversation.Title;
+        var (created, error, _) = await CreateAsync(userId, conversationId, title, ToolSourcePath, spaMode: false, actor, cancellationToken, isTool: true).ConfigureAwait(false);
+        return (created, error);
+    }
+
     /// <summary>從對話的工作目錄建立並發布新網站。</summary>
     public async Task<(SiteSummary? Site, SitePublishError Error, string? Detail)> CreateAsync(
         Guid userId,
@@ -77,7 +132,8 @@ public sealed partial class SiteService(
         string? sourcePath,
         bool spaMode,
         string actor,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool isTool = false)
     {
         // 先確認擁有者：別人的對話一律 404，不透露其他狀態（SA §12）。
         if (await FindWorkingDirectoryAsync(userId, conversationId, cancellationToken).ConfigureAwait(false) is null)
@@ -104,7 +160,7 @@ public sealed partial class SiteService(
 
         var now = timeProvider.GetUtcNow();
         var slug = await NewUniqueSlugAsync(cancellationToken).ConfigureAwait(false);
-        var site = Site.Create(Guid.CreateVersion7(), userId, slug, title, conversationId, source, spaMode, now);
+        var site = Site.Create(Guid.CreateVersion7(), userId, slug, title, conversationId, source, spaMode, now, isTool);
         db.Sites.Add(site);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         var (error, detail) = await PublishCoreAsync(site, actor, cancellationToken).ConfigureAwait(false);

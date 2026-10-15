@@ -46,6 +46,36 @@
     </a>
 
     <nav class="sections">
+      @if (tools.enabled() || tools.tools().length > 0) {
+        <!-- 左側「小工具」：/make 小工具架設 自動發布的前端頁面（ADR-0029） -->
+        <section class="section">
+          <header class="section-header">
+            <span>小工具</span><span class="section-rule" aria-hidden="true"></span>
+          </header>
+          <ul class="items">
+            @for (tool of tools.tools(); track tool.id) {
+              <li>
+                <div class="row">
+                  <a
+                    [routerLink]="['/tools', tool.id]"
+                    routerLinkActive="active"
+                    class="item"
+                    [title]="tool.name"
+                    ><span class="nav-icon" aria-hidden="true"
+                      ><svg viewBox="0 0 24 24">
+                        <path
+                          d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4 2.5-2.5Z"
+                        /></svg></span
+                    ><span class="item-label">{{ tool.name }}</span></a
+                  >
+                </div>
+              </li>
+            } @empty {
+              <li class="muted empty">用「/make 小工具架設」做的工具會出現在這裡</li>
+            }
+          </ul>
+        </section>
+      }
       <section class="section">
         <header class="section-header">
           <span>專案</span>

@@ -28,6 +28,9 @@ public sealed class Conversation
 
     public ConversationStatus Status { get; private set; }
 
+    /// <summary>以產生小工具的 <c>/make</c> 主題開始過（ADR-0029）：每次執行成功後，平台檢查 <c>tool/index.html</c> 並自動發布。</summary>
+    public bool MakesTool { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -52,6 +55,8 @@ public sealed class Conversation
     }
 
     public void Touch(DateTimeOffset now) => UpdatedAt = now;
+
+    public void MarkMakesTool() => MakesTool = true;
 
     public void Rename(string title, DateTimeOffset now)
     {

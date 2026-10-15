@@ -10,6 +10,8 @@ export interface MakeTopicDraft {
   description: string;
   instructions: string;
   isEnabled: boolean;
+  /** 產生前端小工具：成果自動發布並列在左側「小工具」（ADR-0029）。 */
+  producesTool: boolean;
 }
 
 export const emptyMakeTopicDraft = (): MakeTopicDraft => ({
@@ -17,6 +19,7 @@ export const emptyMakeTopicDraft = (): MakeTopicDraft => ({
   description: '',
   instructions: '',
   isEnabled: true,
+  producesTool: false,
 });
 
 export function draftFromTopic(topic: AdminMakeTopic): MakeTopicDraft {
@@ -25,6 +28,7 @@ export function draftFromTopic(topic: AdminMakeTopic): MakeTopicDraft {
     description: topic.description ?? '',
     instructions: topic.instructions,
     isEnabled: topic.isEnabled,
+    producesTool: topic.producesTool,
   };
 }
 
@@ -57,6 +61,7 @@ export function toSaveRequest(draft: MakeTopicDraft, sortOrder: number): SaveMak
     instructions: draft.instructions.trim(),
     sortOrder,
     isEnabled: draft.isEnabled,
+    producesTool: draft.producesTool,
   };
 }
 

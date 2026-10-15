@@ -27,19 +27,26 @@ public sealed class MakeTopic
 
     public bool IsEnabled { get; private set; }
 
+    /// <summary>
+    /// 這個主題產生前端小工具（ADR-0029）：Agent 被要求把成果放在 <c>tool/index.html</c>，
+    /// 執行成功後平台自動發布成私人網站並列在左側「小工具」。
+    /// </summary>
+    public bool ProducesTool { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    public static MakeTopic Create(string name, string? description, string instructions, int sortOrder, bool isEnabled, DateTimeOffset now)
+    public static MakeTopic Create(string name, string? description, string instructions, int sortOrder, bool isEnabled, DateTimeOffset now, bool producesTool = false)
     {
         var topic = new MakeTopic { Id = Guid.CreateVersion7(now), CreatedAt = now };
-        topic.Update(name, description, instructions, sortOrder, isEnabled, now);
+        topic.Update(name, description, instructions, sortOrder, isEnabled, now, producesTool);
         return topic;
     }
 
-    public void Update(string name, string? description, string instructions, int sortOrder, bool isEnabled, DateTimeOffset now)
+    public void Update(string name, string? description, string instructions, int sortOrder, bool isEnabled, DateTimeOffset now, bool producesTool = false)
     {
+        ProducesTool = producesTool;
         Name = DomainGuard.RequiredText(name, NameMaxLength, nameof(name));
         Description = DomainGuard.OptionalText(description, DescriptionMaxLength, nameof(description));
         Instructions = DomainGuard.RequiredText(instructions, InstructionsMaxLength, nameof(instructions));

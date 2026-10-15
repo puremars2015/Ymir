@@ -61,6 +61,7 @@ public sealed class ExecutionService(
 
         // /make 指令：由後端依主題組合送給 Agent 的完整指示；對話紀錄只保存使用者輸入的文字。
         string? agentPrompt = null;
+        var makesTool = false;
         var makeDescription = MakePromptBuilder.ParseDescription(request.Content);
         if (request.MakeTopicId is { } topicId)
         {
@@ -72,6 +73,7 @@ public sealed class ExecutionService(
 
             var extra = string.Equals(makeDescription, topic.Name, StringComparison.Ordinal) ? null : makeDescription;
             agentPrompt = MakePromptBuilder.ForTopic(topic, extra);
+            makesTool = topic.ProducesTool;
         }
         else if (makeDescription is not null)
         {
@@ -80,7 +82,10 @@ public sealed class ExecutionService(
                 return SubmitMessageResult.MakeDescriptionRequired;
             }
 
-            agentPrompt = MakePromptBuilder.ForDescription(makeDescription, await makeTopics.ListEnabledPromptsAsync(cancellationToken).ConfigureAwait(false));
+            var topics = await makeTopics.ListEnabledPromptsAsync(cancellationToken).ConfigureAwait(false);
+            agentPrompt = MakePromptBuilder.ForDescription(makeDescription, topics);
+            // Agent 可能選中產生小工具的主題：執行後只在 tool/index.html 存在時才發布（ADR-0029）。
+            makesTool = topics.Any(t => t.ProducesTool);
         }
         else if (HelpPromptBuilder.IsHelpCommand(request.Content))
         {
@@ -124,6 +129,11 @@ public sealed class ExecutionService(
         if (request.ModelId is not null)
         {
             conversation.SelectModel(request.ModelId);
+        }
+
+        if (makesTool)
+        {
+            conversation.MarkMakesTool();
         }
 
         // 執行時的模型：這次選的 → 對話上次選的 → 預設；已不在清單的模型退回預設。

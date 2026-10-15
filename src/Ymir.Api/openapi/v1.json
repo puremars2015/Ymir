@@ -399,6 +399,26 @@
         }
       }
     },
+    "/api/tools": {
+      "get": {
+        "tags": [
+          "Tools"
+        ],
+        "operationId": "ListTools",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ToolsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/branding": {
       "get": {
         "tags": [
@@ -3947,7 +3967,8 @@
           "instructions",
           "sortOrder",
           "isEnabled",
-          "updatedAt"
+          "updatedAt",
+          "producesTool"
         ],
         "type": "object",
         "properties": {
@@ -3981,6 +4002,9 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "producesTool": {
+            "type": "boolean"
           }
         }
       },
@@ -7361,6 +7385,10 @@
           },
           "isEnabled": {
             "type": "boolean"
+          },
+          "producesTool": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -8136,6 +8164,50 @@
           }
         }
       },
+      "ToolResponse": {
+        "required": [
+          "id",
+          "name",
+          "conversationId",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ToolsResponse": {
+        "required": [
+          "enabled",
+          "tools"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolResponse"
+            }
+          }
+        }
+      },
       "TunnelSettingsResponse": {
         "required": [
           "publicEdgeEnabled",
@@ -8746,6 +8818,9 @@
     },
     {
       "name": "Sites"
+    },
+    {
+      "name": "Tools"
     },
     {
       "name": "Branding"

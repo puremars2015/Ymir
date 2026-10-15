@@ -17,6 +17,7 @@ const topic = (id: string, sortOrder: number | string, name = id): AdminMakeTopi
   sortOrder,
   isEnabled: true,
   updatedAt: '2026-10-06T00:00:00Z',
+  producesTool: false,
 });
 
 describe('makeTopicDraftProblem', () => {
@@ -42,7 +43,13 @@ describe('toSaveRequest / draftFromTopic', () => {
   it('trims text and turns an empty description into null', () => {
     expect(
       toSaveRequest(
-        { name: ' 工具 ', description: '  ', instructions: ' 做 ', isEnabled: false },
+        {
+          name: ' 工具 ',
+          description: '  ',
+          instructions: ' 做 ',
+          isEnabled: false,
+          producesTool: true,
+        },
         30,
       ),
     ).toEqual({
@@ -51,15 +58,17 @@ describe('toSaveRequest / draftFromTopic', () => {
       instructions: '做',
       sortOrder: 30,
       isEnabled: false,
+      producesTool: true,
     });
   });
 
   it('round-trips an existing topic', () => {
-    expect(draftFromTopic({ ...topic('a', 10), description: '說明' })).toEqual({
+    expect(draftFromTopic({ ...topic('a', 10), description: '說明', producesTool: true })).toEqual({
       name: 'a',
       description: '說明',
       instructions: '指示',
       isEnabled: true,
+      producesTool: true,
     });
   });
 });

@@ -27,6 +27,7 @@ import {
   SharedSite,
   SiteAccessMode,
   SiteTicket,
+  Tools,
   UserSearchResult,
   DirectContact,
   DirectMessage,
@@ -549,6 +550,11 @@ export class ApiService {
   /** 網站託管（ADR-0016）。 */
   listSites(): Observable<Sites> {
     return this.http.get<Sites>('/api/sites');
+  }
+
+  /** 左側「小工具」（ADR-0029）。 */
+  listTools(): Observable<Tools> {
+    return this.http.get<Tools>('/api/tools');
   }
 
   publishSite(conversationId: string, request: PublishSiteRequest): Observable<Site> {

@@ -123,16 +123,35 @@ internal sealed class SiteRequestHandler(
 
         var userId = await db.SiteTickets.Where(t => t.TokenHash == hash).Select(t => t.UserId).SingleAsync(context.RequestAborted).ConfigureAwait(false);
         var expires = now + CookieLifetime;
-        context.Response.Cookies.Append(CookieName, _protector.Protect($"{userId:N}|{site.Id:N}|{expires.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)}"), new CookieOptions
-        {
-            HttpOnly = true,
-            SameSite = SameSiteMode.Lax,
-            Secure = options.BaseUrl!.Scheme == Uri.UriSchemeHttps,
-            Path = "/",
-            MaxAge = CookieLifetime,
-        });
+        context.Response.Cookies.Append(CookieName, _protector.Protect($"{userId:N}|{site.Id:N}|{expires.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)}"), CookieOptionsFor(options.BaseUrl!, CookieLifetime));
         context.Response.Headers.CacheControl = "no-store";
         context.Response.Redirect(SiteAccessRules.SafeReturnPath(context.Request.Query["path"].ToString()));
+    }
+
+    /// <summary>
+    /// 網站 cookie：只限這個 hostname、HttpOnly。小工具在 Ymir 內以 iframe 開啟（ADR-0029），網站網域與 Ymir 不同 site 時
+    /// Lax cookie 不會隨 iframe 送出，所以 https（與瀏覽器視為安全來源的 <c>*.localhost</c>）改用 <c>SameSite=None; Secure; Partitioned</c>：
+    /// cookie 依最上層網站分開保存，其他網站嵌入時拿不到；SiteHost 只提供 GET 靜態檔案，沒有可被跨站請求利用的操作。
+    /// </summary>
+    internal static CookieOptions CookieOptionsFor(Uri baseUrl, TimeSpan lifetime)
+    {
+        var secureContext = baseUrl.Scheme == Uri.UriSchemeHttps
+            || baseUrl.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            || baseUrl.Host.EndsWith(".localhost", StringComparison.OrdinalIgnoreCase);
+        var cookie = new CookieOptions
+        {
+            HttpOnly = true,
+            SameSite = secureContext ? SameSiteMode.None : SameSiteMode.Lax,
+            Secure = secureContext,
+            Path = "/",
+            MaxAge = lifetime,
+        };
+        if (secureContext)
+        {
+            cookie.Extensions.Add("Partitioned");
+        }
+
+        return cookie;
     }
 
     /// <summary>私人網站：cookie 識別訪客，再檢查帳號狀態與授權（ADR-0016 §3）。</summary>

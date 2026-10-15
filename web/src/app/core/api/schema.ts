@@ -212,6 +212,22 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/tools': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListTools'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/branding': {
     parameters: {
       query?: never;
@@ -1560,6 +1576,7 @@ export interface components {
       isEnabled: boolean;
       /** Format: date-time */
       updatedAt: string;
+      producesTool: boolean;
     };
     AdminModelOptionResponse: {
       id: string;
@@ -2376,6 +2393,8 @@ export interface components {
       /** Format: int32 */
       sortOrder: number | string;
       isEnabled: boolean;
+      /** @default false */
+      producesTool: boolean;
     };
     SaveMcpServerAccessRequest: {
       enabled: boolean;
@@ -2561,6 +2580,19 @@ export interface components {
       levels: string[];
       defaultLevel: null | string;
       required: boolean;
+    };
+    ToolResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** Format: uuid */
+      conversationId: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ToolsResponse: {
+      enabled: boolean;
+      tools: components['schemas']['ToolResponse'][];
     };
     TunnelSettingsResponse: {
       publicEdgeEnabled: boolean;
@@ -3011,6 +3043,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['UserSearchResult'][];
+        };
+      };
+    };
+  };
+  ListTools: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ToolsResponse'];
         };
       };
     };

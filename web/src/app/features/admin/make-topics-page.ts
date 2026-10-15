@@ -92,6 +92,15 @@ import { AdminTabs } from './admin-tabs';
             />
             啟用（顯示給使用者）
           </label>
+          <label class="check">
+            <input
+              type="checkbox"
+              name="producesTool"
+              [ngModel]="draft().producesTool"
+              (ngModelChange)="patch({ producesTool: $event })"
+            />
+            產生小工具（成果放在 tool/index.html，完成後自動放到使用者左側的「小工具」）
+          </label>
           <div class="row">
             <button type="submit" [disabled]="busy() || !!problem()">儲存</button>
             <button type="button" class="secondary" (click)="cancelEdit()">取消</button>
@@ -116,6 +125,9 @@ import { AdminTabs } from './admin-tabs';
               <strong>{{ topic.name }}</strong>
               @if (!topic.isEnabled) {
                 <span class="badge">已停用</span>
+              }
+              @if (topic.producesTool) {
+                <span class="badge">小工具</span>
               }
               @if (topic.description) {
                 <p class="muted small">{{ topic.description }}</p>

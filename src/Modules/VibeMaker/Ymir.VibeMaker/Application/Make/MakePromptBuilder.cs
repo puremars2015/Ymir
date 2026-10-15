@@ -84,8 +84,21 @@ public static class MakePromptBuilder
         }
 
         builder.AppendLine(indent + "建置指示：" + topic.Instructions);
+        if (topic.ProducesTool)
+        {
+            builder.AppendLine(indent + ToolInstruction);
+        }
     }
+
+    /// <summary>
+    /// 產生小工具的主題一律附加的平台規定（ADR-0029）：成果放在固定位置，平台才能自動發布到左側「小工具」。
+    /// 主題的建置指示由 Admin 編輯，這段不交給 Admin 維護，避免改壞發布位置。
+    /// </summary>
+    public const string ToolInstruction =
+        "平台規定：這是只有前端的網頁小工具，請把成果放在工作目錄的 tool/ 目錄，主頁面必須是 tool/index.html（其他 CSS、JavaScript、圖片也放在 tool/ 內，用相對路徑引用）；"
+        + "不需要後端或資料庫，也不要依賴需要登入的外部服務。完成後平台會自動把它放到左側選單的「小工具」，使用者可以直接開啟。";
 }
 
 /// <summary>組合 prompt 需要的主題內容。</summary>
-public sealed record MakeTopicPrompt(string Name, string? Description, string Instructions);
+/// <param name="ProducesTool">產生前端小工具（ADR-0029）。</param>
+public sealed record MakeTopicPrompt(string Name, string? Description, string Instructions, bool ProducesTool = false);

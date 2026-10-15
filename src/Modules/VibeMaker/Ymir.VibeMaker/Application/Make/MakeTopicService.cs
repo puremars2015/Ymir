@@ -23,14 +23,14 @@ public sealed class MakeTopicService(IVibeMakerDbContext db, ICurrentUser curren
         await db.MakeTopics.AsNoTracking()
             .Where(t => t.IsEnabled)
             .OrderBy(t => t.SortOrder).ThenBy(t => t.Name)
-            .Select(t => new MakeTopicPrompt(t.Name, t.Description, t.Instructions))
+            .Select(t => new MakeTopicPrompt(t.Name, t.Description, t.Instructions, t.ProducesTool))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
     public async Task<MakeTopicPrompt?> FindEnabledPromptAsync(Guid topicId, CancellationToken cancellationToken) =>
         await db.MakeTopics.AsNoTracking()
             .Where(t => t.Id == topicId && t.IsEnabled)
-            .Select(t => new MakeTopicPrompt(t.Name, t.Description, t.Instructions))
+            .Select(t => new MakeTopicPrompt(t.Name, t.Description, t.Instructions, t.ProducesTool))
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -47,7 +47,7 @@ public sealed class MakeTopicService(IVibeMakerDbContext db, ICurrentUser curren
     {
         ArgumentNullException.ThrowIfNull(request);
         var now = timeProvider.GetUtcNow();
-        var topic = MakeTopic.Create(request.Name, request.Description, request.Instructions, request.SortOrder, request.IsEnabled, now);
+        var topic = MakeTopic.Create(request.Name, request.Description, request.Instructions, request.SortOrder, request.IsEnabled, now, request.ProducesTool);
         db.MakeTopics.Add(topic);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await AuditAsync("admin.make_topic.create", topic.Id, now, cancellationToken).ConfigureAwait(false);
@@ -64,7 +64,7 @@ public sealed class MakeTopicService(IVibeMakerDbContext db, ICurrentUser curren
         }
 
         var now = timeProvider.GetUtcNow();
-        topic.Update(request.Name, request.Description, request.Instructions, request.SortOrder, request.IsEnabled, now);
+        topic.Update(request.Name, request.Description, request.Instructions, request.SortOrder, request.IsEnabled, now, request.ProducesTool);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await AuditAsync("admin.make_topic.update", topic.Id, now, cancellationToken).ConfigureAwait(false);
         return ToAdmin(topic);
@@ -88,5 +88,5 @@ public sealed class MakeTopicService(IVibeMakerDbContext db, ICurrentUser curren
         auditLog.WriteAsync(new AuditEntry(currentUser.ActorName, action, "make_topic", topicId.ToString("D"), AuditResult.Success, now, null), cancellationToken);
 
     private static AdminMakeTopicResponse ToAdmin(MakeTopic topic) =>
-        new(topic.Id, topic.Name, topic.Description, topic.Instructions, topic.SortOrder, topic.IsEnabled, topic.UpdatedAt);
+        new(topic.Id, topic.Name, topic.Description, topic.Instructions, topic.SortOrder, topic.IsEnabled, topic.UpdatedAt, topic.ProducesTool);
 }

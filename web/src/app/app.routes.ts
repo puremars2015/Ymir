@@ -44,6 +44,12 @@ export const routes: Routes = [
         title: '我的網站 · Vibe Maker',
       },
       {
+        // 左側「小工具」：在 iframe 內開啟網站網域上的頁面（ADR-0029）。
+        path: 'tools/:siteId',
+        loadComponent: () => import('./features/tools/tool-page').then((m) => m.ToolPage),
+        title: '小工具 · Vibe Maker',
+      },
+      {
         path: 'settings',
         loadComponent: () =>
           import('./features/settings/settings-page').then((m) => m.SettingsPage),

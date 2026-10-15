@@ -10,6 +10,7 @@ import {
   Injector,
   OnInit,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
@@ -26,6 +27,7 @@ import { normalizeTitle } from '../core/navigation/navigation-edits';
 import { parseActiveRoute } from './active-route';
 import { ThemeSwitcher } from '../shared/theme-switcher';
 import { PeoplePanel } from './people-panel';
+import { ToolStore } from '../core/tools/tool.store';
 
 type ItemKind = 'conversation' | 'project';
 
@@ -58,6 +60,7 @@ export class Shell implements OnInit {
   protected readonly branding = inject(BrandingStore);
   protected readonly store = inject(NavigationStore);
   protected readonly messages = inject(DirectMessageStore);
+  protected readonly tools = inject(ToolStore);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -113,6 +116,10 @@ export class Shell implements OnInit {
 
   constructor() {
     // 登入後連上訊息通知；換帳號時重新連線。
+    // 左側「小工具」（ADR-0029）：登入後讀取；執行完成時由對話頁重新讀取。
+    effect(() => {
+      if (this.auth.user()) untracked(() => this.tools.refresh());
+    });
     // 訪客沒有訊息與群組（ADR-0027），不連線。
     effect(() => {
       const user = this.auth.user();

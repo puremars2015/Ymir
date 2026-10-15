@@ -35,6 +35,7 @@ import { normalizeTitle } from '../../core/navigation/navigation-edits';
 import { resolveModel } from '../../core/models/model-selection';
 import { ModelStore } from '../../core/models/model.store';
 import { NavigationStore } from '../../core/navigation/navigation.store';
+import { ToolStore } from '../../core/tools/tool.store';
 import { PendingPromptService } from '../../core/navigation/pending-prompt.service';
 import { Composer } from '../../shared/composer';
 import { AssistantText } from '../../shared/assistant-text';
@@ -77,6 +78,7 @@ export class ChatPage {
   private readonly api = inject(ApiService);
   private readonly streams = inject(ExecutionStreamService);
   private readonly store = inject(NavigationStore);
+  private readonly tools = inject(ToolStore);
   private readonly pending = inject(PendingPromptService);
   protected readonly modelStore = inject(ModelStore);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -353,6 +355,8 @@ export class ChatPage {
   }
 
   private finish(conversationId: string, error: string | null): void {
+    // /make 小工具的執行完成時後端已自動發布（ADR-0029）；不論目前在哪個對話都更新左側清單。
+    this.tools.refresh();
     if (conversationId !== this.conversationId()) return;
     this.error.set(error);
     this.reloadMessages(conversationId, () => this.live.set(null));

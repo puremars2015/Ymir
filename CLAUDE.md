@@ -9,7 +9,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 |---|---|
 | `docs/sa/vibe-maker-core-mvp-sa.md` | SA（需求、資料模型、API、SSE 契約、驗收條件），以章節編號引用，例如「SA §10」 |
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
-| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0028；索引見 `docs/adr/README.md`） |
+| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0029；索引見 `docs/adr/README.md`） |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
 | `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
@@ -92,6 +92,8 @@ cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:network -- <截圖
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:onedrive -- <截圖目錄>
 # 網站託管與分享（ADR-0016；需要 SiteHost 與 *.localhost，前置步驟見 web/e2e/sites-flow.mjs 開頭）
 cd web && WORKSPACE_ROOT=<工作目錄根> CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:sites -- <截圖目錄>
+# 左側小工具（ADR-0029；同 e2e:sites 的前置，SiteHost 的 PlatformUrl 要是 Angular 網址）
+cd web && WORKSPACE_ROOT=<工作目錄根> CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:tools -- <截圖目錄> [baseUrl]
 # 平台 MCP（ADR-0012 B；需要 Fake MCP、MCP Gateway、API 的 Ymir__Mcp__*，見 deploy/mcp/README.md「本機驗證」）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:mcp -- <截圖目錄>
 # 個人連接與工具（ADR-0028；隔離 SQL + Development API 提供 Angular build，不可指向正式資料庫）
@@ -149,6 +151,8 @@ OneDrive connector（ADR-0013）：管理員開放 `oneDrive` 能力後，使用
 RAG 知識庫（ADR-0014）：專案擁有者在專案頁上傳文件（`/api/projects/{id}/knowledge/*`），`KnowledgeIndexWorker` 背景擷取（TXT / Markdown / 文字型 PDF / DOCX）→ `TextChunker` 切段 → 經 LiteLLM `/v1/embeddings`（使用者 virtual key，模型 `VibeMaker:Rag:EmbeddingModel`，沒設定時停用）→ 寫入每專案一份 SQLite（`SqliteVectorStore`，暴力餘弦搜尋）。原始檔與 SQLite 放在 API 自己的 volume `Ymir:Knowledge:Root/<userId>/<projectId>/`（不是 Agent workspace、不掛給 Agent）；新版本索引成功才切換（filtered unique index：同檔名只一份 Ready），失敗保留舊版本，重啟時 `ReconcileAsync` 重做。問答 `POST /api/projects/{id}/knowledge/ask`（`KnowledgeQueryService`）：只在該專案、相同 embedding 模型的 Ready 版本中檢索，低於 `MinScore` 回「資料不足」且不呼叫模型；只有 `VibeMaker:Models:N:AllowKnowledgeBase=true` 的模型會收到片段（否則只回段落），片段放在 `<knowledge>` 資料區塊並要求以 `[n]` 標註。
 
 網站託管（ADR-0016，`deploy/sites/README.md`）：檔案面板「發布網站」選含 `index.html` 的目錄 → `SiteService` 經 `IWorkspaceFileReader` 複製到網站 volume `Ymir:Sites:Root/{siteId}/{versionId}/`（完整寫好才切換 `CurrentVersionId`，保留最近 3 版，失敗不影響目前版本）；`Ymir.SiteHost` 依 Host 找網站、只提供版本目錄內的檔案（路徑逐段檢查、SPA 模式無副檔名回 index.html、`nosniff`）。網站網域（`Ymir:Sites:BaseUrl`）必須與 Ymir 登入網域不同；API 不掛載 workspace，SiteHost 唯讀、不執行使用者程式。存取模式（`PUT /api/sites/{id}/access`）：公開 / 所有 Ymir 使用者 / 指定使用者（`vibemaker.site_shares`），擁有者與 Admin 一律可看（`SiteAccessRules.CanView`，API 與 SiteHost 共用）。私人網站：SiteHost 導向平台 `/site-access` → 前端 `POST /api/sites/{id}/ticket`（60 秒、一次性、只存雜湊）→ SiteHost `/.ymir/auth` 兌換成只限該 hostname、綁定網站的 `ymir_site` cookie；每個請求重新檢查帳號狀態與分享（快取 ≤ 30 秒）。平台 cookie 不得送到網站網域；導回路徑只接受站內相對路徑（`SafeReturnPath`）。
+
+左側「小工具」（ADR-0029）：`make_topics.produces_tool` 的主題（預設「小工具架設」）由 `MakePromptBuilder.ToolInstruction` 要求成果放在 `tool/index.html`，送出時標記 `conversations.makes_tool`；`ExecutionRunner` 在個人對話執行成功、寫完成事件之前呼叫 `SiteService.PublishToolAsync`（best effort，`tool/index.html` 不存在就略過），建立或重新發布 `sites.is_tool` 網站（建立時只有擁有者能看）。`GET /api/tools` 列自己的小工具；前端 `/tools/:siteId` 取票據後以 iframe 載入網站網域（`toolFrameUrl` 拒絕 Ymir 自己的來源）。Ymir CSP 只多 `frame-src *.{網站網域}`、仍 `frame-ancestors 'none'`；SiteHost 回應 `frame-ancestors 'self' {PlatformUrl}`，網站 cookie 在 https / `*.localhost` 為 `SameSite=None; Secure; Partitioned`。
 
 系統資源與安全自動回收（ADR-0025，指南 `deploy/maintenance/README.md`）：獨立的 root 服務 `Ymir.MaintenanceHost`（Unix socket + token，端點只有資源 / 政策 / 紀錄 / dry run，不得新增接受路徑、store、image 或 container 參數的端點；改動時同步更新 `MaintenanceHostProtocolTests.ExposesOnlyTheReviewedEndpoints`）。只管理 Ymir：image 需在設定的 repository 且帶 `ymir.managed=true` label 或已登記，Agent container 需帶 `ymir.reclaimable=agent-runtime`；保護規則在 `Classifier`（純函式，fail closed），不得使用 `--force`、`system prune` 或全 store prune，不得停止任何 container。刪除前重新盤點並取生命週期鎖（`LifecycleLock`：runtime host 的 `VibeMaker:Runtime:LifecycleLockDirectory` 在建立 / 啟動 / 停止 / 刪除時持有 `user-<id>.lock`，部署以 `flock deploy.lock`）；鎖目錄不可用時只監控與 dry run。API `/api/admin/resources*`（Admin + XSRF），政策存 `platform.system_settings`（`maintenance.reclamation_policy`），`MaintenanceSyncWorker` 每分鐘同步並把有動作的回收寫入稽核 `maintenance.reclaim`；未設定 `Ymir:Maintenance:Endpoint` 時頁面顯示不支援。
 

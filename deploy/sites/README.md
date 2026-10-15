@@ -15,6 +15,9 @@
 
 網站網域**必須**與 Ymir 登入網域不同（例如 `ymir.example.com` 與 `*.sites.example.com`，或完全不同的網域），網站腳本才拿不到平台 cookie。
 
+左側「小工具」（ADR-0029）會在 Ymir 內以 iframe 開啟網站：SiteHost 的 `PlatformUrl` 必須是使用者實際開啟 Ymir 的網址（回應帶 `frame-ancestors 'self' <PlatformUrl>`，其他網站不能嵌入），
+API 的 CSP 會依 `Ymir__Sites__BaseUrl` 允許 `frame-src *.<網站網域>`。網站 cookie 在 https 下是 `SameSite=None; Secure; Partitioned`，所以網站網域與 Ymir 是否同一個上層網域都能在 iframe 內登入。
+
 ## 安裝
 
 1. `useradd --system ymir-sites`；`dotnet publish src/Ymir.SiteHost -c Release -o /opt/ymir/site-host`。

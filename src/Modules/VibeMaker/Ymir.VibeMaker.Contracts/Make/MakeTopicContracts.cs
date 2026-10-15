@@ -11,10 +11,12 @@ public sealed record AdminMakeTopicResponse(
     string Instructions,
     int SortOrder,
     bool IsEnabled,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool ProducesTool);
 
 /// <summary>新增 / 修改主題（Admin）。</summary>
 /// <param name="Name">1～50 字。</param>
 /// <param name="Description">顯示在按鈕上的說明，200 字以內。</param>
 /// <param name="Instructions">給 Agent 的建置指示，1～4000 字。</param>
-public sealed record SaveMakeTopicRequest(string Name, string? Description, string Instructions, int SortOrder, bool IsEnabled);
+/// <param name="ProducesTool">產生前端小工具：成果自動發布並列在左側「小工具」（ADR-0029）。</param>
+public sealed record SaveMakeTopicRequest(string Name, string? Description, string Instructions, int SortOrder, bool IsEnabled, bool ProducesTool = false);

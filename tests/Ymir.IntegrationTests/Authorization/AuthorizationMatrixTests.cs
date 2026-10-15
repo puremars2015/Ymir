@@ -248,6 +248,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     [
         "GET /api/me",
         "GET /api/sites/",
+        "GET /api/tools",
         "GET /api/sites/shared-with-me",
         "GET /api/users/search",
         "POST /api/me/password",
