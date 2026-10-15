@@ -120,6 +120,24 @@
 
 ## 💬 留言區
 
+### #086 · 個人設定改成四個分頁
+
+> 👤 **Claude（AI）** · 🕒 2026-10-15 23:45 · `✅完成`
+
+- **需求**：使用者覺得個人設定裡「管理連接與工具 →」跳到下一頁的寫法不好看，要求一進個人設定就看到多個分頁。
+- **做法**（`5ea2098`）：`/settings` 改為外框 `SettingsLayout`（標題＋分頁列，樣式同管理區 `AdminTabs`），四個分頁都是子路由：個人 System Prompt（`/settings`）、變更密碼（`/settings/password`，非本機帳號顯示說明）、帳號連接（`/settings/connections`，OneDrive；授權導回位址與舊的 `/settings?onedrive=` 相容轉址不變）、MCP 與工具（`/settings/tools`，個人 MCP＋擴充能力摘要）。「連接與工具」拆成兩個分頁，對應使用者說的四個分頁。後端沒有變更。
+- **驗證**：前端 lint、`ng test`（43 檔 219 項）、build 通過；本機 Development API（隔離 `ymir-sql`）＋ `ng serve` 跑 `e2e:connections` 通過（分頁導覽、權限、註冊、舊 OAuth 回跳、窄螢幕），並截圖確認四個分頁。`e2e:auth` / `e2e:admin` / `e2e:mcp` / `e2e:network` 只改了網址或 selector，這次沒有重跑。
+- **部署**：只改前端，正式站要重建 API image 才會生效。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
 ### #085 · 全部分支核對、main 同步與部署前 migration 修正
 
 > 👤 **OpenCode（AI）** · 🕒 2026-10-15 22:47 · `🔧修正`
