@@ -119,7 +119,9 @@ RuntimeHost 的更新需另外 publish 至 `/opt/ymir/runtime-host` 並重啟 `y
 更新時的注意事項（2026-10-14 實際部署時遇到）：
 
 - **Quadlet 以 image ID 固定版本時**（`Image=<64 碼 ID>`），重建 tag 不會換版；以新 commit 為 tag 建置後，把 `Image=` 換成 `sudo podman image inspect localhost/ymir/api:<commit> --format '{{.Id}}'` 的值，再 `sudo systemctl daemon-reload` 並重啟。先備份原 Quadlet，失敗時還原即可回到舊版。
-- **主機上沒有 .NET SDK 可用於 root 時**，可改以 `dotnet ef migrations script --idempotent --project <模組 Infrastructure 專案> --context <DbContext> -o <檔名>.sql` 產生 SQL（不連資料庫），在 SQL Server container 內用 `sqlcmd ... -b -I -d ymir -i <檔名>.sql` 套用。**必須加 `-I`**（`QUOTED_IDENTIFIER ON`）：資料表有 filtered index，少了它 `INSERT` / `DELETE` 會失敗（Msg 1934）。history 資料表是 `platform.__ef_migrations_history` 與 `vibemaker.__ef_migrations_history`。
+- **主機上沒有 .NET SDK 可用於 root 時**，可改以 `dotnet ef migrations script --idempotent --project <模組 Infrastructure 專案> --context <DbContext> -o <檔名>.sql` 產生 SQL（不連資料庫），在 SQL Server container 內用 `sqlcmd ... -b -I -d ymir -i <檔名>.sql` 套用。**必須加 `-I`**（`QUOTED_IDENTIFIER ON`）：資料表有 filtered index，少了它 `CREATE INDEX`、`INSERT` / `DELETE` 會失敗（Msg 1934）。部署器另明確設定 `ANSI_NULLS`、`ANSI_PADDING`、`ANSI_WARNINGS`、`ARITHABORT`、`CONCAT_NULL_YIELDS_NULL` 為 ON，`NUMERIC_ROUNDABORT` 為 OFF。history 資料表是 `platform.__ef_migrations_history` 與 `vibemaker.__ef_migrations_history`。
+- **容器安全設定比對**：目前 Quadlet 明確使用 `1654:1654`，image 使用 `1654`；兩者均為預期的非 root 身分，不能把指定 GID 誤判為 root。Podman 的 `inspect.Mounts` 清單順序不保證穩定，應按 `Destination` 排序後逐欄比較；不得忽略 Source、RW 或其他掛載欄位，也不得因順序差異直接略過檢查。
+- **Tunnel 就緒不等於 unit active**：重啟 cloudflared 後，edge 註冊尚未完成時公開網址可能暫時回 530。先驗證本機 API health 與服務狀態，再以有上限的重試確認公開登入頁 200；逾時才回復舊版，不得把持續錯誤當成功。保留每次嘗試的資料庫／金鑰／工作目錄備份及診斷，勿覆蓋上一份備份。
 
 ### 公開入口與故障檢查
 

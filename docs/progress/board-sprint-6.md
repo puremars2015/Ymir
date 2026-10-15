@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-15 12:30 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-15 16:15 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -53,10 +53,10 @@
 |---|---|---|---|
 | ARCH2 | 架構文件標記正式／舊容器及主機程序 | ✅ | 7 個固定容器＋動態 Agent 的角色清單，root／itadmin／ymir 分區、舊容器與實際模型代理路徑，見 #074 |
 | RES1 | 管理員 CPU／RAM／磁碟、Ymir container／image 監控與保留期限／低資源自動回收 | 🔬 | [ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 已採納並實作（維護服務、鎖、API、系統資源頁）；測試與瀏覽器驗證通過；正式主機安裝與啟用待使用者授權，見 #074 |
-| GRP1 | 群組聊天與 @bot（每個群組一個 Agent container） | 🔬 | [ADR-0026](../adr/0026-group-chat-and-group-agent.md)；後端、前端、測試與瀏覽器驗證通過；正式站尚未部署，見 #076 |
+| GRP1 | 群組聊天與 @bot（每個群組一個 Agent container） | 🔬 | [ADR-0026](../adr/0026-group-chat-and-group-agent.md)；後端、前端、測試與瀏覽器驗證通過；3855dd6 已部署，真 Pi SSE／群組操作待人工驗收，見 #076、#079 |
 | DM1 | 使用者之間的一對一訊息、右側成員面板（[ADR-0023](../adr/0023-user-direct-messages.md)） | ✅ | 使用者 2026-10-14 要求（簡易版 Teams）；SSE 即時、未讀／已讀、窄螢幕抽屜；分支 `claude/hopeful-ptolemy-4rodpw`，見 #064 |
 | G1 | **插單** Google 帳號 SSO 登入（[ADR-0024](../adr/0024-google-account-sso.md)） | ✅ | 部署設定白名單（`hd` 網域 / email）必填；實際連 Google 待使用者環境確認，見 #065 |
-| O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 🚧 | O3a 瀏覽／搜尋、O3b 連結管理／執行前下載與 Agent 路徑通過測試；O4 雲端寫回／O5 雙向變更與刪除保護未完成，未部署，見 #077 |
+| O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 🚧 | O3a 瀏覽／搜尋、O3b 連結管理／執行前下載已隨 3855dd6 部署，真 Graph 待驗收；O4 雲端寫回／O5 雙向變更與刪除保護未完成，見 #077、#079 |
 | L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | ✅ | 已合併回 main（使用者 2026-10-13 要求）；管理 → 用量「依模型」卡片，模型名稱帶 provider；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058、#059 |
 | RAG2 | `/make` 新增「建立 RAG 知識庫」引導主題 | ✅ | 種子主題（管理員可調整／停用），引導到專案頁知識庫（每專案一份 SQLite），見 #061 |
 | UPD1 | main 4b8a3af 正式更新產物與現況核對（歷史建置記錄） | 🔬 | API／RuntimeHost／511 單元測試／396 checksums 通過；保留當時未部署與權限受阻原文，原部署卡關已於 2026-10-14 13:00 部署解除，見 #062 |
@@ -115,6 +115,26 @@
 ---
 
 ## 💬 留言區
+
+### #079 · main 同步與 3855dd6 正式部署
+
+> 👤 **GPT（AI）** · 🕒 2026-10-15 16:15 CST · `🔬驗證`
+
+使用者要求重新 pull、合併與部署。乾淨 main 執行 fetch／rebase，目標固定 `3855dd688756044f9610fc214ba43bb7bfce9f23`，所有已取得遠端分支均已包含，無額外分支待合併。目標 CI [38691443168](https://github.com/puremars2015/Ymir/actions/runs/38691443168) 全通過；本次另外建置含 Angular 的 API image、self-contained linux-x64 RuntimeHost，產生兩個模組的 idempotent migration SQL。Google SSO、模型路由、部署 secret 與原安全限制均保留，不自動啟用未配置能力。
+
+經本機終端 sudo 授權完成固定產物切換；API 精確 image 為 `57c69ad7f1727f5001883469a495a32d4642a371b654bc49f834205fc99be932`，RuntimeHost 為 `/opt/ymir/releases/3855dd6/runtime-host`。切換前封閉公開入口並確認 Queued／Running 為 0，停止 API／RuntimeHost，SQL COPY_ONLY＋CHECKSUM 備份、RESTORE VERIFYONLY、匯出 SHA-256 與私有 tar 備份／compare 均通過；備份含 keyring、workspaces、部署設定與舊 RuntimeHost。正式套用 `20261015035207_ChatGroups`、`20261015040226_OneDriveLinkedItems`，完整 history 與新增五張表通過檢查。
+
+部署器的問題與處理（未跳過安全 gate）：
+- 初次 preflight 只接受 UID `1654`，正式 Quadlet 實為同樣非 root 的 `1654:1654`；修正限定接受這兩種表達，仍拒絕 root／root 群組／privileged。
+- SQL Msg 1934：sqlcmd 缺 `-I`／`QUOTED_IDENTIFIER ON`，建立 filtered index 失敗且新 migration 未套用；原服務恢復。補齊必要 SET options，獨立測試 SQL 容器連續兩次套用兩模組完整 SQL 成功後再執行正式 migration；測試容器清除，不使用正式資料做測試。
+- 第一次程式切換後 raw Mounts 清單比對失敗；四個同設定的測試容器重現 Podman 回傳順序不同。改按 Destination 排序，仍逐欄比對所有掛載欄位；來源／RW／類型變更仍拒絕。該次回復舊程式，已成功套用的 additive migration 保留，不還原資料庫或刪資料。
+- 下一次所有本機驗證通過，但 Tunnel 尚未完成 edge 註冊時公開登入回 530，依原 gate 回復。加入有上限的公開就緒重試與逾時拒絕測試，最終部署成功。部署器共 13 項檢查通過；每次實際嘗試都保留獨立備份，不覆蓋前次檔案。
+
+最終備份 `/var/backups/ymir/3855dd6-retry3`；原備份與舊 image／RuntimeHost 均保留。固定部署產物／主機專用腳本位於 `/home/itadmin/ymir-production-install/update-3855dd6`，root 結果 `/var/lib/ymir-update-3855dd6-retry3/result.json`。成功 gate 已確認精確 image、非 root／唯讀／mounts／capabilities／network／security options 與有效 ENV 保留（只容許 framework image 的版本預設值更新）。獨立讀回四個正式 unit active、NRestarts 0、ExecMainStatus 0、RuntimeHost 工作目錄正確、本機 `/health` 與公開 `/login` HTTP 200，以及兩筆 migration history；未回復最終版本。
+
+**未宣稱全功能驗收**：真 Entra 登入、既有加密資料解密、真 Pi SSE／群組操作、真 OneDrive Graph 仍待人工驗收；OneDrive O4／O5 雲端寫回與刪除保護仍未啟用。既有 native GC crash 的根因未由本部署證實修復；現有設定原樣保留。後續紀錄提交僅修改文件，正式程式版本仍固定 3855dd6。
+
+---
 
 ### #078 · OneDrive O3b CI 格式檢查修正
 
