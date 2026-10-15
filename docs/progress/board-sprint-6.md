@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-15 23:55 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-15 23:59 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -56,7 +56,7 @@
 | CONN1 | 個人「連接與工具」：OneDrive 與 HTTP MCP 註冊管理 | 🔬 | [ADR-0028](../adr/0028-personal-connections-and-tools.md)；入口、加密註冊／測試／啟停／移除、權限與群組隔離、桌面／手機 E2E 通過；尚未正式部署，見 #081 |
 | USR1 | 管理 → 使用者：改名、變更角色、刪除帳號，新增訪客角色 | 🔬 | [ADR-0027](../adr/0027-admin-user-management-and-guest-role.md)；後端、前端與測試通過；未做瀏覽器 e2e，正式站需套 Platform migration `UserAdminManagement`，見 #080 |
 | ARCH2 | 架構文件標記正式／舊容器及主機程序 | ✅ | 7 個固定容器＋動態 Agent 的角色清單，root／itadmin／ymir 分區、舊容器與實際模型代理路徑，見 #074 |
-| RES1 | 管理員 CPU／RAM／磁碟、Ymir container／image 監控與保留期限／低資源自動回收 | 🔬 | [ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 已採納並實作（維護服務、鎖、API、系統資源頁）；測試與瀏覽器驗證通過；正式主機安裝與啟用待使用者授權，見 #074 |
+| RES1 | 管理員 CPU／RAM／磁碟、Ymir container／image 監控與保留期限／低資源自動回收 | 🔬 | [ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 已採納並實作（維護服務、鎖、API、系統資源頁、資源不足告警）；對照 ADR 逐項檢查完畢；正式主機安裝與啟用待使用者授權，見 #074、#088 |
 | GRP1 | 群組聊天與 @bot（每個群組一個 Agent container） | 🔬 | [ADR-0026](../adr/0026-group-chat-and-group-agent.md)；後端、前端、測試與瀏覽器驗證通過；3855dd6 已部署，真 Pi SSE／群組操作待人工驗收，見 #076、#079 |
 | DM1 | 使用者之間的一對一訊息、右側成員面板（[ADR-0023](../adr/0023-user-direct-messages.md)） | ✅ | 使用者 2026-10-14 要求（簡易版 Teams）；SSE 即時、未讀／已讀、窄螢幕抽屜；分支 `claude/hopeful-ptolemy-4rodpw`，見 #064 |
 | G1 | **插單** Google 帳號 SSO 登入（[ADR-0024](../adr/0024-google-account-sso.md)） | ✅ | 部署設定白名單（`hd` 網域 / email）必填；實際連 Google 待使用者環境確認，見 #065 |
@@ -119,6 +119,26 @@
 ---
 
 ## 💬 留言區
+
+### #088 · RES1 對照 ADR-0025 補齊：資源不足告警
+
+> 👤 **Claude（AI）** · 🕒 2026-10-15 23:59 · `🔬驗證`
+
+- **需求**：使用者要求依 #073／ADR-0025 把 RES1 開發處理好。主體已在 #074 實作，本回合逐項對照 ADR §1～§4 與「實作與驗證順序」檢查程式碼（`Classifier` 保護規則、`MaintenanceService` 回收／重新確認／鎖、`PressureTracker` 遲滯、API、系統資源頁）。
+- **找到的缺口**：ADR §3「無安全候選或資源仍不足時顯示告警」——頁面原本只在門檻清單列「低於門檻 · 已觸發緊急回收」，沒有明確告警。
+- **修改**：`core/admin/resource-rules.ts` 新增純函式 `pressureAlerts`：自動回收未運作（關閉／鎖不可用）而低於門檻時提醒「不會自動處理」；已觸發緊急回收仍不足時，以與維護服務相同的範圍（磁碟只看受壓檔案系統的 store）計算剩餘安全候選，並明示不會停止執行中的工作。系統資源頁頂端以 `role=alert` 卡片顯示；仍在等待持續時間的門檻不告警。後端與 API 契約未變。
+- **驗證（實際執行）**：前端 `npm run lint` 通過、`npm test` 43 檔 223 項通過（新增 `pressureAlerts` 4 項）、`npm run build` 完成；`dotnet build Ymir.slnx` 0 警告、`Ymir.UnitTests` 712 項通過。未重跑整合測試（後端未改）與 `e2e:resources` 瀏覽器流程（需要本機維護服務）。
+- **分支**：本次雲端 session 指定在 `claude/great-planck-94vgem` 開發與推送，尚未進 `main`；需要時由使用者決定合併。
+- **❓待決定（不變）**：正式主機安裝維護服務、runtime host 鎖目錄、API 掛載 socket、既有 image 登記、先 dry run 再開啟自動回收（ADR 第 6 步，需使用者授權）；舊的 `ymir-image-prune` timer 不得與新機制同時啟用。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #087 · 使用者管理：清單只留「編輯」「刪除」，其餘移到使用者設定頁
 
