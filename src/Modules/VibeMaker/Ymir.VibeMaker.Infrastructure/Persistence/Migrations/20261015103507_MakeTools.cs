@@ -43,7 +43,8 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                 filter: "[is_tool] = 1");
 
             // 預設的「小工具架設」主題（MakeTools 之前的種子資料）產生小工具（ADR-0029）；Admin 刪掉了就沒有影響。
-            migrationBuilder.Sql("UPDATE [vibemaker].[make_topics] SET [produces_tool] = 1 WHERE [id] = '0199b7a0-0000-7000-8000-000000000001';");
+            // Idempotent SQL 會把新增欄位與更新放在同一個 batch；延後解析，避免欄位尚不存在時編譯失敗。
+            migrationBuilder.Sql("EXEC(N'UPDATE [vibemaker].[make_topics] SET [produces_tool] = 1 WHERE [id] = ''0199b7a0-0000-7000-8000-000000000001'';');");
         }
 
         /// <inheritdoc />

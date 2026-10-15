@@ -1,14 +1,27 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using Ymir.Api.Infrastructure;
 using Ymir.SiteHost;
 using Ymir.VibeMaker.Application.Make;
 using Ymir.VibeMaker.Domain;
+using Ymir.VibeMaker.Infrastructure.Persistence.Migrations;
 
 namespace Ymir.UnitTests.Sites;
 
 /// <summary>左側「小工具」（ADR-0029）：主題指示、自動發布的網站預設私人、iframe 相關的標頭與 cookie。</summary>
 public class ToolRulesTests
 {
+    [Fact]
+    public void MakeToolsMigration_DefersSeedUpdateUntilTheNewColumnExists()
+    {
+        // Idempotent script 的 IF 不會隔離 SQL 編譯；必須用動態 SQL 延後解析新增欄位。
+        var migration = new MakeTools();
+        var update = Assert.Single(migration.UpOperations.OfType<SqlOperation>());
+
+        Assert.StartsWith("EXEC(N'UPDATE [vibemaker].[make_topics] SET [produces_tool] = 1", update.Sql, StringComparison.Ordinal);
+        Assert.Contains("''0199b7a0-0000-7000-8000-000000000001''", update.Sql, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void ToolTopics_GetThePlatformPublishingInstruction()
     {

@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-15 18:23 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-15 22:47 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| DEP3 | 所有遠端分支核對、main 同步與新版正式部署 | 🚧 | 7 個遠端分支均已在 main；隔離 SQL 發現並修正 MakeTools idempotent script 的欄位解析問題；正式切換待本機 sudo，見 #085 |
 | TOOL1 | 左側「小工具」：/make 小工具自動發布，在 Ymir 內以 iframe 開啟 | 🔬 | [ADR-0029](../adr/0029-make-tools-sidebar.md)；後端、前端、測試與瀏覽器 e2e 通過；正式站需部署 SiteHost 與網站網域並套 VibeMaker migration `MakeTools`，見 #083、#084 |
 | CONN1 | 個人「連接與工具」：OneDrive 與 HTTP MCP 註冊管理 | 🔬 | [ADR-0028](../adr/0028-personal-connections-and-tools.md)；入口、加密註冊／測試／啟停／移除、權限與群組隔離、桌面／手機 E2E 通過；尚未正式部署，見 #081 |
 | USR1 | 管理 → 使用者：改名、變更角色、刪除帳號，新增訪客角色 | 🔬 | [ADR-0027](../adr/0027-admin-user-management-and-guest-role.md)；後端、前端與測試通過；未做瀏覽器 e2e，正式站需套 Platform migration `UserAdminManagement`，見 #080 |
@@ -118,6 +119,18 @@
 ---
 
 ## 💬 留言區
+
+### #085 · 全部分支核對、main 同步與部署前 migration 修正
+
+> 👤 **OpenCode（AI）** · 🕒 2026-10-15 22:47 · `🔧修正`
+
+- **範圍**：使用者要求合併全部 branch、pull 最新並重新部署。乾淨 main 執行 fetch／rebase，`ea1c1c1` 已包含目前 7 個 `origin/claude/*` 分支，不製造多餘 merge、不刪除分支。該提交 CI [38723526596](https://github.com/puremars2015/Ymir/actions/runs/38723526596) 的 .NET、Angular、Agent image 全數通過。
+- **部署預演發現**：獨立、無網路的暫時 SQL container 套用 idempotent migration 時，`MakeTools` 更新 `produces_tool` 的敘述在新欄位建立前就被 SQL Server 編譯，報 `Invalid column name 'produces_tool'`。修正為 `EXEC(N'UPDATE ...')` 延後解析，補單元回歸測試；不更改 migration ID、資料模型或已套用資料庫的歷史。
+- **修正後實際驗證**：`dotnet build` 0 警告／錯誤，712 單元測試全通過、無略過，format 與兩模組 `has-pending-model-changes` 通過。重新產生的兩模組 idempotent SQL 在全新隔離 SQL container 連續套用兩次，兩次完整 migration history 均符合固定清單（Platform 8 筆、VibeMaker 20 筆）；測完僅停止並移除該新建測試 container，未連正式 SQL。主機部署器 14 個檢查通過。
+- **正式站尚未切換**：四個正式 unit active，本機 health Healthy、公開 `/login` HTTP 200。API 當前 `NRestarts=3`，不宣稱先前 GC 問題已解決。主機專用部署器沿用上輪備份／校驗／migration history／安全設定比對／失敗回復流程，固定三筆待套 migration（`UserAdminManagement`、`PersonalMcpServers`、`MakeTools`）。準備完成後需使用者在本機終端授權 sudo，不在聊天提供密碼。
+- **保留邊界**：不新增 DNS、不擅自啟用 SiteHost、維護服務或未配置的 Google SSO；小工具的正式網站網域與 SiteHost 仍待配置。真登入、加密資料解密、Pi SSE、Graph／第三方 MCP 仍需人工驗收。
+
+---
 
 ### #084 · 小工具與 main 整合（ADR 改編號 0029、migration 重新產生）
 
