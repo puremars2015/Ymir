@@ -30,12 +30,17 @@ public sealed class OneDriveLinkedItem
 
     public static OneDriveLinkedItem Create(Guid id, Guid userId, Guid scopeId, string driveId, string itemId, string name, string localName, bool isFolder, bool readOnly, DateTimeOffset now) => new()
     {
-        Id = id, UserId = userId, ScopeId = scopeId,
+        Id = id,
+        UserId = userId,
+        ScopeId = scopeId,
         DriveId = DomainGuard.RequiredText(driveId, OneDriveConnection.DriveIdMaxLength, nameof(driveId)),
         ItemId = DomainGuard.RequiredText(itemId, OneDriveConnection.ItemIdMaxLength, nameof(itemId)),
         Name = DomainGuard.RequiredText(name, 255, nameof(name)),
         LocalName = DomainGuard.RequiredText(localName, 200, nameof(localName)),
-        IsFolder = isFolder, ReadOnly = readOnly, CreatedAt = now, State = OneDriveLinkedItemState.Pending,
+        IsFolder = isFolder,
+        ReadOnly = readOnly,
+        CreatedAt = now,
+        State = OneDriveLinkedItemState.Pending,
     };
 
     public void SetReadOnly(bool readOnly) => ReadOnly = readOnly;
@@ -68,7 +73,9 @@ public sealed class OneDriveLinkedFile
 
     public static OneDriveLinkedFile Create(Guid linkId, string path) => new()
     {
-        Id = Guid.NewGuid(), LinkId = linkId, Path = path,
+        Id = Guid.NewGuid(),
+        LinkId = linkId,
+        Path = path,
         PathKey = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(path))),
     };
 
