@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-15 02:30 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-15 12:30 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -53,6 +53,7 @@
 |---|---|---|---|
 | ARCH2 | 架構文件標記正式／舊容器及主機程序 | ✅ | 7 個固定容器＋動態 Agent 的角色清單，root／itadmin／ymir 分區、舊容器與實際模型代理路徑，見 #074 |
 | RES1 | 管理員 CPU／RAM／磁碟、Ymir container／image 監控與保留期限／低資源自動回收 | 🔬 | [ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 已採納並實作（維護服務、鎖、API、系統資源頁）；測試與瀏覽器驗證通過；正式主機安裝與啟用待使用者授權，見 #074 |
+| GRP1 | 群組聊天與 @bot（每個群組一個 Agent container） | 🔬 | [ADR-0026](../adr/0026-group-chat-and-group-agent.md)；後端、前端、測試與瀏覽器驗證通過；正式站尚未部署，見 #076 |
 | DM1 | 使用者之間的一對一訊息、右側成員面板（[ADR-0023](../adr/0023-user-direct-messages.md)） | ✅ | 使用者 2026-10-14 要求（簡易版 Teams）；SSE 即時、未讀／已讀、窄螢幕抽屜；分支 `claude/hopeful-ptolemy-4rodpw`，見 #064 |
 | G1 | **插單** Google 帳號 SSO 登入（[ADR-0024](../adr/0024-google-account-sso.md)） | ✅ | 部署設定白名單（`hd` 網域 / email）必填；實際連 Google 待使用者環境確認，見 #065 |
 | O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 🚧 | 使用者已要求實作；O3a 自己整個 drive 瀏覽／搜尋與設定頁入口通過測試，檔案連結／下載／寫回／刪除保護尚未完成，未部署，見 #075 |
@@ -114,6 +115,34 @@
 ---
 
 ## 💬 留言區
+
+### #076 · 群組聊天與 @bot（ADR-0026）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-15 12:30 · `🔬驗證`
+
+- **需求**：使用者要求 (1) 群組聊天；(2) 群組中以 `@bot` 與 Agent 交談，同一群組第一次呼叫時建立該群組專屬的 Agent container。
+- **使用者決定**：模型費用記在呼叫者；Agent 背景是最近的群組訊息；擴充能力依呼叫者權限；任何人可建立群組、建立者管理。依此新增 [ADR-0026](../adr/0026-group-chat-and-group-agent.md)（修訂 ADR-0007、0008、0023）。補充：呼叫者的個人連結（OneDrive、個人 system prompt）不帶入群組 workspace（成員共用）。
+- **開發方式（使用者核准的一次性例外）**：原工作目錄有另一個工作階段尚未 commit 的 OneDrive 修改，為避免互相干擾，另開 worktree 開發，完成後 rebase 到最新 origin/main 並推送 main（不建 PR、不 merge commit）。
+- **後端**：
+  - Platform：`platform.chat_groups` / `chat_group_members` / `chat_group_messages`（migration `ChatGroups`）、`IChatGroupService`；`/api/chat-groups`（清單、建立、詳情、改名、成員加入 / 移除 / 退出、封存、訊息、已讀）；非成員 / 已封存一律 404；群組異動寫稽核（不含內文）；即時通知沿用 `/api/direct-messages/events`（`group-message` / `group-updated` / `group-read`）。
+  - @bot：`ExecutionService.SubmitForGroupAsync` 在群組的 Agent 對話（擁有者 = 群組 id）建立 execution，`AgentExecution.UserId` = 呼叫者。`ExecutionRunner` 以對話擁有者為 runtime 擁有者（container、workspace、鎖、閒置停止），以呼叫者計算模型、配額、預算與擴充能力；群組執行不做 OneDrive、不附個人 system prompt，改用群組 system prompt；模型 key 改為只給這次執行、結束即撤銷（避免共用 workspace 留下可用的 key）。runtime host 協定不變。
+  - 背景：最近 30 則（約 8000 字）群組訊息放在 `<group-chat>` 資料區塊並跳脫結尾標籤。Bot 回覆先存 Pending，`GroupBotWorker` 依 execution 結果補齊（API 重啟後仍會補）；成員以 `/api/chat-groups/{id}/executions/{executionId}/events` 看即時回答。
+  - 管理介面執行環境清單以「群組：名稱」顯示群組 runtime；`RuntimeLifecycleService` 判斷執行中時納入群組對話。
+- **前端**：成員面板加「成員 / 群組」分頁；建立群組、群組對話（顯示寄件者、Bot 回覆標示呼叫者、Pending 時即時顯示「正在思考中 / 工作中」與回答）、成員管理（擁有者改名 / 加入 / 移除 / 封存，成員退出）；輸入 @bot 時提示費用記在自己帳號；工具列未讀數含群組。共用樣式抽到 `layout/_chat-panel.scss`。
+- **驗證（實際執行）**：
+  - `dotnet build` 0 警告、`dotnet format --verify-no-changes` 通過；新增整合測試 `ChatGroupTests`（成員資格、非成員 404、擁有者權限、退出 / 移除 / 封存、@bot 以呼叫者執行、成員 / 非成員串流權限、背景含群組訊息且跳脫、群組對話不出現在個人清單、workspace 屬於群組 id）與單元測試 `GroupPromptBuilderTests`；授權矩陣、OpenAPI 快照與前端 schema 更新（既有 path 只有 SSE 說明文字變更）；全套 `dotnet test --solution Ymir.slnx`（Pi 1.0.0）932 通過、0 失敗、0 略過；rebase 到含 OneDrive 瀏覽（#075）的 main 後重跑 943 通過、前端 206 項通過、schema 與重新產生的一致。整合測試使用獨立的暫時 SQL container（port 14334），未使用正式 `ymir-sql`。
+  - 前端 lint、`npm test`（39 檔 203 項）、build 通過。
+  - 瀏覽器（`npm run e2e:groups`，兩個帳號 + 手機寬度）：建立群組、即時未讀、即時收發與 HTML 不被解譯、@bot 即時回答並完成（呼叫者與其他成員都看到）、只有擁有者能管理、成員退出後群組消失、手機抽屜，全部通過；修正封存與改名按鈕樣式。
+- **未驗證 / 待決定**：未以真實 Pi + 模型測試群組 Agent（使用示範 harness）；正式站尚未部署（需要 migration `ChatGroups`）。群組檔案面板（下載 Agent 產出的檔案）列為之後的階段。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #075 · ADR-0022 採納與第一個實作切片 O3a：整個自己的 OneDrive 瀏覽／搜尋
 
