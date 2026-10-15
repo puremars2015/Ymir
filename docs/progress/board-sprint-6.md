@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-15 23:59 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-16 00:10 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| GRP2 | 右側面板可拖曳調整寬度；群組聊天可上傳檔案給 @bot | 🔬 | ADR-0026 補充；後端、前端、整合測試與瀏覽器 e2e 通過；已整合回 main、尚未部署，見 #089 |
 | DEP3 | 所有遠端分支核對、main 同步與新版正式部署 | ✅ | 7 個遠端分支均已在 main；修正 MakeTools idempotent SQL 後，經本機 sudo 授權完成 e7cf9f9 正式部署，四個 unit／health／公開登入頁通過；真登入與 Pi SSE 待人工驗收，見 #085 |
 | TOOL1 | 左側「小工具」：/make 小工具自動發布，在 Ymir 內以 iframe 開啟 | 🔬 | [ADR-0029](../adr/0029-make-tools-sidebar.md)；後端、前端、測試與瀏覽器 e2e 通過；正式站需部署 SiteHost 與網站網域並套 VibeMaker migration `MakeTools`，見 #083、#084 |
 | CONN1 | 個人「連接與工具」：OneDrive 與 HTTP MCP 註冊管理 | 🔬 | [ADR-0028](../adr/0028-personal-connections-and-tools.md)；入口、加密註冊／測試／啟停／移除、權限與群組隔離、桌面／手機 E2E 通過；尚未正式部署，見 #081 |
@@ -119,6 +120,26 @@
 ---
 
 ## 💬 留言區
+
+### #089 · 右側面板可調整寬度、群組附件給 @bot
+
+> 👤 **Claude（AI）** · 🕒 2026-10-16 00:10 · `🔬驗證`
+
+- **需求**：使用者要求調整右側聊天區塊的 UI / UX：(1) 成員與群組的右側面板可以拖動放寬或收窄；(2) 群組聊天也要能上傳檔案給 AI Agent。
+- **面板寬度**：新元件 `app-panel-resizer`（面板左緣、寬 0，以偽元素擴大可拖曳範圍），拖曳、聚焦後左右鍵 / Home / End 調整、雙擊還原預設 18rem；寬度（256～640 px）記在 `localStorage` 的 `ymir.peopleWidth`，CSS 再以 `100vw - 40rem` 限制，保留中間對話區。窄螢幕的抽屜不變。純函式在 `panel-width.ts` 並有 Vitest。
+- **群組附件**（ADR-0026 補充）：`POST /api/chat-groups/{id}/attachments`（成員才可，非成員 404）經 `AttachmentService.UploadForGroupAsync` 寫進群組 Agent 對話的 `uploads/`（runtime 擁有者 = 群組 id，與 @bot 共用 `GroupConversations.GetOrCreateAsync`）。`SendGroupMessageRequest.AttachmentIds` 只能隨 @bot 送出、只能綁定自己上傳且未送出的附件；送出前先檢查，群組訊息本文附上「📎 檔名」。綁定後與個人附件相同（路徑附加到 prompt、圖片經 Pi `images`）。前端：迴紋針按鈕、拖放、貼上；有附件時自動補 `@bot`，沒有輸入問題時用預設說明；依序上傳後才送出。上傳的暫存檔處理抽成 `AttachmentEndpoints.ReceiveAsync` 共用。
+- **驗證（實際執行）**：`dotnet build` 0 警告、`dotnet format --verify-no-changes` 通過；單元測試 712 通過；整合測試 `ChatGroupTests`（新增群組附件：非成員 404、檔案在群組 workspace、一般訊息帶附件 400、其他成員不能用別人的附件、Agent 收到路徑、不能重複使用）、`AttachmentTests`、`AuthorizationMatrixTests`、`OpenApiSnapshotTests` 共 20 項通過；OpenAPI 快照與 `schema.ts` 已更新。前端 lint、`ng test`（44 檔 225 項）、build 通過。瀏覽器 e2e `e2e:groups`（`group-chat-flow.mjs` 新增附件與面板寬度步驟：拖曳變寬、重新整理後記住、Home 縮到最小、雙擊還原）全數通過並截圖確認。整合測試全套未重跑。
+- **分支**：本 session 指定在 `claude/trusting-ritchie-al9xjk` 開發並推送（與 CLAUDE.md「直接在 main」規則不同，依 session 指示），使用者要求整合回 main：rebase 到最新 main（含 #087、#088）後重新驗證並推送 main。
+- **部署**：無 migration；正式站需重建 API image（含 Angular）才會生效。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #088 · RES1 對照 ADR-0025 補齊：資源不足告警
 
