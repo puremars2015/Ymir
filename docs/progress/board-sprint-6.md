@@ -51,7 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
-| TOOL1 | 左側「小工具」：/make 小工具自動發布，在 Ymir 內以 iframe 開啟 | 🔬 | [ADR-0029](../adr/0029-make-tools-sidebar.md)；後端、前端、測試與瀏覽器 e2e 通過；正式站需部署 SiteHost 與網站網域並套 VibeMaker migration `MakeTools`，見 #083 |
+| TOOL1 | 左側「小工具」：/make 小工具自動發布，在 Ymir 內以 iframe 開啟 | 🔬 | [ADR-0029](../adr/0029-make-tools-sidebar.md)；後端、前端、測試與瀏覽器 e2e 通過；正式站需部署 SiteHost 與網站網域並套 VibeMaker migration `MakeTools`，見 #083、#084 |
 | CONN1 | 個人「連接與工具」：OneDrive 與 HTTP MCP 註冊管理 | 🔬 | [ADR-0028](../adr/0028-personal-connections-and-tools.md)；入口、加密註冊／測試／啟停／移除、權限與群組隔離、桌面／手機 E2E 通過；尚未正式部署，見 #081 |
 | USR1 | 管理 → 使用者：改名、變更角色、刪除帳號，新增訪客角色 | 🔬 | [ADR-0027](../adr/0027-admin-user-management-and-guest-role.md)；後端、前端與測試通過；未做瀏覽器 e2e，正式站需套 Platform migration `UserAdminManagement`，見 #080 |
 | ARCH2 | 架構文件標記正式／舊容器及主機程序 | ✅ | 7 個固定容器＋動態 Agent 的角色清單，root／itadmin／ymir 分區、舊容器與實際模型代理路徑，見 #074 |
@@ -118,6 +118,24 @@
 ---
 
 ## 💬 留言區
+
+### #084 · 小工具與 main 整合（ADR 改編號 0029、migration 重新產生）
+
+> 👤 **Claude（AI）** · 🕒 2026-10-15 19:05 · `🔧修正`
+
+- **整合**：推送前 origin/main 已有另一工作階段的「個人連接與工具」（ADR-0028、migration `PersonalMcpServers`）。rebase 時解決衝突並保留雙方：`ExecutionRunner` 同時注入 `PersonalMcpService` 與 `SiteService`、ADR 索引兩筆都保留；本功能改為 **ADR-0029**（檔名、程式註解、CLAUDE.md、看板 #083 同步）。
+- **migration**：`MakeTools` 原本在 `PersonalMcpServers` 之前產生，已在其後重新產生（`20261015103507_MakeTools`，內容相同、含預設主題的 `produces_tool` 更新），model snapshot 與 main 一致，`has-pending-model-changes` 無變更。
+- **驗證（整合後實際執行）**：`dotnet build` 0 警告、`dotnet format --verify-no-changes` 通過；單元測試 711 通過；OpenAPI 快照與前端 schema 重新產生後無差異；整合測試全套 342 項第一次 307 通過、11 項逾時失敗（同時在跑 4 分鐘的前端 build，主機只剩約 2 GB 記憶體，失敗項目都執行 1～4 分鐘），單獨重跑這 10 個類別 67 項全部通過；前端 lint、`ng test`（43 檔 219 項）、build 通過。整合測試使用獨立暫時 SQL container（port 14339），未使用正式 `ymir-sql`。
+- **待辦**：同 #083——正式站需部署 SiteHost 與網站網域、備份後套 migration `MakeTools`。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #083 · 左側「小工具」（ADR-0029）
 
