@@ -13,7 +13,7 @@ public interface IUserDirectory
 
     Task<User?> FindAsync(Guid userId, CancellationToken cancellationToken);
 
-    /// <summary>管理用列表（Admin，SA §4）：依名稱 / 帳號 / email 搜尋，依最後登入時間排序。</summary>
+    /// <summary>管理用列表（Admin，SA §4）：依名稱 / 帳號 / email 搜尋，依最後登入時間排序；不含已刪除的帳號（ADR-0027）。</summary>
     Task<IReadOnlyList<User>> ListAsync(string? search, int take, CancellationToken cancellationToken);
 
     /// <summary>依 id 批次取得使用者（稽核頁、總覽顯示名稱用）；找不到的 id 不會出現在結果中。</summary>
@@ -25,8 +25,17 @@ public interface IUserDirectory
     /// <summary>總覽統計（Admin 總覽，ADR-0010）。</summary>
     Task<UserStatistics> GetStatisticsAsync(DateTimeOffset activeSince, CancellationToken cancellationToken);
 
-    /// <summary>停用 / 啟用；找不到使用者時回傳 null。</summary>
+    /// <summary>停用 / 啟用；找不到使用者（含已刪除）時回傳 null。</summary>
     Task<User?> SetStatusAsync(Guid userId, UserStatus status, CancellationToken cancellationToken);
+
+    /// <summary>Admin 設定顯示名稱（ADR-0027）；找不到使用者（含已刪除）時回傳 null。</summary>
+    Task<User?> RenameAsync(Guid userId, string displayName, CancellationToken cancellationToken);
+
+    /// <summary>Admin 變更角色（ADR-0027）；找不到使用者（含已刪除）時回傳 null。</summary>
+    Task<User?> ChangeRoleAsync(Guid userId, UserRole role, CancellationToken cancellationToken);
+
+    /// <summary>刪除帳號並移除本機帳號密碼（ADR-0027）；找不到使用者（含已刪除）時回傳 null。</summary>
+    Task<User?> DeleteAsync(Guid userId, CancellationToken cancellationToken);
 }
 
 /// <param name="ActiveSince">在 activeSince 之後登入過的使用者數。</param>

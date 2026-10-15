@@ -83,7 +83,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
         });
 
         // 使用者之間的訊息（ADR-0023）；同一模組內，可以建 FK。兩個 FK 都指向 users，SQL Server 不允許兩條串聯刪除路徑，所以不串聯
-        //（使用者只會停用、不會刪除）。
+        //（使用者刪除只是標示 Deleted，資料列保留，ADR-0027）。
         modelBuilder.Entity<DirectMessage>(message =>
         {
             message.ToTable("direct_messages");
@@ -98,7 +98,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             message.HasIndex(m => new { m.RecipientId, m.ReadAt });
         });
 
-        // 群組聊天（ADR-0026）；同一模組內可以建 FK。使用者只會停用、不會刪除，所以不串聯刪除使用者。
+        // 群組聊天（ADR-0026）；同一模組內可以建 FK。使用者刪除只是標示 Deleted（ADR-0027），所以不串聯刪除使用者。
         modelBuilder.Entity<ChatGroup>(group =>
         {
             group.ToTable("chat_groups");

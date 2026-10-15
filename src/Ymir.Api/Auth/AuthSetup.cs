@@ -44,6 +44,9 @@ internal static class AuthSetup
     /// <summary>Admin 專用端點的 policy（SA §4）。</summary>
     public const string AdminPolicy = "AdminOnly";
 
+    /// <summary>使用者之間的訊息與群組聊天的 policy：訪客不能使用（ADR-0027）。</summary>
+    public const string MessagingPolicy = "Messaging";
+
     /// <summary>帳號密碼登入的 rate limit policy（每個來源 IP）。</summary>
     public const string PasswordLoginRateLimit = "password-login";
 
@@ -96,7 +99,8 @@ internal static class AuthSetup
 
         services.AddAuthorizationBuilder()
             .SetFallbackPolicy(new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build())
-            .AddPolicy(AdminPolicy, policy => policy.RequireAuthenticatedUser().RequireRole(nameof(UserRole.Admin)));
+            .AddPolicy(AdminPolicy, policy => policy.RequireAuthenticatedUser().RequireRole(nameof(UserRole.Admin)))
+            .AddPolicy(MessagingPolicy, policy => policy.RequireAuthenticatedUser().RequireRole(nameof(UserRole.User), nameof(UserRole.Admin)));
 
         // 帳號密碼登入：每個來源 IP 每分鐘有次數上限（預設 10），搭配帳號鎖定減緩猜密碼。
         services.AddRateLimiter(options =>

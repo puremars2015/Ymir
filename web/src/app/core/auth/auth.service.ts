@@ -2,6 +2,7 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { catchError, map, Observable, of, tap } from 'rxjs';
 import { ApiService } from '../api/api.service';
 import { Me, UserRole } from '../api/api-types';
+import { canUseMessaging } from './auth-rules';
 
 /** 目前登入的使用者。前端不保存任何 token，登入狀態以 `/api/me` 為準（ADR-0002）。 */
 @Injectable({ providedIn: 'root' })
@@ -11,6 +12,8 @@ export class AuthService {
 
   readonly user = this.current.asReadonly();
   readonly isAdmin = computed(() => this.current()?.role === 'Admin');
+  /** 訪客沒有使用者之間的訊息與群組聊天（ADR-0027）。 */
+  readonly canUseMessaging = computed(() => canUseMessaging(this.current()));
   /** 本機帳號第一次登入（或被重設密碼）後必須先改密碼（ADR-0009）。 */
   readonly mustChangePassword = computed(() => this.current()?.mustChangePassword === true);
 

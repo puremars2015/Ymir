@@ -20,13 +20,13 @@ internal static class DirectMessageEndpoints
 
     /// <summary>
     /// SSE 心跳間隔：Cloudflare 等代理會切斷閒置超過 100 秒的連線（ADR-0006）；
-    /// 每次心跳也重新確認帳號狀態，停用的帳號不會一直收到通知（ADR-0009）。
+    /// 每次心跳也重新確認帳號狀態，停用或改成訪客的帳號不會一直收到通知（ADR-0009、ADR-0027）。
     /// </summary>
     internal static TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(25);
 
     public static IEndpointRouteBuilder MapDirectMessageEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/direct-messages").WithTags("DirectMessages").RequireAntiforgeryHeader();
+        var group = endpoints.MapGroup("/api/direct-messages").WithTags("DirectMessages").RequireAuthorization(AuthSetup.MessagingPolicy).RequireAntiforgeryHeader();
         group.MapGet("/contacts", ListContactsAsync).WithName("ListDirectContacts");
         group.MapGet("/events", StreamEvents)
             .WithName("StreamDirectMessageEvents")
@@ -98,7 +98,7 @@ internal static class DirectMessageEndpoints
             var delay = Task.Delay(HeartbeatInterval, heartbeat.Token);
             if (await Task.WhenAny(next, delay) != next)
             {
-                if (await users.FindAsync(userId, cancellationToken) is not { Status: UserStatus.Active })
+                if (await users.FindAsync(userId, cancellationToken) is not { Status: UserStatus.Active, Role: not UserRole.Guest })
                 {
                     yield break;
                 }

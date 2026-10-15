@@ -394,6 +394,18 @@ export class ApiService {
     return this.http.post<void>(`/api/admin/users/${userId}/reset-password`, { newPassword });
   }
 
+  adminRenameUser(userId: string, displayName: string): Observable<AdminUser> {
+    return this.http.put<AdminUser>(`/api/admin/users/${userId}/display-name`, { displayName });
+  }
+
+  adminChangeUserRole(userId: string, role: UserRole): Observable<AdminUser> {
+    return this.http.put<AdminUser>(`/api/admin/users/${userId}/role`, { role });
+  }
+
+  adminDeleteUser(userId: string): Observable<void> {
+    return this.http.delete<void>(`/api/admin/users/${userId}`);
+  }
+
   listProjects(): Observable<Project[]> {
     return this.http.get<Project[]>('/api/projects');
   }

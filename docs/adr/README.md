@@ -30,6 +30,7 @@
 | [0024](0024-google-account-sso.md) | Google 帳號 SSO 登入 | 已採納 |
 | [0025](0025-ymir-resource-monitoring-and-reclamation.md) | Ymir 資源監控與安全自動回收 | 已採納 |
 | [0026](0026-group-chat-and-group-agent.md) | 群組聊天與群組 Agent（@bot） | 已採納 |
+| [0027](0027-admin-user-management-and-guest-role.md) | 管理員的使用者管理（改名、角色、刪除）與訪客角色 | 已採納 |
 
 新增 ADR 時複製以下格式：
 

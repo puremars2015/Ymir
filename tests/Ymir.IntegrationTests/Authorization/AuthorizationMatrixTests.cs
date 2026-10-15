@@ -161,6 +161,15 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         {
             Content = JsonContent.Create(new ResetPasswordRequest("intruder-password-123")),
         },
+        ["PUT /api/admin/users/{userId:guid}/display-name"] = () => new HttpRequestMessage(HttpMethod.Put, $"/api/admin/users/{Guid.NewGuid()}/display-name")
+        {
+            Content = JsonContent.Create(new RenameUserRequest("Intruder")),
+        },
+        ["PUT /api/admin/users/{userId:guid}/role"] = () => new HttpRequestMessage(HttpMethod.Put, $"/api/admin/users/{Guid.NewGuid()}/role")
+        {
+            Content = JsonContent.Create(new ChangeUserRoleRequest(UserRole.Admin)),
+        },
+        ["DELETE /api/admin/users/{userId:guid}"] = () => new HttpRequestMessage(HttpMethod.Delete, $"/api/admin/users/{Guid.NewGuid()}"),
         ["GET /api/admin/make-topics/"] = () => Get("/api/admin/make-topics"),
         ["POST /api/admin/make-topics/"] = () => new HttpRequestMessage(HttpMethod.Post, "/api/admin/make-topics")
         {

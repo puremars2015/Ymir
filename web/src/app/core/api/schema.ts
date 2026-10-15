@@ -533,6 +533,54 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/admin/users/{userId}/display-name': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['AdminRenameUser'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/users/{userId}/role': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['AdminChangeUserRole'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/admin/users/{userId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations['AdminDeleteUser'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/admin/overview': {
     parameters: {
       query?: never;
@@ -1505,6 +1553,7 @@ export interface components {
       lastLoginAt: null | string;
       /** Format: date-time */
       createdAt: string;
+      canChangeAdminRole: boolean;
     };
     ArtifactGroupResponse: {
       /** Format: uuid */
@@ -1568,6 +1617,9 @@ export interface components {
     ChangePasswordRequest: {
       currentPassword: null | string;
       newPassword: null | string;
+    };
+    ChangeUserRoleRequest: {
+      role: null | components['schemas']['UserRole'];
     };
     ChatGroupMemberResponse: {
       /** Format: uuid */
@@ -2172,6 +2224,9 @@ export interface components {
     RenameChatGroupRequest: {
       name: null | string;
     };
+    RenameUserRequest: {
+      displayName: null | string;
+    };
     RepublishSiteRequest: {
       /** Format: uuid */
       conversationId: null | string;
@@ -2507,7 +2562,7 @@ export interface components {
       provider?: null | string;
     };
     /** @enum {unknown} */
-    UserRole: 'User' | 'Admin';
+    UserRole: 'User' | 'Admin' | 'Guest';
     UserSearchResult: {
       /** Format: uuid */
       id: string;
@@ -2518,7 +2573,7 @@ export interface components {
       systemPrompt: null | string;
     };
     /** @enum {unknown} */
-    UserStatus: 'Active' | 'Disabled';
+    UserStatus: 'Active' | 'Disabled' | 'Deleted';
     UserUsageResponse: {
       /** Format: uuid */
       userId: string;
@@ -3499,6 +3554,78 @@ export interface operations {
         'application/json': components['schemas']['ResetPasswordRequest'];
       };
     };
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AdminRenameUser: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RenameUserRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminUserResponse'];
+        };
+      };
+    };
+  };
+  AdminChangeUserRole: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ChangeUserRoleRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminUserResponse'];
+        };
+      };
+    };
+  };
+  AdminDeleteUser: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description No Content */
       204: {

@@ -9,7 +9,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 |---|---|
 | `docs/sa/vibe-maker-core-mvp-sa.md` | SA（需求、資料模型、API、SSE 契約、驗收條件），以章節編號引用，例如「SA §10」 |
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
-| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0026；索引見 `docs/adr/README.md`） |
+| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0027；索引見 `docs/adr/README.md`） |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
 | `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
@@ -151,6 +151,8 @@ RAG 知識庫（ADR-0014）：專案擁有者在專案頁上傳文件（`/api/pr
 群組聊天與 @bot（ADR-0026）：共用核心 `platform.chat_groups` / `chat_group_members` / `chat_group_messages`、`IChatGroupService`；端點 `/api/chat-groups`（任何人建立、擁有者管理、成員可退出；非成員 / 已封存一律 404），通知走同一條 `/api/direct-messages/events`（`group-message` / `group-updated` / `group-read`，`group-updated` 的內容在前端 `core/messaging/group-events.ts` 手寫，與後端 `GroupUpdatedResponse` 同步）。訊息以 `@bot` 開頭時（`GroupPromptBuilder.ParseBotRequest`）由 `ExecutionService.SubmitForGroupAsync` 在群組的 Agent 對話（`Conversation.UserId` = 群組 id，不會出現在任何人的對話清單）建立 execution，`AgentExecution.UserId` 是呼叫者：**runtime 擁有者 = 對話擁有者**（container、workspace、執行鎖、閒置停止都以群組 id），費用、配額、模型與擴充能力以呼叫者計算；群組執行一律不帶 OneDrive 與個人 system prompt，模型 key 用 `RuntimeCredentialService.IssueForExecutionAsync`（只給這次、結束即撤銷）。背景以最近 30 則群組訊息放在 `<group-chat>` 資料區塊。Bot 回覆先存 Pending，`GroupBotWorker` 依 execution 結果補齊（重啟後仍會補）；成員看即時回答用 `/api/chat-groups/{id}/executions/{executionId}/events`（成員 + 該群組的 execution 才可讀）。runtime host 協定不變。
 
 使用者之間的訊息（ADR-0023）：共用核心 `platform.direct_messages`、`IDirectMessageService` / `IDirectMessageHub`（程序內，只支援單一 API 程序）；端點 `/api/direct-messages`（`contacts`、`{peerId}`、`{peerId}/read`、SSE `events`），一律以目前使用者為其中一方，收件者不存在 / 停用 / 自己都回 404；訊息不寫稽核。前端 shell 右側 `app-people-panel`（`DirectMessageStore`，每次 SSE `ready` 重新讀取補齊），訊息只以文字綁定顯示。
+
+使用者管理與訪客（ADR-0027）：Admin 在「管理 → 使用者」改顯示名稱（`display_name_overridden`，之後登入不被 IdP 覆寫）、變更角色、刪除帳號。角色 `User` / `Admin` / `Guest`；企業帳號與 Google 帳號的 IdP 只同步「是否為 Admin」（`User.SyncRole`），Ymir 只能在使用者與訪客之間切換（`AdminEndpoints.CanChangeRole`），不能改自己的角色、不能刪除自己。訪客與使用者相同，但 `/api/direct-messages/*`、`/api/chat-groups/*` 套 `AuthSetup.MessagingPolicy`（訪客 403），不出現在聯絡人、不能被加入群組，前端 `canUseMessaging` 隱藏成員面板。刪除是 `UserStatus.Deleted`（資料列保留給歷史紀錄，`(issuer, subject)` 釋放、本機密碼刪除，同一身分可重新建立成新使用者），並與停用一樣清理 runtime；檢查帳號有效一律用 `Status == Active`。
 
 可選模型：`VibeMaker__Models__N__Id` / `DisplayName` / `Provider`（預設為 `VibeMaker__Pi__ModelId`；provider 只在管理介面顯示，使用者只看到模型名稱，只有同一份清單裡有同名模型時才以「名稱 (provider)」區分，ADR-0020 補充）；個人與專案 system prompt 以檔案附加在 Pi 預設 prompt 之後（`--append-system-prompt`，不經程序參數）。
 

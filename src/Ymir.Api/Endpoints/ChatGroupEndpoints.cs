@@ -20,7 +20,7 @@ internal static class ChatGroupEndpoints
 
     public static IEndpointRouteBuilder MapChatGroupEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/chat-groups").WithTags("ChatGroups").RequireAntiforgeryHeader();
+        var group = endpoints.MapGroup("/api/chat-groups").WithTags("ChatGroups").RequireAuthorization(AuthSetup.MessagingPolicy).RequireAntiforgeryHeader();
         group.MapGet("/", ListAsync).WithName("ListChatGroups").Produces<List<ChatGroupSummaryResponse>>();
         group.MapPost("/", CreateAsync).WithName("CreateChatGroup").Produces<ChatGroupResponse>(StatusCodes.Status201Created);
         group.MapGet("/{groupId:guid}", GetAsync).WithName("GetChatGroup").Produces<ChatGroupResponse>();

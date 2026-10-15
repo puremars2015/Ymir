@@ -38,7 +38,8 @@ internal sealed class DirectMessageService(PlatformDbContext db, IDirectMessageH
             }
         }
 
-        var query = db.Users.AsNoTracking().Where(u => u.Status == UserStatus.Active && u.Id != userId);
+        // 訪客不能使用訊息（ADR-0027），不出現在名單。
+        var query = db.Users.AsNoTracking().Where(u => u.Status == UserStatus.Active && u.Role != UserRole.Guest && u.Id != userId);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
@@ -95,7 +96,7 @@ internal sealed class DirectMessageService(PlatformDbContext db, IDirectMessageH
         }
 
         if (recipientId == senderId
-            || !await db.Users.AsNoTracking().AnyAsync(u => u.Id == recipientId && u.Status == UserStatus.Active, cancellationToken).ConfigureAwait(false))
+            || !await db.Users.AsNoTracking().AnyAsync(u => u.Id == recipientId && u.Status == UserStatus.Active && u.Role != UserRole.Guest, cancellationToken).ConfigureAwait(false))
         {
             return new(DirectMessageSendOutcome.RecipientNotFound, null);
         }

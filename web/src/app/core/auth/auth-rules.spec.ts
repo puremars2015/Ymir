@@ -1,6 +1,9 @@
 import { AdminUser, Me } from '../api/api-types';
 import {
+  assignableRoles,
   canToggleUser,
+  canUseMessaging,
+  describeRole,
   describeAuthMethod,
   isLocalPath,
   loginErrorMessage,
@@ -49,6 +52,31 @@ describe('auth rules', () => {
     expect(canToggleUser({ id: 'me' } as AdminUser, me)).toBe(false);
     expect(canToggleUser({ id: 'other' } as AdminUser, me)).toBe(true);
     expect(canToggleUser({ id: 'other' } as AdminUser, null)).toBe(false);
+  });
+
+  it('describes roles', () => {
+    expect(describeRole('Admin')).toBe('管理員');
+    expect(describeRole('User')).toBe('使用者');
+    expect(describeRole('Guest')).toBe('訪客');
+  });
+
+  it('limits role changes for self and IdP-managed admins', () => {
+    const me = { id: 'me' } as Me;
+    const local = { id: 'a', role: 'User', canChangeAdminRole: true } as AdminUser;
+    const idpUser = { id: 'b', role: 'Guest', canChangeAdminRole: false } as AdminUser;
+    const idpAdmin = { id: 'c', role: 'Admin', canChangeAdminRole: false } as AdminUser;
+    expect(assignableRoles(local, me)).toEqual(['User', 'Guest', 'Admin']);
+    expect(assignableRoles(idpUser, me)).toEqual(['User', 'Guest']);
+    expect(assignableRoles(idpAdmin, me)).toEqual([]);
+    expect(assignableRoles({ ...local, id: 'me' }, me)).toEqual([]);
+    expect(assignableRoles(local, null)).toEqual([]);
+  });
+
+  it('hides messaging from guests', () => {
+    expect(canUseMessaging({ role: 'User' } as Me)).toBe(true);
+    expect(canUseMessaging({ role: 'Admin' } as Me)).toBe(true);
+    expect(canUseMessaging({ role: 'Guest' } as Me)).toBe(false);
+    expect(canUseMessaging(null)).toBe(false);
   });
 
   it('validates new passwords', () => {

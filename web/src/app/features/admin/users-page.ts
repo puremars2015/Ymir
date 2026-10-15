@@ -25,8 +25,10 @@ import {
   UserRole,
 } from '../../core/api/api-types';
 import {
+  assignableRoles,
   canToggleUser,
   describeAuthMethod,
+  describeRole,
   newPasswordProblem,
   PASSWORD_MIN_LENGTH,
 } from '../../core/auth/auth-rules';
@@ -36,8 +38,8 @@ import { UserModelCard } from './user-model-card';
 
 /**
  * 使用者管理（Admin，SA §4、ADR-0009）：停用 / 啟用帳號、建立本機帳號、重設本機帳號密碼、
- * 個人的 Agent 擴充能力覆寫（ADR-0012）。
- * 企業帳號的角色以 Entra 的 app role 為準，不在這裡修改。
+ * 個人的 Agent 擴充能力覆寫（ADR-0012）；設定顯示名稱、變更角色（含訪客）、刪除帳號（ADR-0027）。
+ * 企業帳號與 Google 帳號是否為管理員以 IdP 為準，這裡只能在使用者與訪客之間切換。
  */
 @Component({
   selector: 'app-users-page',
@@ -84,8 +86,9 @@ import { UserModelCard } from './user-model-card';
             <label>
               角色
               <select name="role" [ngModel]="newRole()" (ngModelChange)="newRole.set($event)">
-                <option value="User">User</option>
-                <option value="Admin">Admin</option>
+                <option value="User">使用者</option>
+                <option value="Guest">訪客（不能使用訊息與群組）</option>
+                <option value="Admin">管理員</option>
               </select>
             </label>
             <label
@@ -170,7 +173,26 @@ import { UserModelCard } from './user-model-card';
                 </td>
                 <td>{{ user.accountName }}</td>
                 <td>{{ methodLabel(user) }}</td>
-                <td>{{ user.role === 'Admin' ? '管理員' : '使用者' }}</td>
+                <td>
+                  @if (roleOptions(user); as options) {
+                    @if (options.length > 0) {
+                      <select
+                        class="role-select"
+                        [attr.aria-label]="user.displayName + ' 的角色'"
+                        [disabled]="busy()"
+                        (change)="changeRole(user, $event)"
+                      >
+                        @for (role of options; track role) {
+                          <option [value]="role" [selected]="role === user.role">
+                            {{ roleLabel(role) }}
+                          </option>
+                        }
+                      </select>
+                    } @else {
+                      {{ roleLabel(user.role) }}
+                    }
+                  }
+                </td>
                 <td>
                   @if (user.status === 'Disabled') {
                     <span class="danger-text">已停用</span>
@@ -183,6 +205,14 @@ import { UserModelCard } from './user-model-card';
                 </td>
                 <td>
                   <span class="actions">
+                    <button
+                      type="button"
+                      class="link"
+                      [disabled]="busy()"
+                      (click)="startRename(user)"
+                    >
+                      改名
+                    </button>
                     @if (canToggle(user)) {
                       <button
                         type="button"
@@ -220,9 +250,49 @@ import { UserModelCard } from './user-model-card';
                         重設密碼
                       </button>
                     }
+                    @if (canToggle(user)) {
+                      <button
+                        type="button"
+                        class="link danger-text"
+                        [disabled]="busy()"
+                        (click)="remove(user)"
+                      >
+                        刪除
+                      </button>
+                    }
                   </span>
                 </td>
               </tr>
+              @if (renaming()?.id === user.id) {
+                <tr class="reset-row">
+                  <td colspan="7">
+                    <form class="inline-form" (ngSubmit)="rename(user)">
+                      <input
+                        name="displayName"
+                        aria-label="新的顯示名稱"
+                        maxlength="200"
+                        placeholder="顯示名稱"
+                        [ngModel]="renameText()"
+                        (ngModelChange)="renameText.set($event)"
+                      />
+                      <button
+                        type="submit"
+                        [disabled]="
+                          busy() || !renameText().trim() || renameText().trim() === user.displayName
+                        "
+                      >
+                        儲存
+                      </button>
+                      <button type="button" class="secondary" (click)="renaming.set(null)">
+                        取消
+                      </button>
+                    </form>
+                    @if (user.authMethod === 'Oidc' || user.authMethod === 'Google') {
+                      <p class="muted small">設定後，對方登入時不再使用公司帳號系統的名稱。</p>
+                    }
+                  </td>
+                </tr>
+              }
               @if (resetting()?.id === user.id) {
                 <tr class="reset-row">
                   <td colspan="7">
@@ -371,6 +441,9 @@ import { UserModelCard } from './user-model-card';
     tr.disabled td {
       opacity: 0.65;
     }
+    .role-select {
+      padding: 0.125rem 0.25rem;
+    }
     .actions {
       white-space: nowrap;
       display: inline-flex;
@@ -399,6 +472,8 @@ export class UsersPage implements OnInit {
   protected readonly newPassword = signal('');
 
   protected readonly resetting = signal<AdminUser | null>(null);
+  protected readonly renaming = signal<AdminUser | null>(null);
+  protected readonly renameText = signal('');
   protected readonly modelUser = signal<AdminUser | null>(null);
   protected readonly capabilities = CAPABILITIES;
   protected readonly grantSettings = GRANT_SETTINGS;
@@ -435,6 +510,70 @@ export class UsersPage implements OnInit {
 
   protected canToggle(user: AdminUser): boolean {
     return canToggleUser(user, this.me());
+  }
+
+  protected roleOptions(user: AdminUser): UserRole[] {
+    return assignableRoles(user, this.me());
+  }
+
+  protected roleLabel(role: UserRole): string {
+    return describeRole(role);
+  }
+
+  protected startRename(user: AdminUser): void {
+    this.renameText.set(user.displayName);
+    this.renaming.set(user);
+  }
+
+  protected rename(user: AdminUser): void {
+    this.run(this.api.adminRenameUser(user.id, this.renameText().trim()), (updated) => {
+      this.renaming.set(null);
+      this.replace(updated);
+      this.message.set(`已將「${user.displayName}」改名為「${updated.displayName}」。`);
+    });
+  }
+
+  protected changeRole(user: AdminUser, event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    const role = select.value as UserRole;
+    if (role === user.role) return;
+    const warning =
+      role === 'Guest'
+        ? '訪客不能使用成員訊息與群組聊天。'
+        : role === 'Admin'
+          ? '管理員可以管理所有使用者與系統設定。'
+          : '';
+    if (!confirm(`確定把「${user.displayName}」改成${describeRole(role)}？${warning}`)) {
+      // 取消時把下拉選單還原成原本的角色。
+      select.value = user.role;
+      return;
+    }
+    this.run(
+      this.api.adminChangeUserRole(user.id, role),
+      (updated) => {
+        this.replace(updated);
+        this.message.set(`${updated.displayName} 已改為${describeRole(updated.role)}。`);
+      },
+      () => (select.value = user.role),
+    );
+  }
+
+  protected remove(user: AdminUser): void {
+    if (
+      !confirm(
+        `確定刪除「${user.displayName}」？對方會立即被登出、無法再登入，執行中的工作也會停止。對話與檔案會保留，但不會再出現在清單中。`,
+      )
+    ) {
+      return;
+    }
+    this.run(this.api.adminDeleteUser(user.id), () => {
+      this.users.update((list) => list.filter((u) => u.id !== user.id));
+      this.message.set(`已刪除 ${user.displayName}。`);
+    });
+  }
+
+  private replace(updated: AdminUser): void {
+    this.users.update((list) => list.map((u) => (u.id === updated.id ? updated : u)));
   }
 
   protected toggleCreate(): void {
@@ -535,7 +674,7 @@ export class UsersPage implements OnInit {
     });
   }
 
-  private run<T>(request: Observable<T>, done: (value: T) => void): void {
+  private run<T>(request: Observable<T>, done: (value: T) => void, failed?: () => void): void {
     this.busy.set(true);
     this.error.set(null);
     this.message.set(null);
@@ -547,6 +686,7 @@ export class UsersPage implements OnInit {
       error: (e: unknown) => {
         this.error.set(describeApiError(e));
         this.busy.set(false);
+        failed?.();
       },
     });
   }

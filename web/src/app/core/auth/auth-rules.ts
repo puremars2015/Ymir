@@ -1,4 +1,4 @@
-import { AdminUser, AuthMethod, Me } from '../api/api-types';
+import { AdminUser, AuthMethod, Me, UserRole } from '../api/api-types';
 
 /** 與後端 `LocalAccounts.MinimumPasswordLength` 一致（ADR-0009）。 */
 export const PASSWORD_MIN_LENGTH = 12;
@@ -68,4 +68,31 @@ export function newPasswordProblem(
     return '兩次輸入的密碼不一致。';
   }
   return null;
+}
+
+/** 角色的中文名稱（ADR-0027）。 */
+export function describeRole(role: UserRole): string {
+  switch (role) {
+    case 'Admin':
+      return '管理員';
+    case 'Guest':
+      return '訪客';
+    default:
+      return '使用者';
+  }
+}
+
+/**
+ * 管理員可以把這位使用者改成哪些角色（ADR-0027）；空陣列表示不能變更。
+ * 不能改自己；企業帳號與 Google 帳號的管理員權限由 IdP 決定（`canChangeAdminRole`），只能在使用者與訪客之間切換。
+ */
+export function assignableRoles(user: AdminUser, me: Me | null): UserRole[] {
+  if (!me || user.id === me.id) return [];
+  if (user.canChangeAdminRole) return ['User', 'Guest', 'Admin'];
+  return user.role === 'Admin' ? [] : ['User', 'Guest'];
+}
+
+/** 訪客不能使用使用者之間的訊息與群組聊天（ADR-0027）。 */
+export function canUseMessaging(me: Me | null): boolean {
+  return !!me && me.role !== 'Guest';
 }

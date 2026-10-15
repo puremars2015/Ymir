@@ -43,7 +43,7 @@ public sealed class ExecutionService(
 
         var userId = currentUser.UserId;
         var user = await users.FindAsync(userId, cancellationToken).ConfigureAwait(false);
-        if (user is null || user.Status == UserStatus.Disabled)
+        if (user is null || user.Status != UserStatus.Active)
         {
             return SubmitMessageResult.Forbidden; // 停用的使用者不得建立 execution（SA §12）
         }
@@ -266,7 +266,7 @@ public sealed class ExecutionService(
         }
 
         var user = await users.FindAsync(userId, cancellationToken).ConfigureAwait(false);
-        if (user is null || user.Status == UserStatus.Disabled)
+        if (user is null || user.Status != UserStatus.Active)
         {
             return SubmitMessageResult.Forbidden;
         }

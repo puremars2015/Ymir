@@ -45,7 +45,7 @@ internal sealed class UserDirectory(PlatformDbContext db, TimeProvider timeProvi
 
     public async Task<IReadOnlyList<User>> ListAsync(string? search, int take, CancellationToken cancellationToken)
     {
-        var query = db.Users.AsNoTracking();
+        var query = db.Users.AsNoTracking().Where(u => u.Status != UserStatus.Deleted);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim();
@@ -78,6 +78,7 @@ internal sealed class UserDirectory(PlatformDbContext db, TimeProvider timeProvi
     public async Task<UserStatistics> GetStatisticsAsync(DateTimeOffset activeSince, CancellationToken cancellationToken)
     {
         var counts = await db.Users.AsNoTracking()
+            .Where(u => u.Status != UserStatus.Deleted)
             .GroupBy(_ => 1)
             .Select(g => new
             {
@@ -94,24 +95,57 @@ internal sealed class UserDirectory(PlatformDbContext db, TimeProvider timeProvi
             : new UserStatistics(counts.Total, counts.Total - counts.Disabled, counts.Disabled, counts.Admins, counts.Recent);
     }
 
-    public async Task<User?> SetStatusAsync(Guid userId, UserStatus status, CancellationToken cancellationToken)
+    public Task<User?> SetStatusAsync(Guid userId, UserStatus status, CancellationToken cancellationToken)
     {
-        var user = await db.Users.SingleOrDefaultAsync(u => u.Id == userId, cancellationToken).ConfigureAwait(false);
+        if (status == UserStatus.Deleted)
+        {
+            throw new ArgumentOutOfRangeException(nameof(status), "Use DeleteAsync to delete a user (ADR-0027).");
+        }
+
+        return UpdateAsync(userId, (user, now) =>
+        {
+            if (status == UserStatus.Disabled)
+            {
+                user.Disable(now);
+            }
+            else
+            {
+                user.Enable(now);
+            }
+        }, cancellationToken);
+    }
+
+    public Task<User?> RenameAsync(Guid userId, string displayName, CancellationToken cancellationToken) =>
+        UpdateAsync(userId, (user, now) => user.Rename(displayName, now), cancellationToken);
+
+    public Task<User?> ChangeRoleAsync(Guid userId, UserRole role, CancellationToken cancellationToken) =>
+        UpdateAsync(userId, (user, now) => user.ChangeRole(role, now), cancellationToken);
+
+    public async Task<User?> DeleteAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        // 本機帳號密碼一併刪除：帳號名稱釋放後可以重新建立，舊密碼不得再有效。
+        var credential = await db.LocalCredentials.SingleOrDefaultAsync(c => c.UserId == userId, cancellationToken).ConfigureAwait(false);
+        return await UpdateAsync(userId, (user, now) =>
+        {
+            if (credential is not null)
+            {
+                db.LocalCredentials.Remove(credential);
+            }
+
+            user.Delete(now);
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>已刪除的帳號視為不存在（ADR-0027），不能再停用、改名或改角色。</summary>
+    private async Task<User?> UpdateAsync(Guid userId, Action<User, DateTimeOffset> update, CancellationToken cancellationToken)
+    {
+        var user = await db.Users.SingleOrDefaultAsync(u => u.Id == userId && u.Status != UserStatus.Deleted, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
             return null;
         }
 
-        var now = timeProvider.GetUtcNow();
-        if (status == UserStatus.Disabled)
-        {
-            user.Disable(now);
-        }
-        else
-        {
-            user.Enable(now);
-        }
-
+        update(user, timeProvider.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return user;
     }

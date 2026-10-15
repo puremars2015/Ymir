@@ -65,7 +65,7 @@ internal sealed class ChatGroupService(PlatformDbContext db, IDirectMessageHub h
 
         if (!await AllActiveAsync(others, cancellationToken).ConfigureAwait(false))
         {
-            return Invalid("有成員不存在或已停用。");
+            return Invalid("有成員不存在、已停用或是訪客。");
         }
 
         var now = timeProvider.GetUtcNow();
@@ -154,7 +154,7 @@ internal sealed class ChatGroupService(PlatformDbContext db, IDirectMessageHub h
 
         if (!await AllActiveAsync(added, cancellationToken).ConfigureAwait(false))
         {
-            return Invalid("有成員不存在或已停用。");
+            return Invalid("有成員不存在、已停用或是訪客。");
         }
 
         var now = timeProvider.GetUtcNow();
@@ -371,9 +371,10 @@ internal sealed class ChatGroupService(PlatformDbContext db, IDirectMessageHub h
             .SingleOrDefaultAsync(cancellationToken);
     }
 
+    /// <summary>新成員必須是啟用中、非訪客的使用者（訪客沒有群組功能，ADR-0027）。</summary>
     private async Task<bool> AllActiveAsync(List<Guid> userIds, CancellationToken cancellationToken) =>
         userIds.Count == 0
-        || await db.Users.AsNoTracking().CountAsync(u => userIds.Contains(u.Id) && u.Status == UserStatus.Active, cancellationToken).ConfigureAwait(false) == userIds.Count;
+        || await db.Users.AsNoTracking().CountAsync(u => userIds.Contains(u.Id) && u.Status == UserStatus.Active && u.Role != UserRole.Guest, cancellationToken).ConfigureAwait(false) == userIds.Count;
 
     private Task<List<Guid>> MemberIdsAsync(Guid groupId, CancellationToken cancellationToken) =>
         db.ChatGroupMembers.AsNoTracking().Where(m => m.GroupId == groupId).Select(m => m.UserId).ToListAsync(cancellationToken);

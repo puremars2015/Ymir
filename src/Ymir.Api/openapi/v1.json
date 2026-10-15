@@ -1219,6 +1219,112 @@
         }
       }
     },
+    "/api/admin/users/{userId}/display-name": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminRenameUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}/role": {
+      "put": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminChangeUserRole",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeUserRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/users/{userId}": {
+      "delete": {
+        "tags": [
+          "Admin"
+        ],
+        "operationId": "AdminDeleteUser",
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
     "/api/admin/overview": {
       "get": {
         "tags": [
@@ -3869,7 +3975,8 @@
           "status",
           "authMethod",
           "lastLoginAt",
-          "createdAt"
+          "createdAt",
+          "canChangeAdminRole"
         ],
         "type": "object",
         "properties": {
@@ -3911,6 +4018,9 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "canChangeAdminRole": {
+            "type": "boolean"
           }
         }
       },
@@ -4166,6 +4276,24 @@
             "type": [
               "null",
               "string"
+            ]
+          }
+        }
+      },
+      "ChangeUserRoleRequest": {
+        "required": [
+          "role"
+        ],
+        "type": "object",
+        "properties": {
+          "role": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/UserRole"
+              }
             ]
           }
         }
@@ -6653,6 +6781,20 @@
           }
         }
       },
+      "RenameUserRequest": {
+        "required": [
+          "displayName"
+        ],
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "RepublishSiteRequest": {
         "required": [
           "conversationId",
@@ -8089,7 +8231,8 @@
       "UserRole": {
         "enum": [
           "User",
-          "Admin"
+          "Admin",
+          "Guest"
         ]
       },
       "UserSearchResult": {
@@ -8132,7 +8275,8 @@
       "UserStatus": {
         "enum": [
           "Active",
-          "Disabled"
+          "Disabled",
+          "Deleted"
         ]
       },
       "UserUsageResponse": {

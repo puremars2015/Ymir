@@ -3,7 +3,7 @@ namespace Ymir.Platform.Messaging;
 /// <summary>使用者之間的訊息（ADR-0023）。所有方法都以「目前使用者」為一方，呼叫端必須傳入 <c>ICurrentUser.UserId</c>。</summary>
 public interface IDirectMessageService
 {
-    /// <summary>右側聯絡人名單：未停用的其他使用者，附未讀數與最後訊息時間（未讀優先、再依最近聯絡排序）。</summary>
+    /// <summary>右側聯絡人名單：未停用、非訪客（ADR-0027）的其他使用者，附未讀數與最後訊息時間（未讀優先、再依最近聯絡排序）。</summary>
     Task<IReadOnlyList<DirectContact>> ListContactsAsync(Guid userId, string? search, CancellationToken cancellationToken);
 
     /// <summary>

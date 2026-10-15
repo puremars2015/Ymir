@@ -23,7 +23,7 @@ internal static class CookiePrincipalValidator
 
         var users = context.HttpContext.RequestServices.GetRequiredService<IUserDirectory>();
         var user = await users.FindAsync(userId, context.HttpContext.RequestAborted);
-        if (user is null || user.Status == UserStatus.Disabled)
+        if (user is null || user.Status != UserStatus.Active)
         {
             await RejectAsync(context);
             return;

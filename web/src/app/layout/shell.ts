@@ -75,8 +75,10 @@ export class Shell implements OnInit {
   /** 右側成員面板：桌面預設展開（可收合並記住），窄螢幕為抽屜、預設關閉。 */
   protected readonly peopleCollapsed = signal(readPeopleCollapsed());
   protected readonly peopleDrawerOpen = signal(false);
-  protected readonly peopleVisible = computed(() =>
-    this.mobile() ? this.peopleDrawerOpen() : !this.peopleCollapsed(),
+  protected readonly peopleVisible = computed(
+    () =>
+      this.auth.canUseMessaging() &&
+      (this.mobile() ? this.peopleDrawerOpen() : !this.peopleCollapsed()),
   );
   private readonly pageVisible = signal(globalThis.document?.visibilityState !== 'hidden');
   protected readonly creatingProject = signal(false);
@@ -111,9 +113,11 @@ export class Shell implements OnInit {
 
   constructor() {
     // 登入後連上訊息通知；換帳號時重新連線。
+    // 訪客沒有訊息與群組（ADR-0027），不連線。
     effect(() => {
       const user = this.auth.user();
-      if (user) this.messages.connect(user.id);
+      if (user && this.auth.canUseMessaging()) this.messages.connect(user.id);
+      else this.messages.disconnect();
     });
     // 面板看不到（收合或分頁在背景）時，新訊息不自動標為已讀。
     effect(() => this.messages.setVisible(this.peopleVisible() && this.pageVisible()));

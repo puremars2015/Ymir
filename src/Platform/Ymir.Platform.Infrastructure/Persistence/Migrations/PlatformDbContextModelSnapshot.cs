@@ -361,6 +361,10 @@ namespace Ymir.Platform.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(200)")
                         .HasColumnName("display_name");
 
+                    b.Property<bool>("DisplayNameOverridden")
+                        .HasColumnType("bit")
+                        .HasColumnName("display_name_overridden");
+
                     b.Property<string>("Email")
                         .HasMaxLength(320)
                         .HasColumnType("nvarchar(320)")

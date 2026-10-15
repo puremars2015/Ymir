@@ -139,7 +139,7 @@ internal sealed class LocalAccountService(PlatformDbContext db, IUserDirectory u
     public async Task<LocalAccountResult> ResetPasswordAsync(Guid userId, string newPassword, CancellationToken cancellationToken)
     {
         var user = await users.FindAsync(userId, cancellationToken).ConfigureAwait(false);
-        if (user is null)
+        if (user is null || user.Status == UserStatus.Deleted)
         {
             return new LocalAccountResult(LocalAccountOutcome.NotFound);
         }
