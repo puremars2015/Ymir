@@ -1045,6 +1045,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/conversations/{conversationId}/onedrive/links': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListOneDriveLinks'];
+    put?: never;
+    post: operations['AddOneDriveLink'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/conversations/{conversationId}/onedrive/links/{linkId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations['RemoveOneDriveLink'];
+    options?: never;
+    head?: never;
+    patch: operations['SetOneDriveLinkReadOnly'];
+    trace?: never;
+  };
   '/api/admin/settings/oidc': {
     parameters: {
       query?: never;
@@ -1405,6 +1437,11 @@ export interface components {
   schemas: {
     AddChatGroupMembersRequest: {
       userIds: null | string[];
+    };
+    AddOneDriveLinkRequest: {
+      itemId: null | string;
+      /** @default false */
+      readOnly: boolean;
     };
     AdminDryRunResponse: {
       supported: boolean;
@@ -1991,6 +2028,24 @@ export interface components {
       parentItemId: null | string;
       items: components['schemas']['OneDriveBrowserItem'][];
     };
+    OneDriveLinkedItemInfo: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      localPath: string;
+      isFolder: boolean;
+      readOnly: boolean;
+      state: components['schemas']['OneDriveLinkedItemState'];
+      /** Format: int32 */
+      conflictCount: number | string;
+      /** Format: date-time */
+      lastDownloadedAt: null | string;
+      lastError: null | string;
+      /** @default false */
+      writeBackEnabled: boolean;
+    };
+    /** @enum {unknown} */
+    OneDriveLinkedItemState: 'Pending' | 'Downloaded' | 'Failed' | 'CloudDeleted';
     /** @enum {unknown} */
     OneDriveLinkState: 'NotConnected' | 'Connected' | 'NeedsReauth';
     OneDriveStatusResponse: {
@@ -2281,6 +2336,9 @@ export interface components {
     ServiceHealthResponse: {
       status: string;
       checks: components['schemas']['ServiceHealthItem'][];
+    };
+    SetOneDriveLinkReadOnlyRequest: {
+      readOnly: null | boolean;
     };
     SetOneDriveRootRequest: {
       path: null | string;
@@ -4313,6 +4371,102 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  ListOneDriveLinks: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OneDriveLinkedItemInfo'][];
+        };
+      };
+    };
+  };
+  AddOneDriveLink: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AddOneDriveLinkRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OneDriveLinkedItemInfo'];
+        };
+      };
+    };
+  };
+  RemoveOneDriveLink: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+        linkId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  SetOneDriveLinkReadOnly: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        conversationId: string;
+        linkId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SetOneDriveLinkReadOnlyRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OneDriveLinkedItemInfo'];
+        };
       };
     };
   };

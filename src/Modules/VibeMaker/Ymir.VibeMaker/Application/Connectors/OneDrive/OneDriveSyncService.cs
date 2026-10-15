@@ -18,6 +18,12 @@ public sealed class OneDriveSyncOptions
     /// <summary>一個工作目錄（或雲端資料夾）最多同步的檔案數；超過時停止同步並提示。</summary>
     public int MaxFiles { get; set; } = 5000;
 
+    /// <summary>ADR-0022：每個工作目錄明確連結的項目上限。</summary>
+    public int MaxLinksPerScope { get; set; } = 20;
+
+    /// <summary>ADR-0022：每個連結資料夾下載的檔案上限。</summary>
+    public int MaxLinkedFolderFiles { get; set; } = 500;
+
     /// <summary>背景 worker 檢查待同步工作的間隔（排入工作時會立即喚醒，這只是保底）。</summary>
     public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(30);
 }
@@ -538,7 +544,7 @@ public sealed partial class OneDriveSyncService(
         {
             foreach (var child in await graph.ListChildrenAsync(run.AccessToken, folder.Id, cancellationToken).ConfigureAwait(false))
             {
-                if (WorkspacePathRules.IsHidden(child.Name))
+                if (WorkspacePathRules.IsHidden(child.Name) || (folder.Prefix.Length == 0 && OneDriveLinks.IsReservedPath(child.Name)))
                 {
                     continue;
                 }
@@ -578,6 +584,8 @@ public sealed partial class OneDriveSyncService(
         var files = new Dictionary<string, WorkspaceFileEntry>(StringComparer.Ordinal);
         foreach (var entry in entries)
         {
+            // 連結檔案有獨立雲端位置與同步基準，不能又上傳到 ADR-0013 的同步資料夾。
+            if (OneDriveLinks.IsReservedPath(entry.Path)) continue;
             files[entry.Path] = entry;
         }
 

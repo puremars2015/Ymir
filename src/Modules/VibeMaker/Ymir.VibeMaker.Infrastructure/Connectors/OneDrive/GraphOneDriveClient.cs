@@ -99,10 +99,11 @@ internal sealed partial class GraphOneDriveClient(HttpClient http, IOptions<OneD
         };
     }
 
-    public async Task<IReadOnlyList<DriveItemInfo>> ListChildrenAsync(string accessToken, string folderId, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<DriveItemInfo>> ListChildrenAsync(string accessToken, string folderId, CancellationToken cancellationToken, int maxItems = int.MaxValue)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxItems);
         var items = new List<DriveItemInfo>();
-        string? next = $"{_baseUrl}/me/drive/items/{Uri.EscapeDataString(folderId)}/children?$top={PageSize}";
+        string? next = $"{_baseUrl}/me/drive/items/{Uri.EscapeDataString(folderId)}/children?$top={Math.Min(PageSize, maxItems)}";
         while (next is not null)
         {
             var url = next;
@@ -117,6 +118,7 @@ internal sealed partial class GraphOneDriveClient(HttpClient http, IOptions<OneD
             foreach (var item in document.RootElement.GetProperty("value").EnumerateArray())
             {
                 items.Add(ToItem(item));
+                if (items.Count >= maxItems) return items;
             }
 
             // nextLink 是 Graph 給的完整網址；只接受同一個 Graph 位址，避免把 token 送到別處。

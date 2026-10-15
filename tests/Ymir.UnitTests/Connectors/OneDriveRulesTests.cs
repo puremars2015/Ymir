@@ -1,4 +1,7 @@
 using System.Net;
+using System.Net.Http.Json;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Ymir.VibeMaker.Application.Connectors.OneDrive;
 using Ymir.VibeMaker.Infrastructure.Connectors.OneDrive;
 
@@ -7,6 +10,58 @@ namespace Ymir.UnitTests.Connectors;
 /// <summary>ADR-0013：根資料夾規則、Entra 端點推導、Graph 限流的重試間隔。</summary>
 public class OneDriveRulesTests
 {
+    [Theory]
+    [InlineData(3, 1)]
+    [InlineData(55, 2)]
+    public async Task GraphListing_StopsAtTheRequestedMetadataBudget(int limit, int pages)
+    {
+        using var handler = new GraphPageHandler();
+        using var http = new HttpClient(handler);
+        var graph = new GraphOneDriveClient(http, Options.Create(new OneDriveOptions { GraphBaseUrl = new Uri("https://graph.example/v1.0") }), NullLogger<GraphOneDriveClient>.Instance);
+        var items = await graph.ListChildrenAsync("fixture-token", "folder", TestContext.Current.CancellationToken, limit);
+        Assert.Equal(limit, items.Count);
+        Assert.Equal(pages, handler.Pages);
+    }
+
+    private sealed class GraphPageHandler : HttpMessageHandler
+    {
+        public int Pages { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Pages++;
+            Assert.Equal("Bearer fixture-token", request.Headers.Authorization?.ToString());
+            var body = new Dictionary<string, object>
+            {
+                ["value"] = Enumerable.Range(0, 50).Select(i => new { id = $"{Pages}-{i}", name = $"{i}.txt" }).ToArray(),
+                ["@odata.nextLink"] = "https://graph.example/v1.0/page",
+            };
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(body) });
+        }
+    }
+
+    [Theory]
+    [InlineData("onedrive", true)]
+    [InlineData("OneDrive/file.txt", true)]
+    [InlineData("onedrive/file.txt", true)]
+    [InlineData("src/onedrive/file.txt", false)]
+    [InlineData("onedrives/file.txt", false)]
+    public void LegacySync_ReservesTheLinkedNamespaceAcrossPlatforms(string path, bool reserved) =>
+        Assert.Equal(reserved, OneDriveLinks.IsReservedPath(path));
+
+    [Theory]
+    [InlineData("報告.pdf")]
+    [InlineData("../../escape")]
+    [InlineData(".env")]
+    [InlineData("控制\n字元")]
+    public void LinkLocalName_IsASafeSingleSegmentWithStableIdPrefix(string name)
+    {
+        var id = Guid.Parse("01234567-89ab-cdef-0123-456789abcdef");
+        var local = OneDriveLinks.LocalName(name, id);
+        Assert.StartsWith("01234567-", local, StringComparison.Ordinal);
+        Assert.DoesNotContain('/', local);
+        Assert.True(Ymir.VibeMaker.Application.Files.WorkspacePathRules.IsSafeRelativePath(local));
+    }
+
     [Theory]
     [InlineData("own", false, true)]
     [InlineData("other", false, false)]

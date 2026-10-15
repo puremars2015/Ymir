@@ -31,6 +31,7 @@ public sealed class ExecutionRunner(
     RuntimePolicyService policies,
     IExtensionPolicy extensionPolicy,
     OneDriveSyncService oneDrive,
+    OneDriveLinks oneDriveLinks,
     PlatformMcpService platformMcp,
     IAuditLog auditLog,
     VibeMakerTelemetry telemetry,
@@ -190,11 +191,16 @@ public sealed class ExecutionRunner(
             var workingDirectory = await GetWorkingDirectoryAsync(execution, stoppingToken).ConfigureAwait(false);
             await PrepareDeliveryAsync(runtime.RuntimeId, execution.Id, workingDirectory, runToken).ConfigureAwait(false);
             oneDriveActive = extensions.OneDrive && await SyncFromOneDriveAsync(execution, runToken, stoppingToken).ConfigureAwait(false);
+            var linked = extensions.OneDrive
+                ? await DownloadLinkedOneDriveAsync(execution, runToken).ConfigureAwait(false)
+                : new OneDriveLinkedDownload(string.Empty, null);
+            if (linked.Warning is { } linkedWarning)
+                await AppendAsync(execution.Id, new StatusEvent(linkedWarning), stoppingToken).ConfigureAwait(false);
             var request = new AgentRunRequest(
                 executionId,
                 runtime.RuntimeId,
                 session.Id,
-                await GetPromptAsync(execution, stoppingToken).ConfigureAwait(false),
+                await GetPromptAsync(execution, stoppingToken).ConfigureAwait(false) + linked.Prompt,
                 workingDirectory,
                 credential.ApiKey,
                 selectedModel,
@@ -273,6 +279,24 @@ public sealed class ExecutionRunner(
         }
 
         return result.Active;
+    }
+
+    private async Task<OneDriveLinkedDownload> DownloadLinkedOneDriveAsync(AgentExecution execution, CancellationToken token)
+    {
+        try
+        {
+            return await oneDriveLinks.DownloadBeforeRunAsync(execution.UserId, execution.ConversationId, token).ConfigureAwait(false);
+        }
+#pragma warning disable CA1031 // ADR-0022：連結下載失敗不阻擋 execution；只回傳摘要，不把 token／雲端回應帶入事件。
+        catch (Exception exception) when (exception is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            logger.LogWarning("OneDrive linked download preparation failed for execution {ExecutionId}", execution.Id);
+            // 同一 DbContext 還要保存 execution 的終止事件，不能讓失敗的同步寫入污染後續 SaveChanges。
+            foreach (var file in db.OneDriveLinkedFiles.Local.ToArray()) db.Entry(file).State = EntityState.Detached;
+            foreach (var link in db.OneDriveLinkedItems.Local.ToArray()) db.Entry(link).State = EntityState.Detached;
+            return new(string.Empty, "OneDrive 連結檔案未更新，使用本機檔案。請檢查連線或重新授權。");
+        }
     }
 
     /// <summary>執行結束後排入 OneDrive 上傳工作（背景 worker 處理）；失敗只記錄 log，不影響已完成的 execution。</summary>

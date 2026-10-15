@@ -92,6 +92,26 @@ public class OneDriveSyncTests(OneDriveApiFactory factory) : IClassFixture<OneDr
     }
 
     [Fact]
+    public async Task LinkedNamespace_IsNeverCopiedIntoTheLegacySyncFolder()
+    {
+        var (client, userId) = await ConnectedUserAsync("od-sync-linked-namespace");
+        using var _ = client;
+        var conversation = await client.CreateConversationAsync(null, "namespace");
+        var before = DateTimeOffset.UtcNow.AddSeconds(-1);
+        await RunAsync(client, conversation.Id, "hello");
+        await WaitForSyncAsync(client, conversation.Id, before);
+        var local = Path.Combine(HostDirectory(userId, conversation.Id), "onedrive", "linked");
+        Directory.CreateDirectory(local);
+        await File.WriteAllTextAsync(Path.Combine(local, "private.txt"), "linked content", Ct);
+        var status = await SyncNowAsync(client, conversation.Id);
+        var drive = factory.Oidc.Graph.DriveOf("od-sync-linked-namespace");
+        Assert.DoesNotContain(drive.ListFiles($"{Root}/{status.FolderPath}"), path => path.StartsWith("onedrive/", StringComparison.Ordinal));
+        drive.WriteFile($"{Root}/{status.FolderPath}/onedrive/old.txt", "old duplicate"u8.ToArray());
+        await RunAsync(client, conversation.Id, "again");
+        Assert.False(File.Exists(Path.Combine(HostDirectory(userId, conversation.Id), "onedrive", "old.txt")));
+    }
+
+    [Fact]
     public async Task Run_UploadsWorkspaceFiles_AndDownloadsCloudChangesBeforeTheNextRun()
     {
         var (client, userId) = await ConnectedUserAsync("od-sync-amy");

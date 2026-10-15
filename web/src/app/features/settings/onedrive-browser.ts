@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
@@ -51,6 +59,17 @@ import { OneDriveBrowserItem } from '../../core/api/api-types';
             } @else {
               <span>📄 {{ item.name }}</span>
             }
+            @if (selectable()) {
+              <button
+                type="button"
+                class="link"
+                [disabled]="busy() || selectionDisabled()"
+                (click)="selected.emit(item)"
+                [attr.aria-label]="'連結 ' + item.name"
+              >
+                {{ item.isFolder ? '連結資料夾' : '連結檔案' }}
+              </button>
+            }
           </li>
         } @empty {
           @if (!busy() && !error()) {
@@ -99,6 +118,9 @@ import { OneDriveBrowserItem } from '../../core/api/api-types';
   `,
 })
 export class OneDriveBrowser {
+  readonly selectable = input(false);
+  readonly selectionDisabled = input(false);
+  readonly selected = output<OneDriveBrowserItem>();
   private readonly api = inject(ApiService);
   protected readonly query = signal('');
   protected readonly items = signal<OneDriveBrowserItem[]>([]);

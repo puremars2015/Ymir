@@ -678,6 +678,135 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                     b.ToTable("onedrive_connections", "vibemaker");
                 });
 
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveLinkedFile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ETag")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("e_tag");
+
+                    b.Property<string>("ItemId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("item_id");
+
+                    b.Property<Guid>("LinkId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("link_id");
+
+                    b.Property<string>("LocalHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)")
+                        .HasColumnName("local_hash");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(1024)
+                        .HasColumnType("nvarchar(1024)")
+                        .HasColumnName("path");
+
+                    b.Property<string>("PathKey")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)")
+                        .HasColumnName("path_key");
+
+                    b.HasKey("Id")
+                        .HasName("pk_onedrive_linked_files");
+
+                    b.HasIndex("LinkId", "PathKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_onedrive_linked_files_link_id_path_key");
+
+                    b.ToTable("onedrive_linked_files", "vibemaker");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveLinkedItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ConflictCount")
+                        .HasColumnType("int")
+                        .HasColumnName("conflict_count");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DriveId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("drive_id");
+
+                    b.Property<bool>("IsFolder")
+                        .HasColumnType("bit")
+                        .HasColumnName("is_folder");
+
+                    b.Property<string>("ItemId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("item_id");
+
+                    b.Property<DateTimeOffset?>("LastDownloadedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("last_downloaded_at");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)")
+                        .HasColumnName("last_error");
+
+                    b.Property<string>("LocalName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("local_name");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .HasColumnName("name");
+
+                    b.Property<bool>("ReadOnly")
+                        .HasColumnType("bit")
+                        .HasColumnName("read_only");
+
+                    b.Property<Guid>("ScopeId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("scope_id");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("state");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_onedrive_linked_items");
+
+                    b.HasIndex("UserId", "ScopeId", "DriveId", "ItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_onedrive_linked_items_user_id_scope_id_drive_id_item_id");
+
+                    b.ToTable("onedrive_linked_items", "vibemaker");
+                });
+
             modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveSyncItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1181,6 +1310,16 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasForeignKey("MessageId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_message_attachments_messages_message_id");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveLinkedFile", b =>
+                {
+                    b.HasOne("Ymir.VibeMaker.Domain.OneDriveLinkedItem", null)
+                        .WithMany()
+                        .HasForeignKey("LinkId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_onedrive_linked_files_onedrive_linked_items_link_id");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveSyncItem", b =>

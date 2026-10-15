@@ -395,7 +395,9 @@ internal static class FakeGraphEndpoints
             var end = tail.LastIndexOf(":/", StringComparison.Ordinal);
             if (end < 0)
             {
-                return NotFound();
+                // Graph 以 parent:/{name} 取得既有子項目；不可把已存在的資料夾誤判成不存在。
+                return method == "GET" && drive.Child(parentId, Uri.UnescapeDataString(tail.TrimEnd(':'))) is { } child
+                    ? ItemResult(drive, child) : NotFound();
             }
 
             var name = Uri.UnescapeDataString(tail[..end]);

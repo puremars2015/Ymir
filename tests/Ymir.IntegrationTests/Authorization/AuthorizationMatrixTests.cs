@@ -45,6 +45,16 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["GET /api/conversations/{conversationId:guid}/files/archive"] = r => Get($"/api/conversations/{r.ConversationId}/files/archive"),
         ["GET /api/conversations/{conversationId:guid}/onedrive/"] = r => Get($"/api/conversations/{r.ConversationId}/onedrive"),
         ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/onedrive/sync"),
+        ["GET /api/conversations/{conversationId:guid}/onedrive/links"] = r => Get($"/api/conversations/{r.ConversationId}/onedrive/links"),
+        ["POST /api/conversations/{conversationId:guid}/onedrive/links"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/onedrive/links")
+        {
+            Content = JsonContent.Create(new AddOneDriveLinkRequest("item", true)),
+        },
+        ["PATCH /api/conversations/{conversationId:guid}/onedrive/links/{linkId:guid}"] = r => new HttpRequestMessage(HttpMethod.Patch, $"/api/conversations/{r.ConversationId}/onedrive/links/{r.ExecutionId}")
+        {
+            Content = JsonContent.Create(new SetOneDriveLinkReadOnlyRequest(true)),
+        },
+        ["DELETE /api/conversations/{conversationId:guid}/onedrive/links/{linkId:guid}"] = r => new HttpRequestMessage(HttpMethod.Delete, $"/api/conversations/{r.ConversationId}/onedrive/links/{r.ExecutionId}"),
         ["GET /api/projects/{projectId:guid}/knowledge/"] = r => Get($"/api/projects/{r.ProjectId}/knowledge"),
         ["POST /api/projects/{projectId:guid}/knowledge/documents"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{r.ProjectId}/knowledge/documents?fileName=intrusion.txt")
         {
@@ -99,6 +109,9 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     private static readonly Dictionary<string, HttpStatusCode> OwnerStatusOverrides = new()
     {
         ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = HttpStatusCode.Conflict,
+        ["POST /api/conversations/{conversationId:guid}/onedrive/links"] = HttpStatusCode.Forbidden,
+        ["PATCH /api/conversations/{conversationId:guid}/onedrive/links/{linkId:guid}"] = HttpStatusCode.NotFound,
+        ["DELETE /api/conversations/{conversationId:guid}/onedrive/links/{linkId:guid}"] = HttpStatusCode.NotFound,
         // 這個 fixture 沒有設定 Embedding 模型（知識庫停用）；文件 id 不存在。擁有者的成功路徑在 KnowledgeBaseTests。
         ["POST /api/projects/{projectId:guid}/knowledge/documents"] = HttpStatusCode.Conflict,
         ["DELETE /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}"] = HttpStatusCode.NotFound,

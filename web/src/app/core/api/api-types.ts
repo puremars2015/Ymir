@@ -82,6 +82,7 @@ export type OneDriveLinkState = Schemas['OneDriveLinkState'];
 export type ConversationOneDrive = Schemas['ConversationOneDriveResponse'];
 export type OneDriveBrowserItem = Schemas['OneDriveBrowserItem'];
 export type OneDriveBrowserPage = Schemas['OneDriveBrowserPage'];
+export type OneDriveLinkedItem = Schemas['OneDriveLinkedItemInfo'];
 export type PlatformMcpServers = Schemas['PlatformMcpServersResponse'];
 export type McpServerAccess = Schemas['McpServerAccessResponse'];
 export type McpAccessMode = Schemas['McpAccessMode'];

@@ -20,6 +20,7 @@ import {
   OneDriveStatus,
   OneDriveBrowserPage,
   OneDriveBrowserItem,
+  OneDriveLinkedItem,
   ConversationOneDrive,
   KnowledgeAnswer,
   PublishSiteRequest,
@@ -273,6 +274,38 @@ export class ApiService {
     return this.http.get<OneDriveBrowserItem[]>('/api/connectors/onedrive/search', {
       params: { q },
     });
+  }
+
+  getOneDriveLinks(conversationId: string): Observable<OneDriveLinkedItem[]> {
+    return this.http.get<OneDriveLinkedItem[]>(
+      `/api/conversations/${conversationId}/onedrive/links`,
+    );
+  }
+
+  addOneDriveLink(
+    conversationId: string,
+    itemId: string,
+    readOnly: boolean,
+  ): Observable<OneDriveLinkedItem> {
+    return this.http.post<OneDriveLinkedItem>(
+      `/api/conversations/${conversationId}/onedrive/links`,
+      { itemId, readOnly },
+    );
+  }
+
+  setOneDriveLinkReadOnly(
+    conversationId: string,
+    linkId: string,
+    readOnly: boolean,
+  ): Observable<OneDriveLinkedItem> {
+    return this.http.patch<OneDriveLinkedItem>(
+      `/api/conversations/${conversationId}/onedrive/links/${linkId}`,
+      { readOnly },
+    );
+  }
+
+  removeOneDriveLink(conversationId: string, linkId: string): Observable<void> {
+    return this.http.delete<void>(`/api/conversations/${conversationId}/onedrive/links/${linkId}`);
   }
 
   setOneDriveRoot(path: string): Observable<OneDriveStatus> {

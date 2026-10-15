@@ -39,6 +39,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
     public DbSet<OneDriveSyncScope> OneDriveSyncScopes => Set<OneDriveSyncScope>();
 
     public DbSet<OneDriveSyncItem> OneDriveSyncItems => Set<OneDriveSyncItem>();
+    public DbSet<OneDriveLinkedItem> OneDriveLinkedItems => Set<OneDriveLinkedItem>();
+    public DbSet<OneDriveLinkedFile> OneDriveLinkedFiles => Set<OneDriveLinkedFile>();
 
     public DbSet<McpServerAccess> McpServerAccess => Set<McpServerAccess>();
 
@@ -242,6 +244,33 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             item.Property(i => i.ETag).HasMaxLength(OneDriveConnection.ItemIdMaxLength);
             item.HasIndex(i => i.ScopeId);
             item.HasOne<OneDriveSyncScope>().WithMany().HasForeignKey(i => i.ScopeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<OneDriveLinkedItem>(link =>
+        {
+            link.ToTable("onedrive_linked_items");
+            link.HasKey(l => l.Id);
+            link.Property(l => l.Id).ValueGeneratedNever();
+            link.Property(l => l.DriveId).HasMaxLength(OneDriveConnection.DriveIdMaxLength);
+            link.Property(l => l.ItemId).HasMaxLength(OneDriveConnection.ItemIdMaxLength);
+            link.Property(l => l.Name).HasMaxLength(255);
+            link.Property(l => l.LocalName).HasMaxLength(200);
+            link.Property(l => l.State).HasConversion<UpperSnakeCaseEnumConverter<OneDriveLinkedItemState>>().HasMaxLength(30);
+            link.Property(l => l.LastError).HasMaxLength(OneDriveConnection.ErrorMaxLength);
+            link.HasIndex(l => new { l.UserId, l.ScopeId, l.DriveId, l.ItemId }).IsUnique();
+        });
+        modelBuilder.Entity<OneDriveLinkedFile>(file =>
+        {
+            file.ToTable("onedrive_linked_files");
+            file.HasKey(f => f.Id);
+            file.Property(f => f.Id).ValueGeneratedNever();
+            file.Property(f => f.Path).HasMaxLength(OneDriveSyncItem.PathMaxLength);
+            file.Property(f => f.PathKey).HasMaxLength(64).IsUnicode(false);
+            file.Property(f => f.ItemId).HasMaxLength(OneDriveConnection.ItemIdMaxLength);
+            file.Property(f => f.ETag).HasMaxLength(OneDriveConnection.ItemIdMaxLength);
+            file.Property(f => f.LocalHash).HasMaxLength(64);
+            file.HasIndex(f => new { f.LinkId, f.PathKey }).IsUnique();
+            file.HasOne<OneDriveLinkedItem>().WithMany().HasForeignKey(f => f.LinkId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<McpServerAccess>(access =>

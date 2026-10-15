@@ -2360,6 +2360,160 @@
         }
       }
     },
+    "/api/conversations/{conversationId}/onedrive/links": {
+      "get": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "ListOneDriveLinks",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OneDriveLinkedItemInfo"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "AddOneDriveLink",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddOneDriveLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OneDriveLinkedItemInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/conversations/{conversationId}/onedrive/links/{linkId}": {
+      "patch": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "SetOneDriveLinkReadOnly",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "linkId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOneDriveLinkReadOnlyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OneDriveLinkedItemInfo"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Conversations"
+        ],
+        "operationId": "RemoveOneDriveLink",
+        "parameters": [
+          {
+            "name": "conversationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "linkId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/api/admin/settings/oidc": {
       "get": {
         "tags": [
@@ -3469,6 +3623,24 @@
               "type": "string",
               "format": "uuid"
             }
+          }
+        }
+      },
+      "AddOneDriveLinkRequest": {
+        "required": [
+          "itemId"
+        ],
+        "type": "object",
+        "properties": {
+          "itemId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "readOnly": {
+            "type": "boolean",
+            "default": false
           }
         }
       },
@@ -5929,6 +6101,74 @@
           }
         }
       },
+      "OneDriveLinkedItemInfo": {
+        "required": [
+          "id",
+          "name",
+          "localPath",
+          "isFolder",
+          "readOnly",
+          "state",
+          "conflictCount",
+          "lastDownloadedAt",
+          "lastError"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "localPath": {
+            "type": "string"
+          },
+          "isFolder": {
+            "type": "boolean"
+          },
+          "readOnly": {
+            "type": "boolean"
+          },
+          "state": {
+            "$ref": "#/components/schemas/OneDriveLinkedItemState"
+          },
+          "conflictCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lastDownloadedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastError": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "writeBackEnabled": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "OneDriveLinkedItemState": {
+        "enum": [
+          "Pending",
+          "Downloaded",
+          "Failed",
+          "CloudDeleted"
+        ]
+      },
       "OneDriveLinkState": {
         "enum": [
           "NotConnected",
@@ -7114,6 +7354,20 @@
             "items": {
               "$ref": "#/components/schemas/ServiceHealthItem"
             }
+          }
+        }
+      },
+      "SetOneDriveLinkReadOnlyRequest": {
+        "required": [
+          "readOnly"
+        ],
+        "type": "object",
+        "properties": {
+          "readOnly": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },

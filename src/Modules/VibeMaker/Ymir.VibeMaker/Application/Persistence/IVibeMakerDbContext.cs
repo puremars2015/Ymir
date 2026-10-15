@@ -39,6 +39,8 @@ public interface IVibeMakerDbContext
     DbSet<OneDriveSyncScope> OneDriveSyncScopes { get; }
 
     DbSet<OneDriveSyncItem> OneDriveSyncItems { get; }
+    DbSet<OneDriveLinkedItem> OneDriveLinkedItems { get; }
+    DbSet<OneDriveLinkedFile> OneDriveLinkedFiles { get; }
 
     DbSet<McpServerAccess> McpServerAccess { get; }
 

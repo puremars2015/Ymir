@@ -62,8 +62,8 @@ public interface IOneDriveClient
     /// <summary>在 <paramref name="parentId"/> 底下取得或建立資料夾；同名的是檔案時拋出 <see cref="OneDriveException"/>。</summary>
     Task<DriveItemInfo> EnsureFolderAsync(string accessToken, string parentId, string name, CancellationToken cancellationToken);
 
-    /// <summary>資料夾內的子項目（會跟著分頁的 <c>@odata.nextLink</c> 讀完）。</summary>
-    Task<IReadOnlyList<DriveItemInfo>> ListChildrenAsync(string accessToken, string folderId, CancellationToken cancellationToken);
+    /// <summary>資料夾內的子項目；跟隨分頁，最多讀取 <paramref name="maxItems"/> 筆以限制大型連結的 metadata 記憶體用量。</summary>
+    Task<IReadOnlyList<DriveItemInfo>> ListChildrenAsync(string accessToken, string folderId, CancellationToken cancellationToken, int maxItems = int.MaxValue);
 
     /// <summary>搜尋目前使用者自己的 drive，最多 50 筆；不得回傳預授權下載網址。</summary>
     Task<IReadOnlyList<DriveItemInfo>> SearchAsync(string accessToken, string query, CancellationToken cancellationToken);

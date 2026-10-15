@@ -46,7 +46,11 @@ public static class VibeMakerInfrastructureExtensions
         services.AddHttpClient<Application.Connectors.OneDrive.IOneDriveOAuthClient, Connectors.OneDrive.OneDriveOAuthClient>(Connectors.OneDrive.OneDriveOAuthClient.HttpClientName);
         services.AddHttpClient<Application.Connectors.OneDrive.IOneDriveClient, Connectors.OneDrive.GraphOneDriveClient>(Connectors.OneDrive.GraphOneDriveClient.HttpClientName);
         services.AddSingleton<Application.Connectors.OneDrive.IOneDriveTokenProtector, Connectors.OneDrive.DataProtectionOneDriveTokenProtector>();
-        services.Configure<Application.Connectors.OneDrive.OneDriveSyncOptions>(configuration.GetSection(Connectors.OneDrive.OneDriveOptions.SectionName));
+        services.AddOptions<Application.Connectors.OneDrive.OneDriveSyncOptions>()
+            .Bind(configuration.GetSection(Connectors.OneDrive.OneDriveOptions.SectionName))
+            .Validate(o => o.MaxFileBytes > 0 && o.MaxFiles > 0 && o.MaxLinksPerScope is > 0 and <= 100
+                && o.MaxLinkedFolderFiles is > 0 and <= 5000 && o.PollInterval > TimeSpan.Zero, "OneDrive sync limits are invalid.")
+            .ValidateOnStart();
         services.AddHostedService<Connectors.OneDrive.OneDriveSyncWorker>();
 
         AddKnowledgeBase(services, configuration, isDevelopment);
@@ -317,4 +321,3 @@ internal static class PlatformMcpCatalogLoader
             : Application.PlatformMcp.McpCatalog.Load(options.CatalogPath);
     }
 }
-
