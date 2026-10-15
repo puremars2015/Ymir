@@ -127,6 +127,7 @@
 - **範圍**：使用者要求合併全部 branch、pull 最新並重新部署。乾淨 main 執行 fetch／rebase，`ea1c1c1` 已包含目前 7 個 `origin/claude/*` 分支，不製造多餘 merge、不刪除分支。該提交 CI [38723526596](https://github.com/puremars2015/Ymir/actions/runs/38723526596) 的 .NET、Angular、Agent image 全數通過。
 - **部署預演發現**：獨立、無網路的暫時 SQL container 套用 idempotent migration 時，`MakeTools` 更新 `produces_tool` 的敘述在新欄位建立前就被 SQL Server 編譯，報 `Invalid column name 'produces_tool'`。修正為 `EXEC(N'UPDATE ...')` 延後解析，補單元回歸測試；不更改 migration ID、資料模型或已套用資料庫的歷史。
 - **修正後實際驗證**：`dotnet build` 0 警告／錯誤，712 單元測試全通過、無略過，format 與兩模組 `has-pending-model-changes` 通過。重新產生的兩模組 idempotent SQL 在全新隔離 SQL container 連續套用兩次，兩次完整 migration history 均符合固定清單（Platform 8 筆、VibeMaker 20 筆）；測完僅停止並移除該新建測試 container，未連正式 SQL。主機部署器 14 個檢查通過。
+- **固定正式目標**：修正提交 `e7cf9f992d800863b63fcf5a2116aab6d7e115b5` 已推送，CI [38755368552](https://github.com/puremars2015/Ymir/actions/runs/38755368552) 全數通過。新版含 Angular 的 API image 已建置，主機專用產物與授權入口位於 `/home/itadmin/ymir-production-install/update-e7cf9f9/`；本次紀錄提交僅更新文件，正式程式目標仍固定該修正提交。
 - **正式站尚未切換**：四個正式 unit active，本機 health Healthy、公開 `/login` HTTP 200。API 當前 `NRestarts=3`，不宣稱先前 GC 問題已解決。主機專用部署器沿用上輪備份／校驗／migration history／安全設定比對／失敗回復流程，固定三筆待套 migration（`UserAdminManagement`、`PersonalMcpServers`、`MakeTools`）。準備完成後需使用者在本機終端授權 sudo，不在聊天提供密碼。
 - **保留邊界**：不新增 DNS、不擅自啟用 SiteHost、維護服務或未配置的 Google SSO；小工具的正式網站網域與 SiteHost 仍待配置。真登入、加密資料解密、Pi SSE、Graph／第三方 MCP 仍需人工驗收。
 
