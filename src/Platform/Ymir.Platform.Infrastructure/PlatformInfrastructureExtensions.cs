@@ -27,6 +27,7 @@ public static class PlatformInfrastructureExtensions
         services.AddScoped<ILocalAccountService, LocalAccountService>();
         services.AddSingleton<IDirectMessageHub, InMemoryDirectMessageHub>();
         services.AddScoped<IDirectMessageService, DirectMessageService>();
+        services.AddScoped<IChatGroupService, ChatGroupService>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
         services.AddSingleton(TimeProvider.System);

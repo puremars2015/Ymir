@@ -239,6 +239,124 @@ public sealed class ExecutionService(
         return query.SingleOrDefaultAsync(e => e.Id == executionId && e.UserId == userId, cancellationToken);
     }
 
+    /// <summary>
+    /// 群組的 <c>@bot</c>（ADR-0026 §2）：在群組的 Agent 對話（擁有者 = 群組 id，第一次呼叫時建立）中，以目前使用者為執行者建立 execution。
+    /// 呼叫端（API）必須先確認目前使用者是這個群組的成員。費用、配額與模型都以目前使用者計算；
+    /// 群組同時只有一個執行中的 @bot（同對話單一執行中的 filtered unique index），忙碌時回傳 Conflict。
+    /// </summary>
+    /// <param name="displayText">保存在群組 Agent 對話中的使用者訊息（「名稱：內容」）。</param>
+    /// <param name="agentPrompt">實際送給 Agent 的內容（含群組背景）。</param>
+    public async Task<SubmitMessageResult> SubmitForGroupAsync(
+        Guid groupId,
+        string groupName,
+        string displayText,
+        string agentPrompt,
+        Guid clientRequestId,
+        CancellationToken cancellationToken)
+    {
+        if (clientRequestId == Guid.Empty || groupId == Guid.Empty)
+        {
+            throw new DomainValidationException("clientRequestId is required.");
+        }
+
+        var userId = currentUser.UserId;
+        if (userId == groupId)
+        {
+            return SubmitMessageResult.Forbidden;
+        }
+
+        var user = await users.FindAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (user is null || user.Status == UserStatus.Disabled)
+        {
+            return SubmitMessageResult.Forbidden;
+        }
+
+        if (await FindExistingAsync(userId, clientRequestId, cancellationToken).ConfigureAwait(false) is { } existing)
+        {
+            return existing;
+        }
+
+        var models = await modelAccess.GetForUserAsync(userId, cancellationToken).ConfigureAwait(false);
+        if (models.DefaultModelId is null)
+        {
+            return SubmitMessageResult.ModelNotAvailable;
+        }
+
+        var now = timeProvider.GetUtcNow();
+        if (await CheckQuotaAsync(userId, now, cancellationToken).ConfigureAwait(false) is { } quota)
+        {
+            return quota;
+        }
+
+        var conversation = await GetOrCreateGroupConversationAsync(groupId, groupName, now, cancellationToken).ConfigureAwait(false);
+        var nextSequence = await db.Messages.Where(m => m.ConversationId == conversation.Id)
+            .MaxAsync(m => (long?)m.SequenceNo, cancellationToken).ConfigureAwait(false) ?? 0;
+        var text = displayText.Length > Message.ContentMaxLength ? displayText[..Message.ContentMaxLength] : displayText;
+        var message = Message.CreateUser(conversation.Id, text, nextSequence + 1, now);
+        var execution = AgentExecution.Queue(conversation, message, clientRequestId, now, models.Resolve(null), agentPrompt, thinkingLevel: null, invokedBy: userId);
+        conversation.Touch(now);
+        db.Messages.Add(message);
+        db.AgentExecutions.Add(execution);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException)
+        {
+            DetachAll();
+            return await FindExistingAsync(userId, clientRequestId, cancellationToken).ConfigureAwait(false)
+                ?? SubmitMessageResult.Conflict;
+        }
+
+        await queue.EnqueueAsync(execution.Id, cancellationToken).ConfigureAwait(false);
+        await auditLog.WriteAsync(new AuditEntry(currentUser.ActorName, "execution.create", "execution", execution.Id.ToString("D"), AuditResult.Success, now, null), cancellationToken)
+            .ConfigureAwait(false);
+        return SubmitMessageResult.Accept(new SendMessageResponse(message.Id, execution.Id, EventStreamUrl(execution.Id)));
+    }
+
+    /// <summary>
+    /// 已結束的群組 execution 的回答（ADR-0026 §2）：完成時是 Agent 的最後回答，失敗時是給使用者看的摘要，取消時是部分回答或「已取消」。
+    /// 尚未結束或不存在時回傳 null。不檢查擁有者：只由確認過群組的背景工作呼叫。
+    /// </summary>
+    public async Task<(string Text, bool Failed)?> GetFinishedReplyAsync(Guid executionId, CancellationToken cancellationToken)
+    {
+        var execution = await db.AgentExecutions.AsNoTracking().SingleOrDefaultAsync(e => e.Id == executionId, cancellationToken).ConfigureAwait(false);
+        if (execution is null || execution.Status is ExecutionStatus.Queued or ExecutionStatus.Running)
+        {
+            return null;
+        }
+
+        var reply = execution.AssistantMessageId is { } messageId
+            ? await db.Messages.AsNoTracking().Where(m => m.Id == messageId).Select(m => m.Content).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false)
+            : null;
+        return execution.Status switch
+        {
+            ExecutionStatus.Completed => (string.IsNullOrWhiteSpace(reply) ? "（沒有回答內容）" : reply, false),
+            ExecutionStatus.Cancelled => (string.IsNullOrWhiteSpace(reply) ? "已取消。" : reply, false),
+            _ => (string.IsNullOrWhiteSpace(reply) ? "Agent 無法完成這次請求。" : reply, true),
+        };
+    }
+
+    private async Task<Conversation> GetOrCreateGroupConversationAsync(Guid groupId, string groupName, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        // 同時兩個第一次呼叫可能各建一個對話：一律使用最早的那個，多出來的空對話不影響。
+        var existing = await db.Conversations
+            .Where(c => c.UserId == groupId && c.Status == ConversationStatus.Active)
+            .OrderBy(c => c.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var title = string.IsNullOrWhiteSpace(groupName) ? "群組 Agent" : groupName.Trim();
+        var conversation = Conversation.Create(groupId, null, title.Length > Conversation.TitleMaxLength ? title[..Conversation.TitleMaxLength] : title, now);
+        db.Conversations.Add(conversation);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return conversation;
+    }
+
     private async Task<SubmitMessageResult?> FindExistingAsync(Guid userId, Guid clientRequestId, CancellationToken cancellationToken)
     {
         var existing = await db.AgentExecutions.AsNoTracking()

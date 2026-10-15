@@ -33,6 +33,7 @@ internal static class AdminOverviewEndpoints
         int? utcOffsetMinutes,
         IUserDirectory users,
         AdminStatsService stats,
+        Ymir.Platform.Messaging.IChatGroupService groups,
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
@@ -46,6 +47,11 @@ internal static class AdminOverviewEndpoints
         var executions = await stats.GetExecutionStatisticsAsync(TimeSpan.FromMinutes(offset), cancellationToken);
         var runtimes = await stats.ListRuntimesAsync(cancellationToken);
         var names = await DisplayNamesAsync(users, [.. runtimes.Select(r => r.UserId)], cancellationToken);
+        // 群組 Agent 的 runtime 擁有者是群組（ADR-0026）：以群組名稱顯示。
+        foreach (var (groupId, groupName) in await groups.FindNamesAsync([.. runtimes.Select(r => r.UserId).Where(id => !names.ContainsKey(id))], cancellationToken))
+        {
+            names[groupId] = $"群組：{groupName}";
+        }
 
         return TypedResults.Ok(new AdminOverviewResponse(
             new UserCountsResponse(userStats.Total, userStats.Active, userStats.Disabled, userStats.Admins, userStats.ActiveSince),

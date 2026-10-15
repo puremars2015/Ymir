@@ -40,6 +40,14 @@ public sealed class ExecutionRunner(
     private long _sequence;
     private bool _started;
 
+    /// <summary>
+    /// runtime 的擁有者（ADR-0026 §3）：一般對話是使用者本人；群組 Agent 的對話擁有者是群組 id。
+    /// container、workspace、執行鎖與閒置停止都以擁有者運作；費用、配額、模型與擴充能力以 execution 的 user（呼叫者）計算。
+    /// </summary>
+    private Guid _runtimeOwnerId;
+
+    private bool IsGroupRun(AgentExecution execution) => _runtimeOwnerId != execution.UserId;
+
     public async Task RunAsync(Guid executionId, CancellationToken stoppingToken)
     {
         var execution = await db.AgentExecutions.SingleOrDefaultAsync(e => e.Id == executionId, stoppingToken).ConfigureAwait(false);
@@ -57,8 +65,9 @@ public sealed class ExecutionRunner(
         using var logScope = logger.BeginScope(
             "ExecutionId:{ExecutionId} ConversationId:{ConversationId} UserId:{UserId}", executionId, execution.ConversationId, execution.UserId);
 
-        // 一個使用者一個 container（ADR-0007）：同一使用者的 execution 依序執行。
-        using var userLock = await userLocks.AcquireAsync(execution.UserId, stoppingToken).ConfigureAwait(false);
+        // 一個使用者一個 container（ADR-0007）、每個用過 @bot 的群組一個 container（ADR-0026）：同一個 runtime 的 execution 依序執行。
+        _runtimeOwnerId = await db.Conversations.Where(c => c.Id == execution.ConversationId).Select(c => c.UserId).SingleAsync(stoppingToken).ConfigureAwait(false);
+        using var userLock = await userLocks.AcquireAsync(_runtimeOwnerId, stoppingToken).ConfigureAwait(false);
 
         // 等待 lock 期間可能已被取消。
         await db.Entry(execution).ReloadAsync(stoppingToken).ConfigureAwait(false);
@@ -108,12 +117,21 @@ public sealed class ExecutionRunner(
             // 擴充能力由伺服器在每次執行時決定（ADR-0012 A.3）；對外連線決定 container 的 network（A.8）。
             // 這裡持有使用者的執行鎖，沒有其他 Agent 在這個 runtime 執行，network 不符時可以安全地重建。
             extensions = await extensionPolicy.ResolveAsync(execution.UserId, stoppingToken).ConfigureAwait(false);
-            runtime = await runtimeManager.EnsureRuntimeAsync(execution.UserId, extensions.NetworkAccess, runToken).ConfigureAwait(false);
+            if (IsGroupRun(execution))
+            {
+                // 群組 workspace 是成員共用的：呼叫者的個人連結（OneDrive）不帶入（ADR-0026 §3）。
+                extensions = extensions with { OneDrive = false };
+            }
+
+            runtime = await runtimeManager.EnsureRuntimeAsync(_runtimeOwnerId, extensions.NetworkAccess, runToken).ConfigureAwait(false);
             await RecordRuntimeAsync(runtime, stoppingToken).ConfigureAwait(false);
             await AuditRuntimeTransitionAsync(runtime, stoppingToken).ConfigureAwait(false);
             session = await GetOrCreateSessionAsync(execution, runtime, stoppingToken).ConfigureAwait(false);
             // 使用者的 LiteLLM virtual key（ADR-0004）：只放進 Agent 程序的環境變數，container 內不會有 master key。
-            credential = await credentials.GetAsync(execution.UserId, runtime.RuntimeId, runToken, policy.MonthlyBudget, modelPolicy.Models.Select(m => m.Id).ToList()).ConfigureAwait(false);
+            // 群組 Agent：只給這次執行用、結束即撤銷的 key（container 與 workspace 是成員共用的，ADR-0026 §3）。
+            credential = IsGroupRun(execution)
+                ? await credentials.IssueForExecutionAsync(execution.UserId, runtime.RuntimeId, policy.ExecutionTimeout + TimeSpan.FromMinutes(5), policy.MonthlyBudget, [.. modelPolicy.Models.Select(m => m.Id)], runToken).ConfigureAwait(false)
+                : await credentials.GetAsync(execution.UserId, runtime.RuntimeId, runToken, policy.MonthlyBudget, modelPolicy.Models.Select(m => m.Id).ToList()).ConfigureAwait(false);
 
             execution.Start(session.Id, runtime.RuntimeId, timeProvider.GetUtcNow());
             await db.SaveChangesAsync(stoppingToken).ConfigureAwait(false);
@@ -221,6 +239,11 @@ public sealed class ExecutionRunner(
         }
 
         await FinishAsync(execution, terminal, stoppingToken, partialText).ConfigureAwait(false);
+        if (IsGroupRun(execution))
+        {
+            await credentials.RevokeIssuedAsync(credential, stoppingToken).ConfigureAwait(false);
+        }
+
         if (oneDriveActive)
         {
             await EnqueueOneDriveUploadAsync(execution, stoppingToken).ConfigureAwait(false);
@@ -315,7 +338,7 @@ public sealed class ExecutionRunner(
 
         // 執行結束也算使用者活動：閒置停止從最後一次 execution 結束開始計時。
         var runtimeRecord = await db.AgentRuntimes
-            .FirstOrDefaultAsync(r => r.UserId == execution.UserId && r.Status != RuntimeStatus.Deleted, cancellationToken)
+            .FirstOrDefaultAsync(r => r.UserId == _runtimeOwnerId && r.Status != RuntimeStatus.Deleted, cancellationToken)
             .ConfigureAwait(false);
         runtimeRecord?.MarkActive(now);
 
@@ -368,10 +391,18 @@ public sealed class ExecutionRunner(
     private async Task<IReadOnlyList<string>> GetSystemPromptsAsync(AgentExecution execution, CancellationToken cancellationToken)
     {
         var prompts = new List<string>(2);
-        var userPrompt = await db.UserSettings.Where(s => s.UserId == execution.UserId).Select(s => s.SystemPrompt).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-        if (!string.IsNullOrWhiteSpace(userPrompt))
+        if (IsGroupRun(execution))
         {
-            prompts.Add(userPrompt);
+            // 群組 Agent 不附加個人 system prompt（ADR-0026 §3），改為說明多人群組的情境。
+            prompts.Add(Groups.GroupPromptBuilder.SystemPrompt);
+        }
+        else
+        {
+            var userPrompt = await db.UserSettings.Where(s => s.UserId == execution.UserId).Select(s => s.SystemPrompt).SingleOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(userPrompt))
+            {
+                prompts.Add(userPrompt);
+            }
         }
 
         var projectPrompt = await db.Conversations.Where(c => c.Id == execution.ConversationId && c.ProjectId != null)

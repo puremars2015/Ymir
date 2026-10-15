@@ -2930,7 +2930,7 @@
         "tags": [
           "DirectMessages"
         ],
-        "summary": "SSE：新訊息（message）與已讀（read）通知；ready 表示已連線，ping 為心跳。",
+        "summary": "SSE：新訊息（message）、已讀（read）、群組訊息（group-message）、群組異動（group-updated）、群組已讀（group-read）；ready 表示已連線，ping 為心跳。",
         "operationId": "StreamDirectMessageEvents",
         "responses": {
           "200": {
@@ -3066,10 +3066,412 @@
           }
         }
       }
+    },
+    "/api/chat-groups": {
+      "get": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "operationId": "ListChatGroups",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChatGroupSummaryResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "operationId": "CreateChatGroup",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateChatGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatGroupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat-groups/{groupId}": {
+      "get": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "operationId": "GetChatGroup",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatGroupResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "operationId": "RenameChatGroup",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenameChatGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatGroupResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "operationId": "ArchiveChatGroup",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/chat-groups/{groupId}/members": {
+      "post": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "operationId": "AddChatGroupMembers",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddChatGroupMembersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatGroupResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat-groups/{groupId}/members/{userId}": {
+      "delete": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "operationId": "RemoveChatGroupMember",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/api/chat-groups/{groupId}/messages": {
+      "get": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "operationId": "ListChatGroupMessages",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "take",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupMessagePageResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "operationId": "SendChatGroupMessage",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendGroupMessageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendGroupMessageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat-groups/{groupId}/read": {
+      "post": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "operationId": "MarkChatGroupRead",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GroupReadResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat-groups/{groupId}/executions/{executionId}/events": {
+      "get": {
+        "tags": [
+          "ChatGroups"
+        ],
+        "summary": "SSE：群組 @bot 執行的即時事件（與 /api/executions/{id}/events 相同格式），只限群組成員。",
+        "operationId": "StreamChatGroupBotEvents",
+        "parameters": [
+          {
+            "name": "groupId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "executionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "lastEventId",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AddChatGroupMembersRequest": {
+        "required": [
+          "userIds"
+        ],
+        "type": "object",
+        "properties": {
+          "userIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        }
+      },
       "AdminDryRunResponse": {
         "required": [
           "supported",
@@ -3533,6 +3935,14 @@
           "Google"
         ]
       },
+      "BotReplyStatus": {
+        "enum": [
+          "Pending",
+          "Completed",
+          "Failed",
+          null
+        ]
+      },
       "BrandingResponse": {
         "required": [
           "companyName",
@@ -3585,6 +3995,135 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "ChatGroupMemberResponse": {
+        "required": [
+          "userId",
+          "displayName",
+          "accountName",
+          "department",
+          "role"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "accountName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "department": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "role": {
+            "$ref": "#/components/schemas/ChatGroupRole"
+          }
+        }
+      },
+      "ChatGroupResponse": {
+        "required": [
+          "id",
+          "name",
+          "ownerId",
+          "createdAt",
+          "members"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatGroupMemberResponse"
+            }
+          }
+        }
+      },
+      "ChatGroupRole": {
+        "enum": [
+          "Owner",
+          "Member"
+        ]
+      },
+      "ChatGroupSummaryResponse": {
+        "required": [
+          "id",
+          "name",
+          "ownerId",
+          "role",
+          "memberCount",
+          "unreadCount",
+          "lastMessageAt",
+          "updatedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "role": {
+            "$ref": "#/components/schemas/ChatGroupRole"
+          },
+          "memberCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "unreadCount": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "lastMessageAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -3778,6 +4317,31 @@
               "string"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "CreateChatGroupRequest": {
+        "required": [
+          "name",
+          "memberIds"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "memberIds": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         }
       },
@@ -4291,6 +4855,131 @@
             "format": "double"
           }
         }
+      },
+      "GroupMessagePageResponse": {
+        "required": [
+          "messages",
+          "hasMore"
+        ],
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GroupMessageResponse"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "GroupMessageResponse": {
+        "required": [
+          "id",
+          "groupId",
+          "senderKind",
+          "senderId",
+          "senderName",
+          "body",
+          "createdAt",
+          "executionId",
+          "invokedById",
+          "invokedByName",
+          "botStatus"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "senderKind": {
+            "$ref": "#/components/schemas/GroupSenderKind"
+          },
+          "senderId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "senderName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "executionId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "invokedById": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "invokedByName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "botStatus": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BotReplyStatus"
+              }
+            ]
+          }
+        }
+      },
+      "GroupReadResponse": {
+        "required": [
+          "groupId",
+          "readerId",
+          "readAt"
+        ],
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "readerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "readAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "GroupSenderKind": {
+        "enum": [
+          "User",
+          "Bot"
+        ]
       },
       "HostResources": {
         "required": [
@@ -5710,6 +6399,20 @@
           }
         }
       },
+      "RenameChatGroupRequest": {
+        "required": [
+          "name"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "RepublishSiteRequest": {
         "required": [
           "conversationId",
@@ -6242,6 +6945,56 @@
         "type": "object",
         "properties": {
           "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SendGroupMessageRequest": {
+        "required": [
+          "text"
+        ],
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "clientRequestId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          }
+        }
+      },
+      "SendGroupMessageResponse": {
+        "required": [
+          "message",
+          "bot",
+          "botProblem"
+        ],
+        "type": "object",
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/GroupMessageResponse"
+          },
+          "bot": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/GroupMessageResponse"
+              }
+            ]
+          },
+          "botProblem": {
             "type": [
               "null",
               "string"
@@ -7382,6 +8135,9 @@
     },
     {
       "name": "DirectMessages"
+    },
+    {
+      "name": "ChatGroups"
     }
   ]
 }

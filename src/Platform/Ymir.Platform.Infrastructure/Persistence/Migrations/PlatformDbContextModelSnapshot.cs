@@ -89,6 +89,142 @@ namespace Ymir.Platform.Infrastructure.Persistence.Migrations
                     b.ToTable("audit_log", "platform");
                 });
 
+            modelBuilder.Entity("Ymir.Platform.Messaging.ChatGroup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_chat_groups");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_chat_groups_owner_id");
+
+                    b.ToTable("chat_groups", "platform");
+                });
+
+            modelBuilder.Entity("Ymir.Platform.Messaging.ChatGroupMember", b =>
+                {
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("group_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("JoinedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("joined_at");
+
+                    b.Property<DateTimeOffset?>("LastReadAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("last_read_at");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("role");
+
+                    b.HasKey("GroupId", "UserId")
+                        .HasName("pk_chat_group_members");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_chat_group_members_user_id");
+
+                    b.ToTable("chat_group_members", "platform");
+                });
+
+            modelBuilder.Entity("Ymir.Platform.Messaging.ChatGroupMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(16001)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("body");
+
+                    b.Property<string>("BotStatus")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("bot_status");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("ExecutionId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("execution_id");
+
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("group_id");
+
+                    b.Property<Guid?>("InvokedById")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("invoked_by_id");
+
+                    b.Property<Guid?>("SenderId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("sender_id");
+
+                    b.Property<string>("SenderKind")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("sender_kind");
+
+                    b.HasKey("Id")
+                        .HasName("pk_chat_group_messages");
+
+                    b.HasIndex("BotStatus")
+                        .HasDatabaseName("ix_chat_group_messages_bot_status")
+                        .HasFilter("[bot_status] = 'PENDING'");
+
+                    b.HasIndex("ExecutionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_chat_group_messages_execution_id")
+                        .HasFilter("[execution_id] IS NOT NULL");
+
+                    b.HasIndex("SenderId")
+                        .HasDatabaseName("ix_chat_group_messages_sender_id");
+
+                    b.HasIndex("GroupId", "CreatedAt")
+                        .HasDatabaseName("ix_chat_group_messages_group_id_created_at");
+
+                    b.ToTable("chat_group_messages", "platform");
+                });
+
             modelBuilder.Entity("Ymir.Platform.Messaging.DirectMessage", b =>
                 {
                     b.Property<Guid>("Id")
@@ -270,6 +406,49 @@ namespace Ymir.Platform.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_users_issuer_subject");
 
                     b.ToTable("users", "platform");
+                });
+
+            modelBuilder.Entity("Ymir.Platform.Messaging.ChatGroup", b =>
+                {
+                    b.HasOne("Ymir.Platform.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_chat_groups_users_owner_id");
+                });
+
+            modelBuilder.Entity("Ymir.Platform.Messaging.ChatGroupMember", b =>
+                {
+                    b.HasOne("Ymir.Platform.Messaging.ChatGroup", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_chat_group_members_chat_groups_group_id");
+
+                    b.HasOne("Ymir.Platform.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired()
+                        .HasConstraintName("fk_chat_group_members_users_user_id");
+                });
+
+            modelBuilder.Entity("Ymir.Platform.Messaging.ChatGroupMessage", b =>
+                {
+                    b.HasOne("Ymir.Platform.Messaging.ChatGroup", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_chat_group_messages_chat_groups_group_id");
+
+                    b.HasOne("Ymir.Platform.Users.User", null)
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .HasConstraintName("fk_chat_group_messages_users_sender_id");
                 });
 
             modelBuilder.Entity("Ymir.Platform.Messaging.DirectMessage", b =>

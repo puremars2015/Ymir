@@ -20,6 +20,12 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
 
     public DbSet<DirectMessage> DirectMessages => Set<DirectMessage>();
 
+    public DbSet<ChatGroup> ChatGroups => Set<ChatGroup>();
+
+    public DbSet<ChatGroupMember> ChatGroupMembers => Set<ChatGroupMember>();
+
+    public DbSet<ChatGroupMessage> ChatGroupMessages => Set<ChatGroupMessage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema(Schema);
@@ -90,6 +96,44 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             message.HasIndex(m => new { m.SenderId, m.RecipientId, m.CreatedAt });
             message.HasIndex(m => new { m.RecipientId, m.SenderId, m.CreatedAt });
             message.HasIndex(m => new { m.RecipientId, m.ReadAt });
+        });
+
+        // 群組聊天（ADR-0026）；同一模組內可以建 FK。使用者只會停用、不會刪除，所以不串聯刪除使用者。
+        modelBuilder.Entity<ChatGroup>(group =>
+        {
+            group.ToTable("chat_groups");
+            group.HasKey(g => g.Id);
+            group.Property(g => g.Id).ValueGeneratedNever();
+            group.Property(g => g.Name).HasMaxLength(ChatGroup.NameMaxLength).IsRequired();
+            group.Property(g => g.Status).HasConversion<UpperSnakeCaseEnumConverter<ChatGroupStatus>>().HasMaxLength(30);
+            group.HasOne<User>().WithMany().HasForeignKey(g => g.OwnerId).OnDelete(DeleteBehavior.NoAction);
+        });
+
+        modelBuilder.Entity<ChatGroupMember>(member =>
+        {
+            member.ToTable("chat_group_members");
+            member.HasKey(m => new { m.GroupId, m.UserId });
+            member.Property(m => m.Role).HasConversion<UpperSnakeCaseEnumConverter<ChatGroupRole>>().HasMaxLength(30);
+            member.HasOne<ChatGroup>().WithMany().HasForeignKey(m => m.GroupId).OnDelete(DeleteBehavior.Cascade);
+            member.HasOne<User>().WithMany().HasForeignKey(m => m.UserId).OnDelete(DeleteBehavior.NoAction);
+            // 「我所屬的群組」。
+            member.HasIndex(m => m.UserId);
+        });
+
+        modelBuilder.Entity<ChatGroupMessage>(message =>
+        {
+            message.ToTable("chat_group_messages");
+            message.HasKey(m => m.Id);
+            message.Property(m => m.Id).ValueGeneratedNever();
+            message.Property(m => m.SenderKind).HasConversion<UpperSnakeCaseEnumConverter<GroupSenderKind>>().HasMaxLength(30);
+            message.Property(m => m.BotStatus).HasConversion<UpperSnakeCaseEnumConverter<BotReplyStatus>>().HasMaxLength(30);
+            message.Property(m => m.Body).HasMaxLength(ChatGroupMessage.BotBodyMaxLength + 1).IsRequired();
+            message.HasOne<ChatGroup>().WithMany().HasForeignKey(m => m.GroupId).OnDelete(DeleteBehavior.Cascade);
+            message.HasOne<User>().WithMany().HasForeignKey(m => m.SenderId).OnDelete(DeleteBehavior.NoAction);
+            message.HasIndex(m => new { m.GroupId, m.CreatedAt });
+            // 背景工作找 Pending 的 Bot 回覆；一個 execution 只對應一則 Bot 訊息。
+            message.HasIndex(m => m.BotStatus).HasFilter("[bot_status] = 'PENDING'");
+            message.HasIndex(m => m.ExecutionId).IsUnique().HasFilter("[execution_id] IS NOT NULL");
         });
 
         modelBuilder.ApplySnakeCaseNames();

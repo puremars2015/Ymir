@@ -1,7 +1,14 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 import { ApiService, describeApiError } from '../api/api.service';
-import { DirectContact, DirectMessage, DirectMessagesRead } from '../api/api-types';
+import {
+  DirectContact,
+  DirectMessage,
+  DirectMessagesRead,
+  GroupMessage,
+  GroupRead,
+} from '../api/api-types';
+import { GroupUpdated } from './group-events';
 import {
   applyMessageToContacts,
   applyReadReceipt,
@@ -11,6 +18,7 @@ import {
   sortContacts,
   totalUnread,
 } from './direct-message-state';
+import { GroupChatStore } from './group-chat.store';
 
 /**
  * 使用者之間的訊息（ADR-0023）：右側成員名單、目前開啟的一對一對話，以及 `/api/direct-messages/events` 的即時通知。
@@ -20,6 +28,8 @@ import {
 @Injectable({ providedIn: 'root' })
 export class DirectMessageStore {
   private readonly api = inject(ApiService);
+  /** 群組聊天（ADR-0026）共用同一條 SSE 連線。 */
+  private readonly groups = inject(GroupChatStore);
   private source: EventSource | null = null;
   private myId: string | null = null;
 
@@ -34,7 +44,8 @@ export class DirectMessageStore {
   /** 面板是否看得到訊息（面板收起或分頁在背景時，新訊息不自動標為已讀）。 */
   readonly visible = signal(true);
 
-  readonly unreadTotal = computed(() => totalUnread(this.contacts()));
+  /** 工具列的未讀總數：一對一訊息 + 群組。 */
+  readonly unreadTotal = computed(() => totalUnread(this.contacts()) + this.groups.unreadTotal());
   readonly openPeer = computed(
     () => this.contacts().find((c) => c.userId === this.openPeerId()) ?? null,
   );
@@ -44,8 +55,10 @@ export class DirectMessageStore {
     if (this.source && this.myId === myId) return;
     this.disconnect();
     this.myId = myId;
+    this.groups.connect(myId);
     if (typeof EventSource === 'undefined') {
       this.refreshContacts();
+      this.groups.refresh();
       return;
     }
     const source = new EventSource('/api/direct-messages/events', { withCredentials: true });
@@ -55,12 +68,22 @@ export class DirectMessageStore {
       this.connected.set(true);
       this.refreshContacts();
       this.reloadOpenConversation();
+      this.groups.refresh();
     });
     source.addEventListener('message', (event: MessageEvent<string>) =>
       this.onMessage(JSON.parse(event.data) as DirectMessage),
     );
     source.addEventListener('read', (event: MessageEvent<string>) =>
       this.onRead(JSON.parse(event.data) as DirectMessagesRead),
+    );
+    source.addEventListener('group-message', (event: MessageEvent<string>) =>
+      this.groups.onMessage(JSON.parse(event.data) as GroupMessage),
+    );
+    source.addEventListener('group-updated', (event: MessageEvent<string>) =>
+      this.groups.onUpdated(JSON.parse(event.data) as GroupUpdated),
+    );
+    source.addEventListener('group-read', (event: MessageEvent<string>) =>
+      this.groups.onRead(JSON.parse(event.data) as GroupRead),
     );
     source.onerror = () => this.connected.set(false);
   }
@@ -70,6 +93,7 @@ export class DirectMessageStore {
     this.source?.close();
     this.source = null;
     this.myId = null;
+    this.groups.disconnect();
     this.connected.set(false);
     this.contacts.set([]);
     this.openPeerId.set(null);
@@ -127,6 +151,7 @@ export class DirectMessageStore {
   /** 面板重新顯示時，把目前對話的未讀補標為已讀。 */
   setVisible(visible: boolean): void {
     this.visible.set(visible);
+    this.groups.setVisible(visible);
     const peerId = this.openPeerId();
     if (
       visible &&

@@ -1,0 +1,303 @@
+<header class="panel-header">
+  @switch (view()) {
+    @case ('list') {
+      <span class="title">
+        <strong>群組</strong>
+      </span>
+    }
+    @case ('create') {
+      <button
+        type="button"
+        class="icon"
+        (click)="view.set('list')"
+        aria-label="回到群組清單"
+        title="回到群組清單"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+      </button>
+      <span class="title"><strong>建立群組</strong></span>
+    }
+    @default {
+      <button
+        type="button"
+        class="icon"
+        (click)="view() === 'manage' ? view.set('thread') : backToList()"
+        [attr.aria-label]="view() === 'manage' ? '回到群組對話' : '回到群組清單'"
+        [title]="view() === 'manage' ? '回到群組對話' : '回到群組清單'"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
+      </button>
+      <span class="avatar group-avatar" aria-hidden="true">#</span>
+      <span class="peer">
+        <strong>{{ store.detail()?.name ?? store.openGroup()?.name }}</strong>
+        <small
+          >{{ store.detail()?.members?.length ?? store.openGroup()?.memberCount }} 位成員</small
+        >
+      </span>
+      @if (view() === 'thread') {
+        <button
+          type="button"
+          class="icon"
+          (click)="manage()"
+          aria-label="群組成員與設定"
+          title="成員與設定"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="9" cy="8" r="3" />
+            <path d="M3 19c0-3 3-5 6-5s6 2 6 5M16 5a3 3 0 0 1 0 6M18 14c2 .5 3 2.5 3 5" />
+          </svg>
+        </button>
+      }
+    }
+  }
+  <button
+    type="button"
+    class="icon close"
+    (click)="closed.emit()"
+    aria-label="關閉成員面板"
+    title="關閉"
+  >
+    ✕
+  </button>
+</header>
+
+@switch (view()) {
+  @case ('list') {
+    <nav class="tabs" aria-label="成員與群組">
+      <button type="button" (click)="showPeople.emit()">成員</button>
+      <button type="button" class="active" aria-current="page">群組</button>
+    </nav>
+    <div class="search">
+      <button type="button" class="create" (click)="startCreate()">＋ 建立群組</button>
+    </div>
+    <ul class="contacts" aria-label="群組清單">
+      @for (group of store.groups(); track group.id) {
+        <li>
+          <button type="button" class="contact" (click)="openGroup(group.id)">
+            <span class="avatar group-avatar" aria-hidden="true">#</span>
+            <span class="contact-text">
+              <span class="contact-name">{{ group.name }}</span>
+              <small>{{ group.memberCount }} 位成員</small>
+            </span>
+            @if (unread(group.unreadCount) > 0) {
+              <span class="badge" [attr.aria-label]="unread(group.unreadCount) + ' 則未讀'">{{
+                unread(group.unreadCount) > 99 ? '99+' : unread(group.unreadCount)
+              }}</span>
+            } @else if (group.lastMessageAt) {
+              <small class="last-time">{{ time(group.lastMessageAt) }}</small>
+            }
+          </button>
+        </li>
+      } @empty {
+        <li class="muted empty">
+          還沒有群組。建立一個群組，就能和多位同事一起聊天，並用 @bot 請 Agent 幫忙。
+        </li>
+      }
+    </ul>
+  }
+
+  @case ('create') {
+    <form class="stack-form" (submit)="$event.preventDefault(); create()">
+      <label class="field"
+        >群組名稱
+        <input
+          name="groupName"
+          [attr.maxlength]="nameMaxLength"
+          [value]="newName()"
+          (input)="newName.set($any($event.target).value)"
+          placeholder="例如：季報專案"
+        />
+      </label>
+      <input
+        type="search"
+        class="field"
+        placeholder="搜尋要加入的成員"
+        aria-label="搜尋成員"
+        [value]="memberQuery()"
+        (input)="memberQuery.set($any($event.target).value)"
+      />
+      <ul class="picker" aria-label="選擇成員">
+        @for (contact of candidates(); track contact.userId) {
+          <li>
+            <label class="pick">
+              <input
+                type="checkbox"
+                [checked]="selected().has(contact.userId)"
+                (change)="toggle(contact.userId)"
+              />
+              <span class="contact-name">{{ contact.displayName }}</span>
+              @if (contact.department || contact.accountName) {
+                <small>{{ contact.department || contact.accountName }}</small>
+              }
+            </label>
+          </li>
+        } @empty {
+          <li class="muted empty">找不到符合的成員</li>
+        }
+      </ul>
+      @if (actionError(); as error) {
+        <p class="error panel-error">{{ error }}</p>
+      }
+      <button type="submit" class="primary" [disabled]="!canCreate()">
+        建立（{{ selected().size + 1 }} 人）
+      </button>
+    </form>
+  }
+
+  @case ('thread') {
+    <div class="thread" #thread role="log" aria-live="polite" aria-label="群組訊息">
+      @if (store.hasMore()) {
+        <button
+          type="button"
+          class="link older"
+          (click)="store.loadOlder()"
+          [disabled]="store.loading()"
+        >
+          載入較早的訊息
+        </button>
+      }
+      @for (message of store.messages(); track message.id) {
+        <div
+          class="message"
+          [class.mine]="message.senderKind === 'User' && message.senderId === myId()"
+          [class.bot]="message.senderKind === 'Bot'"
+        >
+          @if (!(message.senderKind === 'User' && message.senderId === myId())) {
+            <small class="sender">{{ label(message) }}</small>
+          }
+          @if (message.senderKind === 'Bot' && message.botStatus === 'Pending') {
+            <div class="bubble pending">
+              <p class="status-line" role="status">{{ liveStatus(message) }}</p>
+              @if (liveText(message) | assistantText: true; as text) {
+                <p class="live-text">{{ text }}</p>
+              }
+            </div>
+          } @else {
+            <p class="bubble" [class.failed]="message.botStatus === 'Failed'">
+              {{ message.senderKind === 'Bot' ? (message.body | assistantText) : message.body }}
+            </p>
+          }
+          <small class="meta">{{ time(message.createdAt) }}</small>
+        </div>
+      } @empty {
+        @if (!store.loading()) {
+          <p class="muted empty">還沒有訊息。輸入 @bot 開頭的訊息可以請群組的 Agent 幫忙。</p>
+        }
+      }
+    </div>
+
+    @if (notice() || store.error(); as message) {
+      <p class="error panel-error" role="alert">{{ message }}</p>
+    }
+
+    <form class="composer" (submit)="$event.preventDefault(); send()">
+      <textarea
+        #draftInput
+        rows="2"
+        [attr.maxlength]="maxLength"
+        placeholder="輸入訊息；以 @bot 開頭可以請 Agent 回答"
+        aria-label="群組訊息"
+        [class.bot-command]="isBot()"
+        [value]="draft()"
+        (input)="draft.set($any($event.target).value)"
+        (keydown)="onKeydown($event)"
+      ></textarea>
+      <button type="submit" class="send" [disabled]="!canSend()" aria-label="送出" title="送出">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 20 4l-6 16-3-7-7-1Z" /></svg>
+      </button>
+    </form>
+    @if (isBot()) {
+      <p class="hint">送出後會請群組的 Agent 回答；費用記在你的帳號。</p>
+    }
+  }
+
+  @case ('manage') {
+    @if (store.detail(); as group) {
+      <div class="stack-form">
+        @if (store.isOwner()) {
+          <form class="row-form" (submit)="$event.preventDefault(); rename()">
+            <input
+              class="field"
+              aria-label="群組名稱"
+              [attr.maxlength]="nameMaxLength"
+              [value]="renameText()"
+              (input)="renameText.set($any($event.target).value)"
+            />
+            <button type="submit" class="secondary" [disabled]="sending()">改名</button>
+          </form>
+        }
+
+        <h3>成員（{{ group.members.length }}）</h3>
+        <ul class="picker">
+          @for (member of group.members; track member.userId) {
+            <li class="member">
+              <span class="contact-name">{{ member.displayName }}</span>
+              @if (member.role === 'Owner') {
+                <small>擁有者</small>
+              } @else if (store.isOwner()) {
+                <button
+                  type="button"
+                  class="link"
+                  [disabled]="sending()"
+                  (click)="remove(member.userId)"
+                >
+                  移除
+                </button>
+              }
+            </li>
+          }
+        </ul>
+
+        @if (store.isOwner()) {
+          <h3>加入成員</h3>
+          <input
+            type="search"
+            class="field"
+            placeholder="搜尋成員"
+            aria-label="搜尋要加入的成員"
+            [value]="memberQuery()"
+            (input)="memberQuery.set($any($event.target).value)"
+          />
+          <ul class="picker">
+            @for (contact of candidates(); track contact.userId) {
+              <li>
+                <label class="pick">
+                  <input
+                    type="checkbox"
+                    [checked]="selected().has(contact.userId)"
+                    (change)="toggle(contact.userId)"
+                  />
+                  <span class="contact-name">{{ contact.displayName }}</span>
+                </label>
+              </li>
+            } @empty {
+              <li class="muted empty">沒有可以加入的成員</li>
+            }
+          </ul>
+          <button
+            type="button"
+            class="secondary"
+            [disabled]="sending() || selected().size === 0"
+            (click)="addSelected()"
+          >
+            加入 {{ selected().size }} 位
+          </button>
+          <button type="button" class="danger" [disabled]="sending()" (click)="archive()">
+            {{ confirmArchive() ? '確定封存？所有成員都將看不到這個群組' : '封存群組' }}
+          </button>
+        } @else {
+          <button type="button" class="danger" [disabled]="sending()" (click)="leave()">
+            退出群組
+          </button>
+        }
+
+        @if (notice()) {
+          <p class="muted" role="status">{{ notice() }}</p>
+        }
+        @if (actionError(); as error) {
+          <p class="error panel-error">{{ error }}</p>
+        }
+      </div>
+    }
+  }
+}

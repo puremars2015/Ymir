@@ -91,7 +91,9 @@ public sealed class RuntimeLifecycleService(
             }
 
             var hasActiveExecution = await db.AgentExecutions.AnyAsync(
-                e => e.UserId == record.UserId && (e.Status == ExecutionStatus.Queued || e.Status == ExecutionStatus.Running),
+                // 群組 Agent（ADR-0026）的 runtime 擁有者是群組，execution 的 user 是呼叫者：以對話擁有者一併判斷。
+                e => (e.UserId == record.UserId || db.Conversations.Any(c => c.Id == e.ConversationId && c.UserId == record.UserId))
+                    && (e.Status == ExecutionStatus.Queued || e.Status == ExecutionStatus.Running),
                 cancellationToken).ConfigureAwait(false);
             if (hasActiveExecution)
             {

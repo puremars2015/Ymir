@@ -66,6 +66,34 @@ public sealed class RuntimeCredentialService(
         }
     }
 
+    /// <summary>
+    /// 只給一次執行用的 key（不快取）：群組 Agent（ADR-0026）的 container 與 workspace 是成員共用的，
+    /// 呼叫者的 key 只在這次執行期間有效，結束後立即以 <see cref="RevokeIssuedAsync"/> 撤銷；費用仍記在呼叫者。
+    /// </summary>
+    /// <exception cref="ModelCredentialException">無法取得 key。</exception>
+    public async Task<RuntimeModelCredential> IssueForExecutionAsync(Guid userId, Guid runtimeId, TimeSpan lifetime, decimal? monthlyBudget, IReadOnlyList<string> allowedModels, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(allowedModels);
+        var settings = options.Value;
+        var models = allowedModels.ToArray();
+        if (models.Length == 0 || models.Any(m => !settings.AllowedModels.Contains(m)))
+        {
+            throw new ModelCredentialException("No permitted model set is available.");
+        }
+
+        var issued = await gateway.IssueRuntimeCredentialAsync(
+            new RuntimeCredentialRequest(userId, runtimeId, models, lifetime, settings.MaxBudget, monthlyBudget),
+            cancellationToken).ConfigureAwait(false);
+        logger.LogInformation("Issued one-off model key {KeyId} for user {UserId}, expires {ExpiresAt:O}", issued.KeyId, userId, issued.ExpiresAt);
+        return issued;
+    }
+
+    public Task RevokeIssuedAsync(RuntimeModelCredential credential, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(credential);
+        return RevokeQuietlyAsync(credential, cancellationToken);
+    }
+
     /// <summary>撤銷使用者目前的 key（例如帳號停用時，ADR-0004）。</summary>
     public async Task RevokeAsync(Guid userId, CancellationToken cancellationToken)
     {

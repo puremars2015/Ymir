@@ -252,6 +252,18 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "GET /api/direct-messages/{peerId:guid}",
         "POST /api/direct-messages/{peerId:guid}",
         "POST /api/direct-messages/{peerId:guid}/read",
+        // 群組聊天（ADR-0026）：以成員資格授權，非成員 / 非擁有者的拒絕在 ChatGroupTests 驗證。
+        "GET /api/chat-groups/",
+        "POST /api/chat-groups/",
+        "GET /api/chat-groups/{groupId:guid}",
+        "PUT /api/chat-groups/{groupId:guid}",
+        "DELETE /api/chat-groups/{groupId:guid}",
+        "POST /api/chat-groups/{groupId:guid}/members",
+        "DELETE /api/chat-groups/{groupId:guid}/members/{userId:guid}",
+        "GET /api/chat-groups/{groupId:guid}/messages",
+        "POST /api/chat-groups/{groupId:guid}/messages",
+        "POST /api/chat-groups/{groupId:guid}/read",
+        "GET /api/chat-groups/{groupId:guid}/executions/{executionId:guid}/events",
     ];
 
     private sealed record OwnedResources(Guid ProjectId, Guid ConversationId, Guid ExecutionId);

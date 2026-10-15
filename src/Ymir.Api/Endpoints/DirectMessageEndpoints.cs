@@ -30,7 +30,7 @@ internal static class DirectMessageEndpoints
         group.MapGet("/contacts", ListContactsAsync).WithName("ListDirectContacts");
         group.MapGet("/events", StreamEvents)
             .WithName("StreamDirectMessageEvents")
-            .WithSummary("SSE：新訊息（message）與已讀（read）通知；ready 表示已連線，ping 為心跳。");
+            .WithSummary("SSE：新訊息（message）、已讀（read）、群組訊息（group-message）、群組異動（group-updated）、群組已讀（group-read）；ready 表示已連線，ping 為心跳。");
         group.MapGet("/{peerId:guid}", GetHistoryAsync).WithName("ListDirectMessages").Produces<DirectMessagePageResponse>();
         group.MapPost("/{peerId:guid}", SendAsync)
             .WithName("SendDirectMessage")
@@ -117,6 +117,10 @@ internal static class DirectMessageEndpoints
             {
                 DirectMessageSentNotification sent => new SseItem<string>(JsonSerializer.Serialize(DirectMessageResponse.From(sent.Message), jsonOptions), "message"),
                 DirectMessagesReadNotification read => new SseItem<string>(JsonSerializer.Serialize(DirectMessagesReadResponse.From(read.Read), jsonOptions), "read"),
+                // 群組聊天（ADR-0026 §1）：同一條連線傳送群組的訊息、Bot 回覆更新、群組異動與已讀。
+                GroupMessageNotification group => new SseItem<string>(JsonSerializer.Serialize(GroupMessageResponse.From(group.Message), jsonOptions), "group-message"),
+                GroupUpdatedNotification updated => new SseItem<string>(JsonSerializer.Serialize(new GroupUpdatedResponse(updated.GroupId, updated.Removed), jsonOptions), "group-updated"),
+                GroupReadNotification groupRead => new SseItem<string>(JsonSerializer.Serialize(new GroupReadResponse(groupRead.Read.GroupId, groupRead.Read.ReaderId, groupRead.Read.ReadAt), jsonOptions), "group-read"),
                 _ => new SseItem<string>("{}", "ping"),
             };
             next = notifications.MoveNextAsync().AsTask();
@@ -154,3 +158,6 @@ public sealed record DirectMessagesReadResponse(Guid ReaderId, Guid PeerId, Date
 {
     public static DirectMessagesReadResponse From(DirectMessagesRead read) => new(read.ReaderId, read.PeerId, read.ReadAt, read.Count);
 }
+
+/// <param name="Removed">自己被移除、群組被封存：前端從清單拿掉這個群組。</param>
+public sealed record GroupUpdatedResponse(Guid GroupId, bool Removed);

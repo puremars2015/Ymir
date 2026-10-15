@@ -52,7 +52,10 @@ public sealed class AgentExecution
 
     public byte[] RowVersion { get; private set; } = [];
 
-    public static AgentExecution Queue(Conversation conversation, Message userMessage, Guid clientRequestId, DateTimeOffset now, string? modelId = null, string? agentPrompt = null, string? thinkingLevel = null)
+    /// <param name="invokedBy">
+    /// 執行者（費用、配額、模型與擴充能力以這個人計算）；null 時是對話擁有者。群組 Agent（ADR-0026）的對話擁有者是群組，執行者是呼叫 @bot 的成員。
+    /// </param>
+    public static AgentExecution Queue(Conversation conversation, Message userMessage, Guid clientRequestId, DateTimeOffset now, string? modelId = null, string? agentPrompt = null, string? thinkingLevel = null, Guid? invokedBy = null)
     {
         ArgumentNullException.ThrowIfNull(conversation);
         ArgumentNullException.ThrowIfNull(userMessage);
@@ -64,7 +67,7 @@ public sealed class AgentExecution
         {
             Id = Guid.CreateVersion7(now),
             ConversationId = conversation.Id,
-            UserId = conversation.UserId,
+            UserId = invokedBy ?? conversation.UserId,
             UserMessageId = userMessage.Id,
             ClientRequestId = clientRequestId,
             Status = ExecutionStatus.Queued,

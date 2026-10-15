@@ -1244,7 +1244,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** SSE：新訊息（message）與已讀（read）通知；ready 表示已連線，ping 為心跳。 */
+    /** SSE：新訊息（message）、已讀（read）、群組訊息（group-message）、群組異動（group-updated）、群組已讀（group-read）；ready 表示已連線，ping 為心跳。 */
     get: operations['StreamDirectMessageEvents'];
     put?: never;
     post?: never;
@@ -1286,10 +1286,126 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/chat-groups': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListChatGroups'];
+    put?: never;
+    post: operations['CreateChatGroup'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/chat-groups/{groupId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['GetChatGroup'];
+    put: operations['RenameChatGroup'];
+    post?: never;
+    delete: operations['ArchiveChatGroup'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/chat-groups/{groupId}/members': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['AddChatGroupMembers'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/chat-groups/{groupId}/members/{userId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete: operations['RemoveChatGroupMember'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/chat-groups/{groupId}/messages': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListChatGroupMessages'];
+    put?: never;
+    post: operations['SendChatGroupMessage'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/chat-groups/{groupId}/read': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['MarkChatGroupRead'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/chat-groups/{groupId}/executions/{executionId}/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** SSE：群組 @bot 執行的即時事件（與 /api/executions/{id}/events 相同格式），只限群組成員。 */
+    get: operations['StreamChatGroupBotEvents'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    AddChatGroupMembersRequest: {
+      userIds: null | string[];
+    };
     AdminDryRunResponse: {
       supported: boolean;
       available: boolean;
@@ -1401,6 +1517,8 @@ export interface components {
     AuditResult: 'Success' | 'Failure' | 'Denied';
     /** @enum {unknown} */
     AuthMethod: 'Oidc' | 'Local' | 'Dev' | 'Google';
+    /** @enum {unknown} */
+    BotReplyStatus: 'Pending' | 'Completed' | 'Failed' | null;
     BrandingResponse: {
       companyName: string;
       faviconUrl: null | string;
@@ -1413,6 +1531,42 @@ export interface components {
     ChangePasswordRequest: {
       currentPassword: null | string;
       newPassword: null | string;
+    };
+    ChatGroupMemberResponse: {
+      /** Format: uuid */
+      userId: string;
+      displayName: string;
+      accountName: null | string;
+      department: null | string;
+      role: components['schemas']['ChatGroupRole'];
+    };
+    ChatGroupResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** Format: uuid */
+      ownerId: string;
+      /** Format: date-time */
+      createdAt: string;
+      members: components['schemas']['ChatGroupMemberResponse'][];
+    };
+    /** @enum {unknown} */
+    ChatGroupRole: 'Owner' | 'Member';
+    ChatGroupSummaryResponse: {
+      /** Format: uuid */
+      id: string;
+      name: string;
+      /** Format: uuid */
+      ownerId: string;
+      role: components['schemas']['ChatGroupRole'];
+      /** Format: int32 */
+      memberCount: number | string;
+      /** Format: int32 */
+      unreadCount: number | string;
+      /** Format: date-time */
+      lastMessageAt: null | string;
+      /** Format: date-time */
+      updatedAt: string;
     };
     ContainerResource: {
       store: string;
@@ -1456,6 +1610,10 @@ export interface components {
       updatedAt: string;
       /** Format: uuid */
       activeExecutionId?: null | string;
+    };
+    CreateChatGroupRequest: {
+      name: null | string;
+      memberIds: null | string[];
     };
     CreateConversationRequest: {
       /** Format: uuid */
@@ -1578,6 +1736,39 @@ export interface components {
       /** Format: double */
       availablePercent: number | string;
     };
+    GroupMessagePageResponse: {
+      messages: components['schemas']['GroupMessageResponse'][];
+      hasMore: boolean;
+    };
+    GroupMessageResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      groupId: string;
+      senderKind: components['schemas']['GroupSenderKind'];
+      /** Format: uuid */
+      senderId: null | string;
+      senderName: null | string;
+      body: string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: uuid */
+      executionId: null | string;
+      /** Format: uuid */
+      invokedById: null | string;
+      invokedByName: null | string;
+      botStatus: null | components['schemas']['BotReplyStatus'];
+    };
+    GroupReadResponse: {
+      /** Format: uuid */
+      groupId: string;
+      /** Format: uuid */
+      readerId: string;
+      /** Format: date-time */
+      readAt: string;
+    };
+    /** @enum {unknown} */
+    GroupSenderKind: 'User' | 'Bot';
     HostResources: {
       status: components['schemas']['DataStatus'];
       /** Format: date-time */
@@ -1923,6 +2114,9 @@ export interface components {
       updatedByName: null | string;
       synced: null | boolean;
     };
+    RenameChatGroupRequest: {
+      name: null | string;
+    };
     RepublishSiteRequest: {
       /** Format: uuid */
       conversationId: null | string;
@@ -2049,6 +2243,16 @@ export interface components {
     };
     SendDirectMessageRequest: {
       text: null | string;
+    };
+    SendGroupMessageRequest: {
+      text: null | string;
+      /** Format: uuid */
+      clientRequestId?: null | string;
+    };
+    SendGroupMessageResponse: {
+      message: components['schemas']['GroupMessageResponse'];
+      bot: null | components['schemas']['GroupMessageResponse'];
+      botProblem: null | string;
     };
     SendMessageRequest: {
       content: string;
@@ -4672,6 +4876,261 @@ export interface operations {
         content: {
           'application/json': components['schemas']['DirectMessagesReadResponse'];
         };
+      };
+    };
+  };
+  ListChatGroups: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatGroupSummaryResponse'][];
+        };
+      };
+    };
+  };
+  CreateChatGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateChatGroupRequest'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatGroupResponse'];
+        };
+      };
+    };
+  };
+  GetChatGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatGroupResponse'];
+        };
+      };
+    };
+  };
+  RenameChatGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RenameChatGroupRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatGroupResponse'];
+        };
+      };
+    };
+  };
+  ArchiveChatGroup: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  AddChatGroupMembers: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AddChatGroupMembersRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatGroupResponse'];
+        };
+      };
+    };
+  };
+  RemoveChatGroupMember: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        groupId: string;
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description No Content */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  ListChatGroupMessages: {
+    parameters: {
+      query?: {
+        before?: string;
+        take?: number | string;
+      };
+      header?: never;
+      path: {
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GroupMessagePageResponse'];
+        };
+      };
+    };
+  };
+  SendChatGroupMessage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SendGroupMessageRequest'];
+      };
+    };
+    responses: {
+      /** @description Created */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SendGroupMessageResponse'];
+        };
+      };
+    };
+  };
+  MarkChatGroupRead: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        groupId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GroupReadResponse'];
+        };
+      };
+    };
+  };
+  StreamChatGroupBotEvents: {
+    parameters: {
+      query?: {
+        lastEventId?: number | string;
+      };
+      header?: never;
+      path: {
+        groupId: string;
+        executionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
       };
     };
   };

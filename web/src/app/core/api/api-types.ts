@@ -101,6 +101,13 @@ export type UserSearchResult = Schemas['UserSearchResult'];
 export type SiteTicket = Schemas['SiteTicketResponse'];
 export type DirectContact = Schemas['DirectContactResponse'];
 export type DirectMessage = Schemas['DirectMessageResponse'];
+export type ChatGroupSummary = Schemas['ChatGroupSummaryResponse'];
+export type ChatGroup = Schemas['ChatGroupResponse'];
+export type ChatGroupMember = Schemas['ChatGroupMemberResponse'];
+export type GroupMessage = Schemas['GroupMessageResponse'];
+export type GroupMessagePage = Schemas['GroupMessagePageResponse'];
+export type SendGroupMessageResult = Schemas['SendGroupMessageResponse'];
+export type GroupRead = Schemas['GroupReadResponse'];
 export type DirectMessagePage = Schemas['DirectMessagePageResponse'];
 export type DirectMessagesRead = Schemas['DirectMessagesReadResponse'];
 

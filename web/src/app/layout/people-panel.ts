@@ -14,6 +14,8 @@ import {
 import { describeApiError } from '../core/api/api.service';
 import { AuthService } from '../core/auth/auth.service';
 import { DirectMessageStore } from '../core/messaging/direct-message.store';
+import { GroupChatStore } from '../core/messaging/group-chat.store';
+import { GroupChat } from './group-chat';
 import {
   DIRECT_MESSAGE_MAX_LENGTH,
   filterContacts,
@@ -27,12 +29,14 @@ import {
  */
 @Component({
   selector: 'app-people-panel',
+  imports: [GroupChat],
   templateUrl: './people-panel.html',
   styleUrl: './people-panel.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PeoplePanel {
   protected readonly store = inject(DirectMessageStore);
+  protected readonly groups = inject(GroupChatStore);
   protected readonly auth = inject(AuthService);
   private readonly injector = inject(Injector);
   private readonly thread = viewChild<ElementRef<HTMLElement>>('thread');
@@ -42,6 +46,11 @@ export class PeoplePanel {
   readonly closed = output<void>();
 
   protected readonly maxLength = DIRECT_MESSAGE_MAX_LENGTH;
+  /** 成員（一對一）或群組（ADR-0026）。 */
+  protected readonly tab = signal<'people' | 'groups'>('people');
+  protected readonly peopleUnread = computed(() =>
+    this.store.contacts().reduce((sum, c) => sum + Number(c.unreadCount), 0),
+  );
   protected readonly query = signal('');
   protected readonly draft = signal('');
   protected readonly sending = signal(false);

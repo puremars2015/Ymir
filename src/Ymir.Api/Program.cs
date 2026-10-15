@@ -45,6 +45,8 @@ else
 }
 
 builder.Services.AddHostedService<Ymir.Api.Maintenance.MaintenanceSyncWorker>();
+// 群組 @bot 的回覆（ADR-0026）：把 Pending 的 Bot 訊息更新為執行結果。
+builder.Services.AddHostedService<GroupBotWorker>();
 
 var app = builder.Build();
 
@@ -102,6 +104,7 @@ app.MapBrandingEndpoints();
 app.MapAdminModelEndpoints();
 app.MapMakeTopicEndpoints();
 app.MapDirectMessageEndpoints();
+app.MapChatGroupEndpoints();
 app.MapDefaultEndpoints();
 
 await app.RunAsync();

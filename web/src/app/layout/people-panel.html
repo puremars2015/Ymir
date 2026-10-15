@@ -1,123 +1,143 @@
-<header class="panel-header">
-  @if (store.openPeer(); as peer) {
-    <button
-      type="button"
-      class="icon"
-      (click)="back()"
-      aria-label="回到成員名單"
-      title="回到成員名單"
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
-    </button>
-    <span class="avatar" aria-hidden="true">{{ initial(peer.displayName) }}</span>
-    <span class="peer">
-      <strong>{{ peer.displayName }}</strong>
-      @if (peer.department || peer.accountName) {
-        <small>{{ peer.department || peer.accountName }}</small>
-      }
-    </span>
-  } @else {
-    <span class="title">
-      <strong>成員</strong>
-      <small
-        class="status"
-        [class.online]="store.connected()"
-        [title]="store.connected() ? '即時連線中' : '重新連線中'"
-        >{{ store.connected() ? '即時' : '連線中…' }}</small
-      >
-    </span>
-  }
-  <button
-    type="button"
-    class="icon close"
-    (click)="closed.emit()"
-    aria-label="關閉成員面板"
-    title="關閉"
-  >
-    ✕
-  </button>
-</header>
-
-@if (!store.openPeerId()) {
-  <div class="search">
-    <input
-      type="search"
-      placeholder="搜尋姓名、帳號或部門"
-      aria-label="搜尋成員"
-      [value]="query()"
-      (input)="query.set($any($event.target).value)"
-    />
-  </div>
-  <ul class="contacts" aria-label="成員名單">
-    @for (contact of visibleContacts(); track contact.userId) {
-      <li>
-        <button type="button" class="contact" (click)="openChat(contact.userId)">
-          <span class="avatar" aria-hidden="true">{{ initial(contact.displayName) }}</span>
-          <span class="contact-text">
-            <span class="contact-name">{{ contact.displayName }}</span>
-            @if (contact.department || contact.accountName) {
-              <small>{{ contact.department || contact.accountName }}</small>
-            }
-          </span>
-          @if (unread(contact.unreadCount) > 0) {
-            <span class="badge" [attr.aria-label]="unread(contact.unreadCount) + ' 則未讀'">{{
-              unread(contact.unreadCount) > 99 ? '99+' : unread(contact.unreadCount)
-            }}</span>
-          } @else if (contact.lastMessageAt) {
-            <small class="last-time">{{ time(contact.lastMessageAt) }}</small>
-          }
-        </button>
-      </li>
-    } @empty {
-      <li class="muted empty">{{ query() ? '找不到符合的成員' : '目前沒有其他成員' }}</li>
-    }
-  </ul>
+@if (tab() === 'groups') {
+  <app-group-chat (closed)="closed.emit()" (showPeople)="tab.set('people')" />
 } @else {
-  <div class="thread" #thread role="log" aria-live="polite" aria-label="訊息">
-    @if (store.hasMore()) {
+  <header class="panel-header">
+    @if (store.openPeer(); as peer) {
       <button
         type="button"
-        class="link older"
-        (click)="store.loadOlder()"
-        [disabled]="store.loading()"
+        class="icon"
+        (click)="back()"
+        aria-label="回到成員名單"
+        title="回到成員名單"
       >
-        載入較早的訊息
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6" /></svg>
       </button>
+      <span class="avatar" aria-hidden="true">{{ initial(peer.displayName) }}</span>
+      <span class="peer">
+        <strong>{{ peer.displayName }}</strong>
+        @if (peer.department || peer.accountName) {
+          <small>{{ peer.department || peer.accountName }}</small>
+        }
+      </span>
+    } @else {
+      <span class="title">
+        <strong>成員</strong>
+        <small
+          class="status"
+          [class.online]="store.connected()"
+          [title]="store.connected() ? '即時連線中' : '重新連線中'"
+          >{{ store.connected() ? '即時' : '連線中…' }}</small
+        >
+      </span>
     }
-    @for (message of store.messages(); track message.id) {
-      <div class="message" [class.mine]="message.senderId === myId()">
-        <p class="bubble">{{ message.body }}</p>
-        <small class="meta"
-          >{{ time(message.createdAt) }}
-          @if (message.id === lastReadId()) {
-            · 已讀
-          }
-        </small>
-      </div>
-    } @empty {
-      @if (!store.loading()) {
-        <p class="muted empty">還沒有訊息，打聲招呼吧。</p>
-      }
-    }
-  </div>
-
-  @if (sendError() || store.error(); as error) {
-    <p class="error panel-error">{{ error }}</p>
-  }
-
-  <form class="composer" (submit)="$event.preventDefault(); send()">
-    <textarea
-      #draftInput
-      rows="2"
-      [attr.maxlength]="maxLength"
-      placeholder="輸入訊息，Enter 送出、Shift+Enter 換行"
-      aria-label="訊息"
-      [value]="draft()"
-      (input)="draft.set($any($event.target).value)"
-      (keydown)="onKeydown($event)"
-    ></textarea>
-    <button type="submit" class="send" [disabled]="!canSend()" aria-label="送出" title="送出">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 20 4l-6 16-3-7-7-1Z" /></svg>
+    <button
+      type="button"
+      class="icon close"
+      (click)="closed.emit()"
+      aria-label="關閉成員面板"
+      title="關閉"
+    >
+      ✕
     </button>
-  </form>
+  </header>
+
+  @if (!store.openPeerId()) {
+    <nav class="tabs" aria-label="成員與群組">
+      <button type="button" class="active" aria-current="page">
+        成員
+        @if (peopleUnread() > 0) {
+          <span class="tab-badge">{{ peopleUnread() > 99 ? '99+' : peopleUnread() }}</span>
+        }
+      </button>
+      <button type="button" (click)="store.close(); tab.set('groups')">
+        群組
+        @if (groups.unreadTotal() > 0) {
+          <span class="tab-badge">{{
+            groups.unreadTotal() > 99 ? '99+' : groups.unreadTotal()
+          }}</span>
+        }
+      </button>
+    </nav>
+    <div class="search">
+      <input
+        type="search"
+        placeholder="搜尋姓名、帳號或部門"
+        aria-label="搜尋成員"
+        [value]="query()"
+        (input)="query.set($any($event.target).value)"
+      />
+    </div>
+    <ul class="contacts" aria-label="成員名單">
+      @for (contact of visibleContacts(); track contact.userId) {
+        <li>
+          <button type="button" class="contact" (click)="openChat(contact.userId)">
+            <span class="avatar" aria-hidden="true">{{ initial(contact.displayName) }}</span>
+            <span class="contact-text">
+              <span class="contact-name">{{ contact.displayName }}</span>
+              @if (contact.department || contact.accountName) {
+                <small>{{ contact.department || contact.accountName }}</small>
+              }
+            </span>
+            @if (unread(contact.unreadCount) > 0) {
+              <span class="badge" [attr.aria-label]="unread(contact.unreadCount) + ' 則未讀'">{{
+                unread(contact.unreadCount) > 99 ? '99+' : unread(contact.unreadCount)
+              }}</span>
+            } @else if (contact.lastMessageAt) {
+              <small class="last-time">{{ time(contact.lastMessageAt) }}</small>
+            }
+          </button>
+        </li>
+      } @empty {
+        <li class="muted empty">{{ query() ? '找不到符合的成員' : '目前沒有其他成員' }}</li>
+      }
+    </ul>
+  } @else {
+    <div class="thread" #thread role="log" aria-live="polite" aria-label="訊息">
+      @if (store.hasMore()) {
+        <button
+          type="button"
+          class="link older"
+          (click)="store.loadOlder()"
+          [disabled]="store.loading()"
+        >
+          載入較早的訊息
+        </button>
+      }
+      @for (message of store.messages(); track message.id) {
+        <div class="message" [class.mine]="message.senderId === myId()">
+          <p class="bubble">{{ message.body }}</p>
+          <small class="meta"
+            >{{ time(message.createdAt) }}
+            @if (message.id === lastReadId()) {
+              · 已讀
+            }
+          </small>
+        </div>
+      } @empty {
+        @if (!store.loading()) {
+          <p class="muted empty">還沒有訊息，打聲招呼吧。</p>
+        }
+      }
+    </div>
+
+    @if (sendError() || store.error(); as error) {
+      <p class="error panel-error">{{ error }}</p>
+    }
+
+    <form class="composer" (submit)="$event.preventDefault(); send()">
+      <textarea
+        #draftInput
+        rows="2"
+        [attr.maxlength]="maxLength"
+        placeholder="輸入訊息，Enter 送出、Shift+Enter 換行"
+        aria-label="訊息"
+        [value]="draft()"
+        (input)="draft.set($any($event.target).value)"
+        (keydown)="onKeydown($event)"
+      ></textarea>
+      <button type="submit" class="send" [disabled]="!canSend()" aria-label="送出" title="送出">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12 20 4l-6 16-3-7-7-1Z" /></svg>
+      </button>
+    </form>
+  }
 }

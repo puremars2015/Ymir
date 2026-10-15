@@ -29,6 +29,7 @@
 | [0023](0023-user-direct-messages.md) | 使用者之間的一對一訊息（右側成員名單、SSE 即時通知） | 已採納 |
 | [0024](0024-google-account-sso.md) | Google 帳號 SSO 登入 | 已採納 |
 | [0025](0025-ymir-resource-monitoring-and-reclamation.md) | Ymir 資源監控與安全自動回收 | 已採納 |
+| [0026](0026-group-chat-and-group-agent.md) | 群組聊天與群組 Agent（@bot） | 已採納 |
 
 新增 ADR 時複製以下格式：
 

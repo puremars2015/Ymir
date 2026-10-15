@@ -29,6 +29,11 @@ import {
   UserSearchResult,
   DirectContact,
   DirectMessage,
+  ChatGroup,
+  ChatGroupSummary,
+  GroupMessagePage,
+  GroupRead,
+  SendGroupMessageResult,
   DirectMessagePage,
   DirectMessagesRead,
   Site,
@@ -554,6 +559,55 @@ export class ApiService {
 
   markDirectMessagesRead(peerId: string): Observable<DirectMessagesRead> {
     return this.http.post<DirectMessagesRead>(`/api/direct-messages/${peerId}/read`, null);
+  }
+
+  /** 群組聊天與 @bot（ADR-0026）。 */
+  listChatGroups(): Observable<ChatGroupSummary[]> {
+    return this.http.get<ChatGroupSummary[]>('/api/chat-groups');
+  }
+
+  createChatGroup(name: string, memberIds: string[]): Observable<ChatGroup> {
+    return this.http.post<ChatGroup>('/api/chat-groups', { name, memberIds });
+  }
+
+  getChatGroup(groupId: string): Observable<ChatGroup> {
+    return this.http.get<ChatGroup>(`/api/chat-groups/${groupId}`);
+  }
+
+  renameChatGroup(groupId: string, name: string): Observable<ChatGroup> {
+    return this.http.put<ChatGroup>(`/api/chat-groups/${groupId}`, { name });
+  }
+
+  archiveChatGroup(groupId: string): Observable<void> {
+    return this.http.delete<void>(`/api/chat-groups/${groupId}`);
+  }
+
+  addChatGroupMembers(groupId: string, userIds: string[]): Observable<ChatGroup> {
+    return this.http.post<ChatGroup>(`/api/chat-groups/${groupId}/members`, { userIds });
+  }
+
+  removeChatGroupMember(groupId: string, userId: string): Observable<void> {
+    return this.http.delete<void>(`/api/chat-groups/${groupId}/members/${userId}`);
+  }
+
+  listGroupMessages(groupId: string, before?: string): Observable<GroupMessagePage> {
+    const params: Record<string, string> = before ? { before } : {};
+    return this.http.get<GroupMessagePage>(`/api/chat-groups/${groupId}/messages`, { params });
+  }
+
+  sendGroupMessage(
+    groupId: string,
+    text: string,
+    clientRequestId: string,
+  ): Observable<SendGroupMessageResult> {
+    return this.http.post<SendGroupMessageResult>(`/api/chat-groups/${groupId}/messages`, {
+      text,
+      clientRequestId,
+    });
+  }
+
+  markGroupRead(groupId: string): Observable<GroupRead> {
+    return this.http.post<GroupRead>(`/api/chat-groups/${groupId}/read`, null);
   }
 
   cancelExecution(executionId: string): Observable<CancelExecutionResponse> {

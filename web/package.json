@@ -28,6 +28,7 @@
     "e2e:knowledge": "node e2e/knowledge-flow.mjs",
     "e2e:sites": "node e2e/sites-flow.mjs",
     "e2e:resources": "node e2e/resources-flow.mjs",
+    "e2e:groups": "node e2e/group-chat-flow.mjs",
     "e2e:dm": "node e2e/direct-messages-flow.mjs",
     "e2e:google": "node e2e/google-flow.mjs"
   },

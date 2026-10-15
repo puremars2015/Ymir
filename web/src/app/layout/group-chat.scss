@@ -1,0 +1,139 @@
+@use 'chat-panel';
+
+/* 放在 app-people-panel 內，佔滿面板（ADR-0026）。 */
+:host {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.group-avatar {
+  font-weight: 700;
+}
+
+.create {
+  width: 100%;
+}
+
+.stack-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+
+  h3 {
+    margin: 0.5rem 0 0;
+    font-size: 0.875rem;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.875rem;
+}
+
+.row-form {
+  display: flex;
+  gap: 0.5rem;
+
+  button {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+.picker {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+
+  li {
+    padding: 0.375rem 0.625rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  li:last-child {
+    border-bottom: 0;
+  }
+
+  small {
+    color: var(--text-muted);
+    margin-left: 0.375rem;
+  }
+}
+
+.pick {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+}
+
+.sender {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-bottom: 0.125rem;
+}
+
+.bot .bubble {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.bubble.failed {
+  color: var(--danger);
+}
+
+.pending {
+  .status-line {
+    margin: 0;
+    color: var(--text-muted);
+    animation: pulse 1.2s infinite;
+  }
+
+  .live-text {
+    margin: 0.375rem 0 0;
+    white-space: pre-wrap;
+  }
+}
+
+.bot-command {
+  border-color: var(--accent);
+}
+
+.hint {
+  margin: 0;
+  padding: 0 0.75rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
