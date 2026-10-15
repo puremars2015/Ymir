@@ -9,7 +9,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 |---|---|
 | `docs/sa/vibe-maker-core-mvp-sa.md` | SA（需求、資料模型、API、SSE 契約、驗收條件），以章節編號引用，例如「SA §10」 |
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
-| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0027；索引見 `docs/adr/README.md`） |
+| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0028；索引見 `docs/adr/README.md`） |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
 | `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
@@ -94,6 +94,8 @@ cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:onedrive -- <截�
 cd web && WORKSPACE_ROOT=<工作目錄根> CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:sites -- <截圖目錄>
 # 平台 MCP（ADR-0012 B；需要 Fake MCP、MCP Gateway、API 的 Ymir__Mcp__*，見 deploy/mcp/README.md「本機驗證」）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:mcp -- <截圖目錄>
+# 個人連接與工具（ADR-0028；隔離 SQL + Development API 提供 Angular build，不可指向正式資料庫）
+cd web && CHROMIUM_PATH=<Chromium路徑> npm run e2e:connections -- <截圖目錄> http://127.0.0.1:<port>
 # 知識庫（ADR-0014；Fake LLM + API 的 VibeMaker__Rag__EmbeddingModel 等，見 web/e2e/knowledge-flow.mjs 開頭）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:knowledge -- <截圖目錄>
 # 系統資源（ADR-0025；需要主機維護服務與 API 的 Ymir__Maintenance__*，見 web/e2e/resources-flow.mjs 開頭；只查詢與 dry run）
@@ -139,6 +141,8 @@ Runtime 生命週期（ADR-0011）：`RuntimeLifecycleWorker` 啟動時對帳、
 Agent 擴充能力（ADR-0012）：管理員在「管理 → 系統設定」設定全域預設（`vibemaker.extension_policy`），在「使用者」頁設定每人覆寫（`vibemaker.user_extension_grants`）；`ExtensionPolicyService` 解析、`ExecutionRunner` 每次執行帶入 `AgentRunRequest.Extensions`。`PiAgentHarness` **一律** `--no-extensions`（Agent 寫的 extension 不得載入），沒有 `skills` 加 `--no-skills`，有 `mcp` 才 `-e builtin:mcp`；每次執行前重寫 agent dir 的 `settings.json` / `trust.json` / `mcp.json`（使用者自建 MCP 在 `mcp.user.json`）與平台 skill（`PiExtensionConfig`）。成員端 `GET /api/extensions` 只回名稱，不回 MCP 設定內容。對外連線（`internet` 能力，預設允許，ADR-0012 A.8）：關閉時 `ExecutionRunner` 以 `RuntimeNetworkAccess.Restricted` 呼叫 `EnsureRuntimeAsync`，container 改接 `VibeMaker:Runtime:RestrictedNetwork`（`--internal`，名稱只來自部署設定；runtime host 只接受 `network=internet|restricted`）；label `ymir.network` 不符時重建並稽核 `runtime.recreate`；沒有設定受限網路時執行失敗，**不得**退回成可以對外連線。
 
 平台 MCP（ADR-0012 B，指南 `deploy/mcp/README.md`）：服務只在版控的 `deploy/mcp/servers.json` 定義；Admin 在「管理 → 系統設定 → 平台 MCP 服務」只能啟用與設定對象（`vibemaker.mcp_server_access`）。`ExecutionRunner` 經 `PlatformMcpService.PrepareRunAsync` 取得「目錄 ∩ 存取清單」並簽發每人短期 token（`McpGatewayToken`，HMAC，`Ymir:Mcp:TokenSigningKey`），`PiExtensionConfig` 把 gateway 位址寫進 `mcp.json`（`Authorization: Bearer ${YMIR_MCP_TOKEN}`，檔案裡沒有 token 值，平台項目覆蓋同名的使用者項目），token 只以 `exec --env YMIR_MCP_TOKEN` 傳入。Gateway（`src/Ymir.McpGateway`）驗證 token、轉送並換成後端憑證（只在 gateway 的部署 secret）、每人 rate limit、稽核 `mcp.tool.call`；不得掛載 container runtime socket 或 workspace，不讀業務資料表。沒有設定 `Ymir:Mcp:GatewayUrl` 時平台 MCP 停用。
+
+個人連接與工具（ADR-0028，指南 `docs/guides/personal-connections.md`）：`/settings/connections` 統一 OneDrive、個人 MCP 與能力摘要。`/api/connections/mcp` 只接受目前使用者的 HTTPS streamable HTTP 註冊，MCP＋internet 能力控制新增／啟用／測試／執行；停用／移除不要求能力。憑證以 owner-bound Data Protection 密文保存在 `vibemaker.personal_mcp_servers`，API 不回顯；測試由 DNS-pinned public-only transport 執行 initialize，不跟隨 redirect、不呼叫工具，有逾時／大小／頻率限制。個人執行只用程序環境變數傳自己的 token，設定檔只含引用；群組執行不載入個人註冊或憑證。不得把個人 token 說成 Agent 無法讀取，也不得把管理 UI 延伸成任意命令／Connector 上傳。
 
 OneDrive connector（ADR-0013）：管理員開放 `oneDrive` 能力後，使用者在個人設定連結（`/api/connectors/onedrive/connect` → Microsoft 授權碼 + PKCE → `/callback`，state 存在加密的短期 cookie、綁定使用者；企業帳號必須連到同一個 oid）。沿用登入的 Entra 註冊（`OidcOneDriveSettingsSource`），需在 Entra 加 `Files.ReadWrite`、`offline_access` 委派權限與 callback redirect URI。`OneDriveConnectionService` 保存 Data Protection 加密的 refresh token（換發時輪替、`invalid_grant` → `NeedsReauth`），access token 只在記憶體；Graph 呼叫在 `GraphOneDriveClient`（429 / 503 依 Retry-After 重試，base URL `Ymir:Connectors:OneDrive:GraphBaseUrl` 只給測試替身用）。同步（`OneDriveSyncService`，指南 `docs/guides/onedrive.md`）：`ExecutionRunner` 在 Agent 啟動前（持有使用者鎖）下載雲端變更，執行結束後把工作排進 `vibemaker.onedrive_sync_scopes.upload_pending`，由 `OneDriveSyncWorker` 以 `UserExecutionLocks.TryAcquire` 取鎖後下載 + 上傳（持久化、重啟後繼續、失敗退避重試 5 次）。專案 → `<根>/projects/<名稱>-<id8>`、未分組對話 → `<根>/chats/<標題>-<id8>`；雲端以 eTag + If-Match、本機以大小 + 修改時間比對，兩邊都改時原檔名放雲端版本、本機版本另存「(OneDrive 衝突 時間)」副本（兩邊都有），不同步刪除；檔案只經 `IWorkspaceFileReader` / `IWorkspaceFileWriter` 在 runtime 內讀寫，Agent 拿不到任何 Graph 憑證。`deliverables/` 只上傳不下載。對話端點 `GET /api/conversations/{id}/onedrive`、`POST .../onedrive/sync`（未就緒回 409 `ONEDRIVE_NOT_READY`）；檔案面板的 `app-onedrive-sync` 顯示雲端保存狀態，與任務結果分開。
 

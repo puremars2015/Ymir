@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-15 16:15 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-15 18:23 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| CONN1 | 個人「連接與工具」：OneDrive 與 HTTP MCP 註冊管理 | 🔬 | [ADR-0028](../adr/0028-personal-connections-and-tools.md)；入口、加密註冊／測試／啟停／移除、權限與群組隔離、桌面／手機 E2E 通過；尚未正式部署，見 #081 |
 | USR1 | 管理 → 使用者：改名、變更角色、刪除帳號，新增訪客角色 | 🔬 | [ADR-0027](../adr/0027-admin-user-management-and-guest-role.md)；後端、前端與測試通過；未做瀏覽器 e2e，正式站需套 Platform migration `UserAdminManagement`，見 #080 |
 | ARCH2 | 架構文件標記正式／舊容器及主機程序 | ✅ | 7 個固定容器＋動態 Agent 的角色清單，root／itadmin／ymir 分區、舊容器與實際模型代理路徑，見 #074 |
 | RES1 | 管理員 CPU／RAM／磁碟、Ymir container／image 監控與保留期限／低資源自動回收 | 🔬 | [ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 已採納並實作（維護服務、鎖、API、系統資源頁）；測試與瀏覽器驗證通過；正式主機安裝與啟用待使用者授權，見 #074 |
@@ -116,6 +117,30 @@
 ---
 
 ## 💬 留言區
+
+### #081 · 個人連接與工具：OneDrive 與個人 MCP（ADR-0028）
+
+> 👤 **GPT（AI）** · 🕒 2026-10-15 18:23 CST · `🔬驗證`
+
+使用者同意新增統一入口及先支援 OneDrive／個人 MCP。原 main 有另一工作階段尚未提交的使用者管理變更，經使用者選項 2 明確授權一次性獨立 worktree，於 `personal-connections-tools` 隔離開發；不修改／stash 原工作目錄。交付前 rebase 已提交的 ADR-0027 使用者管理與 Guest，僅 ADR 索引衝突，保留 0027 與 0028，程式自動合併後重驗。未開 PR、不建立 merge commit、不 force push。
+
+發布前原工作目錄再次出現未提交的 MakeTools 開發，故不在該目錄操作 rebase／fast-forward；由已驗證且乾淨的授權 worktree 以 `git push origin HEAD:main` 做一般非強制 main 更新。原工作樹與本機 main 不移動，未提交內容保留，後續該工作階段需在自己的變更提交後同步遠端再整合。
+
+新增 `/settings/connections` 與個人設定導覽入口，分開帳號 Connector、個人 MCP、原能力摘要。OneDrive 卡片沿用 OAuth／授權／同步根／瀏覽／解除，未開放任意 Connector；管理員未允許時也能看到限制。新的 connect returnUrl 回此頁，舊 `/settings?onedrive=...` 仍導向新入口並處理結果；更新既有 admin／network／OneDrive／平台 MCP E2E 的入口，不移除舊功能。
+
+新增專用 `vibemaker.personal_mcp_servers` 與 migration `20261015093415_PersonalMcpServers`；每人最多 20 個、名稱唯一。`/api/connections/mcp` GET／POST／PATCH／DELETE／test 只由目前使用者推導 owner，不接受 user id。新增／啟用／測試／執行均要求 MCP＋internet，關閉能力後仍可看摘要、停用、移除。Bearer token 以 owner-bound Data Protection purpose 加密，回應只含 hasCredential；不回顯、不記 prompt／稽核／設定檔／程序參數，UI 提交後立即清空。稽核只記 action、actor、註冊 id 與結果，不含名稱／URL／token／遠端回應。
+
+MCP 首批僅 HTTPS 443 streamable HTTP，不開放 stdio、任意命令／headers／OAuth MCP／套件上傳。initialize 測試不呼叫工具，獨立 handler 禁止 proxy／redirect／cookie；DNS 解析後拒絕任何非公開 IP，直接連接已驗證 IP 並保留 hostname TLS 驗證，防止 DNS 檢查與連線分離造成 rebinding。限制 10 秒、64 KiB、6 次／分鐘；涵蓋 private／loopback／link-local／CGNAT／IPv4-mapped／IPv6 transition／文件網段與 Azure 平台位址拒絕，僅接受測試送出的協定版本，錯誤只顯示固定摘要。
+
+啟用註冊只帶入個人 Agent 執行；設定檔使用 id 衍生名稱與 token 環境變數引用，平台 MCP 最後合併且優先，原 Agent `mcp.user.json` 保留。憑證只送入該次個人 Pi 程序環境；群組執行明確不帶入。UI／指南說明同一個人 runtime 的程式可能讀取自己的 MCP token，不能宣稱如 OneDrive 一樣完全留在 API；停用／移除影響下次執行，不撤銷遠端 token 或中止既有程序。
+
+驗證：整合 ADR-0027 後 702 單元測試通過，完整 format check 與 Release solution build 通過、0 warnings／0 errors，EF 確認無 pending model change。隔離 SQL 上 PersonalMcpManagement 8、授權矩陣 4、UserManagement 4、ChatGroup 4、OpenAPI 1 均通過，無略過；另在整合前驗證既有 OneDriveLinks 8／OneDriveConnection 12。新測試覆蓋密文／owner binding、不回顯、跨使用者、個人執行／群組隔離、撤銷、啟停／移除、重名／數量上限、無效 token／header 注入、程序 env 而非參數／設定檔。OpenAPI 與 TS 重產確認一致。前端 lint、217 tests、build 通過。
+
+新增 `npm run e2e:connections`，在隔離 Development API／SQL test database（非正式 DB）、Chromium 驗證導覽、禁止狀態、新增且輸入／回應不留 token、真 DNS／transport 失敗摘要、啟停、撤銷後移除、舊 OAuth 回跳與手機版；整合前後均通過，無 pageerror。截圖 `/tmp/opencode/connections-e2e-screenshots-merged`；E2E API 已停止、測試 DB 已刪除，專用 SQL 容器完成後清除。未以正式資料庫／真憑證測試，未呼叫外部 MCP 工具。
+
+**部署／剩餘**：本輪僅實作與發布程式，不自行切換正式站。正式程式仍為 3855dd6；部署完整 main 須先備份並套兩模組待套 migration（含 PersonalMcpServers 與 UserAdminManagement），再更新 API／前端。無 RuntimeHost protocol／mount 變更。真實第三方 HTTP MCP／Microsoft 授權、OAuth MCP、私網測試、stdio、修改 URL／token、額外 Connector provider 留待後續；OneDrive 雲端寫回仍依 O4／O5 未啟用。詳見 [使用指南](../guides/personal-connections.md)。
+
+---
 
 ### #080 · 使用者管理：改名、角色、刪除與訪客（ADR-0027）
 

@@ -28,7 +28,7 @@
 
 ## 部署與驗證
 
-部署前備份資料庫與 Data Protection keyring，套用 VibeMaker migration `20261015093415_PersonalMcpServers`，再更新 API／前端。不需要新增 host mount 或 RuntimeHost endpoint。本功能不代表已完成正式部署或真實第三方 MCP 驗收。
+部署前備份資料庫與 Data Protection keyring，套用 VibeMaker migration `20261015093415_PersonalMcpServers`，再更新 API／前端。部署完整 main 時也須檢查並套用兩模組其他尚未套用的 migration（例如 Platform 的 UserAdminManagement），不能只套本功能的 migration。不需要新增 host mount 或 RuntimeHost endpoint。本功能不代表已完成正式部署或真實第三方 MCP 驗收。
 
 本機測試指令（隔離 SQL、Development API 提供 Angular build）：
 
