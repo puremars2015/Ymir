@@ -2,7 +2,7 @@
 
 ## 入口與權限
 
-到「個人設定 → 管理連接與工具」（`/settings/connections`）。頁面分成 Connector 帳號連接、個人 MCP、管理員開放的擴充能力。
+到「個人設定」的「帳號連接」分頁（`/settings/connections`，OneDrive 等 Connector）與「MCP 與工具」分頁（`/settings/tools`，個人 MCP 與管理員開放的擴充能力）。個人設定共四個分頁：個人 System Prompt、變更密碼、帳號連接、MCP 與工具。
 
 - **Connector**：目前支援 OneDrive；沿用 Microsoft OAuth 與帳號隔離。不提供任意 Connector 上傳或網址註冊。
 - **個人 MCP**：管理員必須同時開放 MCP 及對外連線，才可新增、啟用或測試。權限關閉後仍可查看摘要、停用及移除。

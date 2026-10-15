@@ -50,16 +50,36 @@ export const routes: Routes = [
         title: '小工具 · Vibe Maker',
       },
       {
+        // 個人設定：分頁皆為子路由，可直接以網址開啟（OneDrive 授權導回 /settings/connections）。
         path: 'settings',
         loadComponent: () =>
-          import('./features/settings/settings-page').then((m) => m.SettingsPage),
-        title: '個人設定 · Vibe Maker',
-      },
-      {
-        path: 'settings/connections',
-        loadComponent: () =>
-          import('./features/settings/connections-page').then((m) => m.ConnectionsPage),
-        title: '連接與工具 · Vibe Maker',
+          import('./features/settings/settings-layout').then((m) => m.SettingsLayout),
+        children: [
+          {
+            path: '',
+            pathMatch: 'full',
+            loadComponent: () =>
+              import('./features/settings/settings-page').then((m) => m.SettingsPage),
+            title: '個人設定 · Vibe Maker',
+          },
+          {
+            path: 'password',
+            loadComponent: () =>
+              import('./features/settings/password-page').then((m) => m.PasswordPage),
+            title: '變更密碼 · Vibe Maker',
+          },
+          {
+            path: 'connections',
+            loadComponent: () =>
+              import('./features/settings/connections-page').then((m) => m.ConnectionsPage),
+            title: '帳號連接 · Vibe Maker',
+          },
+          {
+            path: 'tools',
+            loadComponent: () => import('./features/settings/tools-page').then((m) => m.ToolsPage),
+            title: 'MCP 與工具 · Vibe Maker',
+          },
+        ],
       },
       {
         path: 'admin',

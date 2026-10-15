@@ -58,12 +58,14 @@ try {
   const user = await login(`connections-user-${stamp}`, 'User');
   const me = await (await user.request.get(`${baseUrl}/api/me`)).json();
   await user.goto(`${baseUrl}/settings`);
-  await user.getByRole('link', { name: '管理連接與工具 →' }).click();
-  await user.locator('app-connections-page h1').waitFor();
+  await user.getByRole('link', { name: '帳號連接', exact: true }).click();
+  await user.waitForURL(/\/settings\/connections/);
+  await user.locator('app-onedrive-card h2').waitFor();
+  await user.getByRole('link', { name: 'MCP 與工具', exact: true }).click();
+  await user.waitForURL(/\/settings\/tools/);
   const card = user.locator('app-personal-mcp-card');
   await card.getByText('尚未註冊個人 MCP。').waitFor();
   assert.equal(await card.locator('form').count(), 0);
-  await user.locator('app-onedrive-card h2').waitFor();
   await grant(admin, me.id, 'Allow');
   await user.reload();
   await card.locator('input[name=mcpName]').fill('browser-tools');

@@ -87,7 +87,7 @@ await row.locator('td:has-text("啟用中")').waitFor();
 await local.fill('input[name=password]', newPassword);
 await local.click('form button[type=submit]:has-text("登入")');
 // 被登出時登入頁記住了原本要去的設定頁（returnUrl）
-await local.waitForSelector('app-settings-page h1');
+await local.waitForSelector('app-settings-layout h1');
 step('disabled account cannot sign in; re-enabled account can (back to where it was)');
 
 console.log(`admin: admin-${stamp}, local: ${localAccount}`);
