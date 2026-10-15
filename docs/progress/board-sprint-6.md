@@ -55,7 +55,7 @@
 | RES1 | 管理員 CPU／RAM／磁碟、Ymir container／image 監控與保留期限／低資源自動回收 | 🔬 | [ADR-0025](../adr/0025-ymir-resource-monitoring-and-reclamation.md) 已採納並實作（維護服務、鎖、API、系統資源頁）；測試與瀏覽器驗證通過；正式主機安裝與啟用待使用者授權，見 #074 |
 | DM1 | 使用者之間的一對一訊息、右側成員面板（[ADR-0023](../adr/0023-user-direct-messages.md)） | ✅ | 使用者 2026-10-14 要求（簡易版 Teams）；SSE 即時、未讀／已讀、窄螢幕抽屜；分支 `claude/hopeful-ptolemy-4rodpw`，見 #064 |
 | G1 | **插單** Google 帳號 SSO 登入（[ADR-0024](../adr/0024-google-account-sso.md)） | ✅ | 部署設定白名單（`hd` 網域 / email）必填；實際連 Google 待使用者環境確認，見 #065 |
-| O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 📝 | ❓ADR 全文待使用者確認後才開始實作；決定事項已確認（刪除、移動、改名改為允許），見 #060 |
+| O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 🚧 | 使用者已要求實作；O3a 自己整個 drive 瀏覽／搜尋與設定頁入口通過測試，檔案連結／下載／寫回／刪除保護尚未完成，未部署，見 #075 |
 | L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | ✅ | 已合併回 main（使用者 2026-10-13 要求）；管理 → 用量「依模型」卡片，模型名稱帶 provider；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058、#059 |
 | RAG2 | `/make` 新增「建立 RAG 知識庫」引導主題 | ✅ | 種子主題（管理員可調整／停用），引導到專案頁知識庫（每專案一份 SQLite），見 #061 |
 | UPD1 | main 4b8a3af 正式更新產物與現況核對（歷史建置記錄） | 🔬 | API／RuntimeHost／511 單元測試／396 checksums 通過；保留當時未部署與權限受阻原文，原部署卡關已於 2026-10-14 13:00 部署解除，見 #062 |
@@ -114,6 +114,18 @@
 ---
 
 ## 💬 留言區
+
+### #075 · ADR-0022 採納與第一個實作切片 O3a：整個自己的 OneDrive 瀏覽／搜尋
+
+> 👤 **GPT（AI）** · 🕒 2026-10-15 · `🚧進度`
+
+使用者要求實作 ADR-0022、由使用者開啟 connector 存取自己的 OneDrive；將 ADR／索引標記採納。本輪完成第一個可驗證切片：後端 GET browse／search、Graph parentReference／remoteItem metadata 與搜尋、現有個人授權／能力檢查，以及個人設定的整個自己 OneDrive 瀏覽／搜尋入口（不需先選同步根目錄）。使用者傳入的 item id 必須對應自己的 drive、拒絕外部 drive／remoteItem 捷徑；根目錄僅對 server 固定的 `/me/drive/root` 容許省略 parentReference。回應只含最少 metadata，不含 token／下載 URL。OpenAPI、Angular 產生型別、FakeGraph、授權矩陣與指南同步更新。
+
+驗證：後端 solution build 0 warnings／0 errors；全部 617 單元測試通過。隔離 SQL 容器（127.0.0.1:14335，非正式 SQL）執行 OneDriveConnectionTests 12、既有 OneDriveSyncTests 6、AuthorizationMatrixTests 4、OpenAPI snapshot 更新 1 皆通過，無略過。前端 Node 24 lint／201 tests／build 通過。包含無能力 403、未連結 409、無同步 root 仍可瀏覽、跨使用者 item id 拒絕、單引號搜尋、metadata 無 token、remoteItem 防護、前端請求取消與錯誤狀態。未跑瀏覽器 E2E 或真實 Microsoft Graph／Entra。
+
+**未完成範圍**：這不是 O3～O5 全部完成。連結資料表／migration、選取項目下載與 AgentPrompt、排除 onedrive/ 重複同步、寫回與衝突、雙向刪除／移動／改名和大量刪除確認仍待後續切片。瀏覽不會自動把雲端檔案交給 Agent；無生產 migration、無正式部署、無雲端資料修改。沒有略過刪除保護直接開放寫入。
+
+---
 
 ### #074 · 架構文件補充目前容器清單
 
