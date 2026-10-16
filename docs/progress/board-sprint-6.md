@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-16 00:10 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-16 16:00 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| DOC2 | 乾淨 Ubuntu 主機的正式安裝總指南 | ✅ | [Ubuntu 安裝總指南](../guides/ubuntu-install.md) 串接持久化資料庫／模型服務、rootless Agent、API、登入／Tunnel、驗收及更新回復；語法／連結／Quadlet 與 mock 檢查通過，未在乾淨 VM 實際安裝，見 #091 |
 | DEP4 | 最新 main／遠端分支同步與重新上版 | ✅ | 348b64c 已經終端 sudo 授權完成部署；四個正式 unit、health、公開登入頁通過，本次無新 migration；後續僅測試競態修正與紀錄，見 #090 |
 | GRP2 | 右側面板可拖曳調整寬度；群組聊天可上傳檔案給 @bot | 🔬 | ADR-0026 補充；後端、前端、整合測試與瀏覽器 e2e 通過；348b64c 已正式部署，真群組 Agent 操作待驗收，見 #089、#090 |
 | DEP3 | 所有遠端分支核對、main 同步與新版正式部署 | ✅ | 7 個遠端分支均已在 main；修正 MakeTools idempotent SQL 後，經本機 sudo 授權完成 e7cf9f9 正式部署，四個 unit／health／公開登入頁通過；真登入與 Pi SSE 待人工驗收，見 #085 |
@@ -121,6 +122,22 @@
 ---
 
 ## 💬 留言區
+
+### #091 · 從乾淨 Ubuntu 主機開始的正式安裝總指南
+
+> 👤 **GPT（AI）** · 🕒 2026-10-16 16:00 CST · `✅文件`
+
+使用者要求把分散的安裝文件串成總指南。原工作目錄目前乾淨，回到 main 並 fetch／rebase 後新增 `docs/guides/ubuntu-install.md`，在 README 文件導覽加入醒目入口；不再使用先前個人 MCP 的一次性 worktree，也未建立新分支／PR。
+
+指南以 Ubuntu 24.04 x86-64、systemd 255+、Podman 4.9+ 為新主機基線：rootful API／SQL／LiteLLM＋PostgreSQL，專用 ymir rootless Agent／模型 proxy／Tunnel。提供具持久化 volume、loopback port、固定 image ID 與開機依賴的 6 份 Quadlet 參考區塊，不要求混裝 Docker daemon；區分新主機 Tunnel 直連 API 與既有 nginx 入口，明確禁止把現有主機修復／切換腳本當首次安裝器。
+
+涵蓋 subuid／subgid 不重疊、rootless user manager／cwd、Unix bridge／受限網路、root-owned scope wrapper（不放寬 cgroup／容器權限）、SDK／runtime、固定版本發布、最小權限 API DB login、兩模組 migration、stdin 建立首次管理員、Entra／Google 與 Tunnel、真 Pi／附件／重開機／還原驗收、可選 Connector／MCP／RAG／SiteHost／Maintenance，以及排錯順序。migration helper 明確設定 filtered index 所需 SET options、移除 UTF-8 BOM，第一模組失敗不執行第二個；密碼不放程序參數／shell trace／Git。更新流程保留 paired DB＋keyring＋workspace＋模型 DB／salt 備份及舊版，區分相容程式回復與經批准的資料還原，不提供盲目 down migration／prune／覆蓋備份指令。
+
+**實際驗證**：46 個本機 Markdown 連結／標題錨點通過；22 段 Bash 以 `bash -n` 檢查，內嵌 Python AST 檢查通過；本機 Podman 5.7.0 Quadlet `--dryrun` 解析 6 份新配置並產生 SQL／PostgreSQL／LiteLLM service，無 unsupported key／conversion error。migration helper 在暫存目錄以假的 sudo sink 驗證 SET options、BOM 移除與第一個失敗時第二個不執行；未呼叫真 sudo／SQL／Podman 安裝操作。`git diff --check` 通過。
+
+**邊界**：只改 Markdown，未重新跑應用程式 build／單元／整合測試；推送後仍追蹤 main CI。沒有新 VM／乾淨 Ubuntu 的端到端安裝、真實 SSO／Graph／模型或 reboot／restore 演練，指南已標註待目標主機驗收。未安裝套件、建立帳號、修改正式服務／secret／資料庫／網路或重新部署。
+
+---
 
 ### #090 · 最新進度同步與 348b64c 正式上版準備
 
