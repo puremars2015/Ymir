@@ -136,6 +136,7 @@
 - **驗證**：`dotnet build` 0 警告；單元測試 717 通過；整合測試新增 `OneDrivePluginTests`（市集預設與能力、平台服務停用、七個工具在 Fake Graph 的讀寫與不覆蓋、後端憑證 / token / execution / 群組 / 已結束 / 停用外掛 / Tunnel 標頭拒絕、跨使用者 item 拒絕）與 gateway 內建轉送測試、public edge `/internal` 測試，連同授權矩陣、OpenAPI 快照、既有 OneDrive 測試通過；全套 `dotnet test --solution Ymir.slnx`（含真 Pi 1.0.0）1055 通過、0 失敗、0 略過，`dotnet format --verify-no-changes` 通過；之後加上 public edge `/internal` 保護，PublicEdge＋OpenAPI 34 項重跑通過。前端 lint、225 Vitest、build 通過。沙箱實際啟動 Fake LLM＋Fake OIDC＋Fake MCP＋API（Pi harness）＋gateway（ApiUrl），`e2e:onedrive`（含真 Pi 經 gateway 呼叫 `mcp__onedrive__search`）、`e2e:mcp`、`e2e:connections` 通過，手機寬度無水平捲動。
 - **部署注意**：先備份再套用 `UserPluginSettings` migration；API、前端與 MCP gateway 一起更新，gateway 加上 `McpGateway__ApiUrl`（gateway 連得到的 API 位址）。
 - **未驗證、待使用者環境確認**：真實 Microsoft Graph 的 move（PATCH）與 delete、正式主機 gateway → API 的位址與受限網路路由。
+- **同步**：rebase 到含 #091（Ubuntu 安裝總指南，只改文件）的 main；看板編號改為 #092。安裝指南的 OneDrive／平台 MCP 列同步改成 ADR-0030 的說明（需使用者自己啟用、gateway 需 `McpGateway__ApiUrl`）。整合的遠端提交只有 Markdown，程式驗證結果不變。
 
 ---
 
