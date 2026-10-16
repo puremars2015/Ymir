@@ -4,6 +4,8 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup Label="Aspire">
+    <!-- GHSA-qhrr-8q5h-9q3h：保留 NuGet audit，修補 Aspire 的間接相依，不升級主要版本。 -->
+    <PackageVersion Include="MessagePack" Version="2.5.303" />
     <PackageVersion Include="Aspire.Hosting.JavaScript" Version="13.6.0" />
     <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.6.0" />
   </ItemGroup>
