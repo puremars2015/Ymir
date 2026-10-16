@@ -226,7 +226,17 @@ public class OneDriveSyncTests(OneDriveApiFactory factory) : IClassFixture<OneDr
 
         factory.Oidc.Issuer.RevokeRefreshTokens("od-sync-dan");
         factory.Services.GetRequiredService<OneDriveAccessTokenCache>().Remove(userId);
-        var status = await SyncNowAsync(client, conversation.Id);
+        before = DateTimeOffset.UtcNow.AddSeconds(-1);
+        using var sync = await client.PostAsync(new Uri($"/api/conversations/{conversation.Id}/onedrive/sync", UriKind.Relative), null, Ct);
+        // RequestSyncAsync 排程後會再讀取狀態；worker 可能已偵測撤銷並改成 NeedsReauth，端點便回 409。
+        // 兩種回應都必須驗證同步確實失敗、需要重新授權，不能只接受任意 409。
+        Assert.Contains(sync.StatusCode, new[] { HttpStatusCode.Accepted, HttpStatusCode.Conflict });
+        if (sync.StatusCode == HttpStatusCode.Conflict)
+        {
+            Assert.Contains("ONEDRIVE_NOT_READY", await sync.Content.ReadAsStringAsync(Ct), StringComparison.Ordinal);
+        }
+
+        var status = await WaitForSyncAsync(client, conversation.Id, before);
 
         Assert.Equal(OneDriveSyncState.Failed, status.State);
         Assert.Contains("重新連結", status.LastError, StringComparison.Ordinal);

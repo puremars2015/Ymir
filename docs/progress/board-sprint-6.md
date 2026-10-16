@@ -51,8 +51,8 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
-| DEP4 | 最新 main／遠端分支同步與重新上版 | 🚧 | 目標固定 348b64c；包含個人設定分頁、使用者設定頁、群組附件／面板寬度及資源告警；CI 全通過，本次無新 migration，正式切換待 sudo，見 #090 |
-| GRP2 | 右側面板可拖曳調整寬度；群組聊天可上傳檔案給 @bot | 🔬 | ADR-0026 補充；後端、前端、整合測試與瀏覽器 e2e 通過；已整合回 main、尚未部署，見 #089 |
+| DEP4 | 最新 main／遠端分支同步與重新上版 | ✅ | 348b64c 已經終端 sudo 授權完成部署；四個正式 unit、health、公開登入頁通過，本次無新 migration；後續僅測試競態修正與紀錄，見 #090 |
+| GRP2 | 右側面板可拖曳調整寬度；群組聊天可上傳檔案給 @bot | 🔬 | ADR-0026 補充；後端、前端、整合測試與瀏覽器 e2e 通過；348b64c 已正式部署，真群組 Agent 操作待驗收，見 #089、#090 |
 | DEP3 | 所有遠端分支核對、main 同步與新版正式部署 | ✅ | 7 個遠端分支均已在 main；修正 MakeTools idempotent SQL 後，經本機 sudo 授權完成 e7cf9f9 正式部署，四個 unit／health／公開登入頁通過；真登入與 Pi SSE 待人工驗收，見 #085 |
 | TOOL1 | 左側「小工具」：/make 小工具自動發布，在 Ymir 內以 iframe 開啟 | 🔬 | [ADR-0029](../adr/0029-make-tools-sidebar.md)；後端、前端、測試與瀏覽器 e2e 通過；正式站需部署 SiteHost 與網站網域並套 VibeMaker migration `MakeTools`，見 #083、#084 |
 | CONN1 | 個人「連接與工具」：OneDrive 與 HTTP MCP 註冊管理 | 🔬 | [ADR-0028](../adr/0028-personal-connections-and-tools.md)；入口、加密註冊／測試／啟停／移除、權限與群組隔離、桌面／手機 E2E 通過；尚未正式部署，見 #081 |
@@ -130,6 +130,10 @@
 - **固定程式目標**：`348b64cdb7cc024b1b8dee050e7ba83a87981b3e`；CI [38770970038](https://github.com/puremars2015/Ymir/actions/runs/38770970038) 全數成功。包含個人設定四分頁、管理使用者設定頁、群組 @bot 附件、可調整右側面板，以及系統資源不足告警。與上一版 e7cf9f9 比對，無 migration 檔案異動，不改正式部署 secret／DNS／SiteHost／維護服務啟用狀態。
 - **已驗證**：先前整合版 659cfa8（與目標後端程式相同）本機 build、712 單元測試、format 通過；與 348b64c 的差異僅文件及資源告警前端。新版 API image 重新建置中，完整整合測試使用獨立 SQL port 14349，未使用正式資料庫。主機部署器改成要求完整 migration history 與現況完全相同，本次不執行 migration，仍保留 SQL／金鑰／workspace 備份、精確 image／隔離／ENV 核對及失敗回復。
 - **正式切換待授權**：主機專用部署入口 `/home/itadmin/ymir-production-install/update-348b64c/authorize.sh`；產物驗證完成後以終端視窗請使用者輸入 sudo 密碼。本次不宣稱已修復先前 Cloudflare／OneDrive 同步期間的串流問題；真登入、Pi SSE、Graph 與小工具網站網域仍需驗收／配置。切換前 API NRestarts 已為 4，保留供追蹤。
+- **產物與本機整合驗證完成**：API image `c5ec456b16e9cdd0e09267cc553b1cd9089dd0c7fb590a63c37cd00749b83264` 與 402 個固定產物 SHA-256 驗證通過，14 個部署器檢查通過；獨立 SQL 完整整合測試 343 通過、0 失敗／略過。第一次終端 sudo 提示因未輸入密碼而逾時，未開始部署；使用者要求繼續後重新開啟授權視窗。
+- **CI 競態處理**：僅文件提交 `60f99d3` 的 CI [38840114142](https://github.com/puremars2015/Ymir/actions/runs/38840114142) 有 1 個失敗：`RevokedAuthorization_StopsSync_AndKeepsLocalFiles` 固定期待 202，但 `RequestSyncAsync` 排程後再讀狀態時 worker 可能已把撤銷授權標成 NeedsReauth，因此合法回 409。測試改為接受 202 或經錯誤碼驗證的 `ONEDRIVE_NOT_READY` 409，仍要求背景同步 Failed、需要重新連結、本機檔案保留、重試 409、停用同步後 execution 正常；未修改正式程式、未跳過或停用測試。修正後 build、format、712 單元與隔離 SQL 全套 343 整合測試全數通過、無略過，固定正式程式目標保持 348b64c。
+- **正式部署成功**：使用者在重開的終端完成 sudo 授權，部署結果 success／狀態碼 0。備份 `/var/backups/ymir/348b64c` 已通過 SQL COPY_ONLY＋CHECKSUM／RESTORE VERIFYONLY、金鑰／檔案／設定 tar compare 與 SHA-256；本次 migration history 保持 Platform 8／VibeMaker 20，不執行 migration。API 精確 image 為上述 c5ec456b…，RuntimeHost `/opt/ymir/releases/348b64c/runtime-host`，有效 ENV、mounts 與安全設定保留，未回復。
+- **部署後獨立驗證**：四個正式 unit 均 active／running、NRestarts 0、ExecMainStatus 0；RuntimeHost 工作目錄正確、本機 health Healthy、公開 `/login` HTTP 200。本次後續提交只含測試與紀錄，不需要再次更新正式程式；未宣稱真登入／Pi SSE／OneDrive 或先前 Cloudflare 串流問題已驗收。
 
 ---
 
