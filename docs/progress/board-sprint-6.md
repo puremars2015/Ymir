@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-16 16:00 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-16 17:00 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -63,7 +63,8 @@
 | GRP1 | 群組聊天與 @bot（每個群組一個 Agent container） | 🔬 | [ADR-0026](../adr/0026-group-chat-and-group-agent.md)；後端、前端、測試與瀏覽器驗證通過；3855dd6 已部署，真 Pi SSE／群組操作待人工驗收，見 #076、#079 |
 | DM1 | 使用者之間的一對一訊息、右側成員面板（[ADR-0023](../adr/0023-user-direct-messages.md)） | ✅ | 使用者 2026-10-14 要求（簡易版 Teams）；SSE 即時、未讀／已讀、窄螢幕抽屜；分支 `claude/hopeful-ptolemy-4rodpw`，見 #064 |
 | G1 | **插單** Google 帳號 SSO 登入（[ADR-0024](../adr/0024-google-account-sso.md)） | ✅ | 部署設定白名單（`hd` 網域 / email）必填；實際連 Google 待使用者環境確認，見 #065 |
-| O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | 🚧 | O3a 瀏覽／搜尋、O3b 連結管理／執行前下載已隨 3855dd6 部署，真 Graph 待驗收；O4 雲端寫回／O5 雙向變更與刪除保護未完成，見 #077、#079 |
+| O3～O5 | 讓 Agent 處理使用者指定的 OneDrive 檔案（[ADR-0022](../adr/0022-onedrive-linked-files.md)） | ✅ | 已關閉：使用者 2026-10-16 改為外掛市集模式，手動連結已被 ADR-0030 取代並移除（資料表保留）；O4／O5 不再實作，見 PLG1、#092 |
+| PLG1 | 外掛市集與 OneDrive Agent 工具（[ADR-0030](../adr/0030-plugin-marketplace-and-onedrive-agent-tools.md)） | 🔬 | `/plugins` 市集、使用者外掛開關、Agent 經 gateway 讀寫自己的 OneDrive（含刪除到回收筒）；沙箱以 Fake Graph + 真 Pi 驗證通過，真 Graph 與正式 gateway 位址待使用者環境確認，見 #092 |
 | L5 | 每人每模型用量（[ADR-0021](../adr/0021-per-user-model-usage.md)） | ✅ | 已合併回 main（使用者 2026-10-13 要求）；管理 → 用量「依模型」卡片，模型名稱帶 provider；token／費用仍讀 LiteLLM、Ymir 不保存；見 #058、#059 |
 | RAG2 | `/make` 新增「建立 RAG 知識庫」引導主題 | ✅ | 種子主題（管理員可調整／停用），引導到專案頁知識庫（每專案一份 SQLite），見 #061 |
 | UPD1 | main 4b8a3af 正式更新產物與現況核對（歷史建置記錄） | 🔬 | API／RuntimeHost／511 單元測試／396 checksums 通過；保留當時未部署與權限受阻原文，原部署卡關已於 2026-10-14 13:00 部署解除，見 #062 |
@@ -122,6 +123,21 @@
 ---
 
 ## 💬 留言區
+
+### #092 · 外掛市集與 OneDrive Agent 工具（ADR-0030）
+
+> 👤 **Claude Code（AI）** · 🕒 2026-10-16 17:00 · `🔬驗證`
+
+- **需求**：使用者回饋 ADR-0022 的「在檔案面板手動挑 OneDrive 項目」不是要的效果；要比照 ChatGPT 外掛：市集 → 找到 OneDrive → 安裝並啟用 → Agent 需要時自己讀寫 OneDrive。使用者決定：Agent 權限讀＋寫（含刪除）、移除 ADR-0022 手動連結（資料表保留）、ADR-0013 同步資料夾保留（不同功能）、市集第一版放 OneDrive＋平台 MCP＋個人 MCP。
+- **ADR-0030**：取代 ADR-0022 手動連結、修訂 ADR-0028 §7 與 ADR-0012 B。OneDrive 工具由 **API** 提供（refresh token 只在 API），經既有 MCP gateway 轉送：gateway 的內建服務 `/mcp/onedrive`（`McpGateway:ApiUrl`）→ API `/internal/mcp/onedrive`，附上由簽章金鑰衍生的後端憑證與 Agent 的 token；token 新增 execution id，API 每次呼叫都重查 execution 執行中、使用者、能力、外掛開關與連線。公開網域的 `/internal/*` 由 public edge 回 404，帶 `Cf-Connecting-Ip` 也拒絕。
+- **後端**：`vibemaker.user_plugin_settings`（migration `UserPluginSettings`）、`PluginService`、`GET /api/plugins`、`PUT /api/plugins/{key}`（稽核 `plugin.enable/disable`）；`OneDriveAgentTools` 七個工具 search / list_folder / download（→ 工作目錄 `onedrive/`）/ upload（預設不覆蓋）/ create_folder / move / delete（回收筒），只操作自己的 drive，寫入類稽核 `onedrive.agent.*`（target 為 item id）；Graph client 與 Fake Graph 新增 move / delete。`PlatformMcpService.PrepareRunAsync` 排除使用者停用的平台服務並在啟用時加入 `onedrive`（群組執行不帶）。`servers.json` 不得使用 `onedrive` 名稱。
+- **移除**：`OneDriveLinks`、`/api/conversations/{id}/onedrive/links*`、`/api/connectors/onedrive/browse`、`/search`、檔案面板「OneDrive 連結檔案」、設定頁「瀏覽整個自己的 OneDrive」與執行前的連結下載；`onedrive/` 仍是同步資料夾排除的頂層目錄。
+- **前端**：新頁面 `/plugins`（左下「外掛」）：OneDrive 卡片（安裝 = 連結帳號、「讓 Agent 使用」開關會先確認風險、帳號與同步資料夾）、平台 MCP 卡片、自訂外掛（個人 MCP）與能力摘要。個人設定只剩 System Prompt、變更密碼；`/settings/connections`、`/settings/tools` 導向 `/plugins`，OAuth 回跳改到 `/plugins`。
+- **驗證**：`dotnet build` 0 警告；單元測試 717 通過；整合測試新增 `OneDrivePluginTests`（市集預設與能力、平台服務停用、七個工具在 Fake Graph 的讀寫與不覆蓋、後端憑證 / token / execution / 群組 / 已結束 / 停用外掛 / Tunnel 標頭拒絕、跨使用者 item 拒絕）與 gateway 內建轉送測試、public edge `/internal` 測試，連同授權矩陣、OpenAPI 快照、既有 OneDrive 測試通過；全套 `dotnet test --solution Ymir.slnx`（含真 Pi 1.0.0）1055 通過、0 失敗、0 略過，`dotnet format --verify-no-changes` 通過；之後加上 public edge `/internal` 保護，PublicEdge＋OpenAPI 34 項重跑通過。前端 lint、225 Vitest、build 通過。沙箱實際啟動 Fake LLM＋Fake OIDC＋Fake MCP＋API（Pi harness）＋gateway（ApiUrl），`e2e:onedrive`（含真 Pi 經 gateway 呼叫 `mcp__onedrive__search`）、`e2e:mcp`、`e2e:connections` 通過，手機寬度無水平捲動。
+- **部署注意**：先備份再套用 `UserPluginSettings` migration；API、前端與 MCP gateway 一起更新，gateway 加上 `McpGateway__ApiUrl`（gateway 連得到的 API 位址）。
+- **未驗證、待使用者環境確認**：真實 Microsoft Graph 的 move（PATCH）與 delete、正式主機 gateway → API 的位址與受限網路路由。
+
+---
 
 ### #091 · 從乾淨 Ubuntu 主機開始的正式安裝總指南
 
