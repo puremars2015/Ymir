@@ -19,6 +19,12 @@ public sealed class McpGatewayOptions
     /// <summary>單一 POST 請求等待後端回應的上限。</summary>
     public int BackendTimeoutSeconds { get; set; } = 120;
 
+    /// <summary>
+    /// gateway 連得到的 Ymir API 位址（ADR-0030 §2），例如 <c>http://127.0.0.1:8080</c>。設定後提供內建服務 <c>/mcp/onedrive</c>，
+    /// 轉送到 API 的 <c>/internal/mcp/onedrive</c>；沒有設定時內建服務停用。
+    /// </summary>
+    public Uri? ApiUrl { get; set; }
+
     /// <summary>單一請求本文上限（JSON-RPC 訊息）。</summary>
     public int MaxRequestBytes { get; set; } = 1024 * 1024;
 }

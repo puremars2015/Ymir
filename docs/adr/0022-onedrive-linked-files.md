@@ -1,6 +1,7 @@
 # ADR-0022：讓 Agent 處理使用者指定的 OneDrive 檔案（後端下載、寫回原位置，含刪除、移動、改名）
 
-- 狀態：已採納（使用者 2026-10-15 要求實作；依 O3～O5 分階段驗證，未完成階段不得宣稱已啟用）
+- 狀態：手動連結（O3～O5）已被 [ADR-0030](0030-plugin-marketplace-and-onedrive-agent-tools.md) 取代（2026-10-16）：改為外掛市集啟用後由 Agent 自行存取；O3 的程式已移除，資料表保留
+- 原狀態：已採納（使用者 2026-10-15 要求實作；依 O3～O5 分階段驗證，未完成階段不得宣稱已啟用）
 - 日期：2026-10-14
 - 依據：使用者要求「讓使用者可以指定 Agent 去操作使用者自己 OneDrive 上的任何文件」；延伸 [ADR-0013](0013-onedrive-connector.md)（OneDrive connector），沿用 [ADR-0012](0012-agent-extensions-and-platform-mcp.md) 的能力開關。
 

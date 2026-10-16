@@ -25,7 +25,7 @@
 | [0019](0019-user-model-access.md) | 個別使用者模型權限：動態繼承、允許與禁止 | 已採納 |
 | [0020](0020-admin-model-access.md) | 管理員控制開放模型（原誤用 0016，2026-10-13 改號） | 已採納（個人權限由 ADR-0019 延伸） |
 | [0021](0021-per-user-model-usage.md) | 每人每模型用量（讀 LiteLLM model_groups，Ymir 不保存） | 已採納 |
-| [0022](0022-onedrive-linked-files.md) | 讓 Agent 處理使用者指定的 OneDrive 檔案（含刪除、移動、改名） | 已採納（分階段實作中） |
+| [0022](0022-onedrive-linked-files.md) | 讓 Agent 處理使用者指定的 OneDrive 檔案（含刪除、移動、改名） | 手動連結已被 ADR-0030 取代 |
 | [0023](0023-user-direct-messages.md) | 使用者之間的一對一訊息（右側成員名單、SSE 即時通知） | 已採納 |
 | [0024](0024-google-account-sso.md) | Google 帳號 SSO 登入 | 已採納 |
 | [0025](0025-ymir-resource-monitoring-and-reclamation.md) | Ymir 資源監控與安全自動回收 | 已採納 |
@@ -33,6 +33,7 @@
 | [0027](0027-admin-user-management-and-guest-role.md) | 管理員的使用者管理（改名、角色、刪除）與訪客角色 | 已採納 |
 | [0028](0028-personal-connections-and-tools.md) | 個人連接與工具管理（OneDrive 與 HTTP MCP） | 已採納 |
 | [0029](0029-make-tools-sidebar.md) | 左側「小工具」：/make 小工具自動發布並在 Ymir 內以 iframe 開啟 | 已採納 |
+| [0030](0030-plugin-marketplace-and-onedrive-agent-tools.md) | 外掛市集與 OneDrive Agent 工具 | 已採納 |
 
 新增 ADR 時複製以下格式：
 

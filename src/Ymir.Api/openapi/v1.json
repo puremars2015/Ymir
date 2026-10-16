@@ -2538,67 +2538,6 @@
         }
       }
     },
-    "/api/connectors/onedrive/browse": {
-      "get": {
-        "tags": [
-          "Connectors"
-        ],
-        "operationId": "BrowseOneDrive",
-        "parameters": [
-          {
-            "name": "itemId",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OneDriveBrowserPage"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/connectors/onedrive/search": {
-      "get": {
-        "tags": [
-          "Connectors"
-        ],
-        "operationId": "SearchOneDrive",
-        "parameters": [
-          {
-            "name": "q",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/OneDriveBrowserItem"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/conversations/{conversationId}/onedrive": {
       "get": {
         "tags": [
@@ -2657,23 +2596,12 @@
         }
       }
     },
-    "/api/conversations/{conversationId}/onedrive/links": {
+    "/api/plugins": {
       "get": {
         "tags": [
-          "Conversations"
+          "Plugins"
         ],
-        "operationId": "ListOneDriveLinks",
-        "parameters": [
-          {
-            "name": "conversationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
+        "operationId": "ListPlugins",
         "responses": {
           "200": {
             "description": "OK",
@@ -2682,47 +2610,8 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/OneDriveLinkedItemInfo"
+                    "$ref": "#/components/schemas/PluginResponse"
                   }
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Conversations"
-        ],
-        "operationId": "AddOneDriveLink",
-        "parameters": [
-          {
-            "name": "conversationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AddOneDriveLinkRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OneDriveLinkedItemInfo"
                 }
               }
             }
@@ -2730,29 +2619,19 @@
         }
       }
     },
-    "/api/conversations/{conversationId}/onedrive/links/{linkId}": {
-      "patch": {
+    "/api/plugins/{key}": {
+      "put": {
         "tags": [
-          "Conversations"
+          "Plugins"
         ],
-        "operationId": "SetOneDriveLinkReadOnly",
+        "operationId": "SetPluginEnabled",
         "parameters": [
           {
-            "name": "conversationId",
+            "name": "key",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "linkId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
+              "type": "string"
             }
           }
         ],
@@ -2760,7 +2639,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SetOneDriveLinkReadOnlyRequest"
+                "$ref": "#/components/schemas/SetPluginEnabledRequest"
               }
             }
           },
@@ -2772,41 +2651,10 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OneDriveLinkedItemInfo"
+                  "$ref": "#/components/schemas/PluginResponse"
                 }
               }
             }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Conversations"
-        ],
-        "operationId": "RemoveOneDriveLink",
-        "parameters": [
-          {
-            "name": "conversationId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          },
-          {
-            "name": "linkId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
           }
         }
       }
@@ -3969,24 +3817,6 @@
               "type": "string",
               "format": "uuid"
             }
-          }
-        }
-      },
-      "AddOneDriveLinkRequest": {
-        "required": [
-          "itemId"
-        ],
-        "type": "object",
-        "properties": {
-          "itemId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "readOnly": {
-            "type": "boolean",
-            "default": false
           }
         }
       },
@@ -6436,132 +6266,6 @@
           "Ready"
         ]
       },
-      "OneDriveBrowserItem": {
-        "required": [
-          "id",
-          "name",
-          "isFolder",
-          "size",
-          "lastModified"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "isFolder": {
-            "type": "boolean"
-          },
-          "size": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int64"
-          },
-          "lastModified": {
-            "type": "string",
-            "format": "date-time"
-          }
-        }
-      },
-      "OneDriveBrowserPage": {
-        "required": [
-          "folderId",
-          "parentItemId",
-          "items"
-        ],
-        "type": "object",
-        "properties": {
-          "folderId": {
-            "type": "string"
-          },
-          "parentItemId": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OneDriveBrowserItem"
-            }
-          }
-        }
-      },
-      "OneDriveLinkedItemInfo": {
-        "required": [
-          "id",
-          "name",
-          "localPath",
-          "isFolder",
-          "readOnly",
-          "state",
-          "conflictCount",
-          "lastDownloadedAt",
-          "lastError"
-        ],
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "name": {
-            "type": "string"
-          },
-          "localPath": {
-            "type": "string"
-          },
-          "isFolder": {
-            "type": "boolean"
-          },
-          "readOnly": {
-            "type": "boolean"
-          },
-          "state": {
-            "$ref": "#/components/schemas/OneDriveLinkedItemState"
-          },
-          "conflictCount": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "lastDownloadedAt": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date-time"
-          },
-          "lastError": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "writeBackEnabled": {
-            "type": "boolean",
-            "default": false
-          }
-        }
-      },
-      "OneDriveLinkedItemState": {
-        "enum": [
-          "Pending",
-          "Downloaded",
-          "Failed",
-          "CloudDeleted"
-        ]
-      },
       "OneDriveLinkState": {
         "enum": [
           "NotConnected",
@@ -6742,6 +6446,58 @@
           },
           "description": {
             "type": "string"
+          }
+        }
+      },
+      "PluginKind": {
+        "enum": [
+          "OneDrive",
+          "PlatformMcp"
+        ]
+      },
+      "PluginResponse": {
+        "required": [
+          "key",
+          "kind",
+          "name",
+          "description",
+          "allowed",
+          "installed",
+          "enabled",
+          "agentReady",
+          "notice"
+        ],
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PluginKind"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "installed": {
+            "type": "boolean"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "agentReady": {
+            "type": "boolean"
+          },
+          "notice": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -7844,20 +7600,6 @@
           }
         }
       },
-      "SetOneDriveLinkReadOnlyRequest": {
-        "required": [
-          "readOnly"
-        ],
-        "type": "object",
-        "properties": {
-          "readOnly": {
-            "type": [
-              "null",
-              "boolean"
-            ]
-          }
-        }
-      },
       "SetOneDriveRootRequest": {
         "required": [
           "path"
@@ -7880,6 +7622,20 @@
         "properties": {
           "enabled": {
             "type": "boolean"
+          }
+        }
+      },
+      "SetPluginEnabledRequest": {
+        "required": [
+          "enabled"
+        ],
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": [
+              "null",
+              "boolean"
+            ]
           }
         }
       },
@@ -8936,6 +8692,9 @@
     },
     {
       "name": "Connectors"
+    },
+    {
+      "name": "Plugins"
     },
     {
       "name": "DirectMessages"

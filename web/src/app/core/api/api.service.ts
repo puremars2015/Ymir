@@ -18,9 +18,7 @@ import {
   ExtensionValues,
   MyExtensions,
   OneDriveStatus,
-  OneDriveBrowserPage,
-  OneDriveBrowserItem,
-  OneDriveLinkedItem,
+  Plugin,
   ConversationOneDrive,
   KnowledgeAnswer,
   PublishSiteRequest,
@@ -260,53 +258,18 @@ export class ApiService {
     return this.http.put<UserExtensions>(`/api/admin/users/${userId}/extensions`, request);
   }
 
+  /** 外掛市集（ADR-0030）：可用的外掛與自己的開關。 */
+  listPlugins(): Observable<Plugin[]> {
+    return this.http.get<Plugin[]>('/api/plugins');
+  }
+
+  setPluginEnabled(key: string, enabled: boolean): Observable<Plugin> {
+    return this.http.put<Plugin>(`/api/plugins/${encodeURIComponent(key)}`, { enabled });
+  }
+
   /** OneDrive 連結狀態（ADR-0013）；不含任何 token。 */
   getOneDriveStatus(): Observable<OneDriveStatus> {
     return this.http.get<OneDriveStatus>('/api/connectors/onedrive');
-  }
-
-  browseOneDrive(itemId?: string): Observable<OneDriveBrowserPage> {
-    return this.http.get<OneDriveBrowserPage>('/api/connectors/onedrive/browse', {
-      params: itemId ? { itemId } : {},
-    });
-  }
-
-  searchOneDrive(q: string): Observable<OneDriveBrowserItem[]> {
-    return this.http.get<OneDriveBrowserItem[]>('/api/connectors/onedrive/search', {
-      params: { q },
-    });
-  }
-
-  getOneDriveLinks(conversationId: string): Observable<OneDriveLinkedItem[]> {
-    return this.http.get<OneDriveLinkedItem[]>(
-      `/api/conversations/${conversationId}/onedrive/links`,
-    );
-  }
-
-  addOneDriveLink(
-    conversationId: string,
-    itemId: string,
-    readOnly: boolean,
-  ): Observable<OneDriveLinkedItem> {
-    return this.http.post<OneDriveLinkedItem>(
-      `/api/conversations/${conversationId}/onedrive/links`,
-      { itemId, readOnly },
-    );
-  }
-
-  setOneDriveLinkReadOnly(
-    conversationId: string,
-    linkId: string,
-    readOnly: boolean,
-  ): Observable<OneDriveLinkedItem> {
-    return this.http.patch<OneDriveLinkedItem>(
-      `/api/conversations/${conversationId}/onedrive/links/${linkId}`,
-      { readOnly },
-    );
-  }
-
-  removeOneDriveLink(conversationId: string, linkId: string): Observable<void> {
-    return this.http.delete<void>(`/api/conversations/${conversationId}/onedrive/links/${linkId}`);
   }
 
   setOneDriveRoot(path: string): Observable<OneDriveStatus> {

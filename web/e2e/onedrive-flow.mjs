@@ -43,17 +43,31 @@ step('admin enabled OneDrive for everyone');
 // 2. 使用者連結 OneDrive（整頁導向 Fake OIDC，login_hint 自動通過）
 const user = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
 await devLogin(user, `od-user-${stamp}`, 'User');
-await user.goto(`${baseUrl}/settings/connections`);
+await user.goto(`${baseUrl}/plugins`);
+const plugin = user.locator('app-plugins-page li.card', { hasText: 'OneDrive' });
+await plugin.locator('.status:has-text("尚未安裝")').waitFor();
 const onedrive = user.locator('app-onedrive-card');
 await onedrive.locator('text=尚未連結').waitFor();
 await user.screenshot({ path: `${outDir}/02-not-connected.png`, fullPage: true });
 await onedrive.locator('button:has-text("連結 OneDrive")').click();
-await user.waitForURL(/\/settings/, { timeout: 30000 });
+await user.waitForURL(/\/plugins/, { timeout: 30000 });
 await onedrive.locator('[role=status]:has-text("已連結 OneDrive")').waitFor();
 await onedrive.locator(`text=od-user-${stamp}@fake-entra.test`).waitFor();
 if (user.url().includes('onedrive='))
   throw new Error('result query should be removed from the URL');
 step('user connected OneDrive through the authorization redirect');
+
+// 2b. 外掛市集：啟用「讓 Agent 使用」需要確認風險（ADR-0030 §5）
+await plugin.locator('.status:has-text("已安裝，未啟用")').waitFor();
+user.once('dialog', (d) => {
+  if (!d.message().includes('刪除')) throw new Error('enable confirmation should explain the risk');
+  return d.accept();
+});
+await plugin.locator('input[type=checkbox]').check();
+// 有設定 MCP gateway 時是「Agent 可以使用」，沒有時是「已啟用，暫時無法使用」並顯示原因。
+await plugin.locator('.status', { hasText: /Agent 可以使用|已啟用/ }).waitFor();
+await user.screenshot({ path: `${outDir}/02b-plugin-enabled.png`, fullPage: true });
+step('user enabled the OneDrive plugin for the Agent');
 
 // 3. 設定同步資料夾
 await onedrive.locator('input[name=rootPath]').fill('/Ymir/E2E');
@@ -61,6 +75,21 @@ await onedrive.locator('button:has-text("儲存")').click();
 await onedrive.locator('text=已連結，同步到 /Ymir/E2E').waitFor();
 await user.screenshot({ path: `${outDir}/03-connected.png`, fullPage: true });
 step("sync folder created in the user's OneDrive");
+
+// 3b. Agent 自己使用 OneDrive 外掛（需要 API 的 VibeMaker__Harness=Pi、Ymir__Mcp__* 與 gateway 的 McpGateway__ApiUrl；
+//     Fake LLM 的 [onedrive-search 關鍵字] 會呼叫 mcp__onedrive__search）。沒有設定 gateway 時略過。
+if ((await plugin.locator('.status').innerText()).includes('Agent 可以使用')) {
+  await user.goto(`${baseUrl}/`);
+  await user.waitForSelector('app-new-chat-page h1');
+  await user.fill('app-composer textarea', '[onedrive-search E2E] 找一下 E2E 資料夾');
+  await user.press('app-composer textarea', 'Enter');
+  await user
+    .locator('.turn.assistant:has-text("MCP 回應")', { hasText: 'E2E' })
+    .waitFor({ timeout: 90000 });
+  await user.screenshot({ path: `${outDir}/03b-agent-searched-onedrive.png`, fullPage: true });
+  step('the Agent searched the OneDrive through the plugin');
+  await user.goto(`${baseUrl}/plugins`);
+}
 
 // 4. 對話執行後自動同步：檔案面板顯示雲端保存狀態，與任務結果分開
 await user.goto(`${baseUrl}/`);
@@ -78,7 +107,7 @@ await cloud.locator('text=已同步到 OneDrive').waitFor({ timeout: 30000 });
 step('conversation synced to OneDrive after the run; manual sync works');
 
 // 5. 解除連結
-await user.goto(`${baseUrl}/settings/connections`);
+await user.goto(`${baseUrl}/plugins`);
 user.once('dialog', (d) => d.accept());
 await onedrive.locator('button:has-text("解除連結")').click();
 await onedrive.locator('text=尚未連結').waitFor();

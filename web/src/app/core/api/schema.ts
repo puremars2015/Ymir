@@ -1093,38 +1093,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/connectors/onedrive/browse': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations['BrowseOneDrive'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/connectors/onedrive/search': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations['SearchOneDrive'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/conversations/{conversationId}/onedrive': {
     parameters: {
       query?: never;
@@ -1157,23 +1125,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/conversations/{conversationId}/onedrive/links': {
+  '/api/plugins': {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get: operations['ListOneDriveLinks'];
+    get: operations['ListPlugins'];
     put?: never;
-    post: operations['AddOneDriveLink'];
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  '/api/conversations/{conversationId}/onedrive/links/{linkId}': {
+  '/api/plugins/{key}': {
     parameters: {
       query?: never;
       header?: never;
@@ -1181,12 +1149,12 @@ export interface paths {
       cookie?: never;
     };
     get?: never;
-    put?: never;
+    put: operations['SetPluginEnabled'];
     post?: never;
-    delete: operations['RemoveOneDriveLink'];
+    delete?: never;
     options?: never;
     head?: never;
-    patch: operations['SetOneDriveLinkReadOnly'];
+    patch?: never;
     trace?: never;
   };
   '/api/admin/settings/oidc': {
@@ -1566,11 +1534,6 @@ export interface components {
   schemas: {
     AddChatGroupMembersRequest: {
       userIds: null | string[];
-    };
-    AddOneDriveLinkRequest: {
-      itemId: null | string;
-      /** @default false */
-      readOnly: boolean;
     };
     AddPersonalMcpRequest: {
       name: string;
@@ -2153,38 +2116,6 @@ export interface components {
     };
     /** @enum {unknown} */
     OneDriveAvailability: 'NotAllowed' | 'NotConnected' | 'NeedsReauth' | 'NoRoot' | 'Ready';
-    OneDriveBrowserItem: {
-      id: string;
-      name: string;
-      isFolder: boolean;
-      /** Format: int64 */
-      size: number | string;
-      /** Format: date-time */
-      lastModified: string;
-    };
-    OneDriveBrowserPage: {
-      folderId: string;
-      parentItemId: null | string;
-      items: components['schemas']['OneDriveBrowserItem'][];
-    };
-    OneDriveLinkedItemInfo: {
-      /** Format: uuid */
-      id: string;
-      name: string;
-      localPath: string;
-      isFolder: boolean;
-      readOnly: boolean;
-      state: components['schemas']['OneDriveLinkedItemState'];
-      /** Format: int32 */
-      conflictCount: number | string;
-      /** Format: date-time */
-      lastDownloadedAt: null | string;
-      lastError: null | string;
-      /** @default false */
-      writeBackEnabled: boolean;
-    };
-    /** @enum {unknown} */
-    OneDriveLinkedItemState: 'Pending' | 'Downloaded' | 'Failed' | 'CloudDeleted';
     /** @enum {unknown} */
     OneDriveLinkState: 'NotConnected' | 'Connected' | 'NeedsReauth';
     OneDriveStatusResponse: {
@@ -2228,6 +2159,19 @@ export interface components {
     PlatformMcpServerSummary: {
       name: string;
       description: string;
+    };
+    /** @enum {unknown} */
+    PluginKind: 'OneDrive' | 'PlatformMcp';
+    PluginResponse: {
+      key: string;
+      kind: components['schemas']['PluginKind'];
+      name: string;
+      description: string;
+      allowed: boolean;
+      installed: boolean;
+      enabled: boolean;
+      agentReady: boolean;
+      notice: null | string;
     };
     PressureStatus: {
       key: string;
@@ -2500,14 +2444,14 @@ export interface components {
       status: string;
       checks: components['schemas']['ServiceHealthItem'][];
     };
-    SetOneDriveLinkReadOnlyRequest: {
-      readOnly: null | boolean;
-    };
     SetOneDriveRootRequest: {
       path: null | string;
     };
     SetPersonalMcpEnabledRequest: {
       enabled: boolean;
+    };
+    SetPluginEnabledRequest: {
+      enabled: null | boolean;
     };
     SetPublicHostnameRequest: {
       hostname: null | string;
@@ -4686,50 +4630,6 @@ export interface operations {
       };
     };
   };
-  BrowseOneDrive: {
-    parameters: {
-      query?: {
-        itemId?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['OneDriveBrowserPage'];
-        };
-      };
-    };
-  };
-  SearchOneDrive: {
-    parameters: {
-      query?: {
-        q?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['OneDriveBrowserItem'][];
-        };
-      };
-    };
-  };
   GetConversationOneDriveStatus: {
     parameters: {
       query?: never;
@@ -4779,13 +4679,11 @@ export interface operations {
       };
     };
   };
-  ListOneDriveLinks: {
+  ListPlugins: {
     parameters: {
       query?: never;
       header?: never;
-      path: {
-        conversationId: string;
-      };
+      path?: never;
       cookie?: never;
     };
     requestBody?: never;
@@ -4796,23 +4694,23 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['OneDriveLinkedItemInfo'][];
+          'application/json': components['schemas']['PluginResponse'][];
         };
       };
     };
   };
-  AddOneDriveLink: {
+  SetPluginEnabled: {
     parameters: {
       query?: never;
       header?: never;
       path: {
-        conversationId: string;
+        key: string;
       };
       cookie?: never;
     };
     requestBody: {
       content: {
-        'application/json': components['schemas']['AddOneDriveLinkRequest'];
+        'application/json': components['schemas']['SetPluginEnabledRequest'];
       };
     };
     responses: {
@@ -4822,55 +4720,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['OneDriveLinkedItemInfo'];
-        };
-      };
-    };
-  };
-  RemoveOneDriveLink: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        conversationId: string;
-        linkId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  SetOneDriveLinkReadOnly: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        conversationId: string;
-        linkId: string;
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SetOneDriveLinkReadOnlyRequest'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['OneDriveLinkedItemInfo'];
+          'application/json': components['schemas']['PluginResponse'];
         };
       };
     };

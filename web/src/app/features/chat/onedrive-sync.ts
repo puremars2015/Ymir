@@ -43,7 +43,7 @@ const MAX_POLLS = 60;
         }
         <div class="actions">
           @if (s.needsSettings) {
-            <a class="link small" routerLink="/settings">前往設定</a>
+            <a class="link small" routerLink="/plugins">前往外掛市集</a>
           }
           @if (s.canSync) {
             <button type="button" class="link small" [disabled]="busy()" (click)="syncNow()">

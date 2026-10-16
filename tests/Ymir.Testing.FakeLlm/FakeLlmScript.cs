@@ -13,6 +13,7 @@ namespace Ymir.Testing.FakeLlm;
 /// <item>使用者訊息含 <c>[fail]</c> → 回傳 HTTP 500（測模型端錯誤）。</item>
 /// <item>使用者訊息含 <c>&lt;knowledge&gt;</c>（知識庫問答，ADR-0014）→ 以第一個片段的第一行回答並標註 <c>[1]</c>。</item>
 /// <item>使用者訊息含 <c>[mcp-echo]</c> → 呼叫工具清單中第一個 <c>mcp__*__echo</c>（平台 MCP，ADR-0012 B），沒有時回覆 <see cref="NoMcpToolReply"/>。</item>
+/// <item>使用者訊息含 <c>[onedrive-search 關鍵字]</c> → 呼叫 OneDrive 外掛的 <c>mcp__*onedrive*__search</c>（ADR-0030），沒有時回覆 <see cref="NoMcpToolReply"/>。</item>
 /// <item>其他：回覆收到的文字；最後一則使用者訊息附有圖片時，加上 <see cref="ImageCountPrefix"/> 與張數。</item>
 /// <item>其他 → 回覆「收到第 N 則使用者訊息：...」，N 可用來驗證 session 續接。</item>
 /// </list>
@@ -28,6 +29,7 @@ public static partial class FakeLlmScript
     public const string KnowledgeReplyPrefix = "根據文件：";
     public const string McpEchoText = "ping from agent";
     public const string McpReplyPrefix = "MCP 回應：";
+    public const string OneDriveSearchMarker = "[onedrive-search ";
     public const string NoMcpToolReply = "沒有可用的 MCP 工具。";
     public const string CreatedFileName = "hello.txt";
     public const string CreatedFileContent = "Hello from Ymir";
@@ -43,7 +45,7 @@ public static partial class FakeLlmScript
         if (lastRole == "tool")
         {
             var toolText = ExtractText(last);
-            return toolText.Contains("echo: ", StringComparison.Ordinal)
+            return toolText.Contains("echo: ", StringComparison.Ordinal) || toolText.Contains("\"items\"", StringComparison.Ordinal)
                 ? FakeLlmReply.Text([McpReplyPrefix, toolText])
                 : FakeLlmReply.Text(["已完成，", $"檔案 {CreatedFileName} 已建立。"]);
         }
@@ -63,6 +65,21 @@ public static partial class FakeLlmScript
             return tool is null
                 ? FakeLlmReply.Text([NoMcpToolReply])
                 : FakeLlmReply.ToolCall(tool, new JsonObject { ["text"] = McpEchoText }, preamble: "我來呼叫平台服務。");
+        }
+
+        var oneDriveSearch = lastUserText.IndexOf(OneDriveSearchMarker, StringComparison.Ordinal);
+        if (oneDriveSearch >= 0)
+        {
+            var start = oneDriveSearch + OneDriveSearchMarker.Length;
+            var end = lastUserText.IndexOf(']', start);
+            var query = end < 0 ? string.Empty : lastUserText[start..end].Trim();
+            var tool = (request["tools"]?.AsArray() ?? [])
+                .Select(t => t?["function"]?["name"]?.GetValue<string>())
+                .FirstOrDefault(n => n is not null && n.StartsWith("mcp__", StringComparison.Ordinal)
+                    && n.Contains("onedrive", StringComparison.Ordinal) && n.EndsWith("search", StringComparison.Ordinal));
+            return tool is null
+                ? FakeLlmReply.Text([NoMcpToolReply])
+                : FakeLlmReply.ToolCall(tool, new JsonObject { ["query"] = query }, preamble: "我來搜尋你的 OneDrive。");
         }
 
         if (lastUserText.Contains(FailMarker, StringComparison.Ordinal))

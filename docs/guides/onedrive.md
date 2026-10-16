@@ -1,6 +1,11 @@
 # OneDrive 同步指南
 
-決策見 [ADR-0013](../adr/0013-onedrive-connector.md)。使用者把自己的公司 OneDrive 連到 Ymir 後，Agent 每次執行前會從 OneDrive 下載檔案，執行後把新增或修改的檔案上傳回去。同步由 Ymir 後端經 Microsoft Graph 進行；Agent container 拿不到任何 Microsoft 憑證，也不需要連到 Microsoft 的網路。
+決策見 [ADR-0013](../adr/0013-onedrive-connector.md)。使用者在**外掛市集**（`/plugins`，[ADR-0030](../adr/0030-plugin-marketplace-and-onedrive-agent-tools.md)）把自己的公司 OneDrive 連到 Ymir 後，有兩個彼此獨立的功能：
+
+- **讓 Agent 使用（OneDrive 外掛）**：Agent 在對話中自己搜尋、下載、上傳、移動、刪除 OneDrive 上的檔案。
+- **同步資料夾**（選用）：Agent 每次執行前從 OneDrive 的一個資料夾下載檔案，執行後把新增或修改的檔案上傳回去。
+
+兩者都由 Ymir 後端經 Microsoft Graph 進行；Agent container 拿不到任何 Microsoft 憑證，也不需要連到 Microsoft 的網路。
 
 ## 1. Entra 應用程式（管理員，一次）
 
@@ -10,44 +15,45 @@ OneDrive 沿用 Ymir 登入用的同一個 Entra 應用程式註冊（[entra-id.
    租戶如果不允許使用者自行同意，請 Entra 管理員按「代表 <租戶> 授與管理員同意」。
 2. **驗證** → Web 平台的重新導向 URI 加上 `https://<Ymir 網域>/api/connectors/onedrive/callback`（與登入的 `/signin-oidc` 並列）。
 
-`Files.ReadWrite` 讓 Ymir 可以存取使用者的整個 OneDrive。除了設定頁的同步資料夾，ADR-0022 現已提供整個自己 drive 的瀏覽／搜尋，以及明確連結項目的執行前下載；**不是**把整個 drive 自動交給 Agent。連結項目的雲端寫回仍未啟用。
+`Files.ReadWrite` 讓 Ymir 可以存取使用者的整個 OneDrive。使用者在外掛市集打開「讓 Agent 使用」後，Agent 就能讀寫整個自己的 OneDrive（見 §4）；沒打開時只有同步資料夾會被存取。
 
 ## 2. 開放能力（管理員）
 
 「管理 → 系統設定 → Agent 擴充能力」勾選 **OneDrive 連結**（全域預設，預設關閉），或在「使用者」頁為個別使用者設定「允許 / 不允許」。關閉後同步立即停止，使用者仍可以解除連結。
 
-## 3. 連結與選擇資料夾（使用者）
+## 3. 安裝與啟用（使用者）
 
-1. 「設定 → OneDrive」按「連結 OneDrive」，在 Microsoft 頁面同意。企業帳號只能連結與 Ymir 登入相同的帳號。
-2. 設定「同步資料夾」（預設 `/Ymir`），Ymir 會在 OneDrive 建立它。
+1. 左下角「外掛」→ OneDrive 卡片按「連結 OneDrive」，在 Microsoft 頁面同意。企業帳號只能連結與 Ymir 登入相同的帳號。
+2. 要讓 Agent 存取 OneDrive：打開卡片上的「讓 Agent 使用」（會先確認風險）。需要管理員設定 MCP gateway（`deploy/mcp/README.md` 第 5 點）；沒有設定時卡片會顯示原因。
+3. 要用同步資料夾：設定「同步資料夾」（預設 `/Ymir`），Ymir 會在 OneDrive 建立它。
 3. 之後每個專案對應 `<同步資料夾>/projects/<專案名稱>-<id 前 8 碼>`，未分組的對話對應 `<同步資料夾>/chats/<標題>-<id 前 8 碼>`。第一次同步建立後，改名不影響對應。
 
 ## 4. 同步規則
 
-### 瀏覽自己的整個 OneDrive（ADR-0022 O3a）
+### Agent 使用 OneDrive（外掛，ADR-0030）
 
-新版本的「設定 → OneDrive」在已連結且管理員允許時，提供「瀏覽整個自己的 OneDrive」。可開啟資料夾、回根目錄／上一層，以及搜尋檔案名稱（最多 50 筆）；不需要先設定同步根資料夾。瀏覽只取得名稱、item id、類型、大小與修改時間，不下載內容、不回傳 token 或預授權 URL。
+打開「讓 Agent 使用」後，每次**個人**對話執行時 Agent 會看到 `onedrive` 服務的工具：
 
-只允許目前使用者自己的 drive，跨 drive／remoteItem 捷徑會被拒絕或過濾，不涵蓋「與我共用」、SharePoint／Teams。管理員關閉能力、使用者解除連結或授權失效後無法繼續瀏覽。
+| 工具 | 說明 |
+|---|---|
+| `search` / `list_folder` | 以名稱搜尋、列出資料夾（只回名稱、id、類型、大小、修改時間） |
+| `download` | 下載檔案到工作目錄 `onedrive/<檔名>`（單檔 100 MB；資料夾要逐一下載） |
+| `upload` | 把工作目錄的檔案上傳到指定資料夾；同名檔案預設不覆蓋，`overwrite=true` 才覆蓋 |
+| `create_folder` / `move` | 建立資料夾、移動或改名（目標已有同名項目時不覆蓋） |
+| `delete` | 刪除到 OneDrive 回收筒，可以從回收筒還原 |
 
-### 選取檔案交給 Agent（ADR-0022 O3b）
+- 只限使用者自己的 drive；「與我共用」、SharePoint、remoteItem 一律拒絕。不能移動或刪除根目錄。
+- 路徑：Agent → MCP gateway（`/mcp/onedrive`，每人 rate limit、稽核工具名稱）→ API `/internal/mcp/onedrive` → Graph。Agent 只有一個短期 gateway token，執行結束後立即失效。
+- 每次呼叫都重新檢查：管理員仍開放、使用者仍啟用、OneDrive 連線正常、這次執行還在進行；關掉任何一項都立即生效。
+- 寫入類工具（upload、create_folder、move、delete）寫稽核 `onedrive.agent.<動作>`（target 是 Graph item id，不記檔名）。
+- 群組對話（@bot）不提供：群組的工作目錄是成員共用的。
+- 風險：啟用後 Agent 可以修改、刪除任何檔案；對話中的檔案或網頁內容可能誘導 Agent 做出使用者沒要求的操作。
 
-1. 在已有對話的「檔案」面板開啟「OneDrive 連結檔案 → 從 OneDrive 加入」。
-2. 瀏覽或搜尋，選「連結檔案」／「連結資料夾」，可設定唯讀。此時只保存連結，不立即啟動 runtime 或修改雲端。
-3. 下次送出訊息前，後端把項目下載到工作目錄的 `onedrive/<連結 id 前 8 碼>-<安全名稱>`，再把路徑與限制附加到 Agent prompt。專案內的對話共用同一組連結；獨立對話各自隔離。
-4. 面板可查看下載時間、錯誤、本機衝突副本數、切換唯讀或取消連結。取消連結只刪 metadata 與基準，不刪雲端或本機副本；管理員關閉能力後仍可取消連結。
+ADR-0022 的「在檔案面板手動連結 OneDrive 項目」已移除（資料表 `onedrive_linked_items`、`onedrive_linked_files` 保留，不再使用）。`onedrive/` 仍是同步資料夾排除的頂層目錄，Agent 下載的檔案不會被重複同步。
 
-- 不要求選擇 ADR-0013 的同步根資料夾，但必須先連結帳號，且管理員允許 OneDrive 能力。
-- 不能連結 drive 根目錄、原同步根目錄或其內的項目；也拒絕包含同步根的祖先資料夾與相互重疊的連結，避免兩套同步／多個連結互相覆蓋。同一項目重複選取會回傳既有連結。
-- 預設每個工作目錄 20 個連結、每個連結資料夾最多下載 500 個檔案、單檔 100 MB；隱藏檔、`node_modules`、不安全路徑、外部 drive／remoteItem、過深或過大的資料夾會略過並提示。
-- 每次以目前使用者 token 重新驗證 drive 與項目；憑證不交給 Agent。管理員關閉能力或使用者解除授權後停止下載，已存在的本機副本保留。
-- 基準使用獨立 `onedrive_linked_files` 表，記錄 item id、eTag 與本機 SHA-256；雲端與本機同時改過時先保留本機衝突副本，再更新雲端版本的本機副本。現階段衝突副本**僅在本機**，尚未上傳到雲端。
-- 唯讀連結不寫回雲端；下次執行時恢復雲端對應檔案的內容，恢復前保留已有本機修改。這不是 Agent 容器內的 OS 唯讀掛載。
-- `onedrive/` 保留給連結項目；原同步資料夾的上傳／下載一律排除這個頂層 namespace（不分大小寫），避免重複同步。
+**部署前必做**：套用 `UserPluginSettings` migration；API、前端與 MCP gateway 一起更新（gateway 加上 `McpGateway__ApiUrl`）。正式資料庫先備份。
 
-**部署前必做**：套用 `OneDriveLinkedItems` migration，再部署 API／前端；本切片不需更新 RuntimeHost 或 Agent image。若部署完整 main，還須依部署指南套用其他尚未套用的 migration（例如 Platform 的 `ChatGroups`），不能只看本功能的 migration。正式資料庫先備份，勿把開發環境的自動 migration 當正式更新程序。
-
-**階段限制**：目前只下載，不自動寫回連結項目的原位置，不傳播刪除／移動／改名。雲端項目失效時保留本機檔案；後續 O4～O5 才加入寫回、雙向變更與大量刪除確認。輸入區附件選單整合仍待後續；目前入口在檔案面板。程式合併不表示正式站已部署。
+**未驗證、待使用者環境確認**：真實 Microsoft Graph 的 move（PATCH）與 delete；沙箱以 Fake Graph 驗證。
 
 ### 既有同步資料夾（ADR-0013）
 

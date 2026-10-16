@@ -57,12 +57,11 @@ try {
   const admin = await login(`connections-admin-${stamp}`, 'Admin');
   const user = await login(`connections-user-${stamp}`, 'User');
   const me = await (await user.request.get(`${baseUrl}/api/me`)).json();
-  await user.goto(`${baseUrl}/settings`);
-  await user.getByRole('link', { name: '帳號連接', exact: true }).click();
-  await user.waitForURL(/\/settings\/connections/);
-  await user.locator('app-onedrive-card h2').waitFor();
-  await user.getByRole('link', { name: 'MCP 與工具', exact: true }).click();
-  await user.waitForURL(/\/settings\/tools/);
+  // 舊網址導向外掛市集（ADR-0030）；OneDrive 卡片與個人 MCP 都在同一頁。
+  await user.goto(`${baseUrl}/settings/connections`);
+  await user.waitForURL(/\/plugins$/);
+  await user.getByRole('link', { name: '外掛', exact: true }).waitFor();
+  await user.locator('app-plugins-page li.card h2:has-text("OneDrive")').waitFor();
   const card = user.locator('app-personal-mcp-card');
   await card.getByText('尚未註冊個人 MCP。').waitFor();
   assert.equal(await card.locator('form').count(), 0);
@@ -98,7 +97,7 @@ try {
   await card.getByRole('button', { name: '移除', exact: true }).click();
   await card.getByText('尚未註冊個人 MCP。').waitFor();
   await user.goto(`${baseUrl}/settings?onedrive=denied`);
-  await user.waitForURL(/\/settings\/connections/);
+  await user.waitForURL(/\/plugins/);
   await user.getByText('已取消連結 OneDrive。', { exact: true }).waitFor();
   await user.setViewportSize({ width: 390, height: 844 });
   await user.screenshot({ path: `${outDir}/connections-mobile.png`, fullPage: true });

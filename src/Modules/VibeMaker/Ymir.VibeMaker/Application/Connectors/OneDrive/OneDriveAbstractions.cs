@@ -75,6 +75,15 @@ public interface IOneDriveClient
     Task<Stream> OpenDownloadAsync(string accessToken, string itemId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// 移動及 / 或改名（ADR-0030 §4）。<paramref name="newParentId"/>、<paramref name="newName"/> 為 null 時不變；
+    /// 目標位置已有同名項目時不覆蓋，拋出 <see cref="OneDriveException"/>。項目不存在時回傳 null。
+    /// </summary>
+    Task<DriveItemInfo?> MoveAsync(string accessToken, string itemId, string? newParentId, string? newName, CancellationToken cancellationToken);
+
+    /// <summary>刪除項目（OneDrive 放進回收筒，使用者可以還原）；項目不存在時回傳 false。</summary>
+    Task<bool> DeleteAsync(string accessToken, string itemId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// 上傳 <paramref name="size"/> 個位元組到 <paramref name="parentId"/>/<paramref name="name"/>（大於 4 MB 用 upload session）。
     /// <paramref name="ifMatch"/> 與雲端版本不符（412），或 <see cref="OneDriveConflictBehavior.Fail"/> 時同名項目已存在（409），回傳 <see cref="OneDriveUploadResult.Conflict"/>。
     /// </summary>

@@ -47,6 +47,7 @@ public sealed class PublicEdgeTests
         app.MapGet("/echo", (HttpContext context) => $"{context.Request.Scheme} {context.Connection.RemoteIpAddress}");
         app.MapGet("/health", () => "Healthy");
         app.MapGet("/alive", () => "Healthy");
+        app.MapGet("/internal/mcp/onedrive", () => "internal");
         await app.StartAsync(TestContext.Current.CancellationToken);
         return app;
     }
@@ -144,6 +145,9 @@ public sealed class PublicEdgeTests
     [InlineData(PublicHost, "/health/ready", HttpStatusCode.NotFound)]
     [InlineData("localhost", "/health", HttpStatusCode.OK)]
     [InlineData("localhost", "/alive", HttpStatusCode.OK)]
+    [InlineData(PublicHost, "/internal/mcp/onedrive", HttpStatusCode.NotFound)]
+    [InlineData(PublicHost, "/Internal/mcp/onedrive", HttpStatusCode.NotFound)]
+    [InlineData("127.0.0.1", "/internal/mcp/onedrive", HttpStatusCode.OK)]
     public async Task HealthChecks_AreHiddenFromPublicHostname(string host, string path, HttpStatusCode expected)
     {
         await using var app = await StartPublicAsync();

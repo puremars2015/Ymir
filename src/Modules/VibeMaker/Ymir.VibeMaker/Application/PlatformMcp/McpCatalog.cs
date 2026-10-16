@@ -28,6 +28,12 @@ public sealed partial class McpCatalog
 
     public static McpCatalog Empty { get; } = new([]);
 
+    /// <summary>
+    /// 內建服務名稱（ADR-0030 §2）：OneDrive 外掛由 API 提供，經 gateway 的 <c>/mcp/onedrive</c> 轉送。
+    /// <c>servers.json</c> 不得使用，避免目錄項目冒充內建服務（或內建服務被轉送到目錄裡的位址）。
+    /// </summary>
+    public const string OneDriveServerName = "onedrive";
+
     public IReadOnlyList<McpServerDefinition> Servers { get; }
 
     public McpServerDefinition? Find(string name) => _byName.GetValueOrDefault(name);
@@ -54,6 +60,11 @@ public sealed partial class McpCatalog
             if (!IsValidName(entry.Name))
             {
                 throw new InvalidOperationException($"{source}: server name '{entry.Name}' must match {ServerName()}.");
+            }
+
+            if (entry.Name == OneDriveServerName)
+            {
+                throw new InvalidOperationException($"{source}: server name '{entry.Name}' is reserved for the built-in OneDrive plugin.");
             }
 
             if (servers.Any(s => s.Name == entry.Name))

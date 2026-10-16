@@ -2,17 +2,17 @@
 
 ## 入口與權限
 
-到「個人設定」的「帳號連接」分頁（`/settings/connections`，OneDrive 等 Connector）與「MCP 與工具」分頁（`/settings/tools`，個人 MCP 與管理員開放的擴充能力）。個人設定共四個分頁：個人 System Prompt、變更密碼、帳號連接、MCP 與工具。
+到左下角的「外掛」（外掛市集 `/plugins`，[ADR-0030](../adr/0030-plugin-marketplace-and-onedrive-agent-tools.md)）：OneDrive、管理員開放的平台 MCP 服務、個人 MCP（自訂外掛）與擴充能力摘要都在同一頁。舊網址 `/settings/connections`、`/settings/tools` 會導向這裡；個人設定只剩個人 System Prompt 與變更密碼兩個分頁。
 
 - **Connector**：目前支援 OneDrive；沿用 Microsoft OAuth 與帳號隔離。不提供任意 Connector 上傳或網址註冊。
 - **個人 MCP**：管理員必須同時開放 MCP 及對外連線，才可新增、啟用或測試。權限關閉後仍可查看摘要、停用及移除。
-- **平台 MCP**：仍由開發人員維護服務目錄、管理員設定存取清單；使用者不能改寫平台服務或憑證。
+- **平台 MCP**：仍由開發人員維護服務目錄、管理員設定存取清單；使用者不能改寫平台服務或憑證，但可以在市集關掉自己不想讓 Agent 使用的服務（預設開啟）。
 
 ## OneDrive
 
-在卡片連結、重新授權或解除帳號，設定既有同步資料夾，或瀏覽自己的 drive。原 `/settings?onedrive=結果` 回跳網址會導向新入口，不需重新註冊 Microsoft callback URI。
+在 OneDrive 卡片連結（= 安裝）、重新授權或解除帳號，並設定同步資料夾（選用）。原 `/settings?onedrive=結果` 回跳網址會導向市集，不需重新註冊 Microsoft callback URI。
 
-帳號授權不會把整個 drive 自動交給 Agent。選定檔案／資料夾請到對話檔案面板；任意連結項目目前只下載、不寫回原位置。原同步資料夾的上傳／下載規則仍保留，詳見 [OneDrive 指南](onedrive.md)。
+連結帳號**不會**自動讓 Agent 存取 OneDrive；要使用者自己打開卡片上的「讓 Agent 使用」（會先確認風險）。打開後 Agent 在個人對話中可以自己搜尋、下載、上傳、移動與刪除（進回收筒）你 OneDrive 上的檔案，詳見 [OneDrive 指南](onedrive.md)。
 
 ## 新增個人 MCP
 

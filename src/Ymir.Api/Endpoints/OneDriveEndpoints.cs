@@ -33,78 +33,13 @@ internal static class OneDriveEndpoints
         group.MapGet("/callback", CallbackAsync).WithName("OneDriveCallback").ExcludeFromDescription();
         group.MapPut("/root", SetRootAsync).WithName("SetOneDriveRoot").RequireAntiforgeryHeader();
         group.MapDelete("/", DisconnectAsync).WithName("DisconnectOneDrive").RequireAntiforgeryHeader();
-        group.MapGet("/browse", BrowseAsync).WithName("BrowseOneDrive").Produces<OneDriveBrowserPage>().RequireAntiforgeryHeader();
-        group.MapGet("/search", SearchAsync).WithName("SearchOneDrive").Produces<IReadOnlyList<OneDriveBrowserItem>>().RequireAntiforgeryHeader();
 
         // 對話（工作目錄）的雲端保存狀態與手動同步（ADR-0013 §4）：只能存取自己的對話（SA §12）。
         var conversations = endpoints.MapGroup("/api/conversations/{conversationId:guid}/onedrive").WithTags("Conversations").RequireAntiforgeryHeader();
         conversations.MapGet("/", GetConversationStatusAsync).WithName("GetConversationOneDriveStatus");
         conversations.MapPost("/sync", SyncConversationAsync).WithName("SyncConversationOneDrive");
-        conversations.MapGet("/links", ListLinksAsync).WithName("ListOneDriveLinks").Produces<IReadOnlyList<OneDriveLinkedItemInfo>>();
-        conversations.MapPost("/links", AddLinkAsync).WithName("AddOneDriveLink").Produces<OneDriveLinkedItemInfo>();
-        conversations.MapPatch("/links/{linkId:guid}", SetLinkReadOnlyAsync).WithName("SetOneDriveLinkReadOnly").Produces<OneDriveLinkedItemInfo>();
-        conversations.MapDelete("/links/{linkId:guid}", RemoveLinkAsync).WithName("RemoveOneDriveLink");
         return endpoints;
     }
-
-    private static async Task<IResult> ListLinksAsync(Guid conversationId, ICurrentUser user, OneDriveLinks links, CancellationToken ct) =>
-        await links.ListAsync(user.UserId, conversationId, ct) is { } result ? TypedResults.Ok(result) : TypedResults.NotFound();
-
-    private static async Task<IResult> AddLinkAsync(Guid conversationId, AddOneDriveLinkRequest request, ICurrentUser user, OneDriveLinks links, CancellationToken ct)
-    {
-        try
-        {
-            return await links.AddAsync(user.UserId, conversationId, request.ItemId, request.ReadOnly, user.ActorName, ct) is { } result
-                ? TypedResults.Ok(result) : TypedResults.NotFound();
-        }
-        catch (OneDriveException exception) { return BrowserProblem(exception); }
-    }
-
-    private static async Task<IResult> SetLinkReadOnlyAsync(Guid conversationId, Guid linkId, SetOneDriveLinkReadOnlyRequest request, ICurrentUser user, OneDriveLinks links, CancellationToken ct)
-    {
-        if (request.ReadOnly is not { } readOnly) return ApiProblem.Create(StatusCodes.Status400BadRequest, "ONEDRIVE_LINK_INVALID", "請指定唯讀設定。");
-        try
-        {
-            return await links.SetReadOnlyAsync(user.UserId, conversationId, linkId, readOnly, user.ActorName, ct) is { } result
-                ? TypedResults.Ok(result) : TypedResults.NotFound();
-        }
-        catch (OneDriveException exception) { return BrowserProblem(exception); }
-    }
-
-    private static async Task<IResult> RemoveLinkAsync(Guid conversationId, Guid linkId, ICurrentUser user, OneDriveLinks links, CancellationToken ct) =>
-        await links.RemoveAsync(user.UserId, conversationId, linkId, user.ActorName, ct) ? TypedResults.NoContent() : TypedResults.NotFound();
-
-    private static async Task<IResult> BrowseAsync(string? itemId, ICurrentUser currentUser, OneDriveBrowser browser, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return TypedResults.Ok(await browser.BrowseAsync(currentUser.UserId, itemId, cancellationToken));
-        }
-        catch (OneDriveException exception)
-        {
-            return BrowserProblem(exception);
-        }
-    }
-
-    private static async Task<IResult> SearchAsync(string? q, ICurrentUser currentUser, OneDriveBrowser browser, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return TypedResults.Ok(await browser.SearchAsync(currentUser.UserId, q, cancellationToken));
-        }
-        catch (OneDriveException exception)
-        {
-            return BrowserProblem(exception);
-        }
-    }
-
-    private static IResult BrowserProblem(OneDriveException exception) => exception switch
-    {
-        OneDriveNotAllowedException => NotAllowed(),
-        OneDriveLinkLimitException => ApiProblem.Create(StatusCodes.Status409Conflict, "ONEDRIVE_LINK_LIMIT", exception.Message),
-        OneDriveItemInvalidException => ApiProblem.Create(StatusCodes.Status400BadRequest, "ONEDRIVE_ITEM_INVALID", exception.Message),
-        _ => ApiProblem.Create(StatusCodes.Status409Conflict, "ONEDRIVE_NOT_READY", "OneDrive 尚未就緒，請檢查連線或重新授權。"),
-    };
 
     private static async Task<Results<Ok<ConversationOneDriveResponse>, NotFound>> GetConversationStatusAsync(
         Guid conversationId,
@@ -132,9 +67,9 @@ internal static class OneDriveEndpoints
             : ApiProblem.Create(StatusCodes.Status409Conflict, "ONEDRIVE_NOT_READY", status.Availability switch
             {
                 OneDriveAvailability.NotAllowed => "管理員尚未開放 OneDrive 連結。",
-                OneDriveAvailability.NeedsReauth => "OneDrive 授權已失效，請到設定頁重新連結。",
-                OneDriveAvailability.NoRoot => "請先到設定頁選擇 OneDrive 同步資料夾。",
-                _ => "請先到設定頁連結 OneDrive。",
+                OneDriveAvailability.NeedsReauth => "OneDrive 授權已失效，請到外掛市集重新連結。",
+                OneDriveAvailability.NoRoot => "請先到外掛市集的 OneDrive 卡片選擇同步資料夾。",
+                _ => "請先到外掛市集連結 OneDrive。",
             });
     }
 
@@ -295,8 +230,6 @@ internal sealed class OidcOneDriveSettingsSource(IOidcSettingsSource oidc) : IOn
 }
 
 public sealed record SetOneDriveRootRequest(string? Path);
-public sealed record AddOneDriveLinkRequest(string? ItemId, bool ReadOnly = false);
-public sealed record SetOneDriveLinkReadOnlyRequest(bool? ReadOnly);
 
 /// <param name="Allowed">管理員是否開放。</param>
 /// <param name="Available">是否已設定企業帳號登入（沒有時無法連結）。</param>

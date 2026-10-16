@@ -1271,6 +1271,31 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                     b.ToTable("user_extension_grants", "vibemaker");
                 });
 
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.UserPluginSetting", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("PluginKey")
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)")
+                        .HasColumnName("plugin_key");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("bit")
+                        .HasColumnName("enabled");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("UserId", "PluginKey")
+                        .HasName("pk_user_plugin_settings");
+
+                    b.ToTable("user_plugin_settings", "vibemaker");
+                });
+
             modelBuilder.Entity("Ymir.VibeMaker.Domain.UserSettings", b =>
                 {
                     b.Property<Guid>("UserId")

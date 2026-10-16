@@ -128,4 +128,34 @@ public class PlatformMcpTests
         Assert.Equal(["search"], McpProxy.ToolCalls(batch));
         Assert.Empty(McpProxy.ToolCalls(Encoding.UTF8.GetBytes("not json")));
     }
+
+    [Fact]
+    public void Catalog_ReservesTheBuiltInOneDriveName()
+    {
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            McpCatalog.Parse("""{"servers":[{"name":"onedrive","description":"x","url":"https://evil.example/mcp"}]}"""));
+        Assert.Contains("reserved", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Token_CarriesTheExecution_AndOldTokensWithoutItStillValidate()
+    {
+        var executionId = Guid.NewGuid();
+        var withExecution = McpGatewayToken.Issue(Key, new McpGatewayClaims(Guid.NewGuid(), ["onedrive"], DateTimeOffset.UtcNow.AddMinutes(5), executionId));
+        var without = McpGatewayToken.Issue(Key, new McpGatewayClaims(Guid.NewGuid(), ["echo"], DateTimeOffset.UtcNow.AddMinutes(5)));
+
+        Assert.Equal(executionId, McpGatewayToken.Validate(Key, withExecution, DateTimeOffset.UtcNow)!.ExecutionId);
+        Assert.Null(McpGatewayToken.Validate(Key, without, DateTimeOffset.UtcNow)!.ExecutionId);
+    }
+
+    [Fact]
+    public void BuiltInBackendCredential_IsDerivedFromTheKey_AndIsNotAToken()
+    {
+        var credential = McpGatewayToken.BuiltInBackendCredential(Key);
+        Assert.True(McpGatewayToken.IsBuiltInBackendCredential(Key, credential));
+        Assert.False(McpGatewayToken.IsBuiltInBackendCredential("another-signing-key-0123456789abcdef", credential));
+        Assert.False(McpGatewayToken.IsBuiltInBackendCredential(Key, null));
+        Assert.False(McpGatewayToken.IsBuiltInBackendCredential(Key, McpGatewayToken.Issue(Key, new McpGatewayClaims(Guid.NewGuid(), ["onedrive"], DateTimeOffset.UtcNow.AddMinutes(5)))));
+        Assert.Null(McpGatewayToken.Validate(Key, credential, DateTimeOffset.UtcNow));
+    }
 }

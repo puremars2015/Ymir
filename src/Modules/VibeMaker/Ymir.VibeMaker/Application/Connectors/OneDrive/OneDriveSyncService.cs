@@ -544,7 +544,7 @@ public sealed partial class OneDriveSyncService(
         {
             foreach (var child in await graph.ListChildrenAsync(run.AccessToken, folder.Id, cancellationToken).ConfigureAwait(false))
             {
-                if (WorkspacePathRules.IsHidden(child.Name) || (folder.Prefix.Length == 0 && OneDriveLinks.IsReservedPath(child.Name)))
+                if (WorkspacePathRules.IsHidden(child.Name) || (folder.Prefix.Length == 0 && OneDrivePaths.IsAgentPath(child.Name)))
                 {
                     continue;
                 }
@@ -585,7 +585,7 @@ public sealed partial class OneDriveSyncService(
         foreach (var entry in entries)
         {
             // 連結檔案有獨立雲端位置與同步基準，不能又上傳到 ADR-0013 的同步資料夾。
-            if (OneDriveLinks.IsReservedPath(entry.Path)) continue;
+            if (OneDrivePaths.IsAgentPath(entry.Path)) continue;
             files[entry.Path] = entry;
         }
 

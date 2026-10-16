@@ -103,12 +103,42 @@ public sealed class PlatformMcpService(
         return [.. catalog.Servers.Where(s => access.Any(a => a.ServerName == s.Name && a.Allows(userId, isAdmin)))];
     }
 
+    /// <summary>使用者在外掛市集停用的平台服務（ADR-0030 §3；沒有紀錄 = 啟用）。</summary>
+    public async Task<IReadOnlySet<string>> DisabledByUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var keys = await db.UserPluginSettings.AsNoTracking()
+            .Where(s => s.UserId == userId && !s.Enabled && s.PluginKey.StartsWith(PluginKeyPrefix))
+            .Select(s => s.PluginKey)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        return keys.Select(k => k[PluginKeyPrefix.Length..]).ToHashSet(StringComparer.Ordinal);
+    }
+
+    /// <summary>外掛市集中平台 MCP 服務的 key 前綴（ADR-0030 §3）。</summary>
+    public const string PluginKeyPrefix = "mcp:";
+
+    /// <summary>給 Agent 看的 OneDrive 內建服務說明（ADR-0030 §4）；Agent 依它判斷何時使用。</summary>
+    public const string OneDriveDescription =
+        "使用者自己的 OneDrive：search（以名稱搜尋）、list_folder（列出資料夾）、download（下載檔案到工作目錄 onedrive/）、"
+        + "upload（把工作目錄的檔案上傳到 OneDrive）、create_folder、move（移動或改名）、delete（刪除到 OneDrive 回收筒）。"
+        + "只在使用者的要求需要 OneDrive 時使用；刪除、覆蓋前先確認使用者確實要求。";
+
     /// <summary>
     /// 執行前準備：有可用服務時簽發 token（期限 = 執行逾時 + 5 分鐘，最長 1 小時）；沒有時回傳 null，Agent 不會看到任何平台服務。
+    /// 使用者在外掛市集停用的服務不帶入（ADR-0030 §3）。<paramref name="includeOneDrive"/> 為 true 時加入內建的 OneDrive 服務
+    /// （由呼叫端確認能力、連線與使用者開關）；token 帶 execution id，API 只在這次執行中接受它（ADR-0030 §2）。
     /// </summary>
-    public async Task<PlatformMcpGrant?> PrepareRunAsync(Guid userId, TimeSpan executionTimeout, CancellationToken cancellationToken)
+    public async Task<PlatformMcpGrant?> PrepareRunAsync(Guid userId, Guid executionId, TimeSpan executionTimeout, bool includeOneDrive, CancellationToken cancellationToken)
     {
-        var servers = await ResolveAsync(userId, cancellationToken).ConfigureAwait(false);
+        var disabled = await DisabledByUserAsync(userId, cancellationToken).ConfigureAwait(false);
+        var gateway = _options.GatewayUrl?.ToString().TrimEnd('/');
+        List<PlatformMcpServer> servers = [.. (await ResolveAsync(userId, cancellationToken).ConfigureAwait(false))
+            .Where(s => !disabled.Contains(s.Name))
+            .Select(s => new PlatformMcpServer(s.Name, s.Description, new Uri($"{gateway}/mcp/{s.Name}")))];
+        if (includeOneDrive && IsEnabled)
+        {
+            servers.Add(new PlatformMcpServer(McpCatalog.OneDriveServerName, OneDriveDescription, new Uri($"{gateway}/mcp/{McpCatalog.OneDriveServerName}")));
+        }
+
         if (servers.Count == 0)
         {
             return null;
@@ -116,8 +146,7 @@ public sealed class PlatformMcpService(
 
         var lifetime = executionTimeout + TimeSpan.FromMinutes(5);
         var expiresAt = timeProvider.GetUtcNow() + (lifetime > MaxTokenLifetime ? MaxTokenLifetime : lifetime);
-        var token = McpGatewayToken.Issue(_options.TokenSigningKey!, new McpGatewayClaims(userId, [.. servers.Select(s => s.Name)], expiresAt));
-        var gateway = _options.GatewayUrl!.ToString().TrimEnd('/');
-        return new PlatformMcpGrant([.. servers.Select(s => new PlatformMcpServer(s.Name, s.Description, new Uri($"{gateway}/mcp/{s.Name}")))], token);
+        var token = McpGatewayToken.Issue(_options.TokenSigningKey!, new McpGatewayClaims(userId, [.. servers.Select(s => s.Name)], expiresAt, executionId));
+        return new PlatformMcpGrant(servers, token);
     }
 }

@@ -106,7 +106,7 @@ step(
   `restricted probes: litellm=${probe('http://litellm:5199/health/liveliness')} internet=${probe('http://1.1.1.1/')}`,
 );
 step(`assistant replied in restricted mode: ${restrictedReply.slice(0, 40)}`);
-await worker.goto(`${baseUrl}/settings/tools`);
+await worker.goto(`${baseUrl}/plugins`);
 await worker.locator('app-my-extensions-card li:has-text("對外連線")').waitFor();
 await worker.screenshot({ path: `${outDir}/15-my-extensions-restricted.png`, fullPage: true });
 

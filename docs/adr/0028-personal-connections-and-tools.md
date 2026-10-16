@@ -2,6 +2,7 @@
 
 - 狀態：已採納（2026-10-15 使用者同意建議並要求實作）
 - 補充：ADR-0012、ADR-0013、ADR-0022、ADR-0026
+- 修訂：[ADR-0030](0030-plugin-marketplace-and-onedrive-agent-tools.md)（入口改為外掛市集 `/plugins`；§7 改為啟用 OneDrive 外掛後由 Agent 自行存取）
 
 ## 決策
 

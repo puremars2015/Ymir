@@ -45,6 +45,8 @@ public interface IVibeMakerDbContext
 
     DbSet<McpServerAccess> McpServerAccess { get; }
 
+    DbSet<UserPluginSetting> UserPluginSettings { get; }
+
     DbSet<KnowledgeDocument> KnowledgeDocuments { get; }
 
     DbSet<Site> Sites { get; }

@@ -1,8 +1,7 @@
 import { ConversationOneDrive, OneDriveStatus } from '../api/api-types';
 
 /** 連結 OneDrive 的整頁導向（瀏覽器導到 Microsoft 再回來；不經 HttpClient，前端不接觸任何 token）。 */
-export const ONEDRIVE_CONNECT_URL =
-  '/api/connectors/onedrive/connect?returnUrl=%2Fsettings%2Fconnections';
+export const ONEDRIVE_CONNECT_URL = '/api/connectors/onedrive/connect?returnUrl=%2Fplugins';
 
 /** callback 導回時的 `?onedrive=` 結果代碼 → 給使用者看的訊息。 */
 export function onedriveResultMessage(
@@ -10,7 +9,10 @@ export function onedriveResultMessage(
 ): { text: string; error: boolean } | null {
   switch (code) {
     case 'connected':
-      return { text: '已連結 OneDrive。請設定要同步的資料夾。', error: false };
+      return {
+        text: '已連結 OneDrive。開啟「讓 Agent 使用」後，Agent 就能在對話中存取你的 OneDrive。',
+        error: false,
+      };
     case 'denied':
       return { text: '已取消連結 OneDrive。', error: true };
     case 'mismatch':
@@ -47,7 +49,7 @@ export interface OneDriveSyncSummary {
   tone: OneDriveSyncTone;
   /** 可以手動同步 / 重試。 */
   canSync: boolean;
-  /** 需要到設定頁處理（連結、重新連結、選資料夾）。 */
+  /** 需要到外掛市集處理（連結、重新連結、選資料夾）。 */
   needsSettings: boolean;
   /** 同步中：前端定期重新讀取狀態。 */
   pending: boolean;

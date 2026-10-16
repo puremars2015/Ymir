@@ -91,6 +91,15 @@ public sealed class FakeDrive
         }
     }
 
+    /// <summary>測試用：路徑對應的 item id；不存在時拋出例外。</summary>
+    public string FindByPathId(string path)
+    {
+        lock (_lock)
+        {
+            return FindByPathLocked(path)?.Id ?? throw new InvalidOperationException($"{path} does not exist.");
+        }
+    }
+
     public bool FolderExists(string path)
     {
         lock (_lock)
@@ -250,6 +259,88 @@ public sealed class FakeDrive
         }
     }
 
+    /// <summary>測試用：被刪除（放進回收筒）的項目路徑，依刪除順序。</summary>
+    public IReadOnlyList<string> RecycleBin
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return [.. _recycleBin];
+            }
+        }
+    }
+
+    private readonly List<string> _recycleBin = [];
+
+    /// <summary>比照 Graph PATCH：同名已存在 409；不能移到自己底下或移動根目錄（400）。</summary>
+    internal (FakeItem? Item, int Status) Move(string id, string? newParentId, string? newName)
+    {
+        lock (_lock)
+        {
+            if (!_items.TryGetValue(id, out var item) || item.ParentId is null)
+            {
+                return (null, item is null ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+            }
+
+            var parentId = newParentId ?? item.ParentId;
+            if (!_items.TryGetValue(parentId, out var parent) || !parent.IsFolder)
+            {
+                return (null, StatusCodes.Status404NotFound);
+            }
+
+            for (var current = parent; current is not null; current = current.ParentId is null ? null : _items[current.ParentId])
+            {
+                if (current.Id == id)
+                {
+                    return (null, StatusCodes.Status400BadRequest);
+                }
+            }
+
+            var name = newName ?? item.Name;
+            if (ChildLocked(parentId, name) is { } existing && existing.Id != id)
+            {
+                return (null, StatusCodes.Status409Conflict);
+            }
+
+            var moved = item with { ParentId = parentId, Name = name, Version = item.Version + 1, Modified = DateTimeOffset.UtcNow };
+            _items[id] = moved;
+            return (moved, StatusCodes.Status200OK);
+        }
+    }
+
+    /// <summary>刪除項目與底下的所有子項目（模擬放進回收筒）；不能刪除根目錄。</summary>
+    internal bool Delete(string id)
+    {
+        lock (_lock)
+        {
+            if (!_items.TryGetValue(id, out var item) || item.ParentId is null)
+            {
+                return false;
+            }
+
+            var names = new List<string>();
+            for (var current = item; current.ParentId is not null; current = _items[current.ParentId])
+            {
+                names.Insert(0, current.Name);
+            }
+
+            _recycleBin.Add("/" + string.Join('/', names));
+            void Remove(string itemId)
+            {
+                foreach (var child in _items.Values.Where(i => i.ParentId == itemId).Select(i => i.Id).ToList())
+                {
+                    Remove(child);
+                }
+
+                _items.Remove(itemId);
+            }
+
+            Remove(id);
+            return true;
+        }
+    }
+
     private FakeItem UpsertFileLocked(string parentId, string name, byte[] content)
     {
         if (ChildLocked(parentId, name) is { } existing)
@@ -332,7 +423,7 @@ internal static class FakeGraphEndpoints
         }));
         endpoints.MapGet(Prefix + "/me/drive", (HttpContext context, FakeGraphStore store) => Authorized(context, (_, drive) =>
             Results.Json(new { id = drive.DriveId, driveType = "business" })));
-        endpoints.MapMethods(Prefix + "/me/drive/{**rest}", ["GET", "POST", "PUT"], (HttpContext context, string rest) =>
+        endpoints.MapMethods(Prefix + "/me/drive/{**rest}", ["GET", "POST", "PUT", "PATCH", "DELETE"], (HttpContext context, string rest) =>
             Authorized(context, (_, drive) => DriveRequestAsync(context, drive, rest)));
         // upload session 的 uploadUrl 是預先授權的網址，不需要 Authorization（與 Graph 相同）。
         endpoints.MapPut("/graph/upload/{sessionId}", UploadChunkAsync);
@@ -481,6 +572,19 @@ internal static class FakeGraphEndpoints
                 return conflict ? Error(StatusCodes.Status409Conflict, "nameAlreadyExists", "Name already exists.")
                     : folder is null ? NotFound()
                     : ItemResult(drive, folder, StatusCodes.Status201Created);
+            case "" when method == "PATCH":
+                {
+                    var update = await context.Request.ReadFromJsonAsync<Dictionary<string, System.Text.Json.JsonElement>>(context.RequestAborted) ?? [];
+                    var newParent = update.TryGetValue("parentReference", out var parentReference) && parentReference.TryGetProperty("id", out var pid) ? pid.GetString() : null;
+                    var newName = update.TryGetValue("name", out var nameValue) ? nameValue.GetString() : null;
+                    var (moved, status) = drive.Move(target.Id, newParent, newName);
+                    return moved is not null ? ItemResult(drive, moved)
+                        : status == StatusCodes.Status409Conflict ? Error(StatusCodes.Status409Conflict, "nameAlreadyExists", "Name already exists.")
+                        : status == StatusCodes.Status400BadRequest ? Error(StatusCodes.Status400BadRequest, "invalidRequest", "Invalid move.")
+                        : NotFound();
+                }
+            case "" when method == "DELETE":
+                return drive.Delete(target.Id) ? Results.NoContent() : Error(StatusCodes.Status400BadRequest, "invalidRequest", "Cannot delete the root.");
             case "content" when method == "GET" && !target.IsFolder:
                 return Results.Bytes(target.Content, "application/octet-stream");
             default:

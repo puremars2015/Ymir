@@ -45,6 +45,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<McpServerAccess> McpServerAccess => Set<McpServerAccess>();
 
+    public DbSet<UserPluginSetting> UserPluginSettings => Set<UserPluginSetting>();
+
     public DbSet<KnowledgeDocument> KnowledgeDocuments => Set<KnowledgeDocument>();
 
     public DbSet<Site> Sites => Set<Site>();
@@ -293,6 +295,14 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             access.Property(a => a.Mode).HasConversion<UpperSnakeCaseEnumConverter<McpAccessMode>>().HasMaxLength(30);
             access.Property(a => a.UserIdList).IsRequired();
             access.Ignore(a => a.UserIds);
+        });
+
+        modelBuilder.Entity<UserPluginSetting>(setting =>
+        {
+            // ADR-0030 §3：使用者自己的外掛開關；沒有紀錄時用外掛的預設值。
+            setting.ToTable("user_plugin_settings");
+            setting.HasKey(s => new { s.UserId, s.PluginKey });
+            setting.Property(s => s.PluginKey).HasMaxLength(UserPluginSetting.KeyMaxLength);
         });
 
         modelBuilder.Entity<KnowledgeDocument>(document =>

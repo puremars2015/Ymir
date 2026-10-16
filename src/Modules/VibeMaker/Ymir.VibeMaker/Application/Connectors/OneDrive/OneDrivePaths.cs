@@ -82,4 +82,13 @@ public static class OneDrivePaths
     public static bool IsSyncablePath(string relativePath) =>
         Files.WorkspacePathRules.IsSafeRelativePath(relativePath)
         && relativePath.Split('/').All(segment => IsValidName(segment) && !segment.EndsWith(' '));
+
+    /// <summary>
+    /// 工作目錄頂層的 <c>onedrive/</c>：OneDrive 外掛的 <c>download</c> 工具放檔案的地方（ADR-0030 §4）。
+    /// 同步資料夾（ADR-0013）的上傳 / 下載一律排除它（不分大小寫），避免同一份雲端檔案又被複製到 <c>&lt;根&gt;/projects/…</c>。
+    /// </summary>
+    public const string AgentDirectory = "onedrive";
+
+    public static bool IsAgentPath(string path) => path.Equals(AgentDirectory, StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith(AgentDirectory + "/", StringComparison.OrdinalIgnoreCase);
 }

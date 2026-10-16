@@ -46,11 +46,15 @@ step('admin enabled the echo platform service for everyone');
 // 2. 成員在設定頁看到可用的平台服務
 const user = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
 await devLogin(user, `mcp-user-${stamp}`, 'User');
-await user.goto(`${baseUrl}/settings/tools`);
+await user.goto(`${baseUrl}/plugins`);
 await user
   .locator('app-my-extensions-card li:has-text("平台服務：") strong:has-text("echo")')
   .waitFor();
-step('member sees the platform service');
+// 外掛市集（ADR-0030）：平台服務預設啟用，使用者可以自己關掉。
+const echoCard = user.locator('app-plugins-page li.card', { hasText: 'echo' });
+await echoCard.locator('.status:has-text("Agent 可以使用")').waitFor();
+await user.screenshot({ path: `${outDir}/02-marketplace.png`, fullPage: true });
+step('member sees the platform service in the marketplace');
 
 // 3. Agent 經 gateway 呼叫 echo
 await user.goto(`${baseUrl}/`);

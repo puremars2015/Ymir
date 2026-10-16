@@ -161,6 +161,66 @@ internal sealed partial class GraphOneDriveClient(HttpClient http, IOptions<OneD
         return new ResponseStream(response, await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false));
     }
 
+    public async Task<DriveItemInfo?> MoveAsync(string accessToken, string itemId, string? newParentId, string? newName, CancellationToken cancellationToken)
+    {
+        var body = new Dictionary<string, object>();
+        if (newParentId is not null)
+        {
+            body["parentReference"] = new Dictionary<string, string> { ["id"] = newParentId };
+        }
+
+        if (newName is not null)
+        {
+            body["name"] = newName;
+        }
+
+        // conflictBehavior=fail：目標已有同名項目時不覆蓋（Graph 回 409）。
+        using var response = await SendAsync(
+            accessToken,
+            () => new HttpRequestMessage(HttpMethod.Patch, $"{_baseUrl}/me/drive/items/{Uri.EscapeDataString(itemId)}?@microsoft.graph.conflictBehavior=fail")
+            {
+                Content = JsonContent.Create(body),
+            },
+            cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            throw new OneDriveException("目標位置已經有同名的項目，沒有移動。");
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw await FailureAsync(response, "移動 OneDrive 項目失敗。", cancellationToken).ConfigureAwait(false);
+        }
+
+        using var moved = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false), cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        return ToItem(moved.RootElement);
+    }
+
+    public async Task<bool> DeleteAsync(string accessToken, string itemId, CancellationToken cancellationToken)
+    {
+        using var response = await SendAsync(
+            accessToken,
+            () => new HttpRequestMessage(HttpMethod.Delete, $"{_baseUrl}/me/drive/items/{Uri.EscapeDataString(itemId)}"),
+            cancellationToken).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw await FailureAsync(response, "刪除 OneDrive 項目失敗。", cancellationToken).ConfigureAwait(false);
+        }
+
+        return true;
+    }
+
     public async Task<OneDriveUploadResult> UploadAsync(
         string accessToken,
         string parentId,

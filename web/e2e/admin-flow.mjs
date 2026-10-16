@@ -269,7 +269,7 @@ await extensionForm.locator('select[name=mcp]').selectOption('Allow');
 await admin.screenshot({ path: `${outDir}/12-user-extensions.png`, fullPage: true });
 await extensionForm.locator('button:has-text("儲存")').click();
 await admin.locator('app-user-detail-page [role=status]:has-text("擴充能力")').waitFor();
-await worker.goto(`${baseUrl}/settings/tools`);
+await worker.goto(`${baseUrl}/plugins`);
 await worker
   .locator('app-my-extensions-card li:has-text("自建 skill") strong:has-text("已開放")')
   .waitFor();

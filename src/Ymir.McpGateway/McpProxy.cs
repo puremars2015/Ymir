@@ -19,13 +19,22 @@ internal sealed partial class McpProxy(
 {
     public const string BackendClientName = "Ymir.McpGateway.Backend";
 
+    /// <summary>API 內建服務的端點（ADR-0030 §2）。</summary>
+    public const string BuiltInOneDrivePath = "/internal/mcp/onedrive";
+
+    /// <summary>轉給 API 內建服務的 Agent token 標頭：API 自己再驗一次，並由它得知使用者與 execution。</summary>
+    public const string ForwardedTokenHeader = "X-Ymir-Mcp-Token";
+
     private static readonly string[] s_forwardedRequestHeaders = ["Accept", "Mcp-Session-Id", "Mcp-Protocol-Version", "Last-Event-ID"];
     private static readonly string[] s_forwardedResponseHeaders = ["Mcp-Session-Id", "Cache-Control"];
 
     public async Task ForwardAsync(string server, HttpContext context)
     {
         var claims = GatewayAuthentication.ClaimsOf(context)!;
-        var definition = catalog.Find(server);
+        var builtIn = server == McpCatalog.OneDriveServerName;
+        var definition = builtIn
+            ? options.ApiUrl is { } api ? new McpServerDefinition(server, string.Empty, new Uri(api, BuiltInOneDrivePath), null) : null
+            : catalog.Find(server);
         if (definition is null || !claims.Servers.Contains(server, StringComparer.Ordinal))
         {
             // 目錄沒有或 token 沒有授權：Agent 只看到摘要（SA §10、§12）。
@@ -65,7 +74,13 @@ internal sealed partial class McpProxy(
             }
         }
 
-        if (definition.CredentialEnv is { } credentialEnv)
+        if (builtIn)
+        {
+            // 內建服務的後端是 API：後端憑證由簽章金鑰衍生；Agent 的 token 只在這裡轉送，讓 API 知道使用者與 execution（ADR-0030 §2）。
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", McpGatewayToken.BuiltInBackendCredential(options.TokenSigningKey!));
+            request.Headers.TryAddWithoutValidation(ForwardedTokenHeader, GatewayAuthentication.TokenOf(context));
+        }
+        else if (definition.CredentialEnv is { } credentialEnv)
         {
             if (Environment.GetEnvironmentVariable(credentialEnv) is not { Length: > 0 } credential)
             {

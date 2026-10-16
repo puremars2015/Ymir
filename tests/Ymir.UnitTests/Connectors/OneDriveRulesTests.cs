@@ -46,21 +46,7 @@ public class OneDriveRulesTests
     [InlineData("src/onedrive/file.txt", false)]
     [InlineData("onedrives/file.txt", false)]
     public void LegacySync_ReservesTheLinkedNamespaceAcrossPlatforms(string path, bool reserved) =>
-        Assert.Equal(reserved, OneDriveLinks.IsReservedPath(path));
-
-    [Theory]
-    [InlineData("報告.pdf")]
-    [InlineData("../../escape")]
-    [InlineData(".env")]
-    [InlineData("控制\n字元")]
-    public void LinkLocalName_IsASafeSingleSegmentWithStableIdPrefix(string name)
-    {
-        var id = Guid.Parse("01234567-89ab-cdef-0123-456789abcdef");
-        var local = OneDriveLinks.LocalName(name, id);
-        Assert.StartsWith("01234567-", local, StringComparison.Ordinal);
-        Assert.DoesNotContain('/', local);
-        Assert.True(Ymir.VibeMaker.Application.Files.WorkspacePathRules.IsSafeRelativePath(local));
-    }
+        Assert.Equal(reserved, OneDrivePaths.IsAgentPath(path));
 
     [Theory]
     [InlineData("own", false, true)]
@@ -226,5 +212,19 @@ public class OneDriveRulesTests
         Assert.Equal(0, scope.Attempts);
         scope.AttemptFailed("請重新連結", retry: false, now);
         Assert.False(scope.UploadPending);
+    }
+
+    [Theory]
+    [InlineData("預算.xlsx", "預算.xlsx")]
+    [InlineData("../../etc/passwd", "_.._etc_passwd")]
+    [InlineData(".env", "env")]
+    [InlineData("...", "未命名檔案")]
+    [InlineData("node_modules", "未命名檔案")]
+    [InlineData("a\nb", "a_b")]
+    public void AgentDownload_LocalFileName_IsASafeSingleSegment(string name, string expected)
+    {
+        var local = OneDriveAgentTools.LocalFileName(name);
+        Assert.Equal(expected, local);
+        Assert.True(Ymir.VibeMaker.Application.Files.WorkspacePathRules.IsSafeRelativePath($"{OneDrivePaths.AgentDirectory}/{local}"));
     }
 }

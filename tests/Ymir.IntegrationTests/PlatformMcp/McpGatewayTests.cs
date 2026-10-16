@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Ymir.Api.Endpoints;
 using Ymir.IntegrationTests.Api;
@@ -84,7 +85,8 @@ public sealed class McpGatewayApiFactory : ApiFactory
     }
 
     /// <summary>啟動 gateway（API 先啟動，資料庫才已經 migrate）；<paramref name="port"/> 為 null 時用 <see cref="GatewayPort"/>。</summary>
-    public async Task<Uri> StartGatewayAsync(int requestsPerMinute = 1000, int? port = null)
+    /// <param name="apiUrl">內建 OneDrive 服務轉送的 API 位址（ADR-0030 §2）；null 時內建服務停用。</param>
+    public async Task<Uri> StartGatewayAsync(int requestsPerMinute = 1000, int? port = null, Uri? apiUrl = null)
     {
         _ = Services;
         var url = $"http://127.0.0.1:{port ?? GatewayPort}";
@@ -95,6 +97,7 @@ public sealed class McpGatewayApiFactory : ApiFactory
             $"--McpGateway:TokenSigningKey={SigningKey}",
             $"--McpGateway:RequestsPerMinute={requestsPerMinute}",
             $"--ConnectionStrings:ymir={DatabaseConnectionString}",
+            .. apiUrl is null ? Array.Empty<string>() : [$"--McpGateway:ApiUrl={apiUrl}"],
         ]);
         await gateway.StartAsync(TestContext.Current.CancellationToken);
         _gateways.Add(gateway);
@@ -177,6 +180,52 @@ public class McpGatewayTests(McpGatewayApiFactory factory) : IClassFixture<McpGa
         using var admin = await factory.LoginAsync($"mcp-audit-{Guid.NewGuid():N}", UserRole.Admin);
         var page = await admin.GetFromJsonAsync<AuditLogPageResponse>($"/api/admin/audit?action={action}", JsonDefaults.Options, Ct);
         return page!.Items;
+    }
+
+    [Fact]
+    public async Task Gateway_ForwardsBuiltInOneDriveToTheApi_WithDerivedCredentialAndTheAgentToken()
+    {
+        // 代替 API 的 /internal/mcp/onedrive：記錄 gateway 送來的標頭（ADR-0030 §2）。
+        var received = new System.Collections.Concurrent.ConcurrentQueue<(string Authorization, string Token)>();
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        await using var api = builder.Build();
+        api.MapPost(McpProxy.BuiltInOneDrivePath, (HttpContext context) =>
+        {
+            received.Enqueue((context.Request.Headers.Authorization.ToString(), context.Request.Headers[McpProxy.ForwardedTokenHeader].ToString()));
+            return Results.Text("""{"jsonrpc":"2.0","id":1,"result":{}}""", "application/json");
+        });
+        await api.StartAsync(Ct);
+        var apiUrl = new Uri(api.Urls.First());
+        var gateway = await factory.StartGatewayAsync(port: McpGatewayApiFactory.FreePort(), apiUrl: apiUrl);
+        using var http = new HttpClient();
+        var userId = Guid.NewGuid();
+        var token = McpGatewayToken.Issue(McpGatewayApiFactory.SigningKey, new McpGatewayClaims(userId, ["onedrive"], DateTimeOffset.UtcNow.AddMinutes(10), Guid.NewGuid()));
+
+        using (var response = await PostAsync(http, gateway, token, "onedrive", new { jsonrpc = "2.0", id = 1, method = "tools/list" }))
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        var (authorization, forwarded) = Assert.Single(received);
+        Assert.Equal($"Bearer {McpGatewayToken.BuiltInBackendCredential(McpGatewayApiFactory.SigningKey)}", authorization);
+        Assert.Equal(token, forwarded);
+
+        // token 沒有授權 onedrive：不轉送。
+        using (var denied = await PostAsync(http, gateway, Token(userId, McpGatewayApiFactory.ServerName), "onedrive", new { jsonrpc = "2.0", id = 1, method = "tools/list" }))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        }
+
+        // 沒有設定 ApiUrl 的 gateway：內建服務停用。
+        var withoutApi = await GatewayAsync();
+        using (var disabled = await PostAsync(http, withoutApi, token, "onedrive", new { jsonrpc = "2.0", id = 1, method = "tools/list" }))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, disabled.StatusCode);
+        }
+
+        Assert.Single(received);
+        await api.StopAsync(Ct);
     }
 
     [Fact]

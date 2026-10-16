@@ -33,7 +33,12 @@ Agent container 裡只有 token 的環境變數 `YMIR_MCP_TOKEN`（`mcp.json` �
 3. 安裝 `ymir-mcp-gateway.service`，`systemctl enable --now ymir-mcp-gateway`。
 4. 網路：Agent container 必須連得到 gateway——包含管理員關閉對外連線時使用的受限網路（ADR-0012 A.8，`--internal` 網路上要有 gateway 的位址，例如把 gateway 以 container 方式接上同一個網路，或在受限網路的閘道位址上監聽）。gateway 自己要連得到後端服務；Agent container 不需要也不應該連得到後端。
 
-沒有設定 `Ymir__Mcp__GatewayUrl` 時，平台 MCP 整個停用（不影響其他功能）。
+5. OneDrive 外掛（ADR-0030）：gateway 設定 `McpGateway__ApiUrl`（gateway 連得到的 API 位址，例如 API container 發布在主機的 `http://127.0.0.1:8080`）。
+   `/mcp/onedrive` 是內建服務，`servers.json` 不能使用這個名稱；gateway 轉送到 API 的 `/internal/mcp/onedrive`，帶上由簽章金鑰衍生的後端憑證與 Agent 的 token，
+   API 再驗證 token、execution 是否執行中、能力、使用者的外掛開關與 OneDrive 連線。這個端點只給 gateway 用：從 Cloudflare Tunnel 進來的請求（帶 `Cf-Connecting-Ip`）一律 404。
+   gateway 與 API 要一起更新（token 多了 execution id）。
+
+沒有設定 `Ymir__Mcp__GatewayUrl` 時，平台 MCP 整個停用（不影響其他功能），OneDrive 外掛也無法讓 Agent 使用。
 
 ## 本機驗證
 
@@ -46,4 +51,7 @@ YMIR_MCP_ECHO_TOKEN=dev-backend-secret dotnet run --project src/Ymir.McpGateway 
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:mcp -- <截圖目錄>
 ```
 
-**未驗證、待使用者環境確認**：真實後端服務（EIP / MES）、正式主機上受限網路連到 gateway 的路由。
+OneDrive 外掛的本機驗證：Fake OIDC（含 Fake Graph）+ Fake LLM + API（`VibeMaker__Harness=Pi`、OneDrive 與 `Ymir__Mcp__*` 設定）+ gateway 加上 `--McpGateway:ApiUrl=http://127.0.0.1:5080`，
+再執行 `npm run e2e:onedrive`：Fake LLM 的 `[onedrive-search 關鍵字]` 會讓 Agent 經 gateway 呼叫 `mcp__onedrive__search`。
+
+**未驗證、待使用者環境確認**：真實後端服務（EIP / MES）、正式主機上受限網路連到 gateway 的路由、真實 Microsoft Graph 的 move / delete。

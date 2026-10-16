@@ -6,7 +6,11 @@ using System.Text.Json;
 namespace Ymir.VibeMaker.Application.PlatformMcp;
 
 /// <summary>gateway token 的內容：哪位使用者、可以用哪些服務、何時過期。</summary>
-public sealed record McpGatewayClaims(Guid UserId, IReadOnlyList<string> Servers, DateTimeOffset ExpiresAt);
+/// <param name="ExecutionId">
+/// 簽發這個 token 的 execution（ADR-0030 §2）：內建服務（OneDrive）以它推導工作目錄，並只在 execution 執行中時接受。
+/// 外部後端服務看不到這個欄位（gateway 不轉送 token）。
+/// </param>
+public sealed record McpGatewayClaims(Guid UserId, IReadOnlyList<string> Servers, DateTimeOffset ExpiresAt, Guid? ExecutionId = null);
 
 /// <summary>
 /// 每人專屬的短期 gateway token（ADR-0012 B.3）：<c>ymcp1.{payload}.{HMAC-SHA256}</c>，payload 是 base64url JSON。
@@ -32,7 +36,7 @@ public static class McpGatewayToken
     {
         ArgumentNullException.ThrowIfNull(claims);
         EnsureKeyIsStrong(signingKey, "signing key");
-        var payload = JsonSerializer.SerializeToUtf8Bytes(new TokenPayload(claims.UserId, [.. claims.Servers], claims.ExpiresAt.ToUnixTimeSeconds()), s_json);
+        var payload = JsonSerializer.SerializeToUtf8Bytes(new TokenPayload(claims.UserId, [.. claims.Servers], claims.ExpiresAt.ToUnixTimeSeconds(), claims.ExecutionId), s_json);
         var body = $"{Prefix}.{Base64Url.EncodeToString(payload)}";
         return $"{body}.{Base64Url.EncodeToString(Sign(signingKey, body))}";
     }
@@ -85,10 +89,25 @@ public static class McpGatewayToken
         }
 
         var expiresAt = DateTimeOffset.FromUnixTimeSeconds(decoded.Exp);
-        return expiresAt <= now ? null : new McpGatewayClaims(decoded.Sub, decoded.Srv, expiresAt);
+        return expiresAt <= now ? null : new McpGatewayClaims(decoded.Sub, decoded.Srv, expiresAt, decoded.Exe);
     }
+
+    /// <summary>
+    /// gateway 呼叫 API 內建服務（ADR-0030 §2）時的後端憑證：由簽章金鑰衍生，API 與 gateway 都算得出來、Agent 算不出來，
+    /// 不需要另一個部署 secret。與 token 簽章用不同的訊息，兩者不能互換。
+    /// </summary>
+    public static string BuiltInBackendCredential(string signingKey)
+    {
+        EnsureKeyIsStrong(signingKey, "signing key");
+        return Base64Url.EncodeToString(Sign(signingKey, "ymir-mcp-builtin-backend:v1"));
+    }
+
+    /// <summary>固定時間比較 <see cref="BuiltInBackendCredential"/>。</summary>
+    public static bool IsBuiltInBackendCredential(string signingKey, string? presented) =>
+        presented is { Length: > 0 and < 256 }
+        && CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(presented), Encoding.UTF8.GetBytes(BuiltInBackendCredential(signingKey)));
 
     private static byte[] Sign(string key, string body) => HMACSHA256.HashData(Encoding.UTF8.GetBytes(key), Encoding.UTF8.GetBytes(body));
 
-    private sealed record TokenPayload(Guid Sub, string[]? Srv, long Exp);
+    private sealed record TokenPayload(Guid Sub, string[]? Srv, long Exp, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] Guid? Exe = null);
 }

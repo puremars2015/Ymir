@@ -98,7 +98,9 @@ public static class PublicEdgeExtensions
 
             // health check 只給本機監控使用。Token 模式的 tunnel 由 Cloudflare dashboard 管理 ingress，無法保證有擋 /health，
             // 因此在 API 端擋：經由公開網域進來的 /health、/alive 一律 404（ADR-0006）。
-            if (IsHealthPath(context.Request.Path) && string.Equals(host, publicHostname, StringComparison.OrdinalIgnoreCase))
+            // /internal 是主機上的服務（MCP gateway → OneDrive 外掛，ADR-0030 §2）呼叫的端點，同樣不經公開網域提供。
+            if ((IsHealthPath(context.Request.Path) || IsInternalPath(context.Request.Path))
+                && string.Equals(host, publicHostname, StringComparison.OrdinalIgnoreCase))
             {
                 context.Response.StatusCode = StatusCodes.Status404NotFound;
                 return;
@@ -111,6 +113,8 @@ public static class PublicEdgeExtensions
 
     private static bool IsLocalHost(string host) =>
         host.Equals("localhost", StringComparison.OrdinalIgnoreCase) || host is "127.0.0.1" or "[::1]" or "::1";
+
+    private static bool IsInternalPath(PathString path) => path.StartsWithSegments("/internal", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsHealthPath(PathString path) =>
         path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase)

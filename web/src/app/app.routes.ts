@@ -50,7 +50,13 @@ export const routes: Routes = [
         title: '小工具 · Vibe Maker',
       },
       {
-        // 個人設定：分頁皆為子路由，可直接以網址開啟（OneDrive 授權導回 /settings/connections）。
+        // 外掛市集（ADR-0030）：OneDrive 授權導回這裡（?onedrive=結果）。
+        path: 'plugins',
+        loadComponent: () => import('./features/plugins/plugins-page').then((m) => m.PluginsPage),
+        title: '外掛市集 · Vibe Maker',
+      },
+      {
+        // 個人設定：分頁皆為子路由，可直接以網址開啟。
         path: 'settings',
         loadComponent: () =>
           import('./features/settings/settings-layout').then((m) => m.SettingsLayout),
@@ -68,17 +74,9 @@ export const routes: Routes = [
               import('./features/settings/password-page').then((m) => m.PasswordPage),
             title: '變更密碼 · Vibe Maker',
           },
-          {
-            path: 'connections',
-            loadComponent: () =>
-              import('./features/settings/connections-page').then((m) => m.ConnectionsPage),
-            title: '帳號連接 · Vibe Maker',
-          },
-          {
-            path: 'tools',
-            loadComponent: () => import('./features/settings/tools-page').then((m) => m.ToolsPage),
-            title: 'MCP 與工具 · Vibe Maker',
-          },
+          // 舊的「帳號連接」「MCP 與工具」分頁已併入外掛市集；保留網址相容（query 參數會一併帶過去）。
+          { path: 'connections', redirectTo: '/plugins' },
+          { path: 'tools', redirectTo: '/plugins' },
         ],
       },
       {

@@ -9,8 +9,12 @@ namespace Ymir.McpGateway;
 internal sealed class GatewayAuthentication(RequestDelegate next, McpGatewayOptions options, TimeProvider timeProvider)
 {
     private const string ClaimsKey = "ymir.mcp.claims";
+    private const string TokenKey = "ymir.mcp.token";
 
     public static McpGatewayClaims? ClaimsOf(HttpContext context) => context.Items.TryGetValue(ClaimsKey, out var value) ? value as McpGatewayClaims : null;
+
+    /// <summary>已驗證的原始 token：只轉送給 API 的內建服務（ADR-0030 §2），不會送到目錄中的外部後端。</summary>
+    public static string? TokenOf(HttpContext context) => context.Items.TryGetValue(TokenKey, out var value) ? value as string : null;
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -29,6 +33,7 @@ internal sealed class GatewayAuthentication(RequestDelegate next, McpGatewayOpti
         }
 
         context.Items[ClaimsKey] = claims;
+        context.Items[TokenKey] = token;
         await next(context).ConfigureAwait(false);
     }
 }

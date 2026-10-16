@@ -1,11 +1,10 @@
 import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Observable } from 'rxjs';
 import { ApiService, describeApiError } from '../../core/api/api.service';
 import { OneDriveStatus } from '../../core/api/api-types';
-import { OneDriveBrowser } from './onedrive-browser';
 import {
   ONEDRIVE_CONNECT_URL,
   onedriveResultMessage,
@@ -13,16 +12,15 @@ import {
 } from '../../core/connectors/onedrive-rules';
 
 /**
- * 個人設定：OneDrive 連結（ADR-0013）。管理員開放後，使用者自己連結並選擇要同步的資料夾。
- * 連結是整頁導向 Microsoft（授權碼 + PKCE 由後端處理），前端不接觸任何 token。
+ * 外掛市集的 OneDrive 帳號與同步資料夾（ADR-0013、ADR-0030）：管理員開放後，使用者自己連結（= 安裝外掛），
+ * 另可設定和工作目錄雙向同步的資料夾。連結是整頁導向 Microsoft（授權碼 + PKCE 由後端處理），前端不接觸任何 token。
  */
 @Component({
   selector: 'app-onedrive-card',
-  imports: [DatePipe, FormsModule, OneDriveBrowser],
+  imports: [DatePipe, FormsModule],
   template: `
     @if (status(); as s) {
       <section class="stack onedrive">
-        <h2>OneDrive</h2>
         <p>
           <strong>{{ stateLabel(s) }}</strong>
           @if (s.account) {
@@ -33,16 +31,17 @@ import {
           <p class="muted hint">連結時間：{{ s.connectedAt | date: 'yyyy-MM-dd HH:mm' }}</p>
         }
         <p class="muted hint">
-          執行 Agent
-          前會從這個資料夾下載檔案，執行後把新增或修改的檔案上傳；兩邊同時修改時會保留兩份。Agent
-          本身拿不到你的 OneDrive 授權。
+          同步資料夾（選用）：執行 Agent
+          前會從這個資料夾下載檔案，執行後把新增或修改的檔案上傳；兩邊同時修改時會保留兩份。和上方「讓
+          Agent 使用」是不同的功能，可以只用其中一個。
         </p>
 
         @if (!s.available) {
           <p class="error">企業帳號登入尚未設定，暫時無法連結 OneDrive。</p>
         } @else if (!s.allowed) {
           <p class="muted">
-            管理員尚未開放 OneDrive 連結，請洽管理員；若已有連結，同步已停止，仍可解除連結。
+            管理員尚未開放 OneDrive，請洽管理員；若已有連結，同步與 Agent
+            存取都已停止，仍可解除連結。
           </p>
         }
 
@@ -59,12 +58,6 @@ import {
             </label>
             <button type="submit" [disabled]="busy() || !rootPath().trim()">儲存</button>
           </form>
-          <button type="button" class="secondary" (click)="browserOpen.set(!browserOpen())">
-            {{ browserOpen() ? '關閉 OneDrive 瀏覽' : '瀏覽整個自己的 OneDrive' }}
-          </button>
-          @if (browserOpen()) {
-            <app-onedrive-browser />
-          }
         }
 
         <div class="row">
@@ -90,11 +83,7 @@ import {
   `,
   styles: `
     .onedrive {
-      margin-top: 2rem;
-    }
-    h2 {
-      margin: 0;
-      font-size: 1.125rem;
+      margin-top: 0.75rem;
     }
     p {
       margin: 0;
@@ -126,8 +115,9 @@ export class OneDriveCard implements OnInit {
   protected readonly status = signal<OneDriveStatus | null>(null);
   protected readonly rootPath = signal('/Ymir');
   protected readonly busy = signal(false);
-  protected readonly browserOpen = signal(false);
   protected readonly message = signal<{ text: string; error: boolean } | null>(null);
+  /** 連結狀態改變（連結結果、同步資料夾、解除連結）：外掛市集據此重新讀取卡片。 */
+  readonly changed = output<void>();
 
   ngOnInit(): void {
     // 從 Microsoft 導回時帶 ?onedrive=結果；顯示後從網址移除，重新整理不會再出現。
@@ -160,7 +150,11 @@ export class OneDriveCard implements OnInit {
   }
 
   protected disconnect(): void {
-    if (!confirm('解除 OneDrive 連結？雲端與執行環境內的檔案都會保留，之後不再同步。')) {
+    if (
+      !confirm(
+        '解除 OneDrive 連結？雲端與執行環境內的檔案都會保留，之後不再同步，Agent 也不能再使用 OneDrive。',
+      )
+    ) {
       return;
     }
 
@@ -175,6 +169,7 @@ export class OneDriveCard implements OnInit {
         this.apply(s);
         this.message.set({ text: done, error: false });
         this.busy.set(false);
+        this.changed.emit();
       },
       error: (e: unknown) => {
         this.message.set({ text: describeApiError(e), error: true });
@@ -185,7 +180,6 @@ export class OneDriveCard implements OnInit {
 
   private apply(status: OneDriveStatus): void {
     this.status.set(status);
-    if (!status.allowed || status.state !== 'Connected') this.browserOpen.set(false);
     if (status.rootPath) {
       this.rootPath.set(status.rootPath);
     }

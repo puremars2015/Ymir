@@ -86,10 +86,10 @@ export class SettingsPage implements OnInit {
   protected readonly dirty = computed(() => this.draft().trim() !== this.savedValue());
 
   ngOnInit(): void {
-    // 相容先前已啟動的 OneDrive OAuth：保留結果代碼，交給新頁面的卡片處理。
+    // 相容先前已啟動的 OneDrive OAuth：保留結果代碼，交給外掛市集的 OneDrive 卡片處理（ADR-0030）。
     const result = this.route.snapshot.queryParamMap.get('onedrive');
     if (result !== null) {
-      void this.router.navigate(['/settings/connections'], {
+      void this.router.navigate(['/plugins'], {
         queryParams: { onedrive: result },
         replaceUrl: true,
       });
