@@ -137,6 +137,7 @@
 - **部署注意**：先備份再套用 `UserPluginSettings` migration；API、前端與 MCP gateway 一起更新，gateway 加上 `McpGateway__ApiUrl`（gateway 連得到的 API 位址）。
 - **未驗證、待使用者環境確認**：真實 Microsoft Graph 的 move（PATCH）與 delete、正式主機 gateway → API 的位址與受限網路路由。
 - **同步**：rebase 到含 #091（Ubuntu 安裝總指南，只改文件）的 main；看板編號改為 #092。安裝指南的 OneDrive／平台 MCP 列同步改成 ADR-0030 的說明（需使用者自己啟用、gateway 需 `McpGateway__ApiUrl`）。整合的遠端提交只有 Markdown，程式驗證結果不變。
+- **CI**：[38874737214](https://github.com/puremars2015/Ymir/actions/runs/38874737214) 第一次在 `.NET build & test` 的 Restore 步驟（9 秒、尚未執行任何 build／測試）失敗，本次提交未改 csproj／套件、本機 restore 正常，判斷為 NuGet 暫時性錯誤，重跑一次後 Restore、format、Release build、測試、Angular、Agent image 全部通過。
 
 ---
 
