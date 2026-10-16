@@ -531,9 +531,9 @@ curl --fail --retry 10 --retry-all-errors --retry-delay 3 https://ymir.example.c
 
 | 功能 | 額外前置與指南 |
 |---|---|
-| OneDrive | 管理員開放能力、Microsoft delegated permissions／callback、個人授權；見 [OneDrive](onedrive.md)。不要把帳號連接等同自動同步整個 drive，任意連結項目的寫回以目前實作階段為準 |
+| OneDrive | 管理員開放能力、Microsoft delegated permissions／callback、個人授權；見 [OneDrive](onedrive.md)。連結帳號不等於讓 Agent 存取：使用者要在外掛市集自己打開「讓 Agent 使用」（ADR-0030），且需要平台 MCP gateway 設定 `McpGateway__ApiUrl` |
 | 個人 MCP | 管理員開放 MCP／internet、個人註冊與最小權限 token；見 [連接與工具](personal-connections.md)，自己的 MCP token 會送入個人程序環境，不等同 OneDrive 授權只留 API |
-| 平台 MCP | [獨立 Gateway](../../deploy/mcp/README.md)、服務目錄、簽章 key、存取清單及受限網路可達性；不要直接把內網服務憑證交給 Agent |
+| 平台 MCP | [獨立 Gateway](../../deploy/mcp/README.md)、服務目錄、簽章 key、存取清單及受限網路可達性；OneDrive 外掛另需 gateway 的 `McpGateway__ApiUrl`（gateway 連得到的 API 位址）；不要直接把內網服務憑證交給 Agent |
 | 知識庫 | 設定真實 embedding 模型、API 自己的持久化 Knowledge root／volume 與模型使用權限；原始文件不放入 Agent mount |
 | 小工具／網站託管 | [SiteHost](../../deploy/sites/README.md)、獨立於登入站的 hostname／wildcard DNS、持久化 sites volume、私人網站 ticket；不要共用登入 origin 或省略存取控制 |
 | 系統資源／安全回收 | [MaintenanceHost](../../deploy/maintenance/README.md)、專用 socket／token／鎖目錄，先 dry run 與保護分類，再決定是否啟用回收；不可用全 store prune 代替 |
