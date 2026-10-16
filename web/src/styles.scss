@@ -68,6 +68,8 @@
 html,
 body {
   margin: 0;
+  /* iOS 在沒有可捲動內容的頁面下拉時會橡皮筋回彈，把固定定位的外框一起拉動 */
+  overscroll-behavior: none;
   background: var(--background);
   color: var(--text);
   font-family:

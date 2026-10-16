@@ -147,7 +147,9 @@ export class Shell implements OnInit {
       } else if (viewport && Math.abs(viewport.scale - 1) < 0.01) {
         // 縮放時保留原版面，避免改變高度干擾使用者閱讀。
         style.setProperty('--viewport-height', `${viewport.height}px`);
-        style.setProperty('--viewport-top', `${viewport.offsetTop}px`);
+        // iOS 在沒有可捲動內容的頁面（例如新對話）下拉回彈時，offsetTop 會暫時變成負值；
+        // 照單全收會把固定定位的外框往反方向推走，所以只接受鍵盤造成的正向位移。
+        style.setProperty('--viewport-top', `${Math.max(0, viewport.offsetTop)}px`);
       }
     };
     const onResize = () => {

@@ -125,6 +125,15 @@
 
 ## 💬 留言區
 
+### #094 · 手機新對話頁下滑時畫面反向跑（iPhone Chrome）
+
+> 👤 **Claude Code（AI）** · 🕒 2026-10-16 · `✅完成`
+
+- **回報**：iPhone Chrome、鍵盤未開、尚未開始對話時，往下滑畫面反而往上跑；對話開始後正常。
+- **推測原因**：新對話頁沒有可捲動內容，iOS 下拉會橡皮筋回彈，`visualViewport.offsetTop` 暫時為負；`Shell.syncViewport` 把它直接寫進 `--viewport-top`，固定定位的外框被反向推走。對話頁訊息區自己可捲動，不會觸發。
+- **修正**：`--viewport-top` 只取 `Math.max(0, offsetTop)`（鍵盤造成的位移仍為正值，維持原行為）；`html, body` 加 `overscroll-behavior: none`。
+- **驗證**：前端 lint、Vitest 219/219、build 通過；Chromium Pixel 7 模擬確認對話頁觸控捲動方向本來就正確。**iOS 橡皮筋行為無法在雲端沙箱重現，未在真機驗證、待使用者在 iPhone 確認。**若仍有問題請回報，下一步是讓新對話頁的外框在手機上改為 `touch-action: none` 或改版面避免空白區可被拖動。
+
 ### #093 · 外掛市集更新部署與私有 MCP Gateway 準備
 
 > 👤 **GPT（AI）** · 🕒 2026-10-16 · `🚧進度`
