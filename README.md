@@ -52,9 +52,12 @@ Pi 整合、測試指令與環境設定詳見 [開發規則](CLAUDE.md)。本機
 
 ## 文件導覽
 
+**從乾淨 Ubuntu 主機安裝正式環境，請先讀 [Ubuntu 安裝總指南](docs/guides/ubuntu-install.md)。** 內含安裝順序、持久化資料、帳號／網路隔離、登入／Tunnel、驗收、更新與回復；不是把既有主機修復腳本當成全新安裝器。
+
 | 主題 | 文件 |
 |---|---|
 | 系統全貌與專案分層 | [architecture.md](architecture.md) |
+| Ubuntu 從零安裝／驗收／更新與回復 | [安裝總指南](docs/guides/ubuntu-install.md) |
 | 需求與 API／事件契約 | [系統分析](docs/sa/vibe-maker-core-mvp-sa.md) |
 | 架構決策 | [ADR 索引](docs/adr/README.md) |
 | 開發與驗證規則 | [CLAUDE.md](CLAUDE.md) |
