@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| DEP5 | 更新外掛市集與 OneDrive Agent 工具，安裝私有 MCP Gateway | 🚧 | 使用者明確同意一併安裝 Gateway；部署前修補 MessagePack 間接相依安全漏洞，1058 Release tests 通過；待固定產物／Gateway 隔離與備份切換，見 #093 |
 | DOC2 | 乾淨 Ubuntu 主機的正式安裝總指南 | ✅ | [Ubuntu 安裝總指南](../guides/ubuntu-install.md) 串接持久化資料庫／模型服務、rootless Agent、API、登入／Tunnel、驗收及更新回復；語法／連結／Quadlet 與 mock 檢查通過，未在乾淨 VM 實際安裝，見 #091 |
 | DEP4 | 最新 main／遠端分支同步與重新上版 | ✅ | 348b64c 已經終端 sudo 授權完成部署；四個正式 unit、health、公開登入頁通過，本次無新 migration；後續僅測試競態修正與紀錄，見 #090 |
 | GRP2 | 右側面板可拖曳調整寬度；群組聊天可上傳檔案給 @bot | 🔬 | ADR-0026 補充；後端、前端、整合測試與瀏覽器 e2e 通過；348b64c 已正式部署，真群組 Agent 操作待驗收，見 #089、#090 |
@@ -123,6 +124,20 @@
 ---
 
 ## 💬 留言區
+
+### #093 · 外掛市集更新部署與私有 MCP Gateway 準備
+
+> 👤 **GPT（AI）** · 🕒 2026-10-16 · `🚧進度`
+
+使用者要求重新 pull 並部署。乾淨 main fetch／rebase 到 `4a04c8e`（外掛市集、ADR-0030 OneDrive Agent 工具，所有已取得遠端分支均已包含），正式 RuntimeHost 仍為 348b64c。差異僅需新套 VibeMaker `20261016081348_UserPluginSettings`；舊 OneDrive 手動連結資料表保留，原同步資料夾保留。正式主機未安裝 MCP Gateway，使用者在選項中明確選擇「一併安裝 Gateway」，不是只更新市集 UI；不替使用者開啟 OneDrive 外掛或增加 Microsoft 權限。
+
+最新 commit 的 CI [38876779888](https://github.com/puremars2015/Ymir/actions/runs/38876779888) 在 Restore 失敗，不是暫時性下載：NU1902 指出 Aspire 間接依賴 MessagePack 2.5.302 受 [GHSA-qhrr-8q5h-9q3h](https://github.com/advisories/GHSA-qhrr-8q5h-9q3h) 影響。對照公告後在中央相依釘選同主要版本的修補版 2.5.303；未停用 NuGet audit、未把漏洞警告降級。restore 成功，project.assets 確認 MessagePack／Annotations 均為 2.5.303。完整 Release solution tests 1058 全通過、0 failed／0 skipped（固定 Pi 1.0.0、Fake 服務與專用暫時 SQL container），format／diff check 通過。第一次暫時 SQL readiness 與清理命令逾時，主機讀回仍有約 5.8 GiB available RAM；未據此推斷 OOM，之後只清理本輪具名測試容器並順序重跑成功，正式 SQL 未用於測試。
+
+計畫：重新固定安全修補後的 commit／API image，publish RuntimeHost 與 MCP Gateway，審查單一 plugin migration；Gateway 專用非 root 帳號、loopback 5310、僅 audit INSERT／id SELECT 的獨立 SQL principal，Agent 透過兩個私有網路上的 proxy／Unix bridge 連接，不新增公開 port，不交付 API／DB／Graph 憑證給 Agent。保留既有 ENV、模型路由、登入與 mount 隔離；只新增明確審查的 MCP 設定與唯讀 catalog mount。切換前先排空工作並備份 SQL／keyring／workspaces／部署 secret，失敗回復原程式與配置，保留 additive migration／備份。實機 Gateway 路由、稽核權限及權限拒絕仍待部署器驗證；真 Graph／使用者授權後的讀寫刪除、真 Pi SSE 待人工驗收。
+
+本留言記錄準備與已完成的驗證，不代表已完成正式切換；正式授權視窗需在產物與安全 gate 完成後才開啟。
+
+---
 
 ### #092 · 外掛市集與 OneDrive Agent 工具（ADR-0030）
 
