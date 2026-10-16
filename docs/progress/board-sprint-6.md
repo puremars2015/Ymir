@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| DEP4 | 最新 main／遠端分支同步與重新上版 | 🚧 | 目標固定 348b64c；包含個人設定分頁、使用者設定頁、群組附件／面板寬度及資源告警；CI 全通過，本次無新 migration，正式切換待 sudo，見 #090 |
 | GRP2 | 右側面板可拖曳調整寬度；群組聊天可上傳檔案給 @bot | 🔬 | ADR-0026 補充；後端、前端、整合測試與瀏覽器 e2e 通過；已整合回 main、尚未部署，見 #089 |
 | DEP3 | 所有遠端分支核對、main 同步與新版正式部署 | ✅ | 7 個遠端分支均已在 main；修正 MakeTools idempotent SQL 後，經本機 sudo 授權完成 e7cf9f9 正式部署，四個 unit／health／公開登入頁通過；真登入與 Pi SSE 待人工驗收，見 #085 |
 | TOOL1 | 左側「小工具」：/make 小工具自動發布，在 Ymir 內以 iframe 開啟 | 🔬 | [ADR-0029](../adr/0029-make-tools-sidebar.md)；後端、前端、測試與瀏覽器 e2e 通過；正式站需部署 SiteHost 與網站網域並套 VibeMaker migration `MakeTools`，見 #083、#084 |
@@ -120,6 +121,17 @@
 ---
 
 ## 💬 留言區
+
+### #090 · 最新進度同步與 348b64c 正式上版準備
+
+> 👤 **OpenCode（AI）** · 🕒 2026-10-16 10:25 · `🔬驗證`
+
+- **同步範圍**：使用者要求 pull／merge 最新並上版。先前合併群組附件後，工作暫停期間遠端已將相同功能重新整合回 main，另有資源告警。重新 fetch／rebase 時保留新版 #088／#089 看板紀錄、排除已存在的重複程式提交；目前所有已取得的遠端分支皆包含於 main，無須額外合併或刪除分支。
+- **固定程式目標**：`348b64cdb7cc024b1b8dee050e7ba83a87981b3e`；CI [38770970038](https://github.com/puremars2015/Ymir/actions/runs/38770970038) 全數成功。包含個人設定四分頁、管理使用者設定頁、群組 @bot 附件、可調整右側面板，以及系統資源不足告警。與上一版 e7cf9f9 比對，無 migration 檔案異動，不改正式部署 secret／DNS／SiteHost／維護服務啟用狀態。
+- **已驗證**：先前整合版 659cfa8（與目標後端程式相同）本機 build、712 單元測試、format 通過；與 348b64c 的差異僅文件及資源告警前端。新版 API image 重新建置中，完整整合測試使用獨立 SQL port 14349，未使用正式資料庫。主機部署器改成要求完整 migration history 與現況完全相同，本次不執行 migration，仍保留 SQL／金鑰／workspace 備份、精確 image／隔離／ENV 核對及失敗回復。
+- **正式切換待授權**：主機專用部署入口 `/home/itadmin/ymir-production-install/update-348b64c/authorize.sh`；產物驗證完成後以終端視窗請使用者輸入 sudo 密碼。本次不宣稱已修復先前 Cloudflare／OneDrive 同步期間的串流問題；真登入、Pi SSE、Graph 與小工具網站網域仍需驗收／配置。切換前 API NRestarts 已為 4，保留供追蹤。
+
+---
 
 ### #089 · 右側面板可調整寬度、群組附件給 @bot
 
