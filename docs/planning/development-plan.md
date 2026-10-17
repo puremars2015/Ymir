@@ -157,32 +157,32 @@ Walking Skeleton 打通：Dev 登入（Cookie + XSRF）→ Workspace / 對話 �
 | 套件下載 / Egress | 內部套件鏡像（npm / PyPI / NuGet） | 公司是否已有 Nexus / Artifactory；或改用 allow-list egress proxy |
 | LiteLLM Virtual Key | 每 runtime 一把、短效、限模型與預算 | 預算額度、可用模型清單、是否依部門分帳 |
 | 企業 IdP | Entra ID（OIDC） | 實際為 Entra ID / ADFS / 純 LDAP？ |
-| Workspace 存放 | 本機工作副本 + 日後以 Microsoft Graph 串接各使用者 OneDrive | 已選定方法二，僅記錄、尚未實作；見 [OneDrive Workspace 計畫](onedrive-workspace-plan.md)；待確認帳號類型、授權、同步與保存規則 |
+| Workspace 存放 | 本機工作副本 + 日後以 Microsoft Graph 串接各使用者 OneDrive | 已實作（[ADR-0013](../adr/0013-onedrive-connector.md) 同步、[ADR-0030](../adr/0030-plugin-marketplace-and-onedrive-agent-tools.md) 外掛市集與 Agent 工具）；見 [OneDrive Workspace 計畫](onedrive-workspace-plan.md)；真 Microsoft Graph 與正式環境驗收待使用者確認 |
 | 資料保存 | Conversation / Workspace 永久保留，可封存 | 公司資料保存與刪除政策 |
 
 ---
 
-## RAG 知識庫（後續開發）
+## RAG 知識庫（已實作）
 
 使用者於 2026-10-07 提出：提供文件後由平台建立向量索引並提供依文件問答；Embedding 使用共用獨立容器，預設每個專案一份 SQLite 向量資料庫，同專案不同任務共用，必要時可選獲授權的外部向量服務。
 
-文件匯入、索引更新、問答與引用、儲存轉接器、隔離、開發階段及驗收見 [RAG 知識庫後續開發計畫](rag-knowledge-base-plan.md)。**僅記錄，尚未實作**；模型／硬體、第一個外部 provider、知識庫分享與保存政策待確認。
+文件匯入、索引更新、問答與引用、儲存轉接器、隔離、開發階段及驗收見 [RAG 知識庫後續開發計畫](rag-knowledge-base-plan.md)。**已實作**（Sprint 6 R0～R2，[ADR-0014](../adr/0014-rag-knowledge-base.md)：每專案一份 SQLite、Embedding 經 LiteLLM、問答含引用與資料不足提示）；外部向量 provider、知識庫分享與保存政策仍待確認，維持私人知識庫。
 
-## 前端網站託管與分享（後續開發）
+## 前端網站託管與分享（已實作）
 
 使用者於 2026-10-07 提出：前端網站成果發布至獨立託管服務，提供穩定網址；可選公開、公司內部或指定使用者存取，發布後能管理分享名單。第一版分享限瀏覽，網站服務獨立於 Agent 容器生命週期。
 
-詳細流程、架構方向、介面需求、開發階段、驗收及待確認事項見 [前端網站託管、發布與分享開發計畫](frontend-site-hosting-plan.md)。**目前僅記錄計畫，尚未實作**；後端／資料庫／SSR 應用部署另列範圍。
+詳細流程、架構方向、介面需求、開發階段、驗收及待確認事項見 [前端網站託管、發布與分享開發計畫](frontend-site-hosting-plan.md)。**已實作**（Sprint 6 H0～H2，[ADR-0016](../adr/0016-site-hosting.md)，另有 [ADR-0029](../adr/0029-make-tools-sidebar.md) 左側小工具）：靜態網站發布、公開／所有 Ymir 使用者／指定使用者存取；真實 DNS／Tunnel 待使用者環境。後端／資料庫／SSR 應用部署仍另列範圍、未實作。
 
-## 多人、多 Agent 軟體專案協作（後續開發）
+## 多人、多 Agent 軟體專案協作（後續開發，唯一尚未實作）
 
 使用者於 2026-10-07 提出：提供類似 Jira 的 Sprint／Task 管理 UI 與 Agent 操作介面，由 SA Agent 制定模組契約與任務，開發 Agent 開工前讀取專案進度留言板、領任務與登記工作，交付後更新進度，再由 QA Agent 依需求與 SA 驗收。
 
 完整流程、權限、任務租約、文件基準、共享 Git 成果與隔離工作副本、UI／API／MCP、開發階段與驗收見 [多人、多 Agent 軟體專案協作開發計畫](multi-agent-project-collaboration-plan.md)。**僅記錄，尚未實作**；現有單一使用者專案與依序執行限制不變。實作前需新 ADR 決定團隊專案、跨人授權、同人多 Agent 並行及 runtime／repository 隔離，並銜接 ADR-0012 的 MCP Gateway。
 
-## 後台（系統設定）待辦功能
+## 後台（系統設定）功能（已實作）
 
-> 使用者於 2026-10-06 提出，**僅記錄、尚未實作**。目前這些值都放在部署主機的 `.env` 或 secret（見 `docs/guides/entra-id.md`、`docs/guides/cloudflare-tunnel.md`）。實作前要先寫新 ADR，因為兩項都會改變現有安全規則（ADR-0006、ADR-0009 與 CLAUDE.md 安全紅線）。
+> 使用者於 2026-10-06 提出，**已由 [ADR-0010](../adr/0010-admin-editable-system-settings.md) 實作**（管理 → 系統設定：Entra ID 與 Cloudflare Tunnel；下表保留原始需求與當時要決定的事）。目前這些值都放在部署主機的 `.env` 或 secret（見 `docs/guides/entra-id.md`、`docs/guides/cloudflare-tunnel.md`）。實作前要先寫新 ADR，因為兩項都會改變現有安全規則（ADR-0006、ADR-0009 與 CLAUDE.md 安全紅線）。
 
 | # | 功能 | 內容 | 實作前要決定的事 |
 |---|---|---|---|
