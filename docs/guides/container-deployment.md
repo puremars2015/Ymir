@@ -53,7 +53,7 @@
 
 目前 root 的 origin／production Tunnel Quadlet、retained-dependencies unit、正式 SQL 的原始建立規格，以及先前一次性 release 更新器，沒有完整的通用版控部署入口。`activate-linux-production.sh` 會操作部分既有主機配置，但不能憑空重建整台主機。
 
-因此現階段**不存在已完成的一鍵增量上版器**。下一步應將去機密的安裝規格、release manifest 與差異部署入口納入版控，再做重複執行／回復測試；這是待辦，不是本文件已實作的功能。禁止把主機 env 或一次性含密鑰的更新包直接提交 Git。
+[`deploy/redeploy-ubuntu.sh`](../../deploy/redeploy-ubuntu.sh)（2026-10-19）只涵蓋 API／RuntimeHost 與 migration 的增量上版，對應[安裝指南](ubuntu-install.md)的拓樸（`sudo bash deploy/redeploy-ubuntu.sh --dry-run` 先預覽），實機尚未驗收；它不處理 SQL／LiteLLM／nginx／Tunnel，也不取代下面流水帳的審查與備份流程。因此現階段**不存在涵蓋全部服務的一鍵增量上版器**。下一步應將去機密的安裝規格、release manifest 與差異部署入口納入版控，再做重複執行／回復測試；這是待辦，不是本文件已實作的功能。禁止把主機 env 或一次性含密鑰的更新包直接提交 Git。
 
 ## 3. 部署前：寫清楚這次要動什麼
 
