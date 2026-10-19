@@ -1,5 +1,7 @@
 # Ymir API container
 
+各 container 所需 script、首次安裝／日常更新順序及實際操作紀錄，見[部署操作索引](../../docs/guides/container-deployment.md)與[部署流水帳](../../docs/deployments/README.md)。
+
 架構決策見 [ADR-0008](../../docs/adr/0008-containerized-api-runtime-host.md)。Image 由 [`src/Ymir.Api/Containerfile`](../../src/Ymir.Api/Containerfile) 建置，內容是 API 加上 Angular build（同源，ADR-0002）。
 
 **用哪個 container engine 跑 API**（使用者決定）：
