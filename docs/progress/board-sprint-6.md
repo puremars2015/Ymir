@@ -88,6 +88,7 @@
 | B1 | 公司識別 favicon 超過約 6 KB 上傳回 500 | ✅ | `SystemSetting.ValueMaxLength` 放寬到 512K 字（欄位已是 nvarchar(max)），補 100 KB／256 KB 測試；見 #036 |
 | B2 | `OneDriveSyncTests` 撤銷授權測試偶發 409 | ✅ | 測試競態：執行後的背景上傳晚於撤銷才跑；改為先等上傳完成，產品程式未變；見 #036 |
 | D1 | ADR 編號重複與看板置頂區整理 | ✅ | 模型開放的 ADR 由 0016 改為 [ADR-0020](../adr/0020-admin-model-access.md)、補齊 ADR 索引；置頂區拆成原計畫／插單兩張表；見 #036 |
+| W12 | Ubuntu 一鍵增量重新部署 `deploy/redeploy-ubuntu.sh` | ✅ | 見 [#102](#102--ubuntu-一鍵增量重新部署-script)；語法與 migration 解析已驗證，**實機待使用者環境確認** |
 | W11 | Windows 本機 HTTPS 與聊天 runtime 恢復 | ✅ | 本機登入頁、假模型聊天／SSE 通過，啟動腳本不啟動 Tunnel；見 #035 |
 | G1 | 分支整合與 main／rebase 開發流程 | ✅ | 使用者 2026-10-12 改為直接在 main 開發；見 #034，取代 I1 的保留分支要求 |
 | I1 | main 與擴充能力整合 | ✅ | 已整合回 main；先前測試見 #028，2026-10-12 分支清理見 #034 |
@@ -127,6 +128,18 @@
 ---
 
 ## 💬 留言區
+
+### #102 · Ubuntu 一鍵增量重新部署 script
+
+> 👤 **Claude（AI）** · 🕒 2026-10-19 · `✅完成`
+
+- **需求**：使用者希望每次修改完只執行一支 script 就能重新部署到 Ubuntu。
+- **交付**：新增 [`deploy/redeploy-ubuntu.sh`](../../deploy/redeploy-ubuntu.sh)，對應 [Ubuntu 安裝指南](../guides/ubuntu-install.md) 的拓樸（rootful Podman API Quadlet + 主機 RuntimeHost），用法 `sudo bash deploy/redeploy-ubuntu.sh [--pull] [--test] [--with-agent-image] [--with-services] [--dry-run] …`。流程：同步程式（選用）→ 建置 API image（含 Angular）→ publish RuntimeHost 並與已安裝版本比對 → 取 `/run/ymir-lifecycle/deploy.lock` → 確認 Queued/Running 已排空 → 比對 EF history 與程式內 migration，**有待套用才**停 API、做 `COPY_ONLY, CHECKSUM` 備份並驗證、用指南的 SET 選項套兩個模組 → 只換 Quadlet 的 `Image=`（固定 image ID）與 RuntimeHost 目錄 → 驗證 health / providers / login / 容器確實用新 image。任一步失敗自動回復舊 Quadlet 與 RuntimeHost（additive migration 保留）。沒有任何差異時直接結束。
+- **刻意不做**：不建帳號與資料庫、不覆蓋 `/etc/ymir/*.env`、不碰 SQL / LiteLLM / nginx / Tunnel、不刪使用者資料；Agent image 只有加 `--with-agent-image` 才建，且不替換既有使用者 container。
+- **驗證**：`bash -n` 通過、`--help` 可輸出；在本沙箱實測 `dotnet ef migrations list --no-connect` 兩個模組的輸出可被腳本的正規式解析。**沒有**在 Ubuntu 實機跑過完整流程（沙箱沒有 rootful Podman Quadlet、SQL container 與 RuntimeHost），**待使用者環境確認**；建議第一次先跑 `--dry-run`。
+- **注意**：拓樸是安裝指南的版本。目前正式主機若是 `itadmin` 的 rootless SQL，需設 `YMIR_SQL_PODMAN_USER=itadmin`（可寫在 `/etc/ymir/redeploy.env`）；nginx 入口與 Tunnel 不在腳本範圍，重啟 API 期間會短暫 502/530。
+
+---
 
 ### #101 · Windows 11 Professional 測試機安裝總指南
 
