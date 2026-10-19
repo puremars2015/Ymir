@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| DOC3 | 各 container 部署 script 對照、流程及部署流水帳 | ✅ | 固定 7 個容器角色＋Agent／主機服務分列，首裝／更新／回復與版控缺口明確標註；98 本機連結及 Bash 範例語法通過，本次僅文件，見 #098 |
 | BOOT1 | 模型代理開機等待 bridge socket、持續退避重試 | 🔬 | 正式 drop-in 已安裝，active／開機 target／等待與退避設定讀回通過、API health 200；8 項測試通過，完整 reboot 待維護時段，見 #096、#097 |
 | DEP5 | 更新外掛市集與 OneDrive Agent 工具，安裝私有 MCP Gateway | 🚧 | 使用者明確同意一併安裝 Gateway；部署前修補 MessagePack 間接相依安全漏洞，1058 Release tests 通過；待固定產物／Gateway 隔離與備份切換，見 #093 |
 | DOC2 | 乾淨 Ubuntu 主機的正式安裝總指南 | ✅ | [Ubuntu 安裝總指南](../guides/ubuntu-install.md) 串接持久化資料庫／模型服務、rootless Agent、API、登入／Tunnel、驗收及更新回復；語法／連結／Quadlet 與 mock 檢查通過，未在乾淨 VM 實際安裝，見 #091 |
@@ -125,6 +126,17 @@
 ---
 
 ## 💬 留言區
+
+### #098 · 各 container 所需 script 與部署流程紀錄
+
+> 👤 **Claude（AI）** · 🕒 2026-10-19 · `✅文件`
+
+- **需求與交付**：使用者要求新增每個 container 的部署 script 與流程紀錄。`b4f8fd6` 新增[部署操作索引](../guides/container-deployment.md)，逐項記錄管理帳號、容器／unit 名稱、repo script／設定來源、主機安裝位置、觸發更新時機與資料保留；分列 7 個固定容器角色、動態 Agent 與非容器的主機服務。明確區分特定修復工具、首次安裝及日常更新，不宣稱已存在一鍵增量上版器。
+- **流程與紀錄**：整理差異計畫、備份／排空／部署鎖、兩模組 migration、精確換版、readiness／真對話驗收、局部回復與結案流程；新增[部署流水帳與範本](../deployments/README.md)，填入[10/19 模型代理恢復及開機修正](../deployments/2026-10-19-model-proxy-boot.md)的實際操作、安裝 exit code、備份與未驗證項目。README／API 指南加入入口。
+- **盤點結果**：root origin／production Tunnel Quadlet 與 retained-dependencies unit 等仍有主機專用、缺完整通用版控來源的項目；文件直接標出缺口，不虛構 script。唯讀 systemd 讀回目前 nginx 反向代理規格、依賴容器啟動方式及 RuntimeHost release `348b64c`；不推定 API 版本相同。前輪開機修正 `132f5c3` 的 CI [39196399120](https://github.com/puremars2015/Ymir/actions/runs/39196399120) 已 success，補記於流水帳，不改寫原歷史留言。
+- **驗證與範圍**：98 個本機 Markdown 連結目標存在，1 段新增 Bash 例子以 `bash -n` 通過（未執行）；`git diff --check` 通過。本次只有 Markdown，未跑 .NET／Angular 全套、未執行部署／migration／重啟／sudo 視窗、未更動主機配置或 secret；完整 reboot／真模型／還原仍待原訂驗收。提交後追蹤本次 main CI。
+
+---
 
 ### #097 · 開機競態修正正式套用
 
