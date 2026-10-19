@@ -127,6 +127,29 @@
 
 ## 💬 留言區
 
+### #100 · 啟動前的 runtime 準備命令合併成一次 exec
+
+> 👤 **Claude Code（AI）** · 🕒 2026-10-19 · `✅完成`
+
+- **背景**：回覆變慢的調查（#099 之前的討論）發現第一個字出現前要連續 5～8 次 `podman exec`（Remote 還要經 runtime host）：建立交付目錄、寫 models.json、讀使用者 MCP、用 `node -e` 寫設定檔、每份 system prompt 各一次。
+- **做法**：新增 `PiPrepareScript`（一支 `sh` 腳本，不再啟動 node）。路徑一律以參數傳入（Local runtime 只改寫參數裡的 runtime 路徑），內容以每個檔案一行 base64 經 stdin（不經程序參數）。`PiAgentHarness.PrepareRuntimeAsync` 取代原本四個步驟；`AgentRunRequest` 新增 `DeliveryDirectory`，`ExecutionRunner` 不再單獨呼叫 `PrepareDeliveryAsync`。
+  - 使用者 MCP 能力**關閉**：全部 1 次 exec（交付目錄、agent / session 目錄、MCP 遷移標記、所有設定檔與 system prompt）。
+  - 能力**開啟**：2 次（先讀回 `mcp.user.json` 才能合併出 `mcp.json`）。
+  - 保留的行為：先遷移再覆寫 `mcp.json`（否則會把產生的檔案複製成使用者設定）、寫暫存檔再 `mv` 取代（預先放的 symlink 被取代而不是被跟隨；新增 noclobber，也不會跟隨預先放的 `*.ymir-tmp` symlink）、交付目錄路徑有 symlink 時拒絕（退出碼 3，仍是 `Could not prepare delivery directory`）、models.json 雜湊沒變就不重寫。
+  - 修正一個合併後才會出現的問題：腳本提早結束時 stdin 會 Broken pipe，改為以退出碼說明原因；stdout（最多 256 KB 的 MCP 設定）與 stdin 同時進行，避免兩邊都超過 pipe 緩衝而互卡。
+- **驗證**：`dotnet build` 0 警告、`dotnet format --verify-no-changes` 通過；單元測試 724/724（新增 `PiPrepareScriptTests` 7 項，用真正的 `sh` 驗證寫檔內容含換行／引號／Unicode／空內容、大內容（500 KB）、symlink 拒絕、預先放置的 symlink 不被跟隨、MCP 遷移只做一次、讀取上限）；整合測試 343/343（含真實 Pi、Remote runtime host、成果交付、擴充能力；新增 `PreparationBeforePi_IsOneExec_OrTwoWhenUserMcpMustBeRead` 數 exec 次數，並確認第二次不再重寫 models.json）。
+- **未驗證**：沒有在正式主機（rootless Podman + runtime host）量實際省下的時間；預期省下 4～6 次 `podman exec`，粗估 0.5～2 秒，待部署後用實際回覆時間比對。`DeleteSystemPromptsAsync`（執行結束後的 `rm`）仍是獨立一次 exec，不在第一個字的路徑上，這次沒動。
+- **部署**：只改後端；正式站要重建 API image。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
 ### #099 · ADR-0031：以 LLM 自動路由選擇回覆模型（Auto）
 
 > 👤 **Claude Code（AI）** · 🕒 2026-10-19 · `📢公告`

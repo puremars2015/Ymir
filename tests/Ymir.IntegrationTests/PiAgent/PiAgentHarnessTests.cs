@@ -3,6 +3,7 @@ using Ymir.Testing.FakeLlm;
 using Ymir.VibeMaker.Application.Agents;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
+using Ymir.VibeMaker.Domain;
 using Ymir.VibeMaker.Infrastructure.PiAgent;
 using Ymir.VibeMaker.Infrastructure.Runtime;
 
@@ -158,5 +159,73 @@ public class PiAgentHarnessTests(PiHarnessFixture fixture) : IClassFixture<PiHar
 
         var failed = Assert.IsType<AgentFailed>(Assert.Single(events));
         Assert.Equal(ExecutionErrorCodes.AgentRuntimeError, failed.Code);
+    }
+
+    /// <summary>
+    /// 啟動前的準備（交付目錄、設定檔、system prompt）合併成一次 exec；只有使用者 MCP 能力開啟才需要先讀回 mcp.user.json（兩次）。
+    /// 這是第一個字出現前每次 <c>podman exec</c> 的固定成本，不要退回逐項執行。
+    /// </summary>
+    [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 2)]
+    public async Task PreparationBeforePi_IsOneExec_OrTwoWhenUserMcpMustBeRead(bool mcp, int expectedPrepareExecs)
+    {
+        SkipUnlessPiInstalled();
+        var ct = TestContext.Current.CancellationToken;
+        var userId = Guid.NewGuid();
+        var runtime = await fixture.RuntimeManager.EnsureRuntimeAsync(userId, ct);
+        var counting = new CountingRuntimeManager(fixture.RuntimeManager);
+        var harness = fixture.CreateHarness(runtimeManager: counting);
+        var request = PiHarnessFixture.Request(runtime.RuntimeId, Guid.NewGuid(), "hi", RuntimePaths.Workspace, systemPrompts: ["PROMPT-ONE", "PROMPT-TWO"]) with
+        {
+            Extensions = new(Skills: false, Mcp: mcp, Internet: true),
+            DeliveryDirectory = "deliverables/it-delivery",
+        };
+
+        var events = await RunAsync(harness, request, ct);
+
+        Assert.IsType<AgentCompleted>(events[^1]);
+        var beforePi = counting.Specs.TakeWhile(s => s.Executable != "pi").ToList();
+        Assert.All(beforePi, s => Assert.Equal("ymir-prepare", s.Arguments[2]));
+        Assert.Equal(expectedPrepareExecs, beforePi.Count);
+        Assert.Contains(counting.Specs, s => s.Executable == "pi");
+        var directories = UserDirectories.For(fixture.WorkspaceRoot, userId);
+        Assert.True(Directory.Exists(Path.Combine(directories.HostPathOf(RuntimePaths.Workspace), "deliverables", "it-delivery")));
+        Assert.True(File.Exists(Path.Combine(directories.AgentState, "pi-agent", "models.json")));
+
+        // 第二次：models.json 沒變，不再重寫（路徑少一個）。
+        var firstPrepare = beforePi[0].Arguments.Count;
+        counting.Specs.Clear();
+        await RunAsync(harness, request with { ExecutionId = Guid.NewGuid() }, ct);
+        Assert.Equal(firstPrepare - 1, counting.Specs.First(s => s.Executable != "pi").Arguments.Count);
+    }
+
+    private sealed class CountingRuntimeManager(IAgentRuntimeManager inner) : IAgentRuntimeManager
+    {
+        public List<RuntimeProcessSpec> Specs { get; } = [];
+
+        public Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, RuntimeNetworkAccess? network, CancellationToken cancellationToken) => inner.EnsureRuntimeAsync(userId, network, cancellationToken);
+
+        public Task StartAsync(Guid runtimeId, CancellationToken cancellationToken) => inner.StartAsync(runtimeId, cancellationToken);
+
+        public Task StopAsync(Guid runtimeId, CancellationToken cancellationToken) => inner.StopAsync(runtimeId, cancellationToken);
+
+        public Task DeleteAsync(Guid runtimeId, CancellationToken cancellationToken) => inner.DeleteAsync(runtimeId, cancellationToken);
+
+        public Task<RuntimeInfo> GetStatusAsync(Guid runtimeId, CancellationToken cancellationToken) => inner.GetStatusAsync(runtimeId, cancellationToken);
+
+        public Task<RuntimeStatus> GetStatusForUserAsync(Guid userId, CancellationToken cancellationToken) => inner.GetStatusForUserAsync(userId, cancellationToken);
+
+        public Task<bool> StopForUserAsync(Guid userId, CancellationToken cancellationToken) => inner.StopForUserAsync(userId, cancellationToken);
+
+        public Task<IRuntimeProcess> StartProcessAsync(Guid runtimeId, RuntimeProcessSpec spec, CancellationToken cancellationToken)
+        {
+            lock (Specs)
+            {
+                Specs.Add(spec);
+            }
+
+            return inner.StartProcessAsync(runtimeId, spec, cancellationToken);
+        }
     }
 }

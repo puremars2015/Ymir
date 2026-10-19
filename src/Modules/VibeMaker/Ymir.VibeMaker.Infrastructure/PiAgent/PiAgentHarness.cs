@@ -104,9 +104,7 @@ internal sealed class PiAgentHarness(
 
         try
         {
-            await EnsureConfigProvisionedAsync(request, cancellationToken).ConfigureAwait(false);
-            await WriteExtensionConfigAsync(request, cancellationToken).ConfigureAwait(false);
-            await WriteSystemPromptsAsync(request, cancellationToken).ConfigureAwait(false);
+            await PrepareRuntimeAsync(request, cancellationToken).ConfigureAwait(false);
 
             // 使用者的 LiteLLM virtual key（ADR-0004），由 ExecutionRunner 經 IModelGateway 取得；只以環境變數名稱傳入 runtime。
             process = await runtimeManager.StartProcessAsync(request.RuntimeId, BuildProcessSpec(request), cancellationToken)
@@ -241,36 +239,35 @@ internal sealed class PiAgentHarness(
     /// <summary>Pi RPC 的 ImageContent（<c>{"type":"image","data":base64,"mimeType":...}</c>）。</summary>
     internal sealed record PiImageContent(string Type, string Data, string MimeType);
 
-    /// <summary>把這次的 system prompt 寫成 runtime 內的檔案（與 models.json 相同，經 stdin 寫入，不經程序參數）。</summary>
-    private async Task WriteSystemPromptsAsync(AgentRunRequest request, CancellationToken cancellationToken)
-    {
-        for (var i = 0; i < request.SystemPrompts.Count; i++)
-        {
-            var spec = new RuntimeProcessSpec(
-                "sh",
-                ["-c", "mkdir -p \"$1\" && cat > \"$2\"", "ymir-prompt", PiRuntimeLayout.PromptDirectory, SystemPromptPath(request.ExecutionId, i)]);
-            var writerProcess = await runtimeManager.StartProcessAsync(request.RuntimeId, spec, cancellationToken).ConfigureAwait(false);
-            await using (writerProcess.ConfigureAwait(false))
-            {
-                await writerProcess.StandardInput.WriteAsync(Encoding.UTF8.GetBytes(request.SystemPrompts[i]), cancellationToken).ConfigureAwait(false);
-                writerProcess.CloseStandardInput();
-                var exitCode = await writerProcess.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-                if (exitCode != 0)
-                {
-                    throw new InvalidOperationException($"Writing system prompt failed with exit code {exitCode}: {writerProcess.GetStandardErrorTail()}");
-                }
-            }
-        }
-    }
-
     /// <summary>
-    /// 每次執行前重寫 Pi 的 <c>settings.json</c>、<c>trust.json</c>、<c>mcp.json</c> 與平台 skill（ADR-0012 A.3、B.3）。
-    /// Agent 在上一次執行改寫這些檔也不會延續；Pi 只在 session 啟動時讀取，執行中被改寫不影響這一次。
+    /// Agent 啟動前的準備：建立交付目錄、必要時寫 models.json、重寫 Pi 的 <c>settings.json</c> / <c>trust.json</c> / <c>mcp.json</c> 與平台 skill
+    /// （ADR-0012 A.3、B.3；Agent 在上一次執行改寫這些檔也不會延續，Pi 只在 session 啟動時讀取）、寫這次的 system prompt（經 stdin，不經程序參數）。
+    /// 原本是 5～8 次連續的 runtime exec，現在合併成一次（<see cref="PiPrepareScript"/>）；
+    /// 只有使用者的 MCP 能力開啟時，才需要先讀 <c>mcp.user.json</c> 再合併出 <c>mcp.json</c>，那時是兩次。
     /// </summary>
-    private async Task WriteExtensionConfigAsync(AgentRunRequest request, CancellationToken cancellationToken)
+    private async Task PrepareRuntimeAsync(AgentRunRequest request, CancellationToken cancellationToken)
     {
         var extensions = request.Extensions ?? EffectiveExtensions.None;
-        var userMcp = await ReadUserMcpConfigAsync(request.RuntimeId, cancellationToken).ConfigureAwait(false);
+
+        // models.json 只在內容變了才重寫（雜湊記在記憶體，API 重啟後第一次會重寫一次）。
+        var modelsJson = PiModelsConfig.Build(_options, models.Models, request.ThinkingLevel == "none" ? request.ModelId : null, request.ThinkingLevel is null ? request.ModelId : null);
+        var modelsHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(modelsJson)));
+        var writeModels = !(_provisionedConfigHashes.TryGetValue(request.RuntimeId, out var existing) && existing == modelsHash);
+
+        List<(string Path, string Content)> before = [];
+        if (writeModels)
+        {
+            before.Add(($"{PiRuntimeLayout.AgentDirectory}/models.json", modelsJson));
+        }
+
+        string? userMcp = null;
+        if (extensions.Mcp)
+        {
+            // 第一階段：建立交付目錄與 agent 目錄、遷移並讀取使用者自建的 MCP 設定（內容要合併進 mcp.json，所以必須先讀回來）。
+            userMcp = await RunPrepareAsync(request, request.DeliveryDirectory, initialize: true, PiExtensionConfig.MaxUserMcpBytes + 1, before, cancellationToken).ConfigureAwait(false);
+            before = [];
+        }
+
         var mcpJson = PiExtensionConfig.BuildMcpConfig(userMcp, extensions.Mcp, out var invalid, request.PlatformMcp?.Servers, extensions.Internet ? request.PersonalMcp : []);
         if (invalid)
         {
@@ -279,6 +276,7 @@ internal sealed class PiAgentHarness(
 
         List<(string Path, string Content)> files =
         [
+            .. before,
             (PiRuntimeLayout.SettingsPath, PiExtensionConfig.SettingsJson),
             (PiRuntimeLayout.TrustPath, PiExtensionConfig.TrustJson),
             (PiRuntimeLayout.McpConfigPath, mcpJson),
@@ -288,63 +286,64 @@ internal sealed class PiAgentHarness(
             files.Add(($"{PiRuntimeLayout.ExtensionBuilderSkillDirectory}/SKILL.md", PiExtensionConfig.BuildExtensionBuilderSkill(extensions)));
         }
 
-        // 以 runtime 內的 node（Pi 本身需要）一次寫入多個檔案。路徑只來自上面的常數、以參數傳入（Local runtime 會換成 host 路徑）；
-        // 內容經 stdin，不經程序參數（使用者的 MCP 設定可能含有憑證）。先寫暫存檔再 rename，Agent 預先放的 symlink 會被取代而不是被跟隨。
-        var spec = new RuntimeProcessSpec("node", ["-e", WriteFilesScript, .. files.Select(f => f.Path)]);
-        var writer = await runtimeManager.StartProcessAsync(request.RuntimeId, spec, cancellationToken).ConfigureAwait(false);
-        await using (writer.ConfigureAwait(false))
+        for (var i = 0; i < request.SystemPrompts.Count; i++)
         {
-            await writer.StandardInput.WriteAsync(JsonSerializer.SerializeToUtf8Bytes(files.Select(f => f.Content).ToList(), s_jsonOptions), cancellationToken)
-                .ConfigureAwait(false);
-            writer.CloseStandardInput();
-            var exitCode = await writer.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            if (exitCode != 0)
-            {
-                throw new InvalidOperationException($"Writing Pi extension config failed with exit code {exitCode}: {writer.GetStandardErrorTail()}");
-            }
+            files.Add((SystemPromptPath(request.ExecutionId, i), request.SystemPrompts[i]));
+        }
+
+        // 沒有第一階段時，這一次要一併做交付目錄與遷移；有第一階段時只寫檔。
+        await RunPrepareAsync(request, extensions.Mcp ? null : request.DeliveryDirectory, initialize: !extensions.Mcp, 0, files, cancellationToken).ConfigureAwait(false);
+
+        if (writeModels)
+        {
+            _provisionedConfigHashes[request.RuntimeId] = modelsHash;
         }
     }
 
-    private const string WriteFilesScript =
-        "const fs=require('fs'),path=require('path');let d='';process.stdin.setEncoding('utf8');" +
-        "process.stdin.on('data',c=>d+=c).on('end',()=>{const c=JSON.parse(d),p=process.argv.slice(1);" +
-        "if(c.length!==p.length)process.exit(2);p.forEach((f,i)=>{fs.mkdirSync(path.dirname(f),{recursive:true});" +
-        "const t=f+'.ymir-tmp';fs.writeFileSync(t,c[i]);fs.renameSync(t,f);});});";
-
-    /// <summary>
-    /// 讀取使用者自建的 MCP 設定。第一次執行時，把 Ymir 管理之前 Agent 寫的 <c>mcp.json</c> 複製成 <c>mcp.user.json</c>，
-    /// 之後 <c>mcp.json</c> 由 Ymir 產生（標記檔避免把產生的檔案又複製回去）。
-    /// </summary>
-    private async Task<string?> ReadUserMcpConfigAsync(Guid runtimeId, CancellationToken cancellationToken)
+    /// <summary>執行一次準備腳本；回傳使用者 MCP 設定內容（<paramref name="readUserMcpBytes"/> 為 0 時一律是 null；超過上限回傳 <c>&lt;too large&gt;</c> 讓呼叫端忽略）。</summary>
+    private async Task<string?> RunPrepareAsync(
+        AgentRunRequest request,
+        string? deliveryDirectory,
+        bool initialize,
+        int readUserMcpBytes,
+        IReadOnlyList<(string Path, string Content)> files,
+        CancellationToken cancellationToken)
     {
-        const string script =
-            "cd \"$1\" 2>/dev/null || exit 0\n" +
-            "if [ ! -e \"$2\" ] && [ -f mcp.json ] && [ ! -e .ymir-mcp-migrated ]; then cp mcp.json \"$2\"; fi\n" +
-            ": > .ymir-mcp-migrated\n" +
-            "if [ -f \"$2\" ]; then head -c \"$3\" \"$2\"; fi\n" +
-            "exit 0\n";
-        var spec = new RuntimeProcessSpec(
-            "sh",
-            ["-c", script, "ymir-read-mcp", PiRuntimeLayout.AgentDirectory, PiRuntimeLayout.UserMcpFileName, (PiExtensionConfig.MaxUserMcpBytes + 1).ToString(System.Globalization.CultureInfo.InvariantCulture)]);
-        var reader = await runtimeManager.StartProcessAsync(runtimeId, spec, cancellationToken).ConfigureAwait(false);
-        await using (reader.ConfigureAwait(false))
+        var spec = PiPrepareScript.BuildSpec(request.WorkingDirectory, deliveryDirectory, initialize, readUserMcpBytes, [.. files.Select(f => f.Path)]);
+        var process = await runtimeManager.StartProcessAsync(request.RuntimeId, spec, cancellationToken).ConfigureAwait(false);
+        await using (process.ConfigureAwait(false))
         {
-            reader.CloseStandardInput();
-            using var buffer = new MemoryStream();
-            await reader.StandardOutput.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
-            var exitCode = await reader.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            if (exitCode != 0)
+            // stdout（最多一個 MCP 設定檔）要和 stdin 同時進行：兩邊都可能超過 pipe 緩衝，只寫不讀會互相卡住。
+            using var output = new MemoryStream();
+            var reading = process.StandardOutput.CopyToAsync(output, cancellationToken);
+            try
             {
-                throw new InvalidOperationException($"Reading user MCP config failed with exit code {exitCode}: {reader.GetStandardErrorTail()}");
+                await process.StandardInput.WriteAsync(PiPrepareScript.EncodeContents([.. files.Select(f => f.Content)]), cancellationToken).ConfigureAwait(false);
+                process.CloseStandardInput();
+            }
+            catch (IOException)
+            {
+                // 腳本提早結束（例如交付目錄路徑上有 symlink）而不再讀 stdin：以退出碼說明原因，不要被 Broken pipe 蓋掉。
             }
 
-            if (buffer.Length == 0)
+            await reading.ConfigureAwait(false);
+            var exitCode = await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            if (exitCode == PiPrepareScript.DeliveryRejectedExitCode)
+            {
+                throw new IOException("Could not prepare delivery directory.");
+            }
+
+            if (exitCode != 0)
+            {
+                throw new InvalidOperationException($"Preparing the Pi runtime failed with exit code {exitCode}: {process.GetStandardErrorTail()}");
+            }
+
+            if (output.Length == 0)
             {
                 return null;
             }
 
-            // 超過上限時不解析，回傳無效內容讓呼叫端記錄並忽略。
-            return buffer.Length > PiExtensionConfig.MaxUserMcpBytes ? "<too large>" : Encoding.UTF8.GetString(buffer.ToArray());
+            return output.Length > PiExtensionConfig.MaxUserMcpBytes ? "<too large>" : Encoding.UTF8.GetString(output.GetBuffer(), 0, (int)output.Length);
         }
     }
 
@@ -397,35 +396,6 @@ internal sealed class PiAgentHarness(
                 // run 已結束。
             }
         }
-    }
-
-    private async Task EnsureConfigProvisionedAsync(AgentRunRequest request, CancellationToken cancellationToken)
-    {
-        var runtimeId = request.RuntimeId;
-        var modelsJson = PiModelsConfig.Build(_options, models.Models, request.ThinkingLevel == "none" ? request.ModelId : null, request.ThinkingLevel is null ? request.ModelId : null);
-        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(modelsJson)));
-        if (_provisionedConfigHashes.TryGetValue(runtimeId, out var existing) && existing == hash)
-        {
-            return;
-        }
-
-        // 透過 runtime 內的 shell 寫入設定，與 runtime provider（Local / Podman）無關。
-        var spec = new RuntimeProcessSpec(
-            "sh",
-            ["-c", "mkdir -p \"$1\" \"$2\" && cat > \"$1/models.json\"", "ymir-provision", PiRuntimeLayout.AgentDirectory, PiRuntimeLayout.SessionDirectory]);
-        var provision = await runtimeManager.StartProcessAsync(runtimeId, spec, cancellationToken).ConfigureAwait(false);
-        await using (provision.ConfigureAwait(false))
-        {
-            await provision.StandardInput.WriteAsync(Encoding.UTF8.GetBytes(modelsJson), cancellationToken).ConfigureAwait(false);
-            provision.CloseStandardInput();
-            var exitCode = await provision.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            if (exitCode != 0)
-            {
-                throw new InvalidOperationException($"Provisioning Pi config failed with exit code {exitCode}: {provision.GetStandardErrorTail()}");
-            }
-        }
-
-        _provisionedConfigHashes[runtimeId] = hash;
     }
 
     private static async Task SendCommandAsync(Stream stdin, SemaphoreSlim stdinLock, object command, CancellationToken cancellationToken)

@@ -45,9 +45,9 @@ public sealed class PiHarnessFixture : IAsyncLifetime
             new TestOutputLogger<LocalRuntimeManager>());
     }
 
-    public IAgentHarness CreateHarness(bool autoRetry = false) =>
+    public IAgentHarness CreateHarness(bool autoRetry = false, IAgentRuntimeManager? runtimeManager = null) =>
         new PiAgentHarness(
-            RuntimeManager,
+            runtimeManager ?? RuntimeManager,
             Options.Create(new PiAgentOptions
             {
                 ModelBaseUrl = FakeLlm.BaseUrl,

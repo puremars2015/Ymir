@@ -192,7 +192,6 @@ public sealed class ExecutionRunner(
         try
         {
             var workingDirectory = await GetWorkingDirectoryAsync(execution, stoppingToken).ConfigureAwait(false);
-            await PrepareDeliveryAsync(runtime.RuntimeId, execution.Id, workingDirectory, runToken).ConfigureAwait(false);
             oneDriveActive = extensions.OneDrive && await SyncFromOneDriveAsync(execution, runToken, stoppingToken).ConfigureAwait(false);
             var request = new AgentRunRequest(
                 executionId,
@@ -214,7 +213,9 @@ public sealed class ExecutionRunner(
                     policy.ExecutionTimeout,
                     extensions.OneDrive && !IsGroupRun(execution) && await plugins.IsOneDriveAgentEnabledAsync(execution.UserId, runToken).ConfigureAwait(false),
                     runToken).ConfigureAwait(false),
-                IsGroupRun(execution) ? [] : await personalMcp.PrepareRunAsync(execution.UserId, runToken).ConfigureAwait(false));
+                IsGroupRun(execution) ? [] : await personalMcp.PrepareRunAsync(execution.UserId, runToken).ConfigureAwait(false),
+                // 交付目錄由 harness 與其他啟動前準備合併成一次 runtime exec（建立目錄、拒絕 symlink 路徑）。
+                ArtifactService.DirectoryFor(execution.Id));
             await foreach (var agentEvent in harness.RunAsync(request, runToken).ConfigureAwait(false))
             {
                 if (agentEvent is AgentCompleted or AgentFailed or AgentCancelled)
@@ -228,7 +229,7 @@ public sealed class ExecutionRunner(
         }
         catch (OperationCanceledException) when (runToken.IsCancellationRequested && !stoppingToken.IsCancellationRequested)
         {
-            // Agent 啟動前的準備工作（例如建立交付目錄）期間逾時或被使用者取消：交給下方的逾時 / 取消處理，
+            // Agent 啟動前的準備工作（例如 OneDrive 同步）期間逾時或被使用者取消：交給下方的逾時 / 取消處理，
             // 不是執行環境錯誤（SA §13 AGENT_TIMEOUT）。harness 本身取消時不拋例外，不會走到這裡。
             terminal = new AgentCancelled(string.Empty);
         }
@@ -471,19 +472,6 @@ public sealed class ExecutionRunner(
 
         prompts.Add(ArtifactService.PromptFor(execution.Id));
         return prompts;
-    }
-
-    private async Task PrepareDeliveryAsync(Guid runtimeId, Guid executionId, string workingDirectory, CancellationToken ct)
-    {
-        var spec = new RuntimeProcessSpec("bash", ["-c", "for p in deliverables .ymir .ymir/tools .ymir/tmp \"$1\"; do [ ! -L \"$p\" ] || exit 3; done; mkdir -p -- \"$1\" .ymir/tools .ymir/tmp", "ymir-delivery", ArtifactService.DirectoryFor(executionId)], WorkingDirectory: workingDirectory);
-        var process = await runtimeManager.StartProcessAsync(runtimeId, spec, ct).ConfigureAwait(false);
-        await using (process.ConfigureAwait(false))
-        {
-            process.CloseStandardInput();
-            await process.StandardOutput.CopyToAsync(Stream.Null, ct).ConfigureAwait(false);
-            if (await process.WaitForExitAsync(ct).ConfigureAwait(false) != 0)
-                throw new IOException("Could not prepare delivery directory.");
-        }
     }
 
     /// <summary>SA §12：runtime 的建立與啟動寫入稽核（原本就在執行時不寫，避免每次 execution 都產生一筆）。</summary>

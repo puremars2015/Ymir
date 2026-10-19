@@ -7,6 +7,7 @@ namespace Ymir.VibeMaker.Application.Agents;
 /// <param name="SystemPrompts">依序附加在 Agent 預設 system prompt 之後的內容（個人 → 專案），可為空。</param>
 /// <param name="Extensions">這次允許的使用者擴充能力（ADR-0012 A.3）；null 視為全部關閉。</param>
 /// <param name="Attachments">使用者附加的檔案（已在工作目錄內）；harness 可把圖片直接附給支援視覺的模型。</param>
+/// <param name="DeliveryDirectory">成果交付目錄（相對於 <paramref name="WorkingDirectory"/>，SA 成果交付）；harness 必須在 Agent 啟動前確保它存在且路徑沒有 symlink。null 表示不需要。</param>
 /// <param name="PlatformMcp">這次可用的平台 MCP 服務與 gateway token（ADR-0012 B）；token 只以環境變數傳入，不得出現在程序參數、設定檔或 log。</param>
 public sealed record AgentRunRequest(
     Guid ExecutionId,
@@ -21,7 +22,8 @@ public sealed record AgentRunRequest(
     IReadOnlyList<AgentAttachment>? Attachments = null,
     string? ThinkingLevel = null,
     PlatformMcp.PlatformMcpGrant? PlatformMcp = null,
-    IReadOnlyList<Extensions.PersonalMcpGrant>? PersonalMcp = null)
+    IReadOnlyList<Extensions.PersonalMcpGrant>? PersonalMcp = null,
+    string? DeliveryDirectory = null)
 {
     public IReadOnlyList<AgentAttachment> Attachments { get; init; } = Attachments ?? [];
 
