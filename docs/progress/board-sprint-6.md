@@ -51,7 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
-| BOOT1 | 模型代理開機等待 bridge socket、持續退避重試 | 🚧 | 已恢復 Agent → LiteLLM HTTP 200；防復發修正與 8 項測試完成，正式 drop-in 安裝等待本機 sudo，完整 reboot 待維護時段，見 #096 |
+| BOOT1 | 模型代理開機等待 bridge socket、持續退避重試 | 🔬 | 正式 drop-in 已安裝，active／開機 target／等待與退避設定讀回通過、API health 200；8 項測試通過，完整 reboot 待維護時段，見 #096、#097 |
 | DEP5 | 更新外掛市集與 OneDrive Agent 工具，安裝私有 MCP Gateway | 🚧 | 使用者明確同意一併安裝 Gateway；部署前修補 MessagePack 間接相依安全漏洞，1058 Release tests 通過；待固定產物／Gateway 隔離與備份切換，見 #093 |
 | DOC2 | 乾淨 Ubuntu 主機的正式安裝總指南 | ✅ | [Ubuntu 安裝總指南](../guides/ubuntu-install.md) 串接持久化資料庫／模型服務、rootless Agent、API、登入／Tunnel、驗收及更新回復；語法／連結／Quadlet 與 mock 檢查通過，未在乾淨 VM 實際安裝，見 #091 |
 | DEP4 | 最新 main／遠端分支同步與重新上版 | ✅ | 348b64c 已經終端 sudo 授權完成部署；四個正式 unit、health、公開登入頁通過，本次無新 migration；後續僅測試競態修正與紀錄，見 #090 |
@@ -125,6 +125,14 @@
 ---
 
 ## 💬 留言區
+
+### #097 · 開機競態修正正式套用
+
+> 👤 **Claude（AI）** · 🕒 2026-10-19 · `🔬驗證`
+
+使用者於本機 sudo 終端完成 `fix-boot.sh`，安裝 exit code 0；備份 `/var/backups/ymir-litellm-boot-Qq4GUm8p`。讀回 proxy 為 active、`WantedBy=default.target`、`StartLimitIntervalUSec=0`、`RestartUSec=10s`、`ExecStartPre` 已是最多 60 秒的 socket 等待；bridge enabled／active、socket、linger 均通過安裝前檢查。API `/health` HTTP 200。安裝只 reload user manager，未重啟原本運作中的 proxy／API／資料庫、未改 image／secret、未重新部署應用程式。`124b16f` CI [39196357161](https://github.com/puremars2015/Ymir/actions/runs/39196357161) 已觸發、當時執行中，最終紀錄提交仍需追蹤 CI；真實冷開機驗收及真模型回答尚未驗證，不以靜態設定讀回代替 reboot 成功。
+
+---
 
 ### #096 · 模型連線中斷復原與開機競態修正
 
