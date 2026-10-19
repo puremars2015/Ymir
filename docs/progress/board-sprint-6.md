@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| DOC4 | Windows 11 Professional 測試機安裝總指南 | ✅ | Windows 原生 PowerShell 7＋Docker Desktop WSL 2／Linux containers；SQL 持久化、真 Pi＋Fake LLM、可選 Remote API、啟停／備份／回復；語法與 mock 驗證通過，未在 Windows 實機安裝，見 #101 |
 | DOC3 | 各 container 部署 script 對照、流程及部署流水帳 | ✅ | 固定 7 個容器角色＋Agent／主機服務分列，首裝／更新／回復與版控缺口明確標註；98 本機連結及 Bash 範例語法通過，本次僅文件，見 #098 |
 | BOOT1 | 模型代理開機等待 bridge socket、持續退避重試 | 🔬 | 正式 drop-in 已安裝，active／開機 target／等待與退避設定讀回通過、API health 200；8 項測試通過，完整 reboot 待維護時段，見 #096、#097 |
 | DEP5 | 更新外掛市集與 OneDrive Agent 工具，安裝私有 MCP Gateway | 🚧 | 使用者明確同意一併安裝 Gateway；部署前修補 MessagePack 間接相依安全漏洞，1058 Release tests 通過；待固定產物／Gateway 隔離與備份切換，見 #093 |
@@ -126,6 +127,17 @@
 ---
 
 ## 💬 留言區
+
+### #101 · Windows 11 Professional 測試機安裝總指南
+
+> 👤 **Claude（AI）** · 🕒 2026-10-19 · `✅文件`
+
+- **交付**：`a697635` 新增[Windows 11 Professional 測試機安裝總指南](../guides/windows-11-test-install.md)，README 與原 Windows Docker 短指南加入入口。以 x64 Windows、原生 PowerShell 7、Docker Desktop WSL 2／Linux containers 為範圍，不改 ADR-0005 的 Linux rootless Podman 正式邊界。
+- **內容**：從系統／虛擬化／工具安裝、固定版本來源、repo 外 DPAPI 測試設定、loopback SQL 與持久 volume、Agent build，到真 Pi＋Fake LLM／主機 API／Angular；另提供 API container＋Windows RuntimeHost 的二擇一路徑。記錄每段依賴、readiness、NTFS／防火牆注意、Development 禁止公開、真服務選用、日常啟停／重登入、成套備份與 migration／回復；不把現有 start-ymir.ps1 或 Ubuntu 修復工具冒充此新機安裝器。
+- **驗證**：於 Linux 暫存目錄使用官方 PowerShell 7.4.6 portable parser，19 段 PowerShell＋1 個內嵌 loader 語法通過；mock Import-Clixml／Set-Location 執行 loader，核對 Docker／Pi／image／測試 DB／Agent URL／Angular proxy／PublicEdge，不讀真憑證、不執行 Docker。42 個本機 Markdown 連結目標存在、SQL readiness 內嵌 Bash 經 `bash -n` 通過、`git diff --check` 通過。推送前 rebase 納入遠端 runtime 準備效能提交並保留 #100，自己的紀錄順延 #101；重跑文件語法／mock／連結檢查。
+- **限制**：只修改 Markdown，沒有安裝／啟動這份 Windows 測試環境、沒有更動正式服務／secret，也未重跑 .NET／Angular 全套。乾淨 Windows 11 Pro、WSL／Docker Desktop host forwarding、DPAPI、Windows 防火牆、NTFS 掛載、真 Pi SSE、冷開機及備份還原皆仍待實機驗收；文件明確標示不以語法／mock 通過代替安裝成功。推送後追蹤 main CI。
+
+---
 
 ### #100 · 啟動前的 runtime 準備命令合併成一次 exec
 
