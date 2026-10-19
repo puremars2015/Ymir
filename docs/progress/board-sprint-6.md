@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| DEP6 | 最新 main 8e47b6e／Pi 啟動準備加速正式部署 | 🚧 | 使用者同意一併完成私有 Gateway；固定 API／RuntimeHost／Gateway 產物、724 單元／29 部署檢查及隔離 SQL 通過，正式 sudo 切換結果待讀回，見 #102 |
 | DOC4 | Windows 11 Professional 測試機安裝總指南 | ✅ | Windows 原生 PowerShell 7＋Docker Desktop WSL 2／Linux containers；SQL 持久化、真 Pi＋Fake LLM、可選 Remote API、啟停／備份／回復；語法與 mock 驗證通過，未在 Windows 實機安裝，見 #101 |
 | DOC3 | 各 container 部署 script 對照、流程及部署流水帳 | ✅ | 固定 7 個容器角色＋Agent／主機服務分列，首裝／更新／回復與版控缺口明確標註；98 本機連結及 Bash 範例語法通過，本次僅文件，見 #098 |
 | BOOT1 | 模型代理開機等待 bridge socket、持續退避重試 | 🔬 | 正式 drop-in 已安裝，active／開機 target／等待與退避設定讀回通過、API health 200；8 項測試通過，完整 reboot 待維護時段，見 #096、#097 |
@@ -127,6 +128,18 @@
 ---
 
 ## 💬 留言區
+
+### #102 · 最新 main／Pi 啟動加速與私有 Gateway 部署準備
+
+> 👤 **Claude（AI）** · 🕒 2026-10-19 · `🚧進度`
+
+使用者要求重新 pull 並部署，另明確選擇一併安裝私有 MCP Gateway。乾淨 main 同步後固定來源 `8e47b6e`（包含 #100 的 runtime 準備 exec 合併、外掛市集及安全修補；auto router 仍只是 ADR 提案），來源 CI [39216450875](https://github.com/puremars2015/Ymir/actions/runs/39216450875) 全通過。正式 RuntimeHost 開始時仍為 348b64c，Gateway 尚未安裝；唯一待套 migration 是 UserPluginSettings。
+
+固定 SHA archive 產生乾淨來源快照，建置含 Angular 的 API image `f7bb10f2f4dcdc8dd5b206d304b18a1a2c62603c6831d0a71d945f27bcba4098`、self-contained RuntimeHost／Gateway；784 個 artifact 已 freeze／SHA-256。724 Release unit tests、14 deploy＋7 Gateway＋8 boot tests 通過；隔離 SQL 驗證完整 history 8／21、plugin migration 雙次套用與 Gateway audit-only effective permissions，結束只清理本次測試容器。EF 新產生的 migration SQL 與部署檔完全一致。未用正式 SQL 做測試，未呼叫付費模型／Graph。
+
+主機專用入口 `/home/itadmin/ymir-production-install/update-8e47b6e/authorize.sh` 已開本機 sudo 終端，正式結果仍待讀回。部署器先取雙鎖、排空、成套私有備份與驗證，再 additive migration／精確切換／Gateway 雙網路與授權拒絕驗證；新增 Gateway proxy 同樣有 socket 等待／10 秒退避，不重建 SQL／LiteLLM／所有 Agent，不替使用者開 OneDrive。詳細流程、產物、備份及驗收將追加於[部署流水帳](../deployments/2026-10-19-release-8e47b6e.md)；本留言只代表準備完成，不宣稱正式切換成功。
+
+---
 
 ### #101 · Windows 11 Professional 測試機安裝總指南
 
