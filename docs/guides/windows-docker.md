@@ -1,5 +1,7 @@
 # Windows + Docker Desktop 開發與驗證指南
 
+> 從全新 **Windows 11 Professional** 測試機開始，請優先依[Windows 11 測試機安裝總指南](windows-11-test-install.md)操作；該文包含持久化 SQL、私有設定、PowerShell 7、啟停／備份／更新及可選 API 容器路徑。本篇保留為既有開發短指南，不能把示例密碼／批次清理當新機安裝流程。
+
 正式環境的 Agent runtime 是 Rootless Podman；沒有 Linux 主機時，可以在 Windows 上用 Docker Desktop 跑完整流程
 （API → Docker container 內的 Pi → 模型）。背景與限制見 [ADR-0005](../adr/0005-docker-for-development.md)。
 
