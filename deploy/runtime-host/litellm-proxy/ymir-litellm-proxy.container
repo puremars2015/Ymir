@@ -4,6 +4,8 @@
 # nginx 設定複製到 /home/ymir/.config/ymir/litellm-nginx.conf，然後以 ymir 帳號 systemctl --user daemon-reload && systemctl --user start ymir-litellm-proxy
 [Unit]
 Description=Agent-network proxy to LiteLLM only
+# system service 與 user service 無法用 After= 互相排序；等待 socket 並持續退避重試。
+StartLimitIntervalSec=0
 
 [Container]
 # 必改：已在 ymir 帳號拉取的 nginx 映像（建議以 image ID 固定），映像內需有 /usr/sbin/nginx
@@ -25,7 +27,10 @@ Entrypoint=/usr/sbin/nginx
 Exec=-g "daemon off;"
 
 [Service]
+ExecStartPre=/usr/bin/timeout 60 /bin/sh -c 'until test -S /run/ymir-litellm/litellm.sock; do sleep 1; done'
+TimeoutStartSec=90
 Restart=on-failure
+RestartSec=10
 
 [Install]
 WantedBy=default.target

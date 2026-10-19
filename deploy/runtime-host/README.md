@@ -168,6 +168,20 @@ Agent ─http://litellm:4000─> ymir-litellm-proxy（nginx，ymir 帳號，接 
    ```
 3. API 的 `VibeMaker__Pi__ModelBaseUrl=http://litellm:4000/v1`（同上方第 3 步）。
 
+**開機競態防護**：bridge 是 system service，proxy 是 `ymir` 的 user service；兩者的 `After=` 不會跨 systemd manager 排序。2026-10-17 曾因 proxy 先啟動、`/run/ymir-litellm` 尚未建立而連續失敗五次，之後永久停在 failed；API 的模型請求只回 `Connection error`。
+
+新版 Quadlet 在建立容器前等待 socket（每輪最多 60 秒），失敗每 10 秒重試、不受快速失敗次數上限阻斷。這只代表 bridge socket 已存在，不代表上游模型已就緒；LiteLLM 與真模型仍需另做健康檢查。不要用 user service 的 `After=ymir-litellm-bridge.service` 假裝建立跨 manager 依賴。
+
+既有主機以 drop-in 修正，**不覆蓋目前的 image、網路、nginx 或 secret，不重啟正在運作的容器**：
+
+```bash
+sudo bash deploy/runtime-host/litellm-proxy/fix-boot.sh
+```
+
+腳本要求既有 bridge enabled／active、socket 存在及 `ymir` linger=yes；先備份同名 drop-in 到 `/var/backups/ymir-litellm-boot-*`，再 reload user manager 並確保 proxy 已啟動。失敗時保留備份與錯誤供診斷，不自動停止現有服務。回復時只還原該次備份的 `90-boot-readiness.conf`（若 `previously-absent` 則僅移除這個新增檔），再以 `ymir` 執行 `systemctl --user daemon-reload`；不需要覆寫 Quadlet 或重啟 API。
+
+驗證：`python3 deploy/runtime-host/litellm-proxy/test-boot.py`；正式主機需再從現存 Agent 呼叫 `http://litellm:4000/health/liveliness`。完整重新開機驗收應安排維護時段，不由修復腳本自動 reboot。
+
 **`client_max_body_size` 必須保留**：Agent 每次呼叫模型都送出完整對話歷史（含 base64 圖片），nginx 預設上限只有 1 MB。沒有這行時，對話一超過 1 MB 就**每則都失敗**，使用者只看到「模型發生錯誤，請稍後再試」，API log 為 `ended with model error: 413 <html>…Request Entity Too Large…nginx`，而 LiteLLM 的 log 沒有對應的請求（2026-10-14 正式主機實際發生）。設定 `100m`：附件單檔上限 50 MB，base64 後約 1.33 倍。
 
 既有主機補上設定（先備份）。設定檔是以**單一檔案** bind mount 進 container，`sed -i` 會換成新檔案（新 inode），container 內仍看到舊檔，`nginx -s reload` **不會生效**；必須重啟 container（模型呼叫中斷數秒），並確認 container 內的設定：
