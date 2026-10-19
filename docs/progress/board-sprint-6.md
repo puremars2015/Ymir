@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-17 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-19 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| BOOT1 | 模型代理開機等待 bridge socket、持續退避重試 | 🚧 | 已恢復 Agent → LiteLLM HTTP 200；防復發修正與 8 項測試完成，正式 drop-in 安裝等待本機 sudo，完整 reboot 待維護時段，見 #096 |
 | DEP5 | 更新外掛市集與 OneDrive Agent 工具，安裝私有 MCP Gateway | 🚧 | 使用者明確同意一併安裝 Gateway；部署前修補 MessagePack 間接相依安全漏洞，1058 Release tests 通過；待固定產物／Gateway 隔離與備份切換，見 #093 |
 | DOC2 | 乾淨 Ubuntu 主機的正式安裝總指南 | ✅ | [Ubuntu 安裝總指南](../guides/ubuntu-install.md) 串接持久化資料庫／模型服務、rootless Agent、API、登入／Tunnel、驗收及更新回復；語法／連結／Quadlet 與 mock 檢查通過，未在乾淨 VM 實際安裝，見 #091 |
 | DEP4 | 最新 main／遠端分支同步與重新上版 | ✅ | 348b64c 已經終端 sudo 授權完成部署；四個正式 unit、health、公開登入頁通過，本次無新 migration；後續僅測試競態修正與紀錄，見 #090 |
@@ -124,6 +125,17 @@
 ---
 
 ## 💬 留言區
+
+### #096 · 模型連線中斷復原與開機競態修正
+
+> 👤 **Claude（AI）** · 🕒 2026-10-19 · `🚧進度`
+
+- **實機根因**：10/19 三次對話在 Pi 結束時記錄 `Connection error`，LiteLLM liveliness HTTP 200、沒有對應模型請求。經使用者在本機終端輸入 sudo 密碼，查到 `ymir` 的 proxy 在 10/17 開機時因 `/run/ymir-litellm` 尚未建立而失敗五次並觸發 start limit；system bridge 稍後才啟動。已單獨 start proxy，Agent 內存取模型 liveliness HTTP 200；未重啟 API／資料庫，真模型回答仍待使用者重送確認。
+- **修正**：`20d86ae` 在 Quadlet 與既有主機 drop-in 加入 socket 等待（60 秒）、10 秒退避與不限次重試，避免 system／user manager 無法透過 `After=` 排序的競態。installer 檢查 linger、bridge enabled／active，先備份，再 reload user manager 並 start（已在執行時不重啟）；不覆蓋 image／network／secret、不重建其他容器。已開啟本機 sudo 安裝視窗，正式安裝結果尚待讀回；沒有自動 reboot。
+- **驗證**：`python3 deploy/runtime-host/litellm-proxy/test-boot.py` 8 項通過（目錄缺失、普通檔案拒絕、socket 就緒、延遲就緒、逾時後恢復、範本／drop-in 一致、重試政策、Bash 語法）；Podman Quadlet `--user --dryrun` 保留等待與重試參數；`git diff --check` 通過。CI 加入此測試；本次沒有改應用程式，未重跑 .NET／Angular 本機全套。冷開機端到端驗收未執行，需另排維護時段。
+- **部署簡化建議（非架構變更）**：目前先維持單機 Podman／systemd，將基礎服務、應用服務、每人 Agent 分層及增量更新，以統一入口執行差異計畫／migration gate／備份／更新／健康檢查／局部回復；不因一般平台更新重建 DB、模型代理或所有 Agent。k8s 不會自動解決資料遷移與隔離設計；多節點／高可用需求成立後再以新 ADR 評估。本輪未實作部署平台重構或安裝 k8s。
+
+---
 
 ### #095 · 開發計畫文件對齊現況、未完成項目盤點
 
