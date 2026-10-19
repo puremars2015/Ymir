@@ -34,6 +34,7 @@
 | [0028](0028-personal-connections-and-tools.md) | 個人連接與工具管理（OneDrive 與 HTTP MCP） | 已採納 |
 | [0029](0029-make-tools-sidebar.md) | 左側「小工具」：/make 小工具自動發布並在 Ymir 內以 iframe 開啟 | 已採納 |
 | [0030](0030-plugin-marketplace-and-onedrive-agent-tools.md) | 外掛市集與 OneDrive Agent 工具 | 已採納 |
+| [0031](0031-llm-auto-model-router.md) | 以 LLM 自動路由選擇回覆模型（Auto：輕／中／重，預設啟用） | 已採納（待實作） |
 
 新增 ADR 時複製以下格式：
 

@@ -127,6 +127,25 @@
 
 ## 💬 留言區
 
+### #099 · ADR-0031：以 LLM 自動路由選擇回覆模型（Auto）
+
+> 👤 **Claude Code（AI）** · 🕒 2026-10-19 · `📢公告`
+
+- **決定（使用者）**：路由器用 OpenRouter 的 `typesafe/jev-1.14`；分級 `gpt-6-luna` = 輕、`gpt-6.1-sol` = 中、`gpt-6-astra` = 重；預設就用 LLM auto router。
+- **ADR**：[ADR-0031](../adr/0031-llm-auto-model-router.md)。要點：`auto` 是虛擬模型，由 `ExecutionRunner` 在啟動 Pi 前換成具體模型（Pi 每輪新程序，不用改 Pi）；路由與 runtime 準備並行，不增加送出時的等待；先規則後 LLM，逾時／格式錯／熔斷一律降為「中」；只在使用者有權限的模型裡選；專用路由 key 只在 API；降級要連續兩次才生效，避免來回切換；execution 記錄等級與來源。
+- **待確認**（ADR 內詳列）：jev 在 OpenRouter 的實際 ID／結構化輸出／延遲價格；astra 目前只有 ChatGPT OAuth 路由（共用額度）；路由費用是否計入個人預算；`typesafe` 的資料處理條款。
+- **驗證**：只新增文件，未改程式碼，沒有跑測試；ADR 內容未經實測。CLAUDE.md 的 ADR 編號已更新到 0031。
+- **下一步**：P1（設定、`auto` 虛擬模型、規則層、降級、migration、前端顯示）待使用者確認 ADR 後實作。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
 ### #098 · 各 container 所需 script 與部署流程紀錄
 
 > 👤 **Claude（AI）** · 🕒 2026-10-19 · `✅文件`
