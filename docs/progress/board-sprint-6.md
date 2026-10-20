@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-19 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-20 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -51,7 +51,8 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
-| DEP6 | 最新 main 8e47b6e／Pi 啟動準備加速正式部署 | 🚧 | 使用者同意一併完成私有 Gateway；固定 API／RuntimeHost／Gateway 產物、724 單元／29 部署檢查及隔離 SQL 通過，正式 sudo 切換結果待讀回，見 #102 |
+| DEP7 | 這台 Ubuntu 的單一手動重新部署入口與安全回復 | 🔬 | 補強既有 redeploy-ubuntu.sh，不重複新增入口；38 項隔離回歸＋8 開機測試通過，腳本／文件已納入版控，未執行新正式部署，見 #104 |
+| DEP6 | 最新 main 8e47b6e／Pi 啟動準備加速正式部署 | ⛔ | 10/20 讀回 sudo 等候逾時、exit 1，正式切換未執行；產物與原驗證保留，Gateway 仍未安裝，改交付手動入口，見 #102、#104 |
 | DOC4 | Windows 11 Professional 測試機安裝總指南 | ✅ | Windows 原生 PowerShell 7＋Docker Desktop WSL 2／Linux containers；SQL 持久化、真 Pi＋Fake LLM、可選 Remote API、啟停／備份／回復；語法與 mock 驗證通過，未在 Windows 實機安裝，見 #101 |
 | DOC3 | 各 container 部署 script 對照、流程及部署流水帳 | ✅ | 固定 7 個容器角色＋Agent／主機服務分列，首裝／更新／回復與版控缺口明確標註；98 本機連結及 Bash 範例語法通過，本次僅文件，見 #098 |
 | BOOT1 | 模型代理開機等待 bridge socket、持續退避重試 | 🔬 | 正式 drop-in 已安裝，active／開機 target／等待與退避設定讀回通過、API health 200；8 項測試通過，完整 reboot 待維護時段，見 #096、#097 |
@@ -129,6 +130,18 @@
 ---
 
 ## 💬 留言區
+
+### #104 · 單一重新部署入口符合現有 Ubuntu 主機並補強安全驗證
+
+> 👤 **Claude（AI）** · 🕒 2026-10-20 · `🔬驗證`
+
+- **需求／同步**：使用者要求一個 script 手動完整重新部署這台 Ubuntu。先在乾淨 main fetch／rebase 取得 `1f19ad7` 已新增的 `deploy/redeploy-ubuntu.sh`，不另建重複入口；`39c7c62` 保留單一可執行 shell 檔（內嵌 Python 標準函式庫），修正為目前 itadmin SQL store、實際 RuntimeHost／選定已安裝服務的 release 路徑。沒有建立額外 worktree、分支或 PR。
+- **安全補強**：拒絕 dirty／非 main；Git／MSBuild 以一般使用者執行，SHA archive 固定來源、來源 CI 必須 success；read-only dry-run 不 fetch／寫目錄／改 root Git config。雙部署鎖涵蓋建置與切換，建置期間配置變更會停止；不論是否有 migration 都做 SQL COPY_ONLY／CHECKSUM／VERIFYONLY／container 外 checksum 與私有檔案備份；history 前綴／critical schema／排空查詢失敗都 fail closed，pending migration 須明確批准 additive 相容性。改以新 release＋drop-in 切換，不覆蓋運作中的 DLL；模型／Gateway 只做無憑證 liveliness 探針，不呼叫付費模型／Graph。
+- **保留與回復**：移除強制中斷、略過備份及自動刪 image／舊備份的行為；不重建 SQL／LiteLLM／PostgreSQL 或所有 Agent，不覆寫任何 secret，不自動安裝缺少的 Gateway。一般換版失敗回復原 image／drop-in／active 服務；migration 未完整成功則保持 API／入口關閉並記錄需人工處理，不冒險重新公開舊程式。新增[操作說明](../guides/ubuntu-redeploy.md)，README／API／部署索引加入入口；首次安裝仍依原指南。
+- **實際驗證**：`python3 deploy/test-redeploy-ubuntu.py` 38 項通過（解析／dry-run／schema 前綴／排空失敗／每次備份／partial migration／回復與回復失敗／秘密遮蔽／CI pin／來源 archive／雙網路探針／socket 服務啟動次序等），全部使用暫時檔與 mock、不需 sudo／正式 container／DB／網路。模型 proxy 8 項 boot tests 通過、shell 語法／內嵌 Python compile 通過；106 個本機文件連結、15 段 Bash 範例語法與 `git diff --check` 通過；CI 新增部署器回歸測試。未改應用程式，未額外跑本機 .NET／Angular 全套。
+- **正式現況／未驗證**：前輪 `/home/itadmin/ymir-production-install/update-8e47b6e/deployment-console.log` 為 `sudo: timed out`、`DEPLOY_EXIT_CODE=1`；10/20 唯讀 systemd 確認 API／RuntimeHost active、RuntimeHost 仍 348b64c、Gateway 未安裝，已更正部署流水帳狀態。本輪只交付腳本及隔離測試，**沒有**新 sudo 視窗／正式 deploy／migration／重啟／資料變更；root 端到端部署、真 SSO／Pi SSE／Graph、reboot／資料還原仍需人工授權及驗收。推送後追蹤 main CI。
+
+---
 
 ### #103 · Ubuntu 一鍵增量重新部署 script
 
