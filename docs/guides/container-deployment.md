@@ -38,6 +38,8 @@
 
 ### 特定用途腳本：不是每次部署都要跑
 
+日常手動重新部署的單一入口為 [`deploy/redeploy-ubuntu.sh`](../../deploy/redeploy-ubuntu.sh)，詳細用法、保留範圍與回復限制見[這台 Ubuntu 重新部署說明](ubuntu-redeploy.md)。下列修復工具不需跟著它逐支執行。
+
 | Script | 只在何時使用 | 影響／限制 |
 |---|---|---|
 | [activate-linux-production.sh](../../deploy/api/activate-linux-production.sh) | 修復既有 Ubuntu 正式入口 | 會切換／啟動 API、nginx、Tunnel；不建置新版、不套 migration；不是首次安裝器 |
@@ -53,7 +55,7 @@
 
 目前 root 的 origin／production Tunnel Quadlet、retained-dependencies unit、正式 SQL 的原始建立規格，以及先前一次性 release 更新器，沒有完整的通用版控部署入口。`activate-linux-production.sh` 會操作部分既有主機配置，但不能憑空重建整台主機。
 
-[`deploy/redeploy-ubuntu.sh`](../../deploy/redeploy-ubuntu.sh)（2026-10-19）只涵蓋 API／RuntimeHost 與 migration 的增量上版，對應[安裝指南](ubuntu-install.md)的拓樸（`sudo bash deploy/redeploy-ubuntu.sh --dry-run` 先預覽），實機尚未驗收；它不處理 SQL／LiteLLM／nginx／Tunnel，也不取代下面流水帳的審查與備份流程。因此現階段**不存在涵蓋全部服務的一鍵增量上版器**。下一步應將去機密的安裝規格、release manifest 與差異部署入口納入版控，再做重複執行／回復測試；這是待辦，不是本文件已實作的功能。禁止把主機 env 或一次性含密鑰的更新包直接提交 Git。
+[`deploy/redeploy-ubuntu.sh`](../../deploy/redeploy-ubuntu.sh) 已於 2026-10-20 補強為這台主機的單一重新部署入口：API／Angular、實際 release 路徑的 RuntimeHost、可選已安裝主機服務、SQL 成套備份與受審查 migration、精確切換與失敗回復。先 `sudo bash deploy/redeploy-ubuntu.sh --dry-run`，再依[操作說明](ubuntu-redeploy.md)執行；本輪僅語法／隔離 mock 驗證，尚未用新腳本正式切換。基礎容器與既有 Agent 不重建，nginx／Tunnel 只依原狀暫停／恢復，**不是清空整台主機或自動首次安裝所有服務的工具**。上列主機專用配置的去機密來源、缺少服務的安裝與 Agent 個別換版仍是獨立工作；禁止把含密鑰設定／一次性更新包直接提交 Git。
 
 ## 3. 部署前：寫清楚這次要動什麼
 

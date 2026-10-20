@@ -2,6 +2,8 @@
 
 各 container 所需 script、首次安裝／日常更新順序及實際操作紀錄，見[部署操作索引](../../docs/guides/container-deployment.md)與[部署流水帳](../../docs/deployments/README.md)。
 
+這台既有 Ubuntu 可使用單一入口 [`deploy/redeploy-ubuntu.sh`](../redeploy-ubuntu.sh)，先 `--dry-run` 再依[操作說明](../../docs/guides/ubuntu-redeploy.md)重新建置／備份／切換；不是首次安裝或資料重置工具。
+
 架構決策見 [ADR-0008](../../docs/adr/0008-containerized-api-runtime-host.md)。Image 由 [`src/Ymir.Api/Containerfile`](../../src/Ymir.Api/Containerfile) 建置，內容是 API 加上 Angular build（同源，ADR-0002）。
 
 **用哪個 container engine 跑 API**（使用者決定）：

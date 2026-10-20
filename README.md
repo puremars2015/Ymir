@@ -60,6 +60,7 @@ Pi 整合、測試指令與環境設定詳見 [開發規則](CLAUDE.md)。本機
 | Ubuntu 從零安裝／驗收／更新與回復 | [安裝總指南](docs/guides/ubuntu-install.md) |
 | Windows 11 Professional 測試機從零安裝 | [測試機安裝總指南](docs/guides/windows-11-test-install.md) |
 | 每個 container 所需 script／部署順序 | [部署操作索引](docs/guides/container-deployment.md) · [部署流水帳](docs/deployments/README.md) |
+| 這台 Ubuntu 手動單一入口重新部署 | [操作說明](docs/guides/ubuntu-redeploy.md) · [redeploy-ubuntu.sh](deploy/redeploy-ubuntu.sh) |
 | 需求與 API／事件契約 | [系統分析](docs/sa/vibe-maker-core-mvp-sa.md) |
 | 架構決策 | [ADR 索引](docs/adr/README.md) |
 | 開發與驗證規則 | [CLAUDE.md](CLAUDE.md) |

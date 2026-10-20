@@ -1,426 +1,655 @@
 #!/usr/bin/env bash
-# Ubuntu 正式主機的「一鍵增量重新部署」：修改程式後在 repo 執行即可。
-# 拓樸：docs/guides/ubuntu-install.md（rootful Podman API Quadlet + 主機 RuntimeHost）。
-# 前提：已依該指南完成首次安裝；本 script 不建帳號、不建資料庫、不覆蓋 /etc/ymir 內任何 secret。
-#
-#   sudo bash deploy/redeploy-ubuntu.sh [選項]
-#
-# 流程：同步程式 → 建置 API image（含 Angular）→ publish RuntimeHost →
-#       取部署鎖 → 檢查執行中工作 → 有待套 migration 才備份並套用 →
-#       切換 API image / RuntimeHost → health 驗證 → 失敗自動回復舊版。
+# 單一入口；Python 僅使用標準函式庫，不依賴主機上的一次性 update-* 安裝包。
+# 既有 Ubuntu 正式部署的安全重新建置／切換，不是清空資料的首次安裝器。
 set -Eeuo pipefail
-
-usage() {
-    cat <<'HELP'
-用法：sudo bash deploy/redeploy-ubuntu.sh [選項]
-
-  --pull             先 git fetch 並 fast-forward 目前分支（預設只部署工作目錄現況）
-  --ref <ref>        改為 checkout 指定 commit / tag（detached），隱含 --pull 的 fetch
-  --test             建置前先跑單元測試（dotnet test --project tests/Ymir.UnitTests）
-  --skip-migrate     不處理資料庫 migration
-  --skip-backup      有 migration 時也不先做 SQL 備份（不建議）
-  --skip-runtime-host  不更新 RuntimeHost
-  --with-agent-image 重建 Agent runtime image（只有 runtime/agent 變動才需要）
-  --with-services    一併更新已安裝的 MCP Gateway / SiteHost / MaintenanceHost
-  --force            即使有 Queued / Running 的 Agent 工作也繼續（會中斷它們）
-  --wait-idle <秒>   有執行中工作時最多等待這麼久，逾時才中止（預設 0 = 不等）
-  --dry-run          只列出將執行的動作與待套 migration，不做任何變更
-  -h, --help         顯示說明
-
-環境變數（也可寫在 /etc/ymir/redeploy.env，內容為 KEY=VALUE 的 shell 語法）：
-  YMIR_API_URL          API 本機位址（預設 http://127.0.0.1:5080）
-  YMIR_SQL_CONTAINER    SQL Server container 名稱（預設 ymir-sql）
-  YMIR_SQL_PODMAN_USER  SQL container 在哪個帳號的 rootless Podman（預設空 = root）
-  YMIR_AGENT_IMAGE      Agent image tag（預設 localhost/ymir/agent-runtime:1.0.0）
-  YMIR_PI_VERSION       Agent image 的 Pi 版本（預設 1.0.0）
-  YMIR_BACKUP_DIR       SQL 備份在 container 內的目錄（預設 /var/opt/mssql/backup）
-  YMIR_STATE_DIR        部署紀錄與備份（預設 /var/lib/ymir-deploy）
-  YMIR_KEEP_RELEASES    保留幾份舊的 API image / 發佈目錄（預設 5）
-  YMIR_HEALTH_TIMEOUT   health 等待秒數（預設 120）
-
-不會做的事：重建 SQL / LiteLLM / nginx / Tunnel、改動 /etc/ymir/*.env、刪除使用者資料。
-HELP
-}
-
-# ---------- 參數 ----------
-DO_PULL=0 REF='' DO_TEST=0 DO_MIGRATE=1 DO_BACKUP=1 DO_RUNTIME_HOST=1
-DO_AGENT_IMAGE=0 DO_SERVICES=0 FORCE=0 WAIT_IDLE=0 DRY_RUN=0
-while (( $# )); do
-    case $1 in
-        --pull) DO_PULL=1 ;;
-        --ref) [[ $# -ge 2 ]] || { echo '--ref 需要參數' >&2; exit 2; }; REF=$2; DO_PULL=1; shift ;;
-        --test) DO_TEST=1 ;;
-        --skip-migrate) DO_MIGRATE=0 ;;
-        --skip-backup) DO_BACKUP=0 ;;
-        --skip-runtime-host) DO_RUNTIME_HOST=0 ;;
-        --with-agent-image) DO_AGENT_IMAGE=1 ;;
-        --with-services) DO_SERVICES=1 ;;
-        --force) FORCE=1 ;;
-        --wait-idle) [[ ${2:-} =~ ^[0-9]+$ ]] || { echo '--wait-idle 需要秒數' >&2; exit 2; }; WAIT_IDLE=$2; shift ;;
-        --dry-run) DRY_RUN=1 ;;
-        -h|--help) usage; exit 0 ;;
-        *) echo "不支援的參數：$1（--help 看說明）" >&2; exit 2 ;;
-    esac
-    shift
-done
-
-# ---------- 設定 ----------
-[[ -r /etc/ymir/redeploy.env ]] && . /etc/ymir/redeploy.env
-API_URL=${YMIR_API_URL:-http://127.0.0.1:5080}
-SQL_CONTAINER=${YMIR_SQL_CONTAINER:-ymir-sql}
-SQL_PODMAN_USER=${YMIR_SQL_PODMAN_USER:-}
-AGENT_IMAGE=${YMIR_AGENT_IMAGE:-localhost/ymir/agent-runtime:1.0.0}
-PI_VERSION=${YMIR_PI_VERSION:-1.0.0}
-BACKUP_DIR=${YMIR_BACKUP_DIR:-/var/opt/mssql/backup}
-STATE_DIR=${YMIR_STATE_DIR:-/var/lib/ymir-deploy}
-KEEP=${YMIR_KEEP_RELEASES:-5}
-HEALTH_TIMEOUT=${YMIR_HEALTH_TIMEOUT:-120}
-
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
-REPO_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
-QUADLET=/etc/containers/systemd/ymir-api.container
-RUNTIME_HOST_DIR=/opt/ymir/runtime-host
-RELEASES_DIR=/opt/ymir/releases
-IMAGE_REPO=localhost/ymir/api
-TS=$(date +%Y%m%d-%H%M%S)
-
-log()  { printf '\n==> %s\n' "$*"; }
-info() { printf '    %s\n' "$*"; }
-warn() { printf '警告：%s\n' "$*" >&2; }
-ROLLED_BACK=0
-fail() {
-    printf '錯誤：%s\n' "$*" >&2
-    trap - ERR
-    if (( ! DRY_RUN && ! ROLLED_BACK )); then ROLLED_BACK=1; rollback; fi
-    exit 1
-}
-run()  { if (( DRY_RUN )); then info "[dry-run] $*"; else "$@"; fi; }
-
-# ---------- 回復所需狀態 ----------
-QUADLET_BACKUP='' RUNTIME_BACKUP='' API_SWITCHED=0 RUNTIME_SWITCHED=0 LOCKED=0
-STAGING=''
-
-rollback() {
-    warn '部署失敗，回復舊版（已套用的 additive migration 與資料保留）。'
-    if (( RUNTIME_SWITCHED )) && [[ -n $RUNTIME_BACKUP && -d $RUNTIME_BACKUP ]]; then
-        info '回復 RuntimeHost'
-        rm -rf "$RUNTIME_HOST_DIR.failed" && mv "$RUNTIME_HOST_DIR" "$RUNTIME_HOST_DIR.failed" \
-            && mv "$RUNTIME_BACKUP" "$RUNTIME_HOST_DIR" \
-            && systemctl restart ymir-runtime-host.service || warn 'RuntimeHost 回復失敗，請手動處理。'
-    fi
-    if (( API_SWITCHED )) && [[ -n $QUADLET_BACKUP && -f $QUADLET_BACKUP ]]; then
-        info '回復 API Quadlet'
-        install -m 644 "$QUADLET_BACKUP" "$QUADLET" && systemctl daemon-reload \
-            && systemctl restart ymir-api.service || warn 'API 回復失敗，請手動處理（備份：'"$QUADLET_BACKUP"'）。'
-    elif (( LOCKED )); then
-        # 只停了 API 還沒切換（例如 migration 失敗）：把舊版 API 開回來。
-        systemctl start ymir-api.service 2>/dev/null || true
-    fi
-}
-cleanup() { [[ -n $STAGING && -d $STAGING ]] && rm -rf "$STAGING"; return 0; }
-on_error() {
-    local code=$? line=$1
-    trap - ERR
-    printf '錯誤：第 %s 行失敗（exit %s）。\n' "$line" "$code" >&2
-    if (( ! DRY_RUN && ! ROLLED_BACK )); then ROLLED_BACK=1; rollback; fi
-    exit "$code"
-}
-trap 'on_error $LINENO' ERR
-trap cleanup EXIT
-
-# ---------- 前置檢查 ----------
-log '前置檢查'
-[[ $EUID -eq 0 ]] || fail '請使用 sudo 執行。'
-for c in git podman dotnet curl flock python3 systemctl sed; do
-    command -v "$c" >/dev/null || fail "找不到 $c。"
-done
-[[ -d /run/systemd/system ]] || fail '需要運作中的 systemd。'
-[[ -f $QUADLET ]] || fail "找不到 $QUADLET，請先完成首次安裝（docs/guides/ubuntu-install.md §8）。"
-[[ -f /etc/ymir/api.env ]] || fail '找不到 /etc/ymir/api.env。'
-(( ! DO_RUNTIME_HOST )) || [[ -d $RUNTIME_HOST_DIR ]] || fail "找不到 $RUNTIME_HOST_DIR，請先完成 RuntimeHost 安裝，或加 --skip-runtime-host。"
-[[ $KEEP =~ ^[0-9]+$ ]] || fail 'YMIR_KEEP_RELEASES 必須是數字。'
-[[ -f $REPO_ROOT/Ymir.slnx ]] || fail "$REPO_ROOT 不是 Ymir repo。"
-cd "$REPO_ROOT"
-
-# repo 若由一般使用者擁有，root 下的 git 會報 dubious ownership；只對此路徑放行。
-git config --global --get-all safe.directory | grep -qx "$REPO_ROOT" || git config --global --add safe.directory "$REPO_ROOT"
-
-sql_exec() {
-    # 以 stdin 餵 SQL；sa 密碼只在 container 內由環境變數取得，不經程序參數。
-    local inner='export SQLCMDPASSWORD="$MSSQL_SA_PASSWORD"; exec /opt/mssql-tools18/bin/sqlcmd -I -C -S localhost -U sa -b "$@"'
-    if [[ -n $SQL_PODMAN_USER ]]; then
-        local uid; uid=$(id -u "$SQL_PODMAN_USER")
-        sudo -H -u "$SQL_PODMAN_USER" env XDG_RUNTIME_DIR="/run/user/$uid" \
-            podman exec -i "$SQL_CONTAINER" sh -c "$inner" sqlcmd "$@"
-    else
-        podman exec -i "$SQL_CONTAINER" sh -c "$inner" sqlcmd "$@"
-    fi
-}
-
-if (( DO_MIGRATE )); then
-    echo 'SELECT 1' | sql_exec -d master -h -1 >/dev/null 2>&1 \
-        || fail "連不上 SQL container（$SQL_CONTAINER）。可用 YMIR_SQL_CONTAINER / YMIR_SQL_PODMAN_USER 指定，或加 --skip-migrate。"
-fi
-
-# ---------- 同步程式 ----------
-if (( DO_PULL )); then
-    log '同步程式碼'
-    git fetch --tags origin
-    if [[ -n $REF ]]; then
-        git switch --detach "$REF"
-    else
-        git merge --ff-only '@{u}'
-    fi
-fi
-SHA=$(git rev-parse --short=12 HEAD)
-if [[ -n $(git status --porcelain) ]]; then
-    warn '工作目錄有未提交變更，會連同部署（image tag 附時間戳）。'
-    TAG="$SHA-dirty-$TS"
-else
-    TAG=$SHA
-fi
-info "版本：$TAG（$(git log -1 --format=%s)）"
-
-if (( DO_TEST )); then
-    log '單元測試'
-    run dotnet test --project tests/Ymir.UnitTests
-fi
-
-# ---------- 建置（鎖之外，長時間作業不阻擋維護服務） ----------
-log "建置 API image（含 Angular）：$IMAGE_REPO:$TAG"
-NEW_IMAGE_ID=''
-if (( DRY_RUN )); then
-    info "[dry-run] podman build -f src/Ymir.Api/Containerfile -t $IMAGE_REPO:$TAG ."
-else
-    podman build -f src/Ymir.Api/Containerfile -t "$IMAGE_REPO:$TAG" .
-    NEW_IMAGE_ID=$(podman image inspect "$IMAGE_REPO:$TAG" --format '{{.Id}}')
-    info "image ID：${NEW_IMAGE_ID:0:12}"
-fi
-
-# Quadlet 目前的 Image=（可能是 tag 或 64 碼 ID）換算成 ID，用來判斷是否有變。
-CUR_REF=$(sed -n 's/^Image=//p' "$QUADLET" | head -1)
-CUR_IMAGE_ID=$(podman image inspect "$CUR_REF" --format '{{.Id}}' 2>/dev/null || true)
-info "目前 Quadlet：${CUR_REF:0:19}…"
-
-if (( DO_AGENT_IMAGE )); then
-    log "建置 Agent image：$AGENT_IMAGE（ymir 帳號的 rootless 儲存區）"
-    YUID=$(id -u ymir)
-    if (( DRY_RUN )); then
-        info '[dry-run] podman build runtime/agent'
-    else
-        sudo -H -u ymir env XDG_RUNTIME_DIR="/run/user/$YUID" \
-            podman build --build-arg "PI_VERSION=$PI_VERSION" -t "$AGENT_IMAGE" \
-            -f runtime/agent/Containerfile runtime/agent
-        warn 'Agent image 已更新；既有使用者 container 不會自動替換，下次重建時才用新版（保留 workspace）。'
-    fi
-fi
-
-install -d -m 755 /opt/ymir "$RELEASES_DIR"
-STAGING=$(mktemp -d /opt/ymir/.staging.XXXXXX)
-
-RUNTIME_CHANGED=0
-if (( DO_RUNTIME_HOST )); then
-    log 'publish RuntimeHost'
-    if (( DRY_RUN )); then
-        info '[dry-run] dotnet publish src/Ymir.RuntimeHost'
-    else
-        dotnet publish src/Ymir.RuntimeHost -c Release -o "$STAGING/runtime-host" --nologo -v quiet
-        if diff -rq "$STAGING/runtime-host" "$RUNTIME_HOST_DIR" >/dev/null 2>&1; then
-            info 'RuntimeHost 與已安裝版本相同，略過。'
-        else
-            RUNTIME_CHANGED=1
-            info 'RuntimeHost 有差異，將於切換階段更新。'
-        fi
-    fi
-fi
-
-# ---------- migration 清單（只讀） ----------
-PENDING=0
-declare -A MIG_SQL=()
-if (( DO_MIGRATE )); then
-    log '檢查待套用的 migration'
-    dotnet tool restore >/dev/null
-    declare -A MIG_PROJECT=(
-        [platform]=src/Platform/Ymir.Platform.Infrastructure
-        [vibemaker]=src/Modules/VibeMaker/Ymir.VibeMaker.Infrastructure
-    )
-    declare -A MIG_CONTEXT=([platform]=PlatformDbContext [vibemaker]=VibeMakerDbContext)
-    for schema in platform vibemaker; do
-        applied=$(printf "SET NOCOUNT ON; IF OBJECT_ID(N'%s.__ef_migrations_history') IS NOT NULL SELECT MigrationId FROM [%s].[__ef_migrations_history];" "$schema" "$schema" \
-            | sql_exec -d ymir -h -1 -W | tr -d '\r' | sed '/^$/d')
-        all=$(dotnet ef migrations list --no-connect --project "${MIG_PROJECT[$schema]}" \
-            --context "${MIG_CONTEXT[$schema]}" 2>/dev/null | grep -Eo '^[0-9]{14}_[A-Za-z0-9_]+' || true)
-        [[ -n $all ]] || fail "讀不到 $schema 的 migration 清單。"
-        pending=$(comm -13 <(printf '%s\n' "$applied" | sort) <(printf '%s\n' "$all" | sort) || true)
-        if [[ -n $pending ]]; then
-            while IFS= read -r m; do info "待套用：$schema / $m"; PENDING=$((PENDING+1)); done <<<"$pending"
-            MIG_SQL[$schema]="$STATE_DIR/migrations/$TAG/$schema.sql"
-            if (( ! DRY_RUN )); then
-                install -d -m 700 "$STATE_DIR/migrations/$TAG"
-                dotnet ef migrations script --idempotent --project "${MIG_PROJECT[$schema]}" \
-                    --context "${MIG_CONTEXT[$schema]}" --output "${MIG_SQL[$schema]}" >/dev/null
-            fi
-        fi
-    done
-    (( PENDING )) || info '沒有待套用的 migration。'
-fi
-
-# ---------- 判斷是否有事可做 ----------
-API_CHANGED=1
-[[ -n $NEW_IMAGE_ID && $NEW_IMAGE_ID == "$CUR_IMAGE_ID" ]] && API_CHANGED=0
-if (( ! DRY_RUN && ! API_CHANGED && ! RUNTIME_CHANGED && ! PENDING && ! DO_SERVICES )); then
-    log '沒有任何差異，不需要重新部署。'
-    exit 0
-fi
-if (( DRY_RUN )); then
-    log 'dry-run 結束：未做任何變更。'
-    exit 0
-fi
-
-# ---------- 部署鎖 + 排空檢查 ----------
-log '取得部署鎖'
-LOCK=/run/ymir-lifecycle/deploy.lock
-if [[ ! -d $(dirname "$LOCK") ]]; then
-    warn '找不到 /run/ymir-lifecycle（未安裝 MaintenanceHost 鎖目錄），改用 /run/lock/ymir-deploy.lock。'
-    LOCK=/run/lock/ymir-deploy.lock
-fi
-exec 9>"$LOCK"
-flock -w 600 9 || fail '等不到部署鎖（另一個部署或維護作業進行中）。'
-LOCKED=1
-
-busy_count() {
-    printf "SET NOCOUNT ON; SELECT COUNT(*) FROM [vibemaker].[agent_executions] WHERE [status] IN (N'QUEUED', N'RUNNING');" \
-        | sql_exec -d ymir -h -1 -W 2>/dev/null | tr -d '\r[:space:]' || true
-}
-if (( DO_MIGRATE )); then
-    # 重啟 API 會中斷背景執行中的 Agent 工作，先確認已排空。
-    deadline=$((SECONDS + WAIT_IDLE))
-    while :; do
-        busy=$(busy_count)
-        [[ $busy =~ ^[0-9]+$ ]] || { warn '無法查詢執行中的工作，略過檢查。'; break; }
-        (( busy == 0 )) && break
-        if (( SECONDS < deadline )); then info "仍有 $busy 個 Queued/Running 工作，等待中…"; sleep 10; continue; fi
-        (( FORCE )) && { warn "有 $busy 個工作會被中斷（--force）。"; break; }
-        fail "有 $busy 個 Queued/Running 的 Agent 工作。等它們結束、加 --wait-idle <秒>，或用 --force。"
-    done
-else
-    warn '--skip-migrate 時不查詢資料庫，無法確認是否有執行中的 Agent 工作；API 重啟會中斷它們。'
-fi
-
-# ---------- migration（API 停止後套用） ----------
-if (( PENDING )); then
-    log '停止 API 並套用 migration'
-    systemctl stop ymir-api.service
-    if (( DO_BACKUP )); then
-        BAK="ymir-pre-$TAG-$TS.bak"
-        info "SQL 備份（COPY_ONLY, CHECKSUM）→ container 內 $BACKUP_DIR/$BAK"
-        printf "BACKUP DATABASE [ymir] TO DISK = N'%s/%s' WITH COPY_ONLY, CHECKSUM, INIT;\nRESTORE VERIFYONLY FROM DISK = N'%s/%s' WITH CHECKSUM;\n" \
-            "$BACKUP_DIR" "$BAK" "$BACKUP_DIR" "$BAK" | sql_exec -d master >/dev/null
-        info '備份並驗證完成；請另外把它複製到容器外保存（docs/guides/backup-restore.md）。'
-    else
-        warn '已略過 SQL 備份（--skip-backup）。'
-    fi
-    # 兩個模組依序套用；SET 選項是 filtered index 所需（Msg 1934），Python 同時去除 BOM。
-    for schema in platform vibemaker; do
-        [[ -n ${MIG_SQL[$schema]:-} ]] || continue
-        info "套用 $schema"
-        python3 - "${MIG_SQL[$schema]}" <<'PY' | sql_exec -d ymir >/dev/null
+exec python3 -B - "$SCRIPT_DIR/.." "$@" <<'PYTHON'
+import argparse
+import datetime
+import fcntl
+import hashlib
+import json
+import os
 from pathlib import Path
+import pwd
+import re
+import shlex
+import shutil
+import signal
+import subprocess
 import sys
-print("SET NOCOUNT ON; SET XACT_ABORT ON; SET QUOTED_IDENTIFIER ON;")
-print("SET ANSI_NULLS ON; SET ANSI_PADDING ON; SET ANSI_WARNINGS ON;")
-print("SET ARITHABORT ON; SET CONCAT_NULL_YIELDS_NULL ON; SET NUMERIC_ROUNDABORT OFF;\nGO")
-sys.stdout.write(Path(sys.argv[1]).read_text(encoding="utf-8-sig"))
-print("\nGO")
-PY
-    done
-fi
+import tarfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
 
-# ---------- 切換 ----------
-if (( RUNTIME_CHANGED )); then
-    log '更新 RuntimeHost'
-    RUNTIME_BACKUP="$RELEASES_DIR/runtime-host-before-$TAG-$TS"
-    # 設定檔在 /etc/ymir，不在發佈目錄，所以整個目錄替換是安全的。
-    cp -a "$RUNTIME_HOST_DIR" "$RUNTIME_BACKUP"
-    rm -rf "$RUNTIME_HOST_DIR.new"
-    cp -a "$STAGING/runtime-host" "$RUNTIME_HOST_DIR.new"
-    chmod -R a+rX "$RUNTIME_HOST_DIR.new"
-    RUNTIME_SWITCHED=1
-    rm -rf "$RUNTIME_HOST_DIR.old"
-    mv "$RUNTIME_HOST_DIR" "$RUNTIME_HOST_DIR.old" && mv "$RUNTIME_HOST_DIR.new" "$RUNTIME_HOST_DIR"
-    rm -rf "$RUNTIME_HOST_DIR.old"
-    systemctl restart ymir-runtime-host.service   # Agent container 不受影響，下次 EnsureRuntime 沿用
-    deadline=$((SECONDS + 60))
-    until sudo -u ymir curl -fsS --max-time 5 --unix-socket /run/ymir-runtime/runtime.sock http://localhost/health >/dev/null 2>&1; do
-        (( SECONDS < deadline )) || fail 'RuntimeHost 重啟後 health 未就緒。'
-        sleep 2
-    done
-    info 'RuntimeHost 就緒'
-fi
 
-log "切換 API image → ${NEW_IMAGE_ID:0:12}"
-QUADLET_BACKUP="$RELEASES_DIR/ymir-api.container.$TS"
-install -d -m 755 "$RELEASES_DIR"
-cp -a "$QUADLET" "$QUADLET_BACKUP"
-# 只替換 Image= 一行，固定到 image ID（浮動 tag 不會換版）。
-sed -i "s|^Image=.*|Image=$NEW_IMAGE_ID|" "$QUADLET"
-API_SWITCHED=1
-systemctl daemon-reload
-systemctl restart ymir-api.service
+class DeployError(RuntimeError):
+    pass
 
-# ---------- 驗證 ----------
-log '驗證'
-wait_http() {
-    local url=$1 deadline=$((SECONDS + HEALTH_TIMEOUT))
-    until curl -fsS --max-time 5 -o /dev/null "$url"; do
-        (( SECONDS < deadline )) || fail "逾時未就緒：$url（查看 journalctl -u ymir-api.service -n 100）"
-        sleep 3
-    done
-    info "OK  $url"
-}
-wait_http "$API_URL/health"
-wait_http "$API_URL/api/auth/providers"
-wait_http "$API_URL/login"
-[[ $(curl -fsS --max-time 5 "$API_URL/health") == Healthy ]] || fail "/health 不是 Healthy。"
-running=$(podman inspect ymir-api --format '{{.Image}}' 2>/dev/null || true)
-[[ $running == "$NEW_IMAGE_ID" ]] || fail 'ymir-api 容器沒有使用新 image。'
 
-# ---------- 可選服務 ----------
-if (( DO_SERVICES )); then
-    log '更新其他主機服務'
-    declare -A SVC=(
-        [ymir-mcp-gateway]="src/Ymir.McpGateway:/opt/ymir/mcp-gateway"
-        [ymir-site-host]="src/Ymir.SiteHost:/opt/ymir/site-host"
-        [ymir-maintenance-host]="src/Ymir.MaintenanceHost:/opt/ymir/maintenance-host"
-    )
-    for unit in "${!SVC[@]}"; do
-        systemctl cat "$unit.service" >/dev/null 2>&1 || { info "略過 $unit（未安裝）"; continue; }
-        proj=${SVC[$unit]%%:*} dest=${SVC[$unit]##*:}
-        out="$STAGING/$unit"
-        dotnet publish "$proj" -c Release -o "$out" --nologo -v quiet
-        if diff -rq "$out" "$dest" >/dev/null 2>&1; then info "$unit 無差異"; continue; fi
-        cp -a "$dest" "$RELEASES_DIR/$unit-before-$TAG-$TS" 2>/dev/null || true
-        # 就地覆蓋內容而非換目錄，保留 unit 的 WorkingDirectory / 權限。
-        cp -a "$out/." "$dest/"
-        systemctl restart "$unit.service"
-        info "已更新並重啟 $unit"
-    done
-fi
+def require(value, message):
+    if not value:
+        raise DeployError(message)
 
-# ---------- 清理舊版（保留最近 KEEP 份；不動使用中的 image） ----------
-log '清理舊版本'
-in_use=$(podman image inspect "$IMAGE_REPO:$TAG" --format '{{.Id}}')
-mapfile -t old_tags < <(podman images --format '{{.CreatedAt}}|{{.Repository}}:{{.Tag}}' "$IMAGE_REPO" 2>/dev/null \
-    | grep -v ':<none>' | sort -r | cut -d'|' -f2 | tail -n +"$((KEEP + 1))")
-for t in "${old_tags[@]:-}"; do
-    [[ -n $t ]] || continue
-    id=$(podman image inspect "$t" --format '{{.Id}}' 2>/dev/null || true)
-    [[ $id == "$in_use" ]] && continue
-    podman rmi "$t" >/dev/null 2>&1 && info "移除舊 image $t" || true
-done
-find "$RELEASES_DIR" -maxdepth 1 -mindepth 1 \( -name 'ymir-api.container.*' -o -name '*-before-*' \) -printf '%T@ %p\n' 2>/dev/null \
-    | sort -rn | tail -n +"$((KEEP * 3 + 1))" | cut -d' ' -f2- | xargs -r rm -rf
 
-trap - ERR
-log "部署完成：$TAG（image ${NEW_IMAGE_ID:0:12}）"
-info "公開入口（nginx / Tunnel）不受影響；回復用 Quadlet 備份：$QUADLET_BACKUP"
+def digest(path):
+    value = hashlib.sha256()
+    with Path(path).open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            value.update(chunk)
+    return value.hexdigest()
+
+
+def migration_prefix(actual, expected):
+    # 不接受未知、跳號或較新 DB；不能只用集合差就略過 schema 不一致。
+    require(actual == expected[:len(actual)], 'Migration history 不是來源版本的完整前綴；停止部署')
+    return expected[len(actual):]
+
+
+def ordered_mounts(items):
+    return sorted(items, key=lambda item: item['Destination'])
+
+
+def validate_archive(path):
+    with tarfile.open(path) as source:
+        for item in source.getmembers():
+            require(not item.name.startswith('/') and '..' not in Path(item.name).parts
+                    and (item.isfile() or item.isdir()), '來源 archive 含特殊檔案／symlink，需人工審查')
+
+
+def atomic(path, content, mode=0o644):
+    path = Path(path)
+    require(not path.is_symlink(), '拒絕覆蓋 symlink 配置')
+    temporary = path.with_name(path.name + '.redeploy-' + uuid.uuid4().hex)
+    with temporary.open('xb') as stream:
+        stream.write(content)
+    os.chmod(temporary, mode)
+    os.replace(temporary, path)
+
+
+def arguments(values):
+    parser = argparse.ArgumentParser(prog='sudo bash deploy/redeploy-ubuntu.sh',
+        description='既有 Ubuntu Ymir 單一重新部署入口；保留 DB、secret、workspace、OAuth 和舊版本。',
+        epilog='設定資料檔：/etc/ymir/redeploy.env（root:0600，不作 shell 執行）。支援 YMIR_SQL_CONTAINER、YMIR_SQL_PODMAN_USER（預設 itadmin，空字串為 root）、YMIR_STATE_DIR、YMIR_API_URL、YMIR_HEALTH_TIMEOUT。不安裝缺少的 Gateway／基礎服務，也不清空資料。')
+    parser.add_argument('--pull', action='store_true', help='以 repo 擁有者 fetch/rebase origin/main；拒絕 dirty 或非 main')
+    parser.add_argument('--ref', help='部署已存在的 commit/tag 快照，不 checkout／改寫工作目錄；可搭配 --pull')
+    parser.add_argument('--test', action='store_true', help='先以一般使用者執行 Release unit tests')
+    parser.add_argument('--with-agent-image', action='store_true', help='另建唯一 tag 的 Agent image，供人工審查；不換既有容器／runtime env')
+    parser.add_argument('--with-services', action='store_true', help='一併重新 publish 已安裝的 MCP Gateway／SiteHost／MaintenanceHost')
+    parser.add_argument('--skip-runtime-host', action='store_true', help='保留現有 RuntimeHost')
+    parser.add_argument('--skip-migrate', action='store_true', help='仍檢查 DB／排空；若有待套 migration 就拒絕部署')
+    parser.add_argument('--accept-additive-migrations', action='store_true', help='確認已審查待套 schema 為 additive 且舊程式相容，才允許自動套用')
+    parser.add_argument('--wait-idle', type=int, default=60, metavar='SECONDS', help='入口暫停後等待空佇列的上限，預設 60 秒')
+    parser.add_argument('--dry-run', action='store_true', help='只讀基線／history 並列計畫；不 fetch、不建置、不建立目錄／備份／鎖')
+    parser.add_argument('--force', action='store_true', help=argparse.SUPPRESS)
+    parser.add_argument('--skip-backup', action='store_true', help=argparse.SUPPRESS)
+    result = parser.parse_args(values)
+    require(not result.force and not result.skip_backup, '不支援 --force／--skip-backup：不能中斷使用中的工作或跳過成套備份')
+    require(0 <= result.wait_idle <= 3600, '--wait-idle 必須介於 0 與 3600')
+    require(not (result.dry_run and result.pull), '--dry-run 不執行 --pull；請先自行同步，再做唯讀計畫')
+    return result
+
+
+class Deployment:
+    API = 'ymir-api.service'
+    RUNTIME = 'ymir-runtime-host.service'
+    ENTRANCES = ['ymir-cloudflared-production.service', 'ymir-origin-production.service']
+    OPTIONAL = {
+        'ymir-mcp-gateway.service': ('src/Ymir.McpGateway', 'Ymir.McpGateway', 'mcp-gateway'),
+        'ymir-site-host.service': ('src/Ymir.SiteHost', 'Ymir.SiteHost', 'site-host'),
+        'ymir-maintenance-host.service': ('src/Ymir.MaintenanceHost', 'Ymir.MaintenanceHost', 'maintenance-host'),
+    }
+    PROJECTS = {
+        'platform': ('src/Platform/Ymir.Platform.Infrastructure', 'PlatformDbContext'),
+        'vibemaker': ('src/Modules/VibeMaker/Ymir.VibeMaker.Infrastructure', 'VibeMakerDbContext'),
+    }
+
+    def __init__(self, repo, options):
+        self.repo, self.options = Path(repo).resolve(), options
+        self.quadlet = Path('/etc/containers/systemd/ymir-api.container')
+        self.stage = self.build = self.backup = None
+        self.locks = []
+        self.paused = self.migration_started = self.migrations_complete = False
+        self.previous, self.overrides, self.old_dirs = {}, {}, {}
+        self.override_modes = {}
+        self.services, self.pending, self.expected = {}, {}, {}
+        self.phase = 'preflight'
+
+    def command(self, args, data=None, timeout=180, user=None, cwd='/', binary=False):
+        env = dict(os.environ)
+        # 子程序不得持有部署鎖；不把 master key／連線字串當程序參數。
+        if user:
+            account = pwd.getpwnam(user)
+            env = {'HOME': account.pw_dir, 'PATH': account.pw_dir + '/.dotnet:/usr/local/bin:/usr/bin:/bin',
+                   'DOTNET_CLI_TELEMETRY_OPTOUT': '1', 'DOTNET_NOLOGO': '1',
+                   'XDG_RUNTIME_DIR': '/run/user/' + str(account.pw_uid)}
+            if (Path(account.pw_dir) / '.dotnet/dotnet').is_file():
+                env['DOTNET_ROOT'] = account.pw_dir + '/.dotnet'
+            args = ['runuser', '-u', user, '--', 'env', *[f'{k}={v}' for k, v in env.items()], *map(str, args)]
+        try:
+            result = subprocess.run(list(map(str, args)), input=data, capture_output=True,
+                                    text=not binary, timeout=timeout, cwd=cwd, env=env)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise DeployError('無法完成命令：' + Path(str(args[0])).name) from error
+        if result.returncode:
+            if self.stage:
+                with (self.stage / 'private-errors.log').open('ab') as stream:
+                    for output in [result.stdout, result.stderr]:
+                        stream.write(output if isinstance(output, bytes) else output.encode())
+            raise DeployError('命令失敗：' + Path(str(args[0])).name + '；原始診斷只保存於私有部署目錄')
+        return result.stdout if binary else result.stdout.strip()
+
+    def git(self, *args):
+        return self.command(['git', '--no-optional-locks', '-c', 'core.fsmonitor=false', '-C', self.repo, *args], user=self.owner)
+
+    def prop(self, service, name):
+        return self.command(['systemctl', 'show', service, '--property=' + name, '--value'])
+
+    def podman(self, *args, sql=False, **kwargs):
+        return self.command(['podman', *args], user=self.sql_owner if sql else None, **kwargs)
+
+    def sql(self, query, database='ymir'):
+        settings = ('SET NOCOUNT ON; SET XACT_ABORT ON; SET QUOTED_IDENTIFIER ON; SET ANSI_NULLS ON; '
+                    'SET ANSI_PADDING ON; SET ANSI_WARNINGS ON; SET ARITHABORT ON; '
+                    'SET CONCAT_NULL_YIELDS_NULL ON; SET NUMERIC_ROUNDABORT OFF;\nGO\n')
+        command = ('export SQLCMDPASSWORD="$MSSQL_SA_PASSWORD"; exec /opt/mssql-tools18/bin/sqlcmd '
+                   '-I -C -S localhost -U sa -d ' + database + ' -b -r1 -h-1 -W -w65535')
+        return self.podman('exec', '-i', self.sql_container, 'sh', '-c', command,
+                           sql=True, data=settings + query + '\nGO\n', timeout=900)
+
+    def config(self):
+        # redeploy.env 只能是 root 私有的資料檔，不能 source 成任意 root shell 程式。
+        allowed = {'YMIR_SQL_CONTAINER', 'YMIR_SQL_PODMAN_USER', 'YMIR_STATE_DIR', 'YMIR_API_URL', 'YMIR_HEALTH_TIMEOUT'}
+        values = {}
+        path = Path('/etc/ymir/redeploy.env')
+        if path.exists():
+            require(not path.is_symlink() and path.stat().st_uid == 0 and path.stat().st_mode & 0o077 == 0,
+                    'redeploy.env 必須為 root 擁有、0600 且不是 symlink')
+            for line in path.read_text().splitlines():
+                if not line.strip() or line.lstrip().startswith('#'):
+                    continue
+                key, separator, value = line.partition('=')
+                require(separator and key.strip() in allowed, 'redeploy.env 含未知設定；請依 --help／操作指南更新')
+                parsed = shlex.split(value)
+                require(len(parsed) == 1, 'redeploy.env 的值必須是單一字串')
+                values[key.strip()] = parsed[0]
+        for key in allowed:
+            if key in os.environ:
+                values[key] = os.environ[key]
+        self.sql_container = values.get('YMIR_SQL_CONTAINER', 'ymir-sql')
+        require(re.fullmatch('[a-zA-Z0-9][a-zA-Z0-9_.-]*', self.sql_container), 'SQL container 名稱不合法')
+        self.sql_owner = values.get('YMIR_SQL_PODMAN_USER', 'itadmin') or None
+        require(self.sql_owner in (None, 'itadmin'), '此主機工具只接受 root 或 itadmin 的 SQL store')
+        self.state = Path(values.get('YMIR_STATE_DIR', '/var/lib/ymir-deploy'))
+        require(self.state.is_absolute() and self.state != Path('/') and not self.state.is_symlink(), '部署紀錄路徑不合法')
+        self.api_url = values.get('YMIR_API_URL', 'http://127.0.0.1:5080').rstrip('/')
+        url = urllib.parse.urlsplit(self.api_url)
+        require(url.scheme == 'http' and url.hostname in ('127.0.0.1', 'localhost') and not url.username
+                and not url.password and not url.query and not url.fragment and not url.path, 'API URL 必須是本機 HTTP origin')
+        timeout = values.get('YMIR_HEALTH_TIMEOUT', '120')
+        require(timeout.isdigit() and 5 <= int(timeout) <= 600, '健康檢查秒數必須介於 5 與 600')
+        self.health_timeout = int(timeout)
+
+    def preflight(self):
+        require(os.geteuid() == 0, '請使用 sudo；--help 不需 sudo')
+        require(sys.platform == 'linux' and Path('/run/systemd/system').is_dir(), '只支援有 systemd 的既有 Ubuntu 主機')
+        for executable in ['git', 'podman', 'tar', 'runuser', 'systemctl']:
+            require(shutil.which(executable), '缺少必要工具：' + executable)
+        self.config()
+        self.owner = pwd.getpwuid(self.repo.stat().st_uid).pw_name
+        require(self.owner != 'root', 'repo 必須由一般部署使用者擁有，不能以 root 執行 git／MSBuild')
+        self.account = pwd.getpwnam(self.owner)
+        require((self.repo / 'Ymir.slnx').is_file() and (self.repo / '.git').exists(), '不是 Ymir Git checkout')
+        require(self.git('status', '--porcelain') == '', '工作目錄有未提交變更；保留工作，請先 commit 後再部署')
+        require(self.git('branch', '--show-current') == 'main', '只接受 main；--ref 不會切換工作分支')
+        self.deployer_hash = digest(self.repo / 'deploy/redeploy-ubuntu.sh')
+        if self.options.pull:
+            self.git('fetch', 'origin')
+            self.git('rebase', 'origin/main')
+            require(digest(self.repo / 'deploy/redeploy-ubuntu.sh') == self.deployer_hash,
+                    '部署器本身已更新；請重新執行新版本，尚未建置／切換')
+        self.sha = self.git('rev-parse', '--verify', '--end-of-options', (self.options.ref or 'HEAD') + '^{commit}')
+        require(re.fullmatch('[a-f0-9]{40}', self.sha), '無法固定來源 SHA')
+        self.original_quadlet = self.quadlet.read_bytes()
+        self.quadlet_mode = self.quadlet.stat().st_mode & 0o777
+        require(not self.quadlet.is_symlink() and self.quadlet.stat().st_uid == 0, 'API Quadlet 必須為 root 的一般檔案')
+        require(len(re.findall(rb'^Image=.+$', self.original_quadlet, re.M)) == 1, 'API Quadlet Image 不明確')
+        self.old_api = json.loads(self.podman('inspect', 'ymir-api'))[0]
+        require(self.old_api['State']['Running'], 'API 必須先恢復至可驗證的運作基線')
+        env = dict(entry.split('=', 1) for entry in self.old_api['Config']['Env'])
+        require(env.get('ASPNETCORE_ENVIRONMENT') == 'Production' and env.get('VibeMaker__Runtime__Provider') == 'Remote',
+                '目前 API 不是 Production／Remote 基線')
+        require(re.search(r'(?:^|;)\s*(?:Database|Initial Catalog)\s*=\s*ymir\s*(?:;|$)', env.get('ConnectionStrings__ymir', ''), re.I),
+                '此工具只管理 ymir 正式 DB')
+        require(re.search(r'(?:^|;)\s*(?:Server|Data Source)\s*=\s*(?:tcp:)?(?:127\.0\.0\.1|localhost)(?:,1433)?\s*(?:;|$)', env.get('ConnectionStrings__ymir', ''), re.I),
+                'API SQL endpoint 不是已審查的本機 1433')
+        require(self.old_api['Config']['User'] in ('1654', '1654:1654') and self.old_api['HostConfig']['ReadonlyRootfs']
+                and not self.old_api['HostConfig']['Privileged'], 'API 安全基線不符')
+        if not self.options.skip_runtime_host:
+            self.services[self.RUNTIME] = ('src/Ymir.RuntimeHost', 'Ymir.RuntimeHost', 'runtime-host')
+        if self.options.with_services:
+            for service, spec in self.OPTIONAL.items():
+                if self.prop(service, 'LoadState') != 'not-found':
+                    self.services[service] = spec
+                else:
+                    print('略過未安裝的服務：' + service)
+        for service in [self.API, self.RUNTIME, *self.ENTRANCES, *self.services]:
+            if self.prop(service, 'LoadState') != 'not-found':
+                self.previous[service] = self.prop(service, 'ActiveState') == 'active'
+        require(self.previous.get(self.RUNTIME) and self.previous.get(self.API), 'API／RuntimeHost 必須先恢復至運作基線')
+        for service in self.services:
+            directory = Path(self.prop(service, 'WorkingDirectory'))
+            require(directory.is_relative_to('/opt/ymir') and directory.is_dir() and not directory.is_symlink()
+                    and directory.resolve().is_relative_to('/opt/ymir'), '主機服務 WorkingDirectory 不在已審查的 /opt/ymir 內')
+            self.old_dirs[service] = directory
+        self.config_hashes = {}
+        for path in map(Path, ['/etc/ymir/api.env', '/etc/ymir/runtime-host.env', '/etc/ymir/mcp-gateway.env',
+                               '/etc/ymir/site-host.env', '/etc/ymir/maintenance-host.env']):
+            if path.exists():
+                require(not path.is_symlink() and path.stat().st_uid == 0 and path.stat().st_mode & 0o077 == 0,
+                        '部署 secret 配置必須為 root 私有一般檔案')
+                self.config_hashes[str(path)] = digest(path)
+        sql_image = json.loads(self.podman('inspect', self.sql_container, sql=True))[0]
+        require(sql_image['State']['Running'] and any(m['Destination'] == '/var/opt/mssql' for m in sql_image['Mounts']),
+                'SQL 必須運作中且有持久化資料掛載')
+        self.refresh_histories()
+        self.schema_gate()
+        # 無論 skip-migrate 與否都先證明能讀取工作狀態，查詢失敗絕不略過。
+        self.jobs()
+        print('來源：' + self.sha + '；SQL store：' + (self.sql_owner or 'root'))
+        print('目標：API＋' + '、'.join(self.services) + '；保留所有既有 DB／模型／Agent 容器')
+        for schema, ids in self.pending.items():
+            print(schema + ' 待套 migration：' + (', '.join(ids) or '無'))
+        if not self.options.dry_run:
+            require(not any(self.pending.values()) or (self.options.accept_additive_migrations and not self.options.skip_migrate),
+                    '有待套 migration；請先審查相容性，再加 --accept-additive-migrations；--skip-migrate 不能略過不相容版本')
+
+    def refresh_histories(self):
+        for schema, (project, context) in self.PROJECTS.items():
+            files = self.git('ls-tree', '-r', '--name-only', self.sha, project + '/Persistence/Migrations').splitlines()
+            expected = sorted(Path(name).stem for name in files if re.fullmatch(r'\d{14}_[A-Za-z0-9_]+\.cs', Path(name).name))
+            require(expected, '來源 migration 清單為空')
+            actual = self.sql(f'SELECT MigrationId FROM {schema}.__ef_migrations_history ORDER BY MigrationId;').splitlines()
+            self.expected[schema] = expected
+            self.pending[schema] = migration_prefix(actual, expected)
+
+    def jobs(self):
+        value = self.sql("SELECT COUNT_BIG(*) FROM vibemaker.agent_executions WHERE status IN ('QUEUED','RUNNING');")
+        require(value.isdigit(), '無法確認執行中的工作；拒絕切換')
+        return int(value)
+
+    def schema_gate(self):
+        tables = ['platform.users', 'platform.system_settings', 'vibemaker.projects', 'vibemaker.conversations', 'vibemaker.agent_executions']
+        if any(name.endswith('_UserPluginSettings') and name not in self.pending['vibemaker'] for name in self.expected['vibemaker']):
+            tables.append('vibemaker.user_plugin_settings')
+        for table in tables:
+            require(self.sql(f"SELECT COUNT(*) FROM sys.tables WHERE object_id=OBJECT_ID(N'{table}');") == '1',
+                    'Critical schema gate 失敗：' + table)
+
+    def acquire_locks(self):
+        # 與目前主機的維護服務及一次性部署器共用，不能另換成不互斥的 fallback 鎖。
+        lifecycle = Path('/run/ymir-lifecycle')
+        if not lifecycle.exists():
+            account = pwd.getpwnam('ymir')
+            lifecycle.mkdir(mode=0o750)
+            os.chown(lifecycle, account.pw_uid, account.pw_gid)
+        require(not lifecycle.is_symlink() and lifecycle.resolve() == lifecycle, '生命週期鎖目錄不安全')
+        for path in [Path('/run/lock/ymir-production-v2.lock'), lifecycle / 'deploy.lock']:
+            require(not path.is_symlink(), '部署鎖不能是 symlink')
+            descriptor = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+            try:
+                fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                os.close(descriptor)
+                raise DeployError('已有部署／維護作業持鎖，請稍後再試')
+            self.locks.append(descriptor)
+
+    def confirm(self):
+        require(sys.stderr.isatty(), '正式部署需要互動終端確認；--dry-run 可做唯讀檢查')
+        confirmation = 'DEPLOY ' + self.sha[:12]
+        print('即將備份並短暫暫停網站；不清空資料。請輸入 ' + confirmation + '：', flush=True)
+        with open('/dev/tty') as terminal:
+            require(terminal.readline().strip() == confirmation, '已取消，尚未建置／切換')
+
+    def prepare(self):
+        self.phase = 'build'
+        self.acquire_locks()
+        run_id = datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + self.sha[:12] + '-' + uuid.uuid4().hex[:8]
+        self.run_id = run_id
+        require(shutil.disk_usage('/var').free > 5 * 1024 ** 3, '可用磁碟少於 5 GiB；請先安排容量，不自動 prune')
+        self.state.mkdir(parents=True, exist_ok=True, mode=0o700)
+        require(self.state.stat().st_uid == 0 and self.state.stat().st_mode & 0o077 == 0, '部署紀錄目錄必須為 root 私有')
+        self.stage = self.state / run_id
+        self.stage.mkdir(mode=0o700)
+        print('私有部署紀錄：' + str(self.stage), flush=True)
+        self.backup = self.stage / 'backup'
+        self.backup.mkdir(mode=0o700)
+        # MSBuild／Git 不以 root 執行；建置區不含部署 env 或備份。
+        self.build = Path(self.account.pw_dir) / ('.ymir-build-' + run_id)
+        self.build.mkdir(mode=0o700)
+        os.chown(self.build, self.account.pw_uid, self.account.pw_gid)
+        archive = self.build / 'source.tar'
+        self.git('archive', '--format=tar', '--output=' + str(archive), self.sha)
+        validate_archive(archive)
+        self.source = self.build / 'source'
+        self.source.mkdir(mode=0o700)
+        os.chown(self.source, self.account.pw_uid, self.account.pw_gid)
+        self.command(['tar', '-xf', archive, '-C', self.source], user=self.owner)
+        dotnet = Path(self.account.pw_dir) / '.dotnet/dotnet'
+        if not dotnet.is_file():
+            dotnet = Path('/usr/bin/dotnet')
+        require(dotnet.is_file(), '找不到部署使用者的 .NET SDK；請先安裝 .NET 10 SDK')
+        self.dotnet = dotnet
+        if self.options.test:
+            print('執行 Release unit tests（不使用正式 DB）', flush=True)
+            output = self.command([dotnet, 'test', '--project', 'tests/Ymir.UnitTests', '--configuration', 'Release'],
+                                  user=self.owner, cwd=self.source, timeout=900)
+            (self.stage / 'unit-tests.log').write_text(output)
+        print('建置 API／Angular；建置完成前不停止正式服務。', flush=True)
+        output = self.podman('build', '--label', 'org.opencontainers.image.revision=' + self.sha,
+                             '-f', 'src/Ymir.Api/Containerfile', '-t', 'localhost/ymir/api:' + run_id, '.', cwd=self.source, timeout=1800)
+        (self.stage / 'api-build.log').write_text(output)
+        self.new_image = json.loads(self.podman('image', 'inspect', 'localhost/ymir/api:' + run_id))[0]
+        require(self.new_image['Config']['User'] == '1654' and self.new_image['Labels'].get('ymir.managed') == 'true'
+                and self.new_image['Labels'].get('org.opencontainers.image.revision') == self.sha, '新 API image 不符安全／來源 pin')
+        self.image_id = self.new_image['Id'].removeprefix('sha256:')
+        self.command([dotnet, 'tool', 'restore', '--tool-manifest', 'dotnet-tools.json'], user=self.owner, cwd=self.source)
+        for schema, (project, context) in self.PROJECTS.items():
+            output = self.build / (schema + '.sql')
+            self.command([dotnet, 'ef', 'migrations', 'script', '--idempotent', '--project', project,
+                          '--context', context, '--output', output], user=self.owner, cwd=self.source, timeout=600)
+            shutil.copyfile(output, self.stage / (schema + '.sql'))
+        self.release = Path('/opt/ymir/releases') / ('redeploy-' + run_id)
+        self.release.mkdir(parents=True, mode=0o755)
+        os.chmod(self.release, 0o755)
+        for service, (project, executable, name) in self.services.items():
+            output = self.build / name
+            print('Publish：' + service, flush=True)
+            published = self.command([dotnet, 'publish', project, '-c', 'Release', '-r', 'linux-x64', '--self-contained',
+                                      '-o', output], user=self.owner, cwd=self.source, timeout=900)
+            (self.stage / (name + '-build.log')).write_text(published)
+            require(not any(p.is_symlink() for p in output.rglob('*')), 'publish 產物含 symlink')
+            destination = self.release / name
+            shutil.copytree(output, destination)
+            for path in [destination, *destination.rglob('*')]:
+                os.chmod(path, 0o755 if path.is_dir() or path.name in (executable, 'createdump') or path.suffix == '.so' else 0o644)
+        if self.options.with_agent_image:
+            # 只產生候選 image；不偷偷修改 runtime env 或使用者容器。
+            image = 'localhost/ymir/agent-runtime:redeploy-' + run_id
+            agent_source = self.release / 'agent-source'
+            shutil.copytree(self.source / 'runtime/agent', agent_source)
+            for path in [agent_source, *agent_source.rglob('*')]:
+                os.chmod(path, 0o755 if path.is_dir() or path.stat().st_mode & 0o111 else 0o644)
+            self.command(['podman', 'build', '-t', image, '-f', 'Containerfile', '.'],
+                         user='ymir', cwd=agent_source, timeout=1800)
+            print('Agent 候選 image：' + image + '；未修改 runtime env／既有容器')
+        manifest = {str(p.relative_to(self.release)): digest(p) for p in self.release.rglob('*') if p.is_file()}
+        (self.stage / 'manifest.json').write_text(json.dumps({'commit': self.sha, 'api_image': self.image_id,
+                                                           'publish': manifest}, indent=2))
+
+    def stop_and_backup(self):
+        self.phase = 'drain'
+        print('暫停入口並排空；不強制中斷工作。', flush=True)
+        # 在鎖內重讀，避免建置期間有人改部署基線或 DB history。
+        require(self.quadlet.read_bytes() == self.original_quadlet, '建置期間 API Quadlet 已變更')
+        for path, expected in getattr(self, 'config_hashes', {}).items():
+            require(digest(path) == expected, '建置期間 secret／部署設定已變更；停止，不覆蓋其他工作')
+        for service, directory in self.old_dirs.items():
+            require(self.prop(service, 'WorkingDirectory') == str(directory), '建置期間主機服務版本已變更')
+        self.refresh_histories()
+        require(not any(self.pending.values()) or (self.options.accept_additive_migrations and not self.options.skip_migrate),
+                '建置期間出現未批准 migration')
+        self.paused = True
+        for unit in self.ENTRANCES:
+            if self.previous.get(unit):
+                self.command(['systemctl', 'stop', unit])
+        deadline = time.monotonic() + self.options.wait_idle
+        while self.jobs():
+            require(time.monotonic() < deadline, '仍有 Queued／Running 工作；不強制中斷，恢復原入口')
+            time.sleep(2)
+        self.command(['systemctl', 'stop', self.API])
+        require(self.jobs() == 0, '停止 API 前出現新工作；拒絕切換')
+        for service in reversed(list(self.services)):
+            if self.previous.get(service):
+                self.command(['systemctl', 'stop', service])
+        self.phase = 'backup'
+        print('建立並驗證 SQL／金鑰／檔案／配置的成套私有備份。', flush=True)
+        sql_path = '/var/opt/mssql/backup/ymir-redeploy-' + self.run_id + '.bak'
+        self.podman('exec', self.sql_container, 'sh', '-c', 'mkdir -p /var/opt/mssql/backup; test ! -e "$1"',
+                    'check-backup', sql_path, sql=True)
+        self.sql(f"BACKUP DATABASE ymir TO DISK=N'{sql_path}' WITH COPY_ONLY,CHECKSUM; RESTORE VERIFYONLY FROM DISK=N'{sql_path}' WITH CHECKSUM;")
+        export = self.build / 'database-copyonly.bak'
+        self.podman('cp', self.sql_container + ':' + sql_path, export, sql=True, timeout=900)
+        shutil.copyfile(export, self.backup / 'database-copyonly.bak')
+        checksum = self.podman('exec', self.sql_container, 'sha256sum', sql_path, sql=True).split()[0]
+        require(digest(self.backup / 'database-copyonly.bak') == checksum, '匯出 SQL 備份 checksum 不符')
+        paths = [Path('/etc/ymir'), Path('/etc/containers/systemd'), Path('/etc/systemd/system'),
+                 Path('/srv/ymir'), Path('/home/ymir/.config'), Path('/var/lib/ymir-maintenance'), *self.old_dirs.values()]
+        paths += [self.repo / 'deploy/litellm' / name for name in ['.env', 'config.chatgpt.runtime.yaml']]
+        # 只備份已知本機 OAuth volume，token 不輸出到 log／程序參數。
+        volumes = self.podman('volume', 'ls', '--format', '{{.Name}}', sql=True).splitlines()
+        if 'ymir-chatgpt-auth' in volumes:
+            volume = json.loads(self.podman('volume', 'inspect', 'ymir-chatgpt-auth', sql=True))[0]
+            paths.append(Path(volume['Mountpoint']))
+        private = self.backup / 'private-preserve.tar'
+        existing = sorted({str(p).lstrip('/') for p in paths if p.exists()})
+        self.command(['tar', '--acls', '--xattrs', '--numeric-owner', '-cpf', private, '-C', '/', *existing], timeout=1800)
+        self.command(['tar', '--compare', '--acls', '--xattrs', '-f', private], timeout=1800)
+        (self.backup / 'SHA256SUMS').write_text('\n'.join(digest(p) + '  ' + p.name for p in [private, self.backup / 'database-copyonly.bak']) + '\n')
+        (self.backup / 'original-quadlet').write_bytes(self.original_quadlet)
+        (self.backup / 'api-baseline-private.json').write_text(json.dumps(self.old_api, indent=2))
+        (self.backup / 'service-baseline.json').write_text(json.dumps({'active': self.previous,
+            'working_directories': {unit: str(path) for unit, path in self.old_dirs.items()}}, indent=2))
+        self.phase = 'migration'
+        print('備份通過；套用已批准的 migration（若有）。', flush=True)
+        for schema in self.PROJECTS:
+            if self.pending[schema]:
+                self.migration_started = True
+                self.sql((self.stage / (schema + '.sql')).read_text(encoding='utf-8-sig'))
+        self.refresh_histories()
+        require(not any(self.pending.values()), '套用後 migration history 未達目標')
+        self.schema_gate()
+        self.migrations_complete = True
+
+    def switch(self):
+        self.phase = 'switch'
+        print('切換精確 image／release，驗證後再恢復入口。', flush=True)
+        for service, (project, executable, name) in self.services.items():
+            directory = Path('/etc/systemd/system') / (service + '.d')
+            directory.mkdir(exist_ok=True, mode=0o755)
+            target = directory / 'zzzzzzzzzzzz-redeploy.conf'
+            require(not target.is_symlink(), '拒絕覆蓋 symlink drop-in')
+            self.overrides[target] = target.read_bytes() if target.exists() else None
+            self.override_modes[target] = target.stat().st_mode & 0o777 if target.exists() else 0o644
+            (self.backup / 'override-state.json').write_text(json.dumps({str(path): {
+                'original_hex': body.hex() if body is not None else None, 'mode': self.override_modes[path]}
+                for path, body in self.overrides.items()}, indent=2))
+            new_dir = self.release / name
+            atomic(target, f'[Service]\nExecStart=\nExecStart={new_dir}/{executable}\nWorkingDirectory={new_dir}\n'.encode())
+        self.api_switched = True  # atomic replace 後若立即發生 signal，也須回復。
+        atomic(self.quadlet, re.sub(rb'^Image=.+$', b'Image=sha256:' + self.image_id.encode(), self.original_quadlet, flags=re.M), self.quadlet_mode)
+        self.command(['systemctl', 'daemon-reload'])
+        self.start_services()
+        self.phase = 'verify'
+        self.wait_http(self.api_url + '/health', b'Healthy')
+        self.wait_http(self.api_url + '/api/auth/providers')
+        self.wait_http(self.api_url + '/login')
+        current = json.loads(self.podman('inspect', 'ymir-api'))[0]
+        (self.stage / 'api-after-private.json').write_text(json.dumps(current, indent=2))
+        require(current['Image'].removeprefix('sha256:') == self.image_id, '正在服務的 image 與 pin 不符')
+        require(ordered_mounts(current['Mounts']) == ordered_mounts(self.old_api['Mounts']), 'API 掛載發生非預期變更')
+        before = dict(item.split('=', 1) for item in self.old_api['Config']['Env'])
+        after = dict(item.split('=', 1) for item in current['Config']['Env'])
+        ignored = {'DOTNET_VERSION', 'ASPNET_VERSION'}
+        require({k: v for k, v in before.items() if k not in ignored} == {k: v for k, v in after.items() if k not in ignored}, '有效部署 env 變更，拒絕成功')
+        for key in ['Privileged', 'ReadonlyRootfs', 'SecurityOpt', 'CapAdd', 'CapDrop', 'NetworkMode']:
+            a, b = self.old_api['HostConfig'].get(key), current['HostConfig'].get(key)
+            require((sorted(a) if isinstance(a, list) else a) == (sorted(b) if isinstance(b, list) else b), 'API 安全政策發生變更')
+        require(current['Config']['User'] == self.old_api['Config']['User'], 'API user 變更')
+        for service, (_, _, name) in self.services.items():
+            require(self.prop(service, 'WorkingDirectory') == str(self.release / name), '服務 drop-in 未生效')
+            if self.previous.get(service):
+                require(self.prop(service, 'ActiveState') == 'active', '主機服務未恢復')
+        if self.previous.get('ymir-mcp-gateway.service') and self.options.with_services:
+            self.wait_http('http://127.0.0.1:5310/health')
+        if self.previous.get('ymir-site-host.service') and self.options.with_services:
+            self.wait_http('http://127.0.0.1:5300/.ymir/health')
+        self.verify_agent_networks()
+        self.resume_entrances()
+        self.verify_public()
+        self.write_result(True)
+        print('部署完成：' + self.sha + '；image ' + self.image_id)
+        print('私有結果／成套備份：' + str(self.stage))
+        print('未執行真 SSO／付費模型／Graph／冷開機／資料還原驗收；沒有刪除舊版或備份。')
+
+    def wait_http(self, url, expected=None):
+        deadline = time.monotonic() + self.health_timeout
+        request = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        while True:
+            try:
+                with urllib.request.urlopen(request, timeout=5) as response:
+                    if response.status == 200 and (expected is None or response.read(1024) == expected):
+                        return
+            except (OSError, urllib.error.URLError):
+                pass
+            require(time.monotonic() < deadline, '健康檢查逾時：' + url)
+            time.sleep(2)
+
+    def resume_entrances(self):
+        for service in reversed(self.ENTRANCES):
+            if self.previous.get(service):
+                self.command(['systemctl', 'start', service])
+
+    def start_services(self):
+        # API 的 socket bind mount 必須先存在；維護服務也可能提供掛載目錄。
+        core = [self.RUNTIME, 'ymir-maintenance-host.service', self.API]
+        for service in [*core, *(unit for unit in self.services if unit not in core)]:
+            if self.previous.get(service):
+                self.command(['systemctl', 'start', service])
+
+    def verify_public(self):
+        # 取現有 PublicEdge hostname，不把登入／Tunnel 改成另一個來源。
+        entries = dict(item.split('=', 1) for item in self.old_api['Config']['Env'])
+        host = entries.get('Ymir__PublicEdge__PublicHostname')
+        if host and re.fullmatch(r'[a-zA-Z0-9.-]+', host):
+            self.wait_http('https://' + host + '/login')
+            self.public_verified = True
+        else:
+            print('公開 hostname 未能由既有 env 確定；公開登入頁仍待人工驗收。')
+
+    def verify_ci(self):
+        url = 'https://api.github.com/repos/puremars2015/Ymir/actions/runs?head_sha=' + self.sha + '&per_page=30'
+        try:
+            with urllib.request.urlopen(url, timeout=20) as response:
+                runs = json.load(response)['workflow_runs']
+            ci = next(item for item in runs if item.get('name') == 'CI' and item.get('head_sha') == self.sha)
+        except (OSError, ValueError, KeyError, StopIteration) as error:
+            raise DeployError('無法確認此 SHA 的 GitHub CI；不切換服務，請先檢查網路與來源 CI') from error
+        require(ci.get('status') == 'completed' and ci.get('conclusion') == 'success', '此來源的最新 CI 尚未通過，停止部署')
+        print('來源 CI 通過：' + ci['html_url'])
+
+    def verify_agent_networks(self):
+        # 無憑證 liveliness，不發送 prompt、不接觸 Graph；探針不掛 workspace／engine socket。
+        values = {}
+        for line in Path('/etc/ymir/runtime-host.env').read_text().splitlines():
+            key, separator, value = line.partition('=')
+            if separator and key.startswith('VibeMaker__Runtime__'):
+                values[key] = value.strip().strip('"\'')
+        image = values.get('VibeMaker__Runtime__Image', '')
+        require(image.startswith('localhost/ymir/agent-runtime:'), 'Agent 探針需要已核對的本機 runtime image')
+        networks = [values.get('VibeMaker__Runtime__Network'), values.get('VibeMaker__Runtime__RestrictedNetwork')]
+        require(networks[0], '此主機必須明確設定 Agent 具名網路，不能猜測模型路徑')
+        entries = dict(item.split('=', 1) for item in self.old_api['Config']['Env'])
+        model_url = urllib.parse.urlsplit(entries.get('VibeMaker__Pi__ModelBaseUrl', ''))
+        require(model_url.scheme in ('http', 'https') and model_url.hostname and not model_url.username and not model_url.password,
+                'Agent 模型 URL 不合法')
+        urls = [urllib.parse.urlunsplit((model_url.scheme, model_url.netloc, '/health/liveliness', '', ''))]
+        if self.previous.get('ymir-mcp-gateway.service'):
+            urls.append('http://mcp-gateway:5310/health')
+        code = 'Promise.all(' + json.dumps(urls) + '.map(u=>fetch(u,{signal:AbortSignal.timeout(10000)}).then(r=>{if(!r.ok)throw Error("unhealthy")}))).then(()=>console.log("ok")).catch(()=>process.exit(1))'
+        for network in dict.fromkeys(item for item in networks if item):
+            require(re.fullmatch('[a-zA-Z0-9_.-]+', network), 'Agent network 名稱不合法')
+            result = self.command(['podman', 'run', '--rm', '--name', 'ymir-deploy-probe-' + uuid.uuid4().hex[:12],
+                                   '--network', network, '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
+                                   '--userns=keep-id:uid=1000,gid=1000', '--user=1000:1000', '--memory=192m', '--cpus=0.5',
+                                   '--pids-limit=64', '--entrypoint=node', image, '-e', code], user='ymir')
+            require(result == 'ok', 'Agent 網路探針失敗')
+
+    def write_result(self, success, manual=False):
+        if self.stage and self.stage.is_dir():
+            (self.stage / 'result.json').write_text(json.dumps({'success': success, 'commit': self.sha,
+                'phase': self.phase, 'manual_recovery_required': manual, 'backup': str(self.backup),
+                'deployer_sha256': getattr(self, 'deployer_hash', None),
+                'api_image': getattr(self, 'image_id', None), 'publish_release': str(getattr(self, 'release', '')),
+                'public_login_verified': getattr(self, 'public_verified', False),
+                'manual_pending': ['real_login', 'pi_sse', 'existing_encrypted_data', 'reboot', 'restore']}, indent=2))
+
+    def recover(self):
+        if not self.paused:
+            self.write_result(False)
+            return
+        if self.migration_started and not self.migrations_complete:
+            self.write_result(False, manual=True)
+            print('Migration 未證明完整成功；維持入口／API 關閉，請依私有備份與診斷人工處理。', file=sys.stderr)
+            return
+        try:
+            if getattr(self, 'api_switched', False):
+                self.command(['systemctl', 'stop', self.API])
+                for service in reversed(list(self.services)):
+                    self.command(['systemctl', 'stop', service])
+                atomic(self.quadlet, self.original_quadlet, self.quadlet_mode)
+            for target, original in self.overrides.items():
+                if original is None:
+                    target.unlink(missing_ok=True)  # 只移除本次新增的單一 drop-in。
+                else:
+                    atomic(target, original, self.override_modes.get(target, 0o644))
+            self.command(['systemctl', 'daemon-reload'])
+            self.start_services()
+            self.wait_http(self.api_url + '/health', b'Healthy')
+            self.resume_entrances()
+            self.write_result(False)
+            print('已恢復原程式／入口；保留相容 additive migration、全部備份與舊版本。', file=sys.stderr)
+        except Exception:
+            self.write_result(False, manual=True)
+            print('自動回復未完成；請查看 root 私有 result／diagnostics，不要重跑或刪除資料。', file=sys.stderr)
+
+    def execute(self):
+        try:
+            self.preflight()
+            if self.options.dry_run:
+                print('DRY-RUN 完成：只讀取狀態；沒有建立檔案、fetch、鎖、建置、停止服務或修改 DB。')
+                return
+            self.verify_ci()
+            self.confirm()
+            self.prepare()
+            self.stop_and_backup()
+            self.switch()
+        except (Exception, KeyboardInterrupt) as error:
+            print('部署停止：' + (str(error) if isinstance(error, DeployError) else '非預期失敗／中斷，未輸出機密'), file=sys.stderr)
+            try:
+                self.recover()
+            except Exception:
+                print('無法完整寫入回復結果；請檢查私有部署目錄，勿重跑或清除備份。', file=sys.stderr)
+            raise SystemExit(1)
+        finally:
+            for descriptor in self.locks:
+                os.close(descriptor)
+
+
+def main():
+    options = arguments(sys.argv[2:])
+    os.umask(0o077)
+    signal.signal(signal.SIGTERM, lambda *unused: (_ for _ in ()).throw(KeyboardInterrupt()))
+    Deployment(sys.argv[1], options).execute()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except DeployError as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(2)
+PYTHON

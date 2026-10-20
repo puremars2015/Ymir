@@ -94,6 +94,9 @@ jobs:
       - name: Model proxy boot readiness regression tests
         run: python3 deploy/runtime-host/litellm-proxy/test-boot.py
 
+      - name: Ubuntu redeployment safety regression tests
+        run: python3 deploy/test-redeploy-ubuntu.py
+
       - name: Build image (rootless Podman)
         run: podman build --build-arg "PI_VERSION=${PI_VERSION}" -t localhost/ymir/agent-runtime:ci -f runtime/agent/Containerfile runtime/agent
 
