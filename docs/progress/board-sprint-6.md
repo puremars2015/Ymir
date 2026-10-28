@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-20 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-28 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| NTF0 | 主動通知與排程任務 ADR（[ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)） | 📝 | 草稿，提議中；7 項待使用者決定（建議先做 N1 長任務完成通知），尚未實作，見 #106 |
 | DEP7 | 這台 Ubuntu 的單一手動重新部署入口與安全回復 | 🔬 | 補強既有 redeploy-ubuntu.sh，不重複新增入口；38 項隔離回歸＋8 開機測試通過，腳本／文件已納入版控，未執行新正式部署，見 #104 |
 | SEC1 | 密鑰集中保管至 private ymir-secret-keys | 🚧 | 本機三份 .env 已收存並推送；正式主機設定／keyring 尚未取得，見 #105 |
 | DEP6 | 最新 main 8e47b6e／Pi 啟動準備加速正式部署 | ⛔ | 10/20 讀回 sudo 等候逾時、exit 1，正式切換未執行；產物與原驗證保留，Gateway 仍未安裝，改交付手動入口，見 #102、#104 |
@@ -131,6 +132,29 @@
 ---
 
 ## 💬 留言區
+### #106 · ADR-0032 草稿：主動通知與排程任務 `❓待決定`
+
+> 👤 **Claude（AI）** · 🕒 2026-10-28 · `📢公告` `❓待決定`
+
+- **背景**：使用者詢問 Agent 能否主動提醒或推送訊息。盤點後目前做不到：execution 只由使用者訊息或 `@bot` 觸發；`IDirectMessageHub` 只推給線上使用者且訪客不可用；`sw.js` 沒有 Web Push；Agent 沒有通知工具。
+- **草稿**：[ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)（提議中），分四階段：
+  - N1：`platform.notifications` + 使用者事件串流 + 長任務完成／失敗通知。
+  - N2：排程任務，分 `reminder`（只通知）與 `agent_run`（建立 execution，冪等鍵沿用 `ClientRequestId`）。
+  - N3：內建 MCP 服務 `notify`（`notify_me`、`schedule_reminder`、`propose_schedule`）；Agent 不能直接建立會花錢的排程。
+  - N4：Web Push（VAPID、端點允許清單、預設 payload 不含內容）。
+  - Email／Teams 不在範圍。
+- **驗證**：只新增文件，未改程式，未執行 build／test。已核對 ADR 引用的既有名稱存在（`ClientRequestId`、`MessagingPolicy`、`Ymir:Retention`、`vibemaker.runtime_policy`、ADR 連結）。
+- **待決定**：ADR 末尾「待決定」表共 7 項（第一個上線階段、事件串流是否泛化成 `/api/events`、Agent 能否直接建排程、Web Push 內容、預設上限、`notify` 能力預設、Email／Teams）。確認後把 ADR 狀態改為已採納，再開 N1。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
 ### #105 · 本機密鑰收存至使用者指定的 private 倉庫
 
 > 👤 **Codex（AI）** · 🕒 2026-10-28 · `🚧進度`
