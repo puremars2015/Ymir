@@ -127,7 +127,22 @@ LiteLLM 由別的主機提供時，不需要跑這個目錄的 proxy，Ymir 直�
    知識庫沒有另設 `VibeMaker__Rag__BaseUrl` 時沿用 `BaseUrl`，service token 一樣會帶上；另設別的位址時不帶 token。
 5. **驗證**（在 API 主機執行，值放環境變數）：不帶 token 打管理子網域應回 403；帶 token + admin key 打 `/user/info?user_id=test` 應回 JSON，不是 403 / 404。
 
-**`llm.webpromaterial.com` 的完整設定**（只用遠端 8 個模型，使用者 2026-10-28 決定）見 [ymir-remote-models.env.example](ymir-remote-models.env.example)：替換 API 環境檔中舊的 Models／AllowedModels／Pi ModelId 與 LiteLLM 連線設定，填入 admin key 與 service token 後重啟 API。這份不適用 `apply-linux-models.sh`；切換後本機的 LiteLLM proxy 可以停用。部署後管理員要到「管理 → 系統設定 → 開放模型」勾選新模型並儲存：已保存的開放清單與個人授權是舊模型 id，不會自動對應到新 id。
+**`llm.webpromaterial.com` 的完整設定**（只用遠端 8 個模型，使用者 2026-10-28 決定）見 [ymir-remote-models.env.example](ymir-remote-models.env.example)：替換 API 環境檔中舊的 Models／AllowedModels／Pi ModelId 與 LiteLLM 連線設定，填入 admin key 與 service token 後重啟 API。這份不適用 `apply-linux-models.sh`；
+
+正式 Ubuntu 主機用切換腳本（在專案根目錄執行）：
+
+```bash
+sudo bash deploy/litellm/apply-remote-litellm.sh --check   # 只檢查連線與權限，不改任何設定
+sudo bash deploy/litellm/apply-remote-litellm.sh           # 切換
+```
+
+- 金鑰（admin key、用戶端識別碼、用戶端密碼）以隱藏輸入取得，不經程序參數；`api.env` 已指向同一個 llm-admin 時按 Enter 沿用。
+- 切換前檢查：不帶 token 時 Access 必須擋下、帶 token 能通過、admin key 能呼叫 `/key/list`、llm 的 `/v1/models` 有範本的全部模型；任何一項不符就停止，不改設定。
+- 切換：備份 `/etc/ymir/api.env` 到 `/var/backups/ymir/remote-litellm-*`（含密鑰）→ 停止外部入口 → 有排隊或執行中的工作就取消 → 停 API → 只替換模型與 LiteLLM 連線設定（預算、key 有效期等其他設定保留，重跑結果相同）→ 啟動 API，`/health` 必須 Healthy（含經 llm-admin 的 litellm 檢查）→ 啟動入口、`/login` 200。失敗時自動還原 `api.env` 並重新啟動 API 與入口。
+- 不停止本機 LiteLLM，也不改開放模型清單；完成後依畫面提示到「開放模型」勾選新模型。回復指令會印在最後。
+- 隔離回歸測試：`python3 deploy/litellm/test-apply-remote-litellm.py`（不需要 sudo、不連網路，CI 會執行）。
+
+切換後本機的 LiteLLM proxy 可以停用。部署後管理員要到「管理 → 系統設定 → 開放模型」勾選新模型並儲存：已保存的開放清單與個人授權是舊模型 id，不會自動對應到新 id。
 
 注意：Agent container 必須能連到外部的 `/v1` 網域，所以被關閉對外連線（`internet` 能力）的使用者無法使用外部模型。費用依遠端 LiteLLM 的單價計算，遠端沒填單價時費用為 0、預算不會用完。
 

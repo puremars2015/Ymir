@@ -51,7 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
-| LLM1 | 外部 LiteLLM（`llm.webpromaterial.com`）：模型走 llm、管理走 llm-admin（Cloudflare Access） | 🔬 | Ymir 端完成，遠端 8 模型範本 `ymir-remote-models.env.example`；本機 API + 真 Pi 端對端通過；**正式主機尚未切換**，見 #107 |
+| LLM1 | 外部 LiteLLM（`llm.webpromaterial.com`）：模型走 llm、管理走 llm-admin（Cloudflare Access） | 🔬 | Ymir 端完成、遠端 8 模型範本、切換腳本 `apply-remote-litellm.sh`（含 `--check`、自動還原）；**正式主機尚未切換**，見 #107 |
 | NTF0 | 主動通知與排程任務 ADR（[ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)） | 📝 | 草稿，提議中；7 項待使用者決定（建議先做 N1 長任務完成通知），尚未實作，見 #106 |
 | DEP7 | 這台 Ubuntu 的單一手動重新部署入口與安全回復 | 🔬 | 補強既有 redeploy-ubuntu.sh，不重複新增入口；38 項隔離回歸＋8 開機測試通過，腳本／文件已納入版控，未執行新正式部署，見 #104 |
 | SEC1 | 密鑰集中保管至 private ymir-secret-keys | 🚧 | 本機三份 .env 已收存並推送；正式主機設定／keyring 尚未取得，見 #105 |
@@ -161,6 +161,12 @@
   - 手動流程：`/user/new` → `/key/generate`（限 4 個模型）→ virtual key 打 llm（haiku 200、清單外模型 403、Sonnet／GPT-6.1 Sol 帶 `reasoning.effort` 200、MiniMax 工具呼叫有 `tool_calls`）→ 用量記到非零費用 → `/key/delete` 後 401 → `/user/delete`。
   - Ymir 端對端：以範本設定啟動 Development API（`Harness=Pi`、Local runtime），`/health` Healthy、`/api/models` 列出 8 個模型與思考設定；送出訊息後 Ymir 向遠端發 key、Pi 經 llm 回覆，SSE 收到 `assistant.delta` 與 `execution.completed`；API log 不含 admin key 或 service token。測試產生的 LiteLLM 使用者與 key 已刪除。
 - **待辦**：正式主機的 API 環境檔換成新範本、重啟 API，並由管理員在「開放模型」勾選新模型（舊的開放清單與個人授權是舊 id）；正式切換未執行。service token 的 secret 與 admin key 出現在對話中，建議上線前重新產生。
+
+> 👤 **Claude（AI）** · 🕒 2026-10-28 · `🚧進度`
+
+- **切換腳本** `deploy/litellm/apply-remote-litellm.sh`（bash 包內嵌 Python，同 `redeploy-ubuntu.sh` 的形式）：`--check` 只做檢查；正式切換會備份 `api.env`、停入口、確認沒有排隊或執行中的工作、只替換模型與 LiteLLM 連線設定（其他設定保留、可重跑）、`/health` Healthy 與 `/login` 200 才算完成，失敗自動還原並重新啟動。金鑰只以隱藏輸入取得。README 補用法，CI 新增 `test-apply-remote-litellm.py`。
+- **驗證**：`bash -n`、`--help`（不需 root）；隔離回歸測試 14 項通過（範本產生、金鑰格式、不得夾帶非受管理設定、重跑結果相同、只保留受管理範圍外設定、權限保留、`--check` 不改任何東西、有執行中工作時不動 `api.env`、API 不健康時還原）。以真實遠端跑 preflight：Access 擋下無 token 請求與錯的密碼（403）、token 正確可通過；提供的 admin key 已被刪除（401 `token_not_found_in_db`），腳本正確停止。
+- **待辦**：使用者以新的 admin key 在正式主機先跑 `--check` 再切換；正式切換未執行。
 
 </details>
 

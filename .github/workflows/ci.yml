@@ -97,6 +97,9 @@ jobs:
       - name: Ubuntu redeployment safety regression tests
         run: python3 deploy/test-redeploy-ubuntu.py
 
+      - name: External LiteLLM switch regression tests
+        run: python3 deploy/litellm/test-apply-remote-litellm.py
+
       - name: Build image (rootless Podman)
         run: podman build --build-arg "PI_VERSION=${PI_VERSION}" -t localhost/ymir/agent-runtime:ci -f runtime/agent/Containerfile runtime/agent
 
