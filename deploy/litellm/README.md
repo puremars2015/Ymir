@@ -88,6 +88,7 @@ Agent container 只拿得到這把 virtual key，**master key 與 MiniMax key �
 |---|---|
 | `VibeMaker__LiteLlm__BaseUrl` | API 連 LiteLLM 的位址，例如 `http://127.0.0.1:4000` |
 | `VibeMaker__LiteLlm__MasterKey` | 與 `.env` 的 `LITELLM_MASTER_KEY` 相同；只放在 API 的 secret / 環境變數 |
+| `VibeMaker__LiteLlm__CfAccessClientId` / `CfAccessClientSecret` | 外部 LiteLLM 的管理端點放在 Cloudflare Access 後面時的 service token（用戶端識別碼 / 用戶端密碼）；只送往 `BaseUrl` 同一來源，見下方「外部 LiteLLM 與 Cloudflare Access」 |
 | `VibeMaker__LiteLlm__AllowedModels__0` | key 可用的模型；未設定時允許 `VibeMaker__Models` 清單，沒有模型清單時只有預設模型 |
 | `VibeMaker__LiteLlm__KeyLifetime` / `RenewBefore` | 有效期（預設 `1.00:00:00`）、提前換發時間（預設 `01:00:00`） |
 | `VibeMaker__LiteLlm__MonthlyBudgetUsd` | 每人每月模型預算（美元，30 天一期；0 或不設表示不限制）。管理介面「系統設定 → 執行環境」的值優先 |
@@ -105,6 +106,28 @@ Agent container 只拿得到這把 virtual key，**master key 與 MiniMax key �
 - 想在本機不跑 LiteLLM 也驗證整個發 key 流程：用 `FAKE_LLM_MASTER_KEY=sk-dev dotnet run --project tests/Ymir.Testing.FakeLlm` 啟動 Fake LLM。
   - 它會模擬 `/key/generate`，並拒絕 master key 與未發放的 key；
   - 也會模擬使用者、預算與用量（`/user/*`、`/user/daily/activity`）：每次 chat completion 算 10 + 5 個 token、US$0.01，依 request 的 model 記錄，回傳 `breakdown.model_groups`；使用者 key 的 embeddings 也依 model 記錄（每段文字 8 個輸入 token、費用 0）。
+
+## 外部 LiteLLM 與 Cloudflare Access（ADR-0004 補充）
+
+LiteLLM 由別的主機提供時，不需要跑這個目錄的 proxy，Ymir 直接接過去即可；virtual key、預算與用量照舊。
+
+1. **兩個網域**：Agent 用的 `/v1`（例如 `https://llm.example.com/v1`，不套 Access），以及管理用子網域（例如 `https://llm-admin.example.com`）。管理用子網域的 nginx 只轉送 `/key/`、`/user/`、`/health/liveliness`（與 `/v1/`），其他路徑回 404；沒有 Access 的網域不得轉送管理端點。
+2. **Cloudflare Zero Trust**：Access → Service auth 建立 service token；為管理用子網域建立 Self-hosted application，policy action 選 **Service Auth**、Include 選這個 token。origin 最好只經 Cloudflare Tunnel 對外，避免繞過 Access。
+3. **admin key**：master key，或 `proxy_admin` 使用者的 key（不要設 `allowed_routes`）。只能呼叫 `llm_api_routes` 的 key 會讓 `/user/*`、`/key/*` 回 403。
+4. **API 設定**：
+
+   | 設定 | 值 |
+   |---|---|
+   | `VibeMaker__LiteLlm__BaseUrl` | 管理用子網域（必須 https） |
+   | `VibeMaker__LiteLlm__MasterKey` | admin key |
+   | `VibeMaker__LiteLlm__CfAccessClientId` / `CfAccessClientSecret` | service token |
+   | `VibeMaker__Pi__ModelBaseUrl` | `/v1` 網域，例如 `https://llm.example.com/v1` |
+   | `VibeMaker__Pi__ModelId`、`VibeMaker__Models__N__Id` | 與 `/v1/models` 的 id 相同 |
+
+   知識庫沒有另設 `VibeMaker__Rag__BaseUrl` 時沿用 `BaseUrl`，service token 一樣會帶上；另設別的位址時不帶 token。
+5. **驗證**（在 API 主機執行，值放環境變數）：不帶 token 打管理子網域應回 403；帶 token + admin key 打 `/user/info?user_id=test` 應回 JSON，不是 403 / 404。
+
+注意：Agent container 必須能連到外部的 `/v1` 網域，所以被關閉對外連線（`internet` 能力）的使用者無法使用外部模型。費用依遠端 LiteLLM 的單價計算，遠端沒填單價時費用為 0、預算不會用完。
 
 ## 用量與每人預算（ADR-0011）
 

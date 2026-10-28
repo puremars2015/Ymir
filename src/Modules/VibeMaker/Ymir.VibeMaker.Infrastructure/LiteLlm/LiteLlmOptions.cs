@@ -17,5 +17,16 @@ public sealed class LiteLlmOptions
     /// </summary>
     public string? MasterKey { get; set; }
 
+    /// <summary>
+    /// Cloudflare Access service token 的用戶端識別碼（<c>CF-Access-Client-Id</c>）：LiteLLM 的管理端點放在 Access 後面時使用
+    /// （ADR-0004 補充）。只放在 API 的 secret 設定，只附加在送往 <see cref="BaseUrl"/> 同一來源的請求。
+    /// </summary>
+    public string? CfAccessClientId { get; set; }
+
+    /// <summary>Cloudflare Access service token 的用戶端密碼（<c>CF-Access-Client-Secret</c>）；規則同 <see cref="CfAccessClientId"/>，不得進 Agent container。</summary>
+    public string? CfAccessClientSecret { get; set; }
+
     public bool IsConfigured => !string.IsNullOrWhiteSpace(MasterKey);
+
+    public bool HasCloudflareAccess => !string.IsNullOrWhiteSpace(CfAccessClientId) && !string.IsNullOrWhiteSpace(CfAccessClientSecret);
 }

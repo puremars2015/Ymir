@@ -42,7 +42,7 @@ public static class VibeMakerInfrastructureExtensions
             .ConfigurePrimaryHttpMessageHandler(PersonalMcpProbe.Handler);
         services.AddHostedService<ExecutionWorker>();
         services.AddHostedService<RuntimeLifecycleWorker>();
-        services.AddHttpClient(nameof(Health.LiteLlmHealthCheck));
+        services.AddHttpClient(nameof(Health.LiteLlmHealthCheck)).AddLiteLlmTransport();
 
         // OneDrive connector（ADR-0013）：只有後端連 Graph 與 Entra；token 不保存在 HttpClient。
         services.Configure<Connectors.OneDrive.OneDriveOptions>(configuration.GetSection(Connectors.OneDrive.OneDriveOptions.SectionName));
@@ -225,8 +225,8 @@ public static class VibeMakerInfrastructureExtensions
         services.AddSingleton<Application.Knowledge.IKnowledgeFileStore, Knowledge.FileSystemKnowledgeStore>();
         services.AddSingleton<Application.Knowledge.IVectorStore, Knowledge.SqliteVectorStore>();
         services.AddSingleton<Application.Knowledge.IDocumentTextExtractor, Knowledge.DocumentTextExtractor>();
-        services.AddHttpClient<Application.Knowledge.IEmbeddingClient, Knowledge.LiteLlmEmbeddingClient>(Knowledge.LiteLlmEmbeddingClient.HttpClientName);
-        services.AddHttpClient<Application.Knowledge.IKnowledgeAnswerClient, Knowledge.LiteLlmAnswerClient>(Knowledge.LiteLlmAnswerClient.HttpClientName);
+        services.AddHttpClient<Application.Knowledge.IEmbeddingClient, Knowledge.LiteLlmEmbeddingClient>(Knowledge.LiteLlmEmbeddingClient.HttpClientName).AddLiteLlmTransport();
+        services.AddHttpClient<Application.Knowledge.IKnowledgeAnswerClient, Knowledge.LiteLlmAnswerClient>(Knowledge.LiteLlmAnswerClient.HttpClientName).AddLiteLlmTransport();
         services.AddHostedService<Knowledge.KnowledgeIndexWorker>();
     }
 
@@ -284,7 +284,8 @@ public static class VibeMakerInfrastructureExtensions
                 throw new InvalidOperationException("VibeMaker:LiteLlm:BaseUrl is required when MasterKey is configured.");
             }
 
-            services.AddHttpClient<IModelGateway, LiteLlmModelGateway>(LiteLlmModelGateway.HttpClientName);
+            ValidateCloudflareAccess(liteLlm);
+            services.AddHttpClient<IModelGateway, LiteLlmModelGateway>(LiteLlmModelGateway.HttpClientName).AddLiteLlmTransport();
             return;
         }
 
@@ -295,6 +296,33 @@ public static class VibeMakerInfrastructureExtensions
         }
 
         services.AddSingleton<IModelGateway, DevelopmentModelGateway>();
+    }
+
+    /// <summary>
+    /// Cloudflare Access service token（ADR-0004 補充）：兩個值要一起設定，且只透過 https 送出；
+    /// 只設一半時拒絕啟動，避免以為管理端點有保護、實際上每個請求都被 Access 擋下。
+    /// </summary>
+    private static void ValidateCloudflareAccess(LiteLlmOptions liteLlm)
+    {
+        if (string.IsNullOrWhiteSpace(liteLlm.CfAccessClientId) != string.IsNullOrWhiteSpace(liteLlm.CfAccessClientSecret))
+        {
+            throw new InvalidOperationException("VibeMaker:LiteLlm:CfAccessClientId and CfAccessClientSecret must be configured together.");
+        }
+
+        if (liteLlm.HasCloudflareAccess && liteLlm.BaseUrl?.Scheme != Uri.UriSchemeHttps)
+        {
+            throw new InvalidOperationException("VibeMaker:LiteLlm:BaseUrl must use https when a Cloudflare Access service token is configured.");
+        }
+    }
+
+    /// <summary>API 送往 LiteLLM 的 client：附加 Access service token（只限同一來源）、不跟隨 redirect、log 不記錄任何 header 值。</summary>
+    private static IHttpClientBuilder AddLiteLlmTransport(this IHttpClientBuilder builder)
+    {
+        builder.Services.TryAddTransient<CloudflareAccessHandler>();
+        return builder
+            .ConfigurePrimaryHttpMessageHandler(CloudflareAccessHandler.CreatePrimaryHandler)
+            .AddHttpMessageHandler<CloudflareAccessHandler>()
+            .RedactLoggedHeaders(_ => true);
     }
 }
 

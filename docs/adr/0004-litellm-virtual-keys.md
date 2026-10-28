@@ -47,6 +47,17 @@ SA §12 要求「LiteLLM key 不應落地到使用者可讀 Workspace，以 runt
 - 預算改為**每人每月**（使用者層級的 `max_budget` + `budget_duration: 30d`），由管理介面的執行政策設定。原本每把 key 的 `max_budget` 會隨 key 每 24 小時換發而重置，保留為相容設定。
 - 管理介面的用量讀 LiteLLM 的 `/user/daily/activity`（含每人每模型：`breakdown.model_groups`，ADR-0021）與 `/user/info`，Ymir 不自己保存 token 或費用。
 
+## 補充（2026-10-28）：外部 LiteLLM 與 Cloudflare Access
+
+- LiteLLM 可以是外部主機（另一個團隊或另一台主機維運），不一定是 `deploy/litellm` 的本機 proxy。virtual key、每人預算與用量的機制不變，API 仍需要能呼叫管理端點（`/key/*`、`/user/*`、`/health/liveliness`）的 admin key（master key 或 `proxy_admin` 使用者的 key）；只能呼叫 `llm_api_routes` 的 key 不夠。
+- 外部 LiteLLM 的管理端點必須放在 **Cloudflare Access**（policy action：Service Auth）後面，建議另開管理用子網域；Agent 用的 `/v1` 網域不套用 Access，因為 Pi 不會帶這組 header，service token 也不得進 container。
+- API 以 `VibeMaker:LiteLlm:CfAccessClientId` / `CfAccessClientSecret` 送出 `CF-Access-Client-Id` / `CF-Access-Client-Secret`（`CloudflareAccessHandler`）：
+  - 只附加在與 `VibeMaker:LiteLlm:BaseUrl` 同一來源（scheme + host + port）的請求；用在發 key、使用者 / 預算 / 用量、health check、知識庫的 embedding 與回答。
+  - 這些 client 不跟隨 redirect：.NET 跟隨 redirect 時只移除 `Authorization`，自訂 header 會被帶到新位址；Access 設定錯誤時的 302 / 403 一律視為失敗。
+  - HttpClient log 遮蔽所有 header 值；兩個值只放在 API 的 secret 設定。
+  - 只設一半，或 `BaseUrl` 不是 https 時拒絕啟動。
+- 這是傳輸層的額外保護，不取代 admin key：兩者都要通過才能呼叫管理端點。
+
 ## 影響
 
 - 即使 key 外洩，影響範圍限於單一使用者、有限模型、有限預算與時間。
