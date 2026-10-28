@@ -127,6 +127,8 @@ LiteLLM 由別的主機提供時，不需要跑這個目錄的 proxy，Ymir 直�
    知識庫沒有另設 `VibeMaker__Rag__BaseUrl` 時沿用 `BaseUrl`，service token 一樣會帶上；另設別的位址時不帶 token。
 5. **驗證**（在 API 主機執行，值放環境變數）：不帶 token 打管理子網域應回 403；帶 token + admin key 打 `/user/info?user_id=test` 應回 JSON，不是 403 / 404。
 
+**`llm.webpromaterial.com` 的完整設定**（只用遠端 8 個模型，使用者 2026-10-28 決定）見 [ymir-remote-models.env.example](ymir-remote-models.env.example)：替換 API 環境檔中舊的 Models／AllowedModels／Pi ModelId 與 LiteLLM 連線設定，填入 admin key 與 service token 後重啟 API。這份不適用 `apply-linux-models.sh`；切換後本機的 LiteLLM proxy 可以停用。部署後管理員要到「管理 → 系統設定 → 開放模型」勾選新模型並儲存：已保存的開放清單與個人授權是舊模型 id，不會自動對應到新 id。
+
 注意：Agent container 必須能連到外部的 `/v1` 網域，所以被關閉對外連線（`internet` 能力）的使用者無法使用外部模型。費用依遠端 LiteLLM 的單價計算，遠端沒填單價時費用為 0、預算不會用完。
 
 ## 用量與每人預算（ADR-0011）

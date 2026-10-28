@@ -51,7 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
-| LLM1 | 外部 LiteLLM（`llm.webpromaterial.com`）：管理端點經 Cloudflare Access service token | 🔬 | Ymir 端已完成（`CfAccessClientId`／`CfAccessClientSecret`）；Access、nginx 已由使用者設好並實測；**待 admin key**（目前 key 只能呼叫 `llm_api_routes`），尚未切換正式設定，見 #107 |
+| LLM1 | 外部 LiteLLM（`llm.webpromaterial.com`）：模型走 llm、管理走 llm-admin（Cloudflare Access） | 🔬 | Ymir 端完成，遠端 8 模型範本 `ymir-remote-models.env.example`；本機 API + 真 Pi 端對端通過；**正式主機尚未切換**，見 #107 |
 | NTF0 | 主動通知與排程任務 ADR（[ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)） | 📝 | 草稿，提議中；7 項待使用者決定（建議先做 N1 長任務完成通知），尚未實作，見 #106 |
 | DEP7 | 這台 Ubuntu 的單一手動重新部署入口與安全回復 | 🔬 | 補強既有 redeploy-ubuntu.sh，不重複新增入口；38 項隔離回歸＋8 開機測試通過，腳本／文件已納入版控，未執行新正式部署，見 #104 |
 | SEC1 | 密鑰集中保管至 private ymir-secret-keys | 🚧 | 本機三份 .env 已收存並推送；正式主機設定／keyring 尚未取得，見 #105 |
@@ -148,9 +148,19 @@
 - **待決定**：模型清單改成遠端 `/v1/models` 的 8 個 id（是否保留 MiniMax／OpenRouter 路由）；遠端 LiteLLM 是否已填單價（沒填時費用為 0、預算失效）。另提醒：service token 的 secret 與原 key 已出現在對話中，正式上線前建議重新產生。
 
 <details>
-<summary>💬 回覆（0）</summary>
+<summary>💬 回覆（1）</summary>
 
-（尚無回覆）
+> 👤 **Claude（AI）** · 🕒 2026-10-28 · `🚧進度`
+
+- **使用者決定**：模型清單只用遠端 8 個；Ymir 直接呼叫 `https://llm.webpromaterial.com`（模型），`https://llm-admin.webpromaterial.com` 只做 LiteLLM 管理；兩個端點都已改 https。使用者已提供 admin key（原 key 已失效）。
+- **新增** `deploy/litellm/ymir-remote-models.env.example`（含 llm／llm-admin 連線設定與 8 個模型，預設 `claude-sonnet-5.5`），README 補說明；舊的 `ymir-models.env.example` 與 `apply-linux-models.sh` 只管本機 LiteLLM，保留不動。
+  - 能力依遠端 `/v1/model/info`：除 MiniMax M3.1 Flash（未標示）外都支援圖片與工具。
+  - 思考深度只給 Claude Sonnet／Haiku（沿用已驗證的 OpenRouter 值）；Opus 與 GPT 系列的 effort 值未核對，先不提供。
+- **驗證（實際呼叫遠端）**：
+  - admin key 經 llm-admin：`/key/list`、`/user/daily/activity`、`/v1/model/info` 200。
+  - 手動流程：`/user/new` → `/key/generate`（限 4 個模型）→ virtual key 打 llm（haiku 200、清單外模型 403、Sonnet／GPT-6.1 Sol 帶 `reasoning.effort` 200、MiniMax 工具呼叫有 `tool_calls`）→ 用量記到非零費用 → `/key/delete` 後 401 → `/user/delete`。
+  - Ymir 端對端：以範本設定啟動 Development API（`Harness=Pi`、Local runtime），`/health` Healthy、`/api/models` 列出 8 個模型與思考設定；送出訊息後 Ymir 向遠端發 key、Pi 經 llm 回覆，SSE 收到 `assistant.delta` 與 `execution.completed`；API log 不含 admin key 或 service token。測試產生的 LiteLLM 使用者與 key 已刪除。
+- **待辦**：正式主機的 API 環境檔換成新範本、重啟 API，並由管理員在「開放模型」勾選新模型（舊的開放清單與個人授權是舊 id）；正式切換未執行。service token 的 secret 與 admin key 出現在對話中，建議上線前重新產生。
 
 </details>
 
