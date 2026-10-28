@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| LLM1 | 外部 LiteLLM（`llm.webpromaterial.com`）：管理端點經 Cloudflare Access service token | 🔬 | Ymir 端已完成（`CfAccessClientId`／`CfAccessClientSecret`）；Access、nginx 已由使用者設好並實測；**待 admin key**（目前 key 只能呼叫 `llm_api_routes`），尚未切換正式設定，見 #107 |
 | NTF0 | 主動通知與排程任務 ADR（[ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)） | 📝 | 草稿，提議中；7 項待使用者決定（建議先做 N1 長任務完成通知），尚未實作，見 #106 |
 | DEP7 | 這台 Ubuntu 的單一手動重新部署入口與安全回復 | 🔬 | 補強既有 redeploy-ubuntu.sh，不重複新增入口；38 項隔離回歸＋8 開機測試通過，腳本／文件已納入版控，未執行新正式部署，見 #104 |
 | SEC1 | 密鑰集中保管至 private ymir-secret-keys | 🚧 | 本機三份 .env 已收存並推送；正式主機設定／keyring 尚未取得，見 #105 |
@@ -132,6 +133,29 @@
 ---
 
 ## 💬 留言區
+### #107 · 外部 LiteLLM 的管理端點經 Cloudflare Access `🔬待驗證`
+
+> 👤 **Claude（AI）** · 🕒 2026-10-28 · `🚧進度` `❓待決定`
+
+- **背景**：使用者要改用外部 LiteLLM 端點 `llm.webpromaterial.com`。實測原本的 key 只能呼叫 `/v1`，管理端點被 nginx 擋掉；與使用者討論後決定沿用 ADR-0004 的 virtual key 機制，管理端點另開 `llm-admin.webpromaterial.com`，放在 Cloudflare Access（Service Auth）後面。
+- **使用者環境（已實測）**：`llm-admin` 不帶 token 一律 403、錯的 secret 403；帶 token 後 `/health/liveliness` 200、`/v1/models` 200；`llm` 網域打 `/key/*`、`/user/*` 為 404（管理端點沒有從沒保護的網域露出）。
+- **Ymir 變更**（`a608770`）：
+  - `VibeMaker:LiteLlm:CfAccessClientId` / `CfAccessClientSecret`；`CloudflareAccessHandler` 只對與 `BaseUrl` 同一來源的請求附加 token，套用在 gateway、health check、知識庫 embedding / answer。
+  - 這些 client 不跟隨 redirect（.NET 跟隨時自訂 header 會外流）、log 遮蔽所有 header 值；只設一半或 `BaseUrl` 非 https 時拒絕啟動。
+  - ADR-0004 補充、`deploy/litellm/README.md`「外部 LiteLLM 與 Cloudflare Access」、`deploy/api/.env.example`。
+- **驗證**：`dotnet build Ymir.slnx` 通過；單元測試 737/737（新增 `CloudflareAccessTests` 13 項）；整合測試 343/343。端對端：本機 API（Development）指向 `llm-admin`，`/health` 為 Healthy，換成錯的 secret 為 Unhealthy；兩次的 API log 都沒有出現 secret 或 key 的值。
+- **卡關**：`/user/info`、`/key/info`、`/user/daily/activity` 回 403 `Virtual key is not allowed to call this route`，現有 key 限制在 `llm_api_routes`。需要使用者提供 master key 或 `proxy_admin` 使用者的 key（不要設 `allowed_routes`），才能發 virtual key；拿到後在正式主機的 `deploy/api/.env` 設定，並用 README 的 curl 驗證。
+- **待決定**：模型清單改成遠端 `/v1/models` 的 8 個 id（是否保留 MiniMax／OpenRouter 路由）；遠端 LiteLLM 是否已填單價（沒填時費用為 0、預算失效）。另提醒：service token 的 secret 與原 key 已出現在對話中，正式上線前建議重新產生。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
+
 ### #106 · ADR-0032 草稿：主動通知與排程任務 `❓待決定`
 
 > 👤 **Claude（AI）** · 🕒 2026-10-28 · `📢公告` `❓待決定`
