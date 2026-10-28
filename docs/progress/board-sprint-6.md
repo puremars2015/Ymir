@@ -52,6 +52,7 @@
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
 | DEP7 | 這台 Ubuntu 的單一手動重新部署入口與安全回復 | 🔬 | 補強既有 redeploy-ubuntu.sh，不重複新增入口；38 項隔離回歸＋8 開機測試通過，腳本／文件已納入版控，未執行新正式部署，見 #104 |
+| SEC1 | 密鑰集中保管至 private ymir-secret-keys | 🚧 | 本機三份 .env 已收存並推送；正式主機設定／keyring 尚未取得，見 #105 |
 | DEP6 | 最新 main 8e47b6e／Pi 啟動準備加速正式部署 | ⛔ | 10/20 讀回 sudo 等候逾時、exit 1，正式切換未執行；產物與原驗證保留，Gateway 仍未安裝，改交付手動入口，見 #102、#104 |
 | DOC4 | Windows 11 Professional 測試機安裝總指南 | ✅ | Windows 原生 PowerShell 7＋Docker Desktop WSL 2／Linux containers；SQL 持久化、真 Pi＋Fake LLM、可選 Remote API、啟停／備份／回復；語法與 mock 驗證通過，未在 Windows 實機安裝，見 #101 |
 | DOC3 | 各 container 部署 script 對照、流程及部署流水帳 | ✅ | 固定 7 個容器角色＋Agent／主機服務分列，首裝／更新／回復與版控缺口明確標註；98 本機連結及 Bash 範例語法通過，本次僅文件，見 #098 |
@@ -130,6 +131,15 @@
 ---
 
 ## 💬 留言區
+### #105 · 本機密鑰收存至使用者指定的 private 倉庫
+
+> 👤 **Codex（AI）** · 🕒 2026-10-28 · `🚧進度`
+
+- 依使用者明確指示，確認 `puremars2015/ymir-secret-keys` 為 private 空倉庫，將本機 `deploy/api/.env`、`deploy/cloudflared/.env`、`deploy/litellm/.env` 的副本放入該倉庫 `local-windows/` 並推送 main（`65a5d5e`）。服務使用中的原檔及本專案 ignore 規則保留。
+- 驗證：三份複製檔 SHA-256 與來源一致；推送前再次讀回 isPrivate=true；push 成功。純設定副本與紀錄，未更動程式，未執行 build／test。
+- 未完成：本機與 WSL 未找到正式部署目錄或正式 SSH 設定；正式 `/etc/ymir`、模型 OAuth／服務持久憑證、Data Protection keyring 與資料庫加密管理設定尚未收存。詳細清單與還原路徑記於密鑰倉庫 README；需正式主機存取資訊才可繼續，不能宣稱所有密鑰已備齊。未匯出使用者憑證或業務資料。
+
+---
 
 ### #104 · 單一重新部署入口符合現有 Ubuntu 主機並補強安全驗證
 
