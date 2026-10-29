@@ -133,6 +133,13 @@
 ---
 
 ## 💬 留言區
+### 外部 LiteLLM 正式切換
+
+> 2026-10-29 · 切換完成，待使用者驗收
+
+- 經使用者終端 sudo 授權，執行切換腳本：Access 保護與 admin key 權限、遠端 8 個模型預檢通過；API 管理端點改為 `https://llm-admin.webpromaterial.com`，Pi 模型端點改為 `https://llm.webpromaterial.com/v1`。原 API 設定的私有備份為 `/var/backups/ymir/remote-litellm-20261029-132353-b2b9de`；本機 LiteLLM 保留未停止。
+- 腳本退出 0；獨立讀回 API、RuntimeHost、兩個入口 active，API health Healthy、本機入口 `/login` HTTP 200。使用者需在「管理 → 系統設定 → 開放模型」勾選新模型，真登入、模型推論／Pi SSE、用量及受限網路使用者仍待驗收；不以 health 取代實際對話。
+
 ### 外部 LiteLLM 切換的控制終端修正
 
 > 2026-10-29 · 切換進行中
