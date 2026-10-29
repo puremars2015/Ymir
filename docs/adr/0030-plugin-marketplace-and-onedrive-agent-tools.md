@@ -5,6 +5,7 @@
 - 取代：[ADR-0022](0022-onedrive-linked-files.md) 的「使用者手動指定連結項目」（O3a 瀏覽入口、O3b 連結與執行前下載；O4、O5 不再實作）
 - 修訂：[ADR-0028](0028-personal-connections-and-tools.md) §7（連接帳號後，啟用外掛的使用者讓 Agent 自行存取自己的 OneDrive）、[ADR-0012](0012-agent-extensions-and-platform-mcp.md) B（gateway 新增內建服務 `onedrive`，後端是 API）
 - 不變：[ADR-0013](0013-onedrive-connector.md) 的同步資料夾（OneDrive 上的一個資料夾和 Agent 工作目錄雙向同步）是另一個功能，保留原樣
+- 2026-10-29 修訂：同步資料夾已由 [ADR-0033](0033-persistent-runtime-and-onedrive-plugin-only.md) 移除，OneDrive 只剩本 ADR 的 Agent 工具；下文提到同步資料夾的部分僅供追溯
 
 ## 背景
 

@@ -491,7 +491,7 @@ MVP 可先單機部署 API + Podman，但程式設計不得假設兩者永遠在
 |---|---|
 | Runtime:Provider | Podman |
 | Runtime:Image | Agent runtime image/version |
-| Runtime:IdleTimeoutMinutes | 閒置多久自動停止。 |
+| Runtime:IdleTimeoutMinutes | 閒置多久自動停止；預設 0 = 常駐（ADR-0033）。 |
 | Runtime:MemoryLimit | 每 Workspace Runtime memory quota。 |
 | Runtime:CpuLimit | 每 Workspace Runtime CPU quota。 |
 | Runtime:ExecutionTimeoutMinutes | 單次 Agent execution timeout。 |

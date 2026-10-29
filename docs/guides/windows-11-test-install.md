@@ -393,7 +393,7 @@ docker compose -p ymir-win11 -f compose.windows.yml logs --tail 50 api
 | 停止 A | 停送新訊息、取消／排空 → Angular Ctrl+C → API Ctrl+C → Fake LLM Ctrl+C → 視需要停止指定 Agent／SQL |
 | 停止 B | 排空 → `docker compose -p ymir-win11 -f compose.windows.yml stop api`（在 `deploy/api`）→ RuntimeHost Ctrl+C → Fake LLM Ctrl+C → 視需要停 SQL |
 
-停止 SQL 使用 `docker stop --time 60 ymir-win11-sql`，不要刪 volume。閒置 Agent 可由平台生命週期停止，或在無工作時精確 stop 已確認的測試容器；不批次停止其他專案。
+停止 SQL 使用 `docker stop --time 60 ymir-win11-sql`，不要刪 volume。Agent 預設常駐（ADR-0033），可由 Admin 在管理介面停止，或在無工作時精確 stop 已確認的測試容器；不批次停止其他專案。
 
 Docker Desktop 可選「登入時啟動」，`restart: unless-stopped` **不等於**未登入就有無人值守的 Windows service；手動 stopped 的容器也不保證下次登入自動啟動。Windows 上的 `dotnet run`／`npm start` 不會因 Docker ready 而自動啟動，重新啟動 Windows 後須按表依序重啟並驗收。
 

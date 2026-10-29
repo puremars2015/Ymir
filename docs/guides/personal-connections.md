@@ -10,7 +10,7 @@
 
 ## OneDrive
 
-在 OneDrive 卡片連結（= 安裝）、重新授權或解除帳號，並設定同步資料夾（選用）。原 `/settings?onedrive=結果` 回跳網址會導向市集，不需重新註冊 Microsoft callback URI。
+在 OneDrive 卡片連結（= 安裝）、重新授權或解除帳號（不同步工作目錄，ADR-0033）。原 `/settings?onedrive=結果` 回跳網址會導向市集，不需重新註冊 Microsoft callback URI。
 
 連結帳號**不會**自動讓 Agent 存取 OneDrive；要使用者自己打開卡片上的「讓 Agent 使用」（會先確認風險）。打開後 Agent 在個人對話中可以自己搜尋、下載、上傳、移動與刪除（進回收筒）你 OneDrive 上的檔案，詳見 [OneDrive 指南](onedrive.md)。
 

@@ -1,6 +1,6 @@
 # ADR-0011：Runtime 生命週期與執行政策
 
-- 狀態：已採納（補充 ADR-0007、ADR-0008、ADR-0010）
+- 狀態：已採納（補充 ADR-0007、ADR-0008、ADR-0010）；閒置停止預設值與重啟後自動啟動由 [ADR-0033](0033-persistent-runtime-and-onedrive-plugin-only.md) 補充
 - 日期：2026-10-07
 
 ## 背景

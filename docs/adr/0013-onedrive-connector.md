@@ -1,6 +1,6 @@
 # ADR-0013：OneDrive connector——後端經 Microsoft Graph 同步，Agent 不持有憑證
 
-- 狀態：已採納（2026-10-07 使用者確認；補充 ADR-0007、ADR-0008、ADR-0009、ADR-0010、ADR-0012）
+- 狀態：已採納（2026-10-07 使用者確認；補充 ADR-0007、ADR-0008、ADR-0009、ADR-0010、ADR-0012）；§3、§4 的同步已被 [ADR-0033](0033-persistent-runtime-and-onedrive-plugin-only.md) 取代並移除，§1、§2 的授權與憑證保存仍有效
 - 日期：2026-10-07
 
 ## 背景

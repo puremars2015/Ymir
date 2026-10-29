@@ -14,9 +14,9 @@
 | [0008](0008-containerized-api-runtime-host.md) | API 放進容器，Agent runtime 由主機上的 runtime host 管理 | 已採納 |
 | [0009](0009-entra-id-and-local-accounts.md) | 企業帳號（Entra ID OIDC）與本機帳號密碼登入 | 已採納 |
 | [0010](0010-admin-editable-system-settings.md) | 管理介面與可由網頁修改的系統設定（Entra ID、Cloudflare Tunnel） | 已採納 |
-| [0011](0011-runtime-lifecycle-policy.md) | Runtime 生命週期與執行政策（閒置停止、對帳、配額、用量） | 已採納 |
+| [0011](0011-runtime-lifecycle-policy.md) | Runtime 生命週期與執行政策（閒置停止、對帳、配額、用量） | 已採納（閒置停止預設由 ADR-0033 改為常駐） |
 | [0012](0012-agent-extensions-and-platform-mcp.md) | Agent 擴充能力：管理員管制的使用者自建擴充，與開發人員維護的平台 MCP | 已採納（egress 由管理員控制，預設允許） |
-| [0013](0013-onedrive-connector.md) | OneDrive connector：後端經 Microsoft Graph 同步，Agent 不持有憑證 | 已採納 |
+| [0013](0013-onedrive-connector.md) | OneDrive connector：後端經 Microsoft Graph 同步，Agent 不持有憑證 | 授權與憑證保留；同步（§3、§4）已被 ADR-0033 取代 |
 | [0014](0014-rag-knowledge-base.md) | RAG 知識庫：專案文件索引、經 LiteLLM 的 Embedding、每專案一份 SQLite | 已採納 |
 | [0015](0015-explicit-execution-deliverables.md) | 交付成果與工作檔案分離 | 已採納 |
 | [0016](0016-site-hosting.md) | 網站託管：獨立網域、SiteHost 服務、票據登入與分享 | 已採納 |
@@ -33,9 +33,10 @@
 | [0027](0027-admin-user-management-and-guest-role.md) | 管理員的使用者管理（改名、角色、刪除）與訪客角色 | 已採納 |
 | [0028](0028-personal-connections-and-tools.md) | 個人連接與工具管理（OneDrive 與 HTTP MCP） | 已採納 |
 | [0029](0029-make-tools-sidebar.md) | 左側「小工具」：/make 小工具自動發布並在 Ymir 內以 iframe 開啟 | 已採納 |
-| [0030](0030-plugin-marketplace-and-onedrive-agent-tools.md) | 外掛市集與 OneDrive Agent 工具 | 已採納 |
+| [0030](0030-plugin-marketplace-and-onedrive-agent-tools.md) | 外掛市集與 OneDrive Agent 工具 | 已採納（同步資料夾部分由 ADR-0033 修訂） |
 | [0031](0031-llm-auto-model-router.md) | 以 LLM 自動路由選擇回覆模型（Auto：輕／中／重，預設啟用） | 已採納（待實作） |
 | [0032](0032-proactive-notifications-and-scheduled-tasks.md) | 主動通知與排程任務（讓 Agent 能提醒使用者） | 提議中（待使用者確認） |
+| [0033](0033-persistent-runtime-and-onedrive-plugin-only.md) | Agent 執行環境常駐，OneDrive 只保留外掛（移除同步） | 已採納 |
 
 新增 ADR 時複製以下格式：
 
