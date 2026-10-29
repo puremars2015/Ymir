@@ -55,8 +55,8 @@ public sealed class ExecutionOptions
     /// <summary>單次 Agent execution 的逾時（<c>ExecutionTimeoutMinutes</c>）。</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(30);
 
-    /// <summary>沒有 execution 多久後停止 runtime（<c>IdleTimeoutMinutes</c>）；<see cref="TimeSpan.Zero"/> 表示不自動停止。</summary>
-    public TimeSpan IdleTimeout { get; set; } = TimeSpan.FromMinutes(30);
+    /// <summary>沒有 execution 多久後停止 runtime（<c>IdleTimeoutMinutes</c>）；預設 <see cref="TimeSpan.Zero"/> = 常駐不停止（ADR-0033）。</summary>
+    public TimeSpan IdleTimeout { get; set; } = TimeSpan.Zero;
 
     /// <summary>每位使用者同時排隊 + 執行中的 execution 上限（<c>MaxPendingExecutionsPerUser</c>）。</summary>
     public int MaxPendingExecutionsPerUser { get; set; } = 5;

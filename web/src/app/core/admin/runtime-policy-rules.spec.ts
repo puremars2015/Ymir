@@ -67,6 +67,16 @@ describe('runtime policy rules', () => {
         updatedByName: null,
       }),
     ).toBe('閒置 30 分鐘後停止 · 單次最長 30 分鐘 · 每人排隊 5 個 · 每日 不限制 · 每月預算 不限制');
+    const persistent = { ...values, idleTimeoutMinutes: 0 };
+    expect(
+      policySummary({
+        effective: persistent,
+        deployment: persistent,
+        source: 'Deployment',
+        updatedAt: null,
+        updatedByName: null,
+      }),
+    ).toBe('執行環境常駐 · 單次最長 30 分鐘 · 每人排隊 5 個 · 每日 不限制 · 每月預算 不限制');
     expect(formatUsd(12.5)).toBe('US$12.50');
     expect(formatUsd(0.004)).toBe('< US$0.01');
     expect(formatBudget(0)).toBe('不限制');

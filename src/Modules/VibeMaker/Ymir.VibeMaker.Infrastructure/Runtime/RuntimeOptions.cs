@@ -40,10 +40,11 @@ public sealed partial class RuntimeOptions
     public bool SelinuxRelabel { get; set; }
 
     /// <summary>
-    /// 沒有 execution 多久後自動停止使用者的 runtime（分鐘，0 表示不停止；檔案保留，下一次送訊息時自動啟動）。
+    /// 沒有 execution 多久後自動停止使用者的 runtime（分鐘；預設 0 = 常駐不停止，ADR-0033，
+    /// 讓使用者能在 container 內跑長任務與排程；設定大於 0 時停止，檔案保留，下一次送訊息時自動啟動）。
     /// 以下四項是部署預設值，管理介面儲存的執行政策優先（ADR-0011）。
     /// </summary>
-    public double IdleTimeoutMinutes { get; set; } = 30;
+    public double IdleTimeoutMinutes { get; set; }
 
     /// <summary>單次 Agent execution 逾時（分鐘，可為小數）。</summary>
     public double ExecutionTimeoutMinutes { get; set; } = 30;

@@ -93,7 +93,10 @@ export const formatLimit = (value: number | string, unit: string): string =>
 export function policySummary(policy: RuntimePolicy): string {
   const e = policy.effective;
   return [
-    `閒置 ${formatMinutes(e.idleTimeoutMinutes, '不自動停止')}後停止`,
+    // 預設 0 = 常駐（ADR-0033）：只有 Admin 手動停止。
+    Number(e.idleTimeoutMinutes)
+      ? `閒置 ${formatMinutes(e.idleTimeoutMinutes)}後停止`
+      : '執行環境常駐',
     `單次最長 ${formatMinutes(e.executionTimeoutMinutes)}`,
     `每人排隊 ${e.maxPendingExecutionsPerUser} 個`,
     `每日 ${formatLimit(e.dailyExecutionLimit, '次')}`,

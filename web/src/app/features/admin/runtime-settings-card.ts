@@ -25,7 +25,7 @@ import { ApiService, describeApiError } from '../../core/api/api.service';
 import { RuntimePolicy } from '../../core/api/api-types';
 
 /**
- * 系統設定：執行環境（ADR-0011）。閒置停止、單次執行上限與每人配額；存檔後立即生效，不必重新啟動。
+ * 系統設定：執行環境（ADR-0011、ADR-0033）。閒置停止（預設常駐）、單次執行上限與每人配額；存檔後立即生效，不必重新啟動。
  */
 @Component({
   selector: 'app-runtime-settings-card',
@@ -61,8 +61,8 @@ import { RuntimePolicy } from '../../core/api/api-types';
                 (ngModelChange)="patch({ idleTimeoutMinutes: $event + '' })"
               />
               <span class="muted small"
-                >沒有工作多久後停止使用者的執行環境（檔案保留，下次送訊息時自動啟動）。0
-                表示不自動停止。部署設定：{{
+                >預設 0：執行環境常駐，只在管理員手動停止時關閉，讓使用者能跑長時間任務與排程。 大於
+                0 時，沒有工作多久後停止（檔案保留，下次送訊息時自動啟動）。部署設定：{{
                   minutes(p.deployment.idleTimeoutMinutes, '不自動停止')
                 }}</span
               >

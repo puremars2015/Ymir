@@ -1,9 +1,19 @@
+using Ymir.VibeMaker.Application.Executions;
 using Ymir.VibeMaker.Application.Runtime;
+using Ymir.VibeMaker.Infrastructure.Runtime;
 
 namespace Ymir.UnitTests.Runtime;
 
 public class RuntimePolicySettingsTests
 {
+    /// <summary>ADR-0033：runtime 預設常駐，只有管理員設定閒置時間或手動停止時才停止。</summary>
+    [Fact]
+    public void IdleStop_IsDisabledByDefault()
+    {
+        Assert.Equal(0, new RuntimeOptions().IdleTimeoutMinutes);
+        Assert.Equal(TimeSpan.Zero, new ExecutionOptions().IdleTimeout);
+    }
+
     [Theory]
     [InlineData(0, 1, 1, 0)]
     [InlineData(30, 30, 5, 0)]

@@ -24,6 +24,7 @@ const ACTION_LABELS: Record<string, string> = {
   'runtime.idle_stop': '閒置自動停止執行環境',
   'runtime.create': '建立執行環境',
   'runtime.start': '啟動執行環境',
+  'runtime.autostart': '重新啟動後自動啟動執行環境',
   'runtime.stop': '停止執行環境',
   'runtime.reconcile': '同步執行環境狀態',
   'runtime.ensure': '執行環境啟動失敗',

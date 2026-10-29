@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Ymir.Api.Auth;
@@ -27,10 +28,50 @@ public sealed class RuntimeLifecycleApiFactory : ApiFactory
     {
         builder.UseSetting("VibeMaker:Runtime:IdleTimeoutMinutes", "0.001");
         builder.UseSetting("VibeMaker:Runtime:IdleCheckIntervalSeconds", "3600");
+        builder.ConfigureTestServices(services =>
+        {
+            // Local runtime 沒有「已停止」狀態：包一層模擬主機重開機後 container 停在 Stopped（ADR-0033）。
+            var descriptor = services.Last(d => d.ServiceType == typeof(IAgentRuntimeManager));
+            services.Remove(descriptor);
+            services.AddSingleton(sp => new RebootableRuntimeManager((IAgentRuntimeManager)ActivatorUtilities.CreateInstance(sp, descriptor.ImplementationType!)));
+            services.AddSingleton<IAgentRuntimeManager>(sp => sp.GetRequiredService<RebootableRuntimeManager>());
+        });
     }
 }
 
-/// <summary>執行政策（ADR-0011）：管理介面設定、配額、閒置停止、啟動時對帳、用量。</summary>
+/// <summary>測試替身：<see cref="SimulateReboot"/> 後該使用者的 container 狀態為 Stopped，直到下一次 EnsureRuntime。</summary>
+public sealed class RebootableRuntimeManager(IAgentRuntimeManager inner) : IAgentRuntimeManager
+{
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, bool> _stopped = new();
+
+    public void SimulateReboot(Guid userId) => _stopped[userId] = true;
+
+    public Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, RuntimeNetworkAccess? network, CancellationToken cancellationToken)
+    {
+        _stopped.TryRemove(userId, out _);
+        return inner.EnsureRuntimeAsync(userId, network, cancellationToken);
+    }
+
+    public RestrictedNetworkSupport RestrictedNetwork => inner.RestrictedNetwork;
+
+    public Task StartAsync(Guid runtimeId, CancellationToken cancellationToken) => inner.StartAsync(runtimeId, cancellationToken);
+
+    public Task StopAsync(Guid runtimeId, CancellationToken cancellationToken) => inner.StopAsync(runtimeId, cancellationToken);
+
+    public Task DeleteAsync(Guid runtimeId, CancellationToken cancellationToken) => inner.DeleteAsync(runtimeId, cancellationToken);
+
+    public Task<RuntimeInfo> GetStatusAsync(Guid runtimeId, CancellationToken cancellationToken) => inner.GetStatusAsync(runtimeId, cancellationToken);
+
+    public async Task<RuntimeStatus> GetStatusForUserAsync(Guid userId, CancellationToken cancellationToken) =>
+        _stopped.ContainsKey(userId) ? RuntimeStatus.Stopped : await inner.GetStatusForUserAsync(userId, cancellationToken);
+
+    public Task<bool> StopForUserAsync(Guid userId, CancellationToken cancellationToken) => inner.StopForUserAsync(userId, cancellationToken);
+
+    public Task<IRuntimeProcess> StartProcessAsync(Guid runtimeId, RuntimeProcessSpec spec, CancellationToken cancellationToken) =>
+        inner.StartProcessAsync(runtimeId, spec, cancellationToken);
+}
+
+/// <summary>執行政策（ADR-0011）：管理介面設定、配額、閒置停止、啟動時對帳與自動啟動（ADR-0033）、用量。</summary>
 public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassFixture<RuntimeLifecycleApiFactory>
 {
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -182,6 +223,60 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
         using var admin = await factory.LoginAsync($"reconcile-admin-{Guid.NewGuid():N}", UserRole.Admin);
         var audit = await admin.GetFromJsonAsync<AuditLogPageResponse>($"/api/admin/audit?action=runtime.reconcile&userId={userId}", JsonDefaults.Options, Ct);
         Assert.Contains(audit!.Items, e => e.Action == "runtime.reconcile");
+    }
+
+    [Fact]
+    public async Task Reconcile_StartsRuntimesStoppedByAHostRestart()
+    {
+        using var client = await factory.LoginAsync($"autostart-user-{Guid.NewGuid():N}");
+        var userId = await UserIdAsync(client);
+        var conversation = await client.CreateConversationAsync(null, "autostart");
+        var (_, sent) = await client.SendMessageAsync(conversation.Id, "hello");
+        await client.ReadEventsAsync(sent!.EventStreamUrl);
+        var manager = factory.Services.GetRequiredService<RebootableRuntimeManager>();
+        var lastActive = (await RuntimeRecordAsync(userId)).LastActiveAt;
+
+        // 主機重開機：container 停在 Stopped，不是平台刻意停止 → API 啟動對帳時啟動回來
+        manager.SimulateReboot(userId);
+        await InScopeAsync(sp => sp.GetRequiredService<RuntimeLifecycleService>().ReconcileAsync(Ct));
+
+        var record = await RuntimeRecordAsync(userId);
+        Assert.Equal(RuntimeStatus.Running, record.Status);
+        Assert.False(record.StopRequested);
+        Assert.Equal(lastActive, record.LastActiveAt); // 自動啟動不是使用者活動
+        Assert.Equal(RuntimeStatus.Running, await manager.GetStatusForUserAsync(userId, Ct));
+        using var admin = await factory.LoginAsync($"autostart-admin-{Guid.NewGuid():N}", UserRole.Admin);
+        var audit = await admin.GetFromJsonAsync<AuditLogPageResponse>($"/api/admin/audit?action=runtime.autostart&userId={userId}", JsonDefaults.Options, Ct);
+        Assert.Contains(audit!.Items, e => e.Action == "runtime.autostart" && e.ActorName == "system");
+    }
+
+    [Fact]
+    public async Task Reconcile_DoesNotStartRuntimesStoppedByAnAdmin_UntilTheNextExecution()
+    {
+        using var client = await factory.LoginAsync($"manual-stop-user-{Guid.NewGuid():N}");
+        var userId = await UserIdAsync(client);
+        var conversation = await client.CreateConversationAsync(null, "manual stop");
+        var (_, sent) = await client.SendMessageAsync(conversation.Id, "hello");
+        await client.ReadEventsAsync(sent!.EventStreamUrl);
+        var manager = factory.Services.GetRequiredService<RebootableRuntimeManager>();
+
+        using var admin = await factory.LoginAsync($"manual-stop-admin-{Guid.NewGuid():N}", UserRole.Admin);
+        using var stop = await admin.PostAsync($"/api/admin/runtimes/{userId}/stop", null, Ct);
+        Assert.Equal(HttpStatusCode.NoContent, stop.StatusCode);
+        Assert.True((await RuntimeRecordAsync(userId)).StopRequested);
+
+        manager.SimulateReboot(userId);
+        await InScopeAsync(sp => sp.GetRequiredService<RuntimeLifecycleService>().ReconcileAsync(Ct));
+        var record = await RuntimeRecordAsync(userId);
+        Assert.Equal(RuntimeStatus.Stopped, record.Status);
+        Assert.True(record.StopRequested);
+
+        // 使用者再次送訊息時照常啟動，人為停止的標記清除
+        var (_, again) = await client.SendMessageAsync(conversation.Id, "again");
+        await client.ReadEventsAsync(again!.EventStreamUrl);
+        record = await RuntimeRecordAsync(userId);
+        Assert.Equal(RuntimeStatus.Running, record.Status);
+        Assert.False(record.StopRequested);
     }
 
     [Fact]

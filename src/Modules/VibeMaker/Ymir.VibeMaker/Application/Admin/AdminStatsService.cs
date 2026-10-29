@@ -130,7 +130,8 @@ public sealed class AdminStatsService(
 
         // 以 user id 停止：runtime id 在服務重新啟動後會改變（見 IAgentRuntimeManager.StopForUserAsync）。
         await runtimes.StopForUserAsync(userId, cancellationToken).ConfigureAwait(false);
-        record.MarkStatus(RuntimeStatus.Stopped, timeProvider.GetUtcNow());
+        // 人為停止：API 重新啟動對帳時不自動啟動，直到使用者下一次執行（ADR-0033）。
+        record.MarkStopped(timeProvider.GetUtcNow());
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await auditLog.WriteAsync(
             new AuditEntry(actor, "admin.runtime.stop", "user", userId.ToString("D"), AuditResult.Success, timeProvider.GetUtcNow(), null),

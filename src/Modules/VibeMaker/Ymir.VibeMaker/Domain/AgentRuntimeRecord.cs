@@ -24,6 +24,12 @@ public sealed class AgentRuntimeRecord
 
     public DateTimeOffset? LastActiveAt { get; private set; }
 
+    /// <summary>
+    /// 平台刻意停止（Admin 手動停止、帳號停用、管理員開啟的閒置停止）：API 重新啟動對帳時不自動啟動（ADR-0033）。
+    /// 下一次 execution 啟動 runtime（<see cref="Update"/>）時清除。
+    /// </summary>
+    public bool StopRequested { get; private set; }
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -49,19 +55,28 @@ public sealed class AgentRuntimeRecord
         Status = status;
         LastActiveAt = now;
         UpdatedAt = now;
+        StopRequested = false;
     }
 
-    /// <summary>使用者活動（execution 結束）：閒置停止以此計時。</summary>
+    /// <summary>使用者活動（execution 結束）：管理員開啟閒置停止時以此計時（ADR-0011、ADR-0033）。</summary>
     public void MarkActive(DateTimeOffset now)
     {
         LastActiveAt = now;
         UpdatedAt = now;
     }
 
-    /// <summary>只更新狀態（例如 Admin 手動停止），不視為使用者活動。</summary>
+    /// <summary>只更新狀態（例如對帳），不視為使用者活動。</summary>
     public void MarkStatus(RuntimeStatus status, DateTimeOffset now)
     {
         Status = status;
+        UpdatedAt = now;
+    }
+
+    /// <summary>平台刻意停止（Admin、帳號停用、閒置停止）：記錄下來，對帳時不自動啟動（ADR-0033）。</summary>
+    public void MarkStopped(DateTimeOffset now)
+    {
+        Status = RuntimeStatus.Stopped;
+        StopRequested = true;
         UpdatedAt = now;
     }
 }

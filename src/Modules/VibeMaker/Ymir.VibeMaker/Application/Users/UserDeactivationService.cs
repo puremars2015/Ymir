@@ -53,7 +53,7 @@ public sealed class UserDeactivationService(
             {
                 // 以 user id 停止，服務重新啟動後也有效（runtime id 只存在於 manager 記憶體）。
                 await runtimes.StopForUserAsync(userId, cancellationToken).ConfigureAwait(false);
-                record.MarkStatus(RuntimeStatus.Stopped, timeProvider.GetUtcNow());
+                record.MarkStopped(timeProvider.GetUtcNow());
                 await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
                 await auditLog.WriteAsync(
                     new AuditEntry(actor, "runtime.stop", "user", userId.ToString("D"), AuditResult.Success, timeProvider.GetUtcNow(), null),
@@ -63,7 +63,7 @@ public sealed class UserDeactivationService(
         catch (Exception ex)
 #pragma warning restore CA1031
         {
-            // runtime host 暫時無法連線等；container 之後仍會由閒置停止處理。
+            // runtime host 暫時無法連線等；下一次對帳會停止非 Active 使用者的 runtime（ADR-0033）。
             logger.LogWarning(ex, "Failed to stop runtime for disabled user {UserId}", userId);
         }
     }
