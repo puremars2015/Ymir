@@ -133,6 +133,12 @@
 ---
 
 ## 💬 留言區
+### 外部模型上游思考檔位補充
+
+> 2026-10-29 · 設定待套用
+
+- 使用者提供各模型上游檔位，補齊 Opus、GPT 的 low／medium；Terra 與 Luna 額外支援 none。Sonnet、Haiku、Opus、MiniMax、Sol、Astra 為 low／medium／high／xhigh／max，Terra／Luna 另有 none。現有 PiModelsConfig 與 PiProcessSpec 測試區分 none 與自動；除 high 外新增檔位仍待真實推論／Pi SSE 驗收。取代下方較保守的待套用範本清單，不改寫原測試紀錄。
+
 ### 外部模型思考深度設定
 
 > 2026-10-29 · 設定待套用

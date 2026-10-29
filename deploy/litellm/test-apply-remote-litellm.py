@@ -67,14 +67,14 @@ class FakeRemote:
 
 
 class RemoteLiteLlmSwitchTests(unittest.TestCase):
-    def test_remote_thinking_levels_are_explicit_and_do_not_offer_none(self):
+    def test_remote_thinking_levels_match_upstream_capabilities(self):
         values, ids = switch.template_settings(rendered())
         expected = {
-            'claude-opus-5.5': ['high'],
-            'gpt-6.1-sol': ['high', 'xhigh', 'max'],
-            'gpt-6.1-terra': ['high', 'xhigh', 'max'],
-            'gpt-6-astra': ['high', 'xhigh', 'max'],
-            'gpt-6-luna': ['high', 'xhigh', 'max'],
+            'claude-opus-5.5': ['low', 'medium', 'high', 'xhigh', 'max'],
+            'gpt-6.1-sol': ['low', 'medium', 'high', 'xhigh', 'max'],
+            'gpt-6.1-terra': ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
+            'gpt-6-astra': ['low', 'medium', 'high', 'xhigh', 'max'],
+            'gpt-6-luna': ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
             'minimax-m3.1-flash': ['low', 'medium', 'high', 'xhigh', 'max'],
         }
         for model, levels in expected.items():
