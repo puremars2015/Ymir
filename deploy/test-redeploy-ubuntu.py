@@ -375,14 +375,15 @@ class RedeployTests(unittest.TestCase):
         obj = self.instance('--with-services')
         obj.old_api = {'Config': {'Env': ['VibeMaker__Pi__ModelBaseUrl=http://litellm:4000/v1']}}
         obj.previous = {'ymir-mcp-gateway.service': True}
-        obj.command = Mock(return_value='ok')
+        image_id = 'a' * 64
+        obj.command = Mock(side_effect=[json.dumps([{'Id': image_id, 'RepoTags': ['localhost/ymir/agent-runtime:1.0.0']}]), 'ok', 'ok'])
         runtime = ('VibeMaker__Runtime__Image=localhost/ymir/agent-runtime:1.0.0\n'
                    'VibeMaker__Runtime__Network=ymir-agents-net\n'
                    'VibeMaker__Runtime__RestrictedNetwork=ymir-agents\n')
         with patch.object(Path, 'read_text', return_value=runtime):
             obj.verify_agent_networks()
-        self.assertEqual(obj.command.call_count, 2)
-        for call in obj.command.call_args_list:
+        self.assertEqual(obj.command.call_count, 3)
+        for call in obj.command.call_args_list[1:]:
             args = call.args[0]
             self.assertEqual(call.kwargs['user'], 'ymir')
             self.assertIn('--read-only', args)
@@ -392,7 +393,26 @@ class RedeployTests(unittest.TestCase):
             self.assertNotIn('--env', args)
             self.assertIn('http://litellm:4000/health/liveliness', args[-1])
             self.assertIn('http://mcp-gateway:5310/health', args[-1])
+            self.assertIn(image_id, args)
             self.assertNotIn('chat/completions', args[-1])
+
+    def test_agent_probe_accepts_pinned_image_only_when_locally_verified(self):
+        image_id = 'a' * 64
+        runtime = (f'VibeMaker__Runtime__Image={image_id}\n'
+                   'VibeMaker__Runtime__Network=ymir-agents-net\n')
+        for tags, inspected_id, accepted in [(['localhost/ymir/agent-runtime:1.0.0'], image_id, True),
+                                             (['other/image:latest'], image_id, False),
+                                             (['localhost/ymir/agent-runtime:1.0.0'], 'b' * 64, False)]:
+            obj = self.instance()
+            obj.old_api = {'Config': {'Env': ['VibeMaker__Pi__ModelBaseUrl=http://litellm:4000/v1']}}
+            obj.previous = {}
+            obj.command = Mock(side_effect=[json.dumps([{'Id': inspected_id, 'RepoTags': tags}]), 'ok'])
+            with patch.object(Path, 'read_text', return_value=runtime):
+                if accepted:
+                    obj.verify_agent_networks()
+                else:
+                    with self.assertRaises(deploy.DeployError):
+                        obj.verify_agent_networks()
 
     def test_current_committed_git_archive_passes_source_validation(self):
         path = self.temporary() / 'source.tar'

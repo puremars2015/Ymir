@@ -565,7 +565,21 @@ class Deployment:
             if separator and key.startswith('VibeMaker__Runtime__'):
                 values[key] = value.strip().strip('"\'')
         image = values.get('VibeMaker__Runtime__Image', '')
-        require(image.startswith('localhost/ymir/agent-runtime:'), 'Agent 探針需要已核對的本機 runtime image')
+        require(re.fullmatch(r'(?:sha256:)?[a-f0-9]{64}', image) or
+                re.fullmatch(r'localhost/ymir/agent-runtime:[A-Za-z0-9_][A-Za-z0-9_.-]*', image),
+                'Agent 探針需要已核對的本機 runtime image')
+        try:
+            inspected = json.loads(self.command(['podman', 'image', 'inspect', image], user='ymir'))
+            require(len(inspected) == 1, 'Agent runtime image 不明確')
+            info = inspected[0]
+            image_id = info['Id'].removeprefix('sha256:')
+            require(re.fullmatch(r'[a-f0-9]{64}', image_id) and
+                    any(re.fullmatch(r'localhost/ymir/agent-runtime:[A-Za-z0-9_][A-Za-z0-9_.-]*', tag)
+                        for tag in (info.get('RepoTags') or [])), 'Agent runtime image 身分不符')
+            if re.fullmatch(r'(?:sha256:)?[a-f0-9]{64}', image):
+                require(image.removeprefix('sha256:') == image_id, 'Agent runtime image ID 不符')
+        except (ValueError, KeyError, TypeError) as error:
+            raise DeployError('無法核對 Agent runtime image') from error
         networks = [values.get('VibeMaker__Runtime__Network'), values.get('VibeMaker__Runtime__RestrictedNetwork')]
         require(networks[0], '此主機必須明確設定 Agent 具名網路，不能猜測模型路徑')
         entries = dict(item.split('=', 1) for item in self.old_api['Config']['Env'])
@@ -581,7 +595,7 @@ class Deployment:
             result = self.command(['podman', 'run', '--rm', '--name', 'ymir-deploy-probe-' + uuid.uuid4().hex[:12],
                                    '--network', network, '--read-only', '--cap-drop=ALL', '--security-opt=no-new-privileges',
                                    '--userns=keep-id:uid=1000,gid=1000', '--user=1000:1000', '--memory=192m', '--cpus=0.5',
-                                   '--pids-limit=64', '--entrypoint=node', image, '-e', code], user='ymir')
+                                   '--pids-limit=64', '--entrypoint=node', image_id, '-e', code], user='ymir')
             require(result == 'ok', 'Agent 網路探針失敗')
 
     def write_result(self, success, manual=False):

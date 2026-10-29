@@ -133,6 +133,13 @@
 ---
 
 ## 💬 留言區
+### Agent 探針辨識固定 image ID
+
+> 2026-10-29 · 部署進行中
+
+- `b19428e` 的非 root image 讀取檢查、建置和備份通過；切換時探針因正式 RuntimeHost 設為完整 image SHA、部署器只接受 tag 而停止，已自動回復；API、RuntimeHost、入口 active，health Healthy。私有紀錄 `/var/lib/ymir-deploy/20261029T032048Z-b19428e6346c-2e9d93af/`；未清理資源。
+- 驗證 ymir store 的設定 SHA 對應 `localhost/ymir/agent-runtime:1.0.0`；修正探針只接受完整 SHA 或指定 repository tag，經本機 inspect 比對 ID 與 tag，再以固定 ID 執行。40 項隔離測試通過；正式主機以短暫、無憑證探針提前驗證兩個 Agent 網路通過，未停止服務。CI 與正式重試待完成。
+
 ### 正式部署回復與 image 權限修正
 
 > 2026-10-29 · 部署進行中
