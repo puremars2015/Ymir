@@ -208,7 +208,15 @@ def reusable(current, target_admin):
 
 
 def ask_secrets(current, target_admin):
-    require(sys.stdin.isatty(), '需要在終端機執行以輸入金鑰（不接受從參數或管線傳入）')
+    # Python 程式碼由 shell heredoc 傳入 stdin；應檢查 getpass 使用的控制終端，而不是 stdin。
+    try:
+        descriptor = os.open('/dev/tty', os.O_RDONLY | os.O_NOCTTY)
+    except OSError:
+        raise SwitchError('需要在終端機執行以輸入金鑰（不接受從參數或管線傳入）') from None
+    try:
+        require(os.isatty(descriptor), '需要在終端機執行以輸入金鑰（不接受從參數或管線傳入）')
+    finally:
+        os.close(descriptor)
     existing = reusable(current, target_admin)
     secrets = {}
     for key, label in SECRET_KEYS.items():

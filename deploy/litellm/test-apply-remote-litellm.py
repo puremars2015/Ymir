@@ -67,6 +67,20 @@ class FakeRemote:
 
 
 class RemoteLiteLlmSwitchTests(unittest.TestCase):
+    def test_secrets_use_controlling_terminal_even_with_heredoc_stdin(self):
+        with patch.object(switch.os, 'open', return_value=123) as opened, \
+             patch.object(switch.os, 'isatty', return_value=True), \
+             patch.object(switch.os, 'close') as closed, \
+             patch.object(switch.getpass, 'getpass', side_effect=list(SECRETS.values())):
+            self.assertEqual(switch.ask_secrets({}, ADMIN), SECRETS)
+        self.assertEqual(opened.call_args.args[0], '/dev/tty')
+        closed.assert_called_once_with(123)
+
+    def test_secrets_reject_missing_controlling_terminal(self):
+        with patch.object(switch.os, 'open', side_effect=OSError('no tty')):
+            with self.assertRaises(switch.SwitchError):
+                switch.ask_secrets({}, ADMIN)
+
     def temporary(self):
         result = tempfile.TemporaryDirectory(prefix='ymir-remote-litellm-test-')
         self.addCleanup(result.cleanup)
