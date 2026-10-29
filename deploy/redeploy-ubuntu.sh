@@ -339,7 +339,8 @@ class Deployment:
         self.source = self.build / 'source'
         self.source.mkdir(mode=0o700)
         os.chown(self.source, self.account.pw_uid, self.account.pw_gid)
-        self.command(['tar', '-xf', archive, '-C', self.source], user=self.owner)
+        # 原始碼 archive 不含 secret；保留 Git 的檔案模式，避免部署器的 077 umask 使 image 內檔案無法供非 root 使用者讀取。
+        self.command(['tar', '--same-permissions', '-xf', archive, '-C', self.source], user=self.owner)
         dotnet = Path(self.account.pw_dir) / '.dotnet/dotnet'
         if not dotnet.is_file():
             dotnet = Path('/usr/bin/dotnet')
@@ -358,6 +359,9 @@ class Deployment:
         require(self.new_image['Config']['User'] == '1654' and self.new_image['Labels'].get('ymir.managed') == 'true'
                 and self.new_image['Labels'].get('org.opencontainers.image.revision') == self.sha, '新 API image 不符安全／來源 pin')
         self.image_id = self.new_image['Id'].removeprefix('sha256:')
+        # 在停止任何正式服務前，以 image 預設非 root 身分確認整個應用程式可讀。
+        self.podman('run', '--rm', '--network', 'none', '--read-only', '--entrypoint', '/bin/sh',
+                    self.image_id, '-c', 'output=$(find /app ! -readable -print -quit) && test -z "$output"')
         self.command([dotnet, 'tool', 'restore', '--tool-manifest', 'dotnet-tools.json'], user=self.owner, cwd=self.source)
         for schema, (project, context) in self.PROJECTS.items():
             output = self.build / (schema + '.sql')

@@ -34,6 +34,23 @@ class RedeployTests(unittest.TestCase):
         self.assertIn('--dry-run', result.stdout)
         self.assertIn('--accept-additive-migrations', result.stdout)
 
+    def test_source_modes_survive_private_umask_and_image_readability_is_checked(self):
+        root = self.temporary()
+        source = root / 'appsettings.json'
+        source.write_text('{}')
+        source.chmod(0o644)
+        archive = root / 'source.tar'
+        with tarfile.open(archive, 'w') as tar:
+            tar.add(source, arcname='appsettings.json')
+        target = root / 'out'
+        target.mkdir()
+        subprocess.run(['tar', '--same-permissions', '-xf', str(archive), '-C', str(target)],
+                       check=True, preexec_fn=lambda: os.umask(0o077))
+        self.assertEqual((target / 'appsettings.json').stat().st_mode & 0o777, 0o644)
+        self.assertIn("['tar', '--same-permissions'", CODE)
+        self.assertIn("'--network', 'none', '--read-only', '--entrypoint', '/bin/sh'", CODE)
+        self.assertIn('find /app ! -readable', CODE)
+
     def test_unsafe_legacy_flags_are_rejected(self):
         for flag in ['--force', '--skip-backup']:
             with self.subTest(flag=flag), self.assertRaises(deploy.DeployError):

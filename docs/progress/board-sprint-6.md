@@ -133,6 +133,13 @@
 ---
 
 ## 💬 留言區
+### 正式部署回復與 image 權限修正
+
+> 2026-10-29 · 部署進行中
+
+- `b184bc2` 已建置、完成成套備份並套用 `UserPluginSettings`；新版 API 健康檢查逾時後部署器回復舊版。已讀回 API／RuntimeHost／兩個入口 active、API health Healthy，RuntimeHost 為 `348b64c`；migration 保留。私有備份與部署紀錄在 `/var/lib/ymir-deploy/20261029T023734Z-b184bc211bfa-42c51989/`。
+- 只讀日誌顯示新版 API 非 root 使用者無法讀取 `/app/appsettings.json`。來源 archive 受部署器私有 umask 影響，實際解出模式為 600；改為保留 archive 模式，image 的公開應用產物明確設為可讀，並在停止服務前以 image 的非 root 使用者、無網路及唯讀容器檢查 `/app` 可讀。隔離部署測試 39 項及 shell 語法通過；新版 CI 與正式重試待完成。未清理舊資源。
+
 ### 部署預檢修正：runuser 路徑
 
 > 2026-10-29 · 部署進行中

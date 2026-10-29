@@ -29,6 +29,8 @@ LABEL ymir.managed="true"
 WORKDIR /app
 COPY --from=api /out ./
 COPY --from=web /src/web/dist/ymir-web/browser ./wwwroot
+# 產物不含 secret；確保以非 root 執行的 API 可讀取，即使建置程序採用嚴格 umask。
+RUN chmod -R a+rX /app
 
 # 預設值；連線字串、LiteLLM master key、runtime host token 等 secret 由部署環境傳入（deploy/api/.env），不放進 image。
 # 以 host network 執行：只綁主機的 127.0.0.1，外部只能經由 cloudflared 進來（ADR-0006）。
