@@ -1077,54 +1077,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/connectors/onedrive/root': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put: operations['SetOneDriveRoot'];
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/conversations/{conversationId}/onedrive': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get: operations['GetConversationOneDriveStatus'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/conversations/{conversationId}/onedrive/sync': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    post: operations['SyncConversationOneDrive'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/plugins': {
     parameters: {
       query?: never;
@@ -1724,17 +1676,6 @@ export interface components {
       protection: null | components['schemas']['ProtectionReason'];
       retentionEligible: boolean;
     };
-    ConversationOneDriveResponse: {
-      availability: components['schemas']['OneDriveAvailability'];
-      rootPath: null | string;
-      folderPath: null | string;
-      state: null | components['schemas']['OneDriveSyncState'];
-      /** Format: date-time */
-      lastSyncedAt: null | string;
-      /** Format: int32 */
-      conflictCount: number | string;
-      lastError: null | string;
-    };
     ConversationResponse: {
       /** Format: uuid */
       id: string;
@@ -2115,21 +2056,16 @@ export interface components {
       message: string;
     };
     /** @enum {unknown} */
-    OneDriveAvailability: 'NotAllowed' | 'NotConnected' | 'NeedsReauth' | 'NoRoot' | 'Ready';
-    /** @enum {unknown} */
     OneDriveLinkState: 'NotConnected' | 'Connected' | 'NeedsReauth';
     OneDriveStatusResponse: {
       allowed: boolean;
       available: boolean;
       state: components['schemas']['OneDriveLinkState'];
       account: null | string;
-      rootPath: null | string;
       /** Format: date-time */
       connectedAt: null | string;
       lastError: null | string;
     };
-    /** @enum {unknown} */
-    OneDriveSyncState: 'Synced' | 'Pending' | 'Failed' | null;
     PasswordLoginRequest: {
       account: null | string;
       password: null | string;
@@ -2443,9 +2379,6 @@ export interface components {
     ServiceHealthResponse: {
       status: string;
       checks: components['schemas']['ServiceHealthItem'][];
-    };
-    SetOneDriveRootRequest: {
-      path: null | string;
     };
     SetPersonalMcpEnabledRequest: {
       enabled: boolean;
@@ -4605,77 +4538,6 @@ export interface operations {
         content: {
           'application/json': components['schemas']['OneDriveStatusResponse'];
         };
-      };
-    };
-  };
-  SetOneDriveRoot: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SetOneDriveRootRequest'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  GetConversationOneDriveStatus: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        conversationId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ConversationOneDriveResponse'];
-        };
-      };
-      /** @description Not Found */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  SyncConversationOneDrive: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        conversationId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
       };
     };
   };

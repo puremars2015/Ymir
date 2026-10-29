@@ -102,11 +102,18 @@ public class OneDriveConnectionTests(OneDriveApiFactory factory) : IClassFixture
         return await scope.ServiceProvider.GetRequiredService<IVibeMakerDbContext>().OneDriveConnections.AsNoTracking().SingleOrDefaultAsync(c => c.UserId == userId, Ct);
     }
 
+    /// <summary>經後端呼叫一次 Graph（Agent 工具與外掛市集共用的路徑）：觸發 access token 換發。</summary>
+    private async Task SearchAsync(Guid userId)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        await scope.ServiceProvider.GetRequiredService<OneDriveBrowser>().SearchAsync(userId, "report", Ct);
+    }
+
     private static Task<OneDriveStatusResponse?> StatusAsync(HttpClient client) =>
         client.GetFromJsonAsync<OneDriveStatusResponse>("/api/connectors/onedrive", JsonDefaults.Options, Ct);
 
     [Fact]
-    public async Task Connect_SetRoot_Disconnect_WithoutEverExposingTokens()
+    public async Task Connect_Disconnect_WithoutEverExposingTokens()
     {
         using var client = await factory.LoginWithOidcAsync("od-alice");
         var userId = await UserIdAsync(client);
@@ -119,18 +126,12 @@ public class OneDriveConnectionTests(OneDriveApiFactory factory) : IClassFixture
         var status = JsonSerializer.Deserialize<OneDriveStatusResponse>(statusBody, JsonDefaults.Options)!;
         Assert.Equal(OneDriveLinkState.Connected, status.State);
         Assert.Equal("od-alice@fake-entra.test", status.Account);
-        Assert.Null(status.RootPath);
         // token 不出現在回應；資料庫只有加密後的 refresh token（ADR-0013 §2）。
         Assert.DoesNotContain("fake-rt-", statusBody, StringComparison.Ordinal);
         Assert.DoesNotContain("fake-at-", statusBody, StringComparison.Ordinal);
         var stored = await ConnectionAsync(userId);
         Assert.DoesNotContain("fake-rt-", stored!.ProtectedRefreshToken, StringComparison.Ordinal);
         Assert.Equal(FakeOidcIssuer.StableGuid("oid:od-alice").ToString("D"), stored.MicrosoftUserId);
-
-        using var root = await client.PutAsJsonAsync("/api/connectors/onedrive/root", new SetOneDriveRootRequest(" Ymir / Work "), Ct);
-        Assert.Equal(HttpStatusCode.OK, root.StatusCode);
-        Assert.Equal("/Ymir/Work", (await root.Content.ReadFromJsonAsync<OneDriveStatusResponse>(JsonDefaults.Options, Ct))!.RootPath);
-        Assert.True(factory.Oidc.Graph.DriveOf("od-alice").FolderExists("/Ymir/Work"));
 
         using var disconnect = await client.DeleteAsync(new Uri("/api/connectors/onedrive", UriKind.Relative), Ct);
         Assert.Equal(OneDriveLinkState.NotConnected, (await disconnect.Content.ReadFromJsonAsync<OneDriveStatusResponse>(JsonDefaults.Options, Ct))!.State);
@@ -139,7 +140,7 @@ public class OneDriveConnectionTests(OneDriveApiFactory factory) : IClassFixture
         using var admin = await factory.LoginAsync("od-audit-admin", UserRole.Admin);
         var audit = await admin.GetFromJsonAsync<AuditLogPageResponse>($"/api/admin/audit?userId={userId}&action=connector.onedrive", JsonDefaults.Options, Ct);
         Assert.Equal(
-            ["connector.onedrive.connect", "connector.onedrive.disconnect", "connector.onedrive.root.update"],
+            ["connector.onedrive.connect", "connector.onedrive.disconnect"],
             audit!.Items.Select(i => i.Action).Order(StringComparer.Ordinal).ToArray());
     }
 
@@ -149,10 +150,8 @@ public class OneDriveConnectionTests(OneDriveApiFactory factory) : IClassFixture
         using var client = await factory.LoginWithOidcAsync("od-denied");
 
         using var connect = await client.GetAsync(new Uri("/api/connectors/onedrive/connect", UriKind.Relative), Ct);
-        using var root = await client.PutAsJsonAsync("/api/connectors/onedrive/root", new SetOneDriveRootRequest("/Ymir"), Ct);
 
         Assert.Equal(HttpStatusCode.Forbidden, connect.StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, root.StatusCode);
         Assert.False((await StatusAsync(client))!.Allowed);
     }
 
@@ -196,9 +195,8 @@ public class OneDriveConnectionTests(OneDriveApiFactory factory) : IClassFixture
         // 模擬密碼變更：refresh token 被撤銷，且記憶體中的 access token 已過期。
         factory.Oidc.Issuer.RevokeRefreshTokens("od-erin");
         factory.Services.GetRequiredService<OneDriveAccessTokenCache>().Remove(userId);
-        using var root = await client.PutAsJsonAsync("/api/connectors/onedrive/root", new SetOneDriveRootRequest("/Ymir"), Ct);
+        await Assert.ThrowsAsync<OneDriveAuthorizationException>(() => SearchAsync(userId));
 
-        Assert.Equal(HttpStatusCode.BadRequest, root.StatusCode);
         var status = await StatusAsync(client);
         Assert.Equal(OneDriveLinkState.NeedsReauth, status!.State);
 
@@ -218,24 +216,8 @@ public class OneDriveConnectionTests(OneDriveApiFactory factory) : IClassFixture
 
         factory.Services.GetRequiredService<OneDriveAccessTokenCache>().Remove(userId);
         factory.Oidc.Graph.ThrottleNext(1);
-        using var root = await client.PutAsJsonAsync("/api/connectors/onedrive/root", new SetOneDriveRootRequest("/Ymir"), Ct);
+        await SearchAsync(userId);
 
-        Assert.Equal(HttpStatusCode.OK, root.StatusCode);
         Assert.NotEqual(before, (await ConnectionAsync(userId))!.ProtectedRefreshToken);
-    }
-
-    [Theory]
-    [InlineData("")]
-    [InlineData("/a/../b")]
-    [InlineData("/bad:name")]
-    public async Task InvalidRoot_IsRejectedWithSummary(string path)
-    {
-        using var client = await factory.LoginWithOidcAsync("od-grace");
-        await AllowOneDriveAsync(await UserIdAsync(client));
-        await OneDriveApiFactory.ConnectOneDriveAsync(client, "od-grace");
-
-        using var root = await client.PutAsJsonAsync("/api/connectors/onedrive/root", new SetOneDriveRootRequest(path), Ct);
-
-        Assert.Equal(HttpStatusCode.BadRequest, root.StatusCode);
     }
 }

@@ -46,8 +46,6 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["GET /api/conversations/{conversationId:guid}/files/"] = r => Get($"/api/conversations/{r.ConversationId}/files"),
         ["GET /api/conversations/{conversationId:guid}/files/download"] = r => Get($"/api/conversations/{r.ConversationId}/files/download?path=hello.txt"),
         ["GET /api/conversations/{conversationId:guid}/files/archive"] = r => Get($"/api/conversations/{r.ConversationId}/files/archive"),
-        ["GET /api/conversations/{conversationId:guid}/onedrive/"] = r => Get($"/api/conversations/{r.ConversationId}/onedrive"),
-        ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/conversations/{r.ConversationId}/onedrive/sync"),
         ["GET /api/projects/{projectId:guid}/knowledge/"] = r => Get($"/api/projects/{r.ProjectId}/knowledge"),
         ["POST /api/projects/{projectId:guid}/knowledge/documents"] = r => new HttpRequestMessage(HttpMethod.Post, $"/api/projects/{r.ProjectId}/knowledge/documents?fileName=intrusion.txt")
         {
@@ -96,7 +94,7 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     };
 
     /// <summary>
-    /// 擁有者呼叫時預期的非成功狀態：通過擁有者檢查之後才會得到的業務錯誤（例如沒有連結 OneDrive 時同步回 409），
+    /// 擁有者呼叫時預期的非成功狀態：通過擁有者檢查之後才會得到的業務錯誤（例如知識庫停用時回 409），
     /// 與別人呼叫時的 404 不同，仍能證明請求本身正確。
     /// </summary>
     private static readonly Dictionary<string, HttpStatusCode> OwnerStatusOverrides = new()
@@ -104,7 +102,6 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         ["PATCH /api/connections/mcp/{id:guid}"] = HttpStatusCode.NotFound,
         ["DELETE /api/connections/mcp/{id:guid}"] = HttpStatusCode.NotFound,
         ["POST /api/connections/mcp/{id:guid}/test"] = HttpStatusCode.NotFound,
-        ["POST /api/conversations/{conversationId:guid}/onedrive/sync"] = HttpStatusCode.Conflict,
         // 這個 fixture 沒有設定 Embedding 模型（知識庫停用）；文件 id 不存在。擁有者的成功路徑在 KnowledgeBaseTests。
         ["POST /api/projects/{projectId:guid}/knowledge/documents"] = HttpStatusCode.Conflict,
         ["DELETE /api/projects/{projectId:guid}/knowledge/documents/{documentId:guid}"] = HttpStatusCode.NotFound,
@@ -263,7 +260,6 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "PUT /api/plugins/{key}",
         "GET /api/connectors/onedrive/connect",
         "GET /api/connectors/onedrive/callback",
-        "PUT /api/connectors/onedrive/root",
         "DELETE /api/connectors/onedrive/",
         // 使用者之間的訊息（ADR-0023）：路徑上的 id 是「對方」，一律只讀寫目前使用者參與的訊息；隱私在 DirectMessageTests 驗證。
         "GET /api/direct-messages/contacts",

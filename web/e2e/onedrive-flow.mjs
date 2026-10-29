@@ -1,5 +1,5 @@
-// OneDrive connector 的端對端驗證（ADR-0013）：管理員開放 → 使用者在個人設定連結（經 Fake OIDC 授權）→ 設定同步資料夾
-// → 送訊息後檔案面板顯示「已同步到 OneDrive」、Fake Graph 建立對話資料夾 → 解除連結。
+// OneDrive 外掛的端對端驗證（ADR-0013、ADR-0030、ADR-0033）：管理員開放 → 使用者在外掛市集連結（經 Fake OIDC 授權）
+// → 啟用「讓 Agent 使用」→（有 gateway 時）Agent 以工具搜尋 OneDrive → 對話執行後不會同步到 OneDrive → 解除連結。
 // 前置：SQL Server、Fake OIDC（dotnet run --project tests/Ymir.Testing.FakeOidc，含 Fake Graph）；
 //       API 設定 Ymir__Auth__Oidc__Authority=http://127.0.0.1:5299/00000000-0000-0000-0000-00000000f00d/v2.0、
 //       Ymir__Auth__Oidc__ClientId=ymir-dev、Ymir__Auth__Oidc__ClientSecret=ymir-dev-secret、
@@ -69,12 +69,12 @@ await plugin.locator('.status', { hasText: /Agent 可以使用|已啟用/ }).wai
 await user.screenshot({ path: `${outDir}/02b-plugin-enabled.png`, fullPage: true });
 step('user enabled the OneDrive plugin for the Agent');
 
-// 3. 設定同步資料夾
-await onedrive.locator('input[name=rootPath]').fill('/Ymir/E2E');
-await onedrive.locator('button:has-text("儲存")').click();
-await onedrive.locator('text=已連結，同步到 /Ymir/E2E').waitFor();
+// 3. 已連結：沒有同步資料夾設定（ADR-0033）
+await onedrive.locator('strong:text-is("已連結")').waitFor();
+if (await onedrive.locator('input[name=rootPath]').count())
+  throw new Error('sync folder setting should be gone');
 await user.screenshot({ path: `${outDir}/03-connected.png`, fullPage: true });
-step("sync folder created in the user's OneDrive");
+step('connected without a sync folder');
 
 // 3b. Agent 自己使用 OneDrive 外掛（需要 API 的 VibeMaker__Harness=Pi、Ymir__Mcp__* 與 gateway 的 McpGateway__ApiUrl；
 //     Fake LLM 的 [onedrive-search 關鍵字] 會呼叫 mcp__onedrive__search）。沒有設定 gateway 時略過。
@@ -91,20 +91,18 @@ if ((await plugin.locator('.status').innerText()).includes('Agent 可以使用')
   await user.goto(`${baseUrl}/plugins`);
 }
 
-// 4. 對話執行後自動同步：檔案面板顯示雲端保存狀態，與任務結果分開
+// 4. 對話執行後不同步到 OneDrive：檔案面板沒有雲端保存狀態（ADR-0033）
 await user.goto(`${baseUrl}/`);
 await user.waitForSelector('app-new-chat-page h1');
 await user.fill('app-composer textarea', '幫我整理會議紀錄');
 await user.press('app-composer textarea', 'Enter');
 await user.locator('.turn.assistant').waitFor({ timeout: 30000 });
 await user.click('button.files-toggle');
-const cloud = user.locator('app-onedrive-sync .cloud');
-await cloud.locator('text=已同步到 OneDrive').waitFor({ timeout: 30000 });
-await cloud.locator('text=OneDrive：/Ymir/E2E/chats/').waitFor();
-await user.screenshot({ path: `${outDir}/04-synced.png`, fullPage: true });
-await cloud.locator('button:has-text("立即同步")').click();
-await cloud.locator('text=已同步到 OneDrive').waitFor({ timeout: 30000 });
-step('conversation synced to OneDrive after the run; manual sync works');
+await user.waitForSelector('app-files-panel');
+if (await user.locator('app-onedrive-sync').count())
+  throw new Error('conversation files should not sync to OneDrive');
+await user.screenshot({ path: `${outDir}/04-no-sync.png`, fullPage: true });
+step('conversation files stay in Ymir (no OneDrive sync)');
 
 // 5. 解除連結
 await user.goto(`${baseUrl}/plugins`);

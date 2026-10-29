@@ -68,9 +68,6 @@ public interface IOneDriveClient
     /// <summary>搜尋目前使用者自己的 drive，最多 50 筆；不得回傳預授權下載網址。</summary>
     Task<IReadOnlyList<DriveItemInfo>> SearchAsync(string accessToken, string query, CancellationToken cancellationToken);
 
-    /// <summary>以名稱取得子項目；不存在時回傳 null。</summary>
-    Task<DriveItemInfo?> GetChildAsync(string accessToken, string parentId, string name, CancellationToken cancellationToken);
-
     /// <summary>下載檔案內容；呼叫端負責 Dispose 回傳的串流。</summary>
     Task<Stream> OpenDownloadAsync(string accessToken, string itemId, CancellationToken cancellationToken);
 

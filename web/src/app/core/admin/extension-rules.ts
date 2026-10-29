@@ -18,7 +18,7 @@ export const CAPABILITIES = [
     key: 'oneDrive',
     label: 'OneDrive 連結',
     description:
-      '讓使用者連結自己的 OneDrive，執行前後自動同步工作檔案；憑證只由平台保管，Agent 拿不到。',
+      '讓使用者連結自己的 OneDrive，並讓 Agent 以工具讀寫；憑證只由平台保管，Agent 拿不到。',
   },
   {
     key: 'internet',

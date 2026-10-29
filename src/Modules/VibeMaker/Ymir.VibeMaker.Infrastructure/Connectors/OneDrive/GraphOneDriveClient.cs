@@ -131,9 +131,6 @@ internal sealed partial class GraphOneDriveClient(HttpClient http, IOptions<OneD
         return items;
     }
 
-    public Task<DriveItemInfo?> GetChildAsync(string accessToken, string parentId, string name, CancellationToken cancellationToken) =>
-        GetChildByNameAsync(accessToken, parentId, name, cancellationToken);
-
     public async Task<IReadOnlyList<DriveItemInfo>> SearchAsync(string accessToken, string query, CancellationToken cancellationToken)
     {
         // OData 字串先處理單引號，再 URL encode；查詢不能變成額外的 OData 運算式。

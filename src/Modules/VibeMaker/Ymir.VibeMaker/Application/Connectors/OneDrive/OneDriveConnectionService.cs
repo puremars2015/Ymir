@@ -23,7 +23,6 @@ public sealed record OneDriveStatus(
     bool Available,
     OneDriveLinkState State,
     string? Account,
-    string? RootPath,
     DateTimeOffset? ConnectedAt,
     string? LastError);
 
@@ -45,7 +44,7 @@ public sealed class OneDriveAccessTokenCache
 
     internal bool TryGet(Guid userId, DateTimeOffset now, out string token)
     {
-        // 提早 2 分鐘換發，避免長時間的同步途中過期。
+        // 提早 2 分鐘換發，避免長時間的工具呼叫途中過期。
         if (_tokens.TryGetValue(userId, out var entry) && entry.ExpiresAt - TimeSpan.FromMinutes(2) > now)
         {
             token = entry.Token;
@@ -66,7 +65,7 @@ public sealed class OneDriveAccessTokenCache
 
 /// <summary>
 /// OneDrive 連結（ADR-0013）：完成授權碼交換、保存加密的 refresh token、設定根資料夾、解除連結，
-/// 以及為同步取得 access token。所有操作只作用在呼叫端給的 user id（由 Api 層從目前使用者取得，SA §12）。
+/// 以及為 Agent 工具取得 access token。所有操作只作用在呼叫端給的 user id（由 Api 層從目前使用者取得，SA §12）。
 /// </summary>
 public sealed partial class OneDriveConnectionService(
     IVibeMakerDbContext db,
@@ -86,13 +85,12 @@ public sealed partial class OneDriveConnectionService(
         var available = await oauthSettings.GetAsync(cancellationToken).ConfigureAwait(false) is not null;
         var connection = await db.OneDriveConnections.AsNoTracking().SingleOrDefaultAsync(c => c.UserId == userId, cancellationToken).ConfigureAwait(false);
         return connection is null
-            ? new OneDriveStatus(allowed, available, OneDriveLinkState.NotConnected, null, null, null, null)
+            ? new OneDriveStatus(allowed, available, OneDriveLinkState.NotConnected, null, null, null)
             : new OneDriveStatus(
                 allowed,
                 available,
                 connection.Status == OneDriveConnectionStatus.Connected ? OneDriveLinkState.Connected : OneDriveLinkState.NeedsReauth,
                 connection.UserPrincipalName,
-                connection.RootPath,
                 connection.ConnectedAt,
                 connection.LastError);
     }
@@ -161,47 +159,6 @@ public sealed partial class OneDriveConnectionService(
             LogConnectFailed(logger, ex, userId);
             await AuditAsync(actor, "connector.onedrive.connect", userId, AuditResult.Failure, cancellationToken).ConfigureAwait(false);
             return OneDriveConnectResult.Failed;
-        }
-    }
-
-    /// <summary>設定根資料夾：在使用者自己的 drive 逐層取得或建立（ADR-0013 §3）。回傳給使用者看的錯誤，成功時為 null。</summary>
-    public async Task<string?> SetRootAsync(Guid userId, string? path, string actor, CancellationToken cancellationToken)
-    {
-        var (normalized, problem) = OneDrivePaths.NormalizeRoot(path);
-        if (normalized is null)
-        {
-            return problem;
-        }
-
-        var connection = await db.OneDriveConnections.SingleOrDefaultAsync(c => c.UserId == userId, cancellationToken).ConfigureAwait(false);
-        if (connection is null)
-        {
-            return "尚未連結 OneDrive。";
-        }
-
-        try
-        {
-            var accessToken = await GetAccessTokenAsync(userId, cancellationToken).ConfigureAwait(false);
-            var folder = await graph.GetRootAsync(accessToken, cancellationToken).ConfigureAwait(false);
-            foreach (var segment in OneDrivePaths.Segments(normalized))
-            {
-                folder = await graph.EnsureFolderAsync(accessToken, folder.Id, segment, cancellationToken).ConfigureAwait(false);
-            }
-
-            await db.Entry(connection).ReloadAsync(cancellationToken).ConfigureAwait(false);
-            connection.SetRoot(folder.Id, normalized, timeProvider.GetUtcNow());
-            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            await AuditAsync(actor, "connector.onedrive.root.update", userId, AuditResult.Success, cancellationToken).ConfigureAwait(false);
-            return null;
-        }
-        catch (OneDriveAuthorizationException)
-        {
-            return "OneDrive 授權已失效，請重新連結。";
-        }
-        catch (OneDriveException ex)
-        {
-            LogRootFailed(logger, ex, userId);
-            return ex.Message;
         }
     }
 
@@ -290,9 +247,6 @@ public sealed partial class OneDriveConnectionService(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Connecting OneDrive failed for user {UserId}")]
     private static partial void LogConnectFailed(ILogger logger, Exception exception, Guid userId);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Setting the OneDrive root folder failed for user {UserId}")]
-    private static partial void LogRootFailed(ILogger logger, Exception exception, Guid userId);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "OneDrive refresh token for user {UserId} is no longer valid; the user must reconnect")]
     private static partial void LogNeedsReauth(ILogger logger, Guid userId);

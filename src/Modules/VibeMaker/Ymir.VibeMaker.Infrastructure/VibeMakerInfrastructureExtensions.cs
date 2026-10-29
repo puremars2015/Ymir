@@ -45,16 +45,11 @@ public static class VibeMakerInfrastructureExtensions
         services.AddHttpClient(nameof(Health.LiteLlmHealthCheck)).AddLiteLlmTransport();
 
         // OneDrive connector（ADR-0013）：只有後端連 Graph 與 Entra；token 不保存在 HttpClient。
+        // 只提供 Agent 工具（ADR-0030）；工作目錄與 OneDrive 的同步已移除（ADR-0033）。
         services.Configure<Connectors.OneDrive.OneDriveOptions>(configuration.GetSection(Connectors.OneDrive.OneDriveOptions.SectionName));
         services.AddHttpClient<Application.Connectors.OneDrive.IOneDriveOAuthClient, Connectors.OneDrive.OneDriveOAuthClient>(Connectors.OneDrive.OneDriveOAuthClient.HttpClientName);
         services.AddHttpClient<Application.Connectors.OneDrive.IOneDriveClient, Connectors.OneDrive.GraphOneDriveClient>(Connectors.OneDrive.GraphOneDriveClient.HttpClientName);
         services.AddSingleton<Application.Connectors.OneDrive.IOneDriveTokenProtector, Connectors.OneDrive.DataProtectionOneDriveTokenProtector>();
-        services.AddOptions<Application.Connectors.OneDrive.OneDriveSyncOptions>()
-            .Bind(configuration.GetSection(Connectors.OneDrive.OneDriveOptions.SectionName))
-            .Validate(o => o.MaxFileBytes > 0 && o.MaxFiles > 0 && o.MaxLinksPerScope is > 0 and <= 100
-                && o.MaxLinkedFolderFiles is > 0 and <= 5000 && o.PollInterval > TimeSpan.Zero, "OneDrive sync limits are invalid.")
-            .ValidateOnStart();
-        services.AddHostedService<Connectors.OneDrive.OneDriveSyncWorker>();
 
         AddKnowledgeBase(services, configuration, isDevelopment);
 

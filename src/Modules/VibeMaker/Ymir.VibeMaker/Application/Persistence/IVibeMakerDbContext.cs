@@ -37,9 +37,6 @@ public interface IVibeMakerDbContext
 
     DbSet<OneDriveConnection> OneDriveConnections { get; }
 
-    DbSet<OneDriveSyncScope> OneDriveSyncScopes { get; }
-
-    DbSet<OneDriveSyncItem> OneDriveSyncItems { get; }
     DbSet<OneDriveLinkedItem> OneDriveLinkedItems { get; }
     DbSet<OneDriveLinkedFile> OneDriveLinkedFiles { get; }
 

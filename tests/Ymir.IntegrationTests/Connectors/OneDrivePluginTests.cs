@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Ymir.Api.Endpoints;
 using Ymir.IntegrationTests.Api;
+using Ymir.IntegrationTests.Executions;
 using Ymir.Platform.Auditing;
 using Ymir.Platform.Infrastructure.Persistence;
 using Ymir.Platform.Users;
@@ -15,6 +16,7 @@ using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Application.PlatformMcp;
 using Ymir.VibeMaker.Application.Plugins;
 using Ymir.VibeMaker.Application.Runtime;
+using Ymir.VibeMaker.Contracts.Executions;
 using Ymir.VibeMaker.Domain;
 using Ymir.VibeMaker.Infrastructure.Runtime;
 
@@ -205,6 +207,21 @@ public class OneDrivePluginTests(OneDrivePluginApiFactory factory) : IClassFixtu
             Assert.True(await platform.AuditLog.AnyAsync(a => a.Action == "plugin.disable" && a.TargetId == key, Ct));
         }
 
+        client.Dispose();
+    }
+
+    /// <summary>ADR-0033：OneDrive 只是 Agent 的外掛，執行前後不再同步工作目錄或對話紀錄。</summary>
+    [Fact]
+    public async Task Run_WithOneDriveEnabled_DoesNotSyncTheWorkspace()
+    {
+        var (client, _, account) = await EnabledUserAsync();
+        var conversation = await client.CreateConversationAsync(null, "no sync");
+        var (_, sent) = await client.SendMessageAsync(conversation.Id, "hello");
+        var events = await client.ReadEventsAsync(sent!.EventStreamUrl);
+
+        Assert.Equal(ExecutionEventNames.ExecutionCompleted, events[^1].EventType);
+        Assert.DoesNotContain(events, e => e.Data.GetRawText().Contains("OneDrive", StringComparison.Ordinal));
+        Assert.False(factory.Oidc.Graph.DriveOf(account).FolderExists("/Ymir"));
         client.Dispose();
     }
 

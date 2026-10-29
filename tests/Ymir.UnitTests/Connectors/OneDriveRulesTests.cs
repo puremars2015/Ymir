@@ -7,7 +7,7 @@ using Ymir.VibeMaker.Infrastructure.Connectors.OneDrive;
 
 namespace Ymir.UnitTests.Connectors;
 
-/// <summary>ADR-0013：根資料夾規則、Entra 端點推導、Graph 限流的重試間隔。</summary>
+/// <summary>ADR-0013 / ADR-0030：OneDrive 名稱規則、Entra 端點推導、Graph 限流的重試間隔。</summary>
 public class OneDriveRulesTests
 {
     [Theory]
@@ -40,15 +40,6 @@ public class OneDriveRulesTests
     }
 
     [Theory]
-    [InlineData("onedrive", true)]
-    [InlineData("OneDrive/file.txt", true)]
-    [InlineData("onedrive/file.txt", true)]
-    [InlineData("src/onedrive/file.txt", false)]
-    [InlineData("onedrives/file.txt", false)]
-    public void LegacySync_ReservesTheLinkedNamespaceAcrossPlatforms(string path, bool reserved) =>
-        Assert.Equal(reserved, OneDrivePaths.IsAgentPath(path));
-
-    [Theory]
     [InlineData("own", false, true)]
     [InlineData("other", false, false)]
     [InlineData("own", true, false)]
@@ -76,31 +67,17 @@ public class OneDriveRulesTests
     }
 
     [Theory]
-    [InlineData("/Ymir", "/Ymir")]
-    [InlineData(" Ymir / Work ", "/Ymir/Work")]
-    [InlineData("Ymir//專案", "/Ymir/專案")]
-    public void Root_IsNormalized(string input, string expected)
-    {
-        Assert.Equal(expected, OneDrivePaths.NormalizeRoot(input).Path);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("   ")]
-    [InlineData("/a/../b")]
-    [InlineData("/.")]
-    [InlineData("/name.")]
-    [InlineData("/a:b")]
-    [InlineData("/a*b")]
-    [InlineData("/a\u0001b")]
-    [InlineData("/1/2/3/4/5/6")]
-    public void Root_RejectsUnsafeOrInvalidNames(string? input)
-    {
-        var (path, problem) = OneDrivePaths.NormalizeRoot(input);
-
-        Assert.Null(path);
-        Assert.False(string.IsNullOrEmpty(problem));
-    }
+    [InlineData("Ymir", true)]
+    [InlineData("專案 1", true)]
+    [InlineData("", false)]
+    [InlineData(".", false)]
+    [InlineData("..", false)]
+    [InlineData("name.", false)]
+    [InlineData("a:b", false)]
+    [InlineData("a*b", false)]
+    [InlineData("a\u0001b", false)]
+    public void Names_RejectCharactersOneDriveDoesNotAccept(string name, bool expected) =>
+        Assert.Equal(expected, OneDrivePaths.IsValidName(name));
 
     [Theory]
     [InlineData("https://login.microsoftonline.com/tid/v2.0", "https://login.microsoftonline.com/tid/oauth2/v2.0/token")]
@@ -145,73 +122,6 @@ public class OneDriveRulesTests
         Assert.Contains("code_challenge_method=S256", uri, StringComparison.Ordinal);
         Assert.Contains("offline_access", Uri.UnescapeDataString(uri), StringComparison.Ordinal);
         Assert.DoesNotContain("secret", uri, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData("季報: 草稿", "季報_ 草稿-01234567")]
-    [InlineData("  ", "未命名-01234567")]
-    [InlineData("a/b\\c*?.", "a_b_c__-01234567")]
-    public void FolderName_ReplacesCharactersOneDriveRejects_AndAppendsTheId(string name, string expected)
-    {
-        Assert.Equal(expected, OneDrivePaths.FolderName(name, Guid.Parse("01234567-89ab-cdef-0123-456789abcdef")));
-    }
-
-    [Fact]
-    public void FolderName_IsTruncated()
-    {
-        var name = OneDrivePaths.FolderName(new string('x', 300), Guid.Empty);
-
-        Assert.Equal(60 + 9, name.Length);
-        Assert.True(OneDrivePaths.IsValidName(name));
-    }
-
-    [Theory]
-    [InlineData("plan.md", "plan (OneDrive 衝突 20261007-093005).md")]
-    [InlineData("src/app.min.js", "src/app.min (OneDrive 衝突 20261007-093005).js")]
-    [InlineData("docs/README", "docs/README (OneDrive 衝突 20261007-093005)")]
-    [InlineData(".gitignore", ".gitignore (OneDrive 衝突 20261007-093005)")]
-    public void ConflictPath_KeepsTheDirectoryAndExtension(string path, string expected)
-    {
-        Assert.Equal(expected, OneDrivePaths.ConflictPath(path, new DateTimeOffset(2026, 10, 7, 9, 30, 5, TimeSpan.Zero)));
-    }
-
-    [Theory]
-    [InlineData("notes.txt", true)]
-    [InlineData("src/中文/資料 1.bin", true)]
-    [InlineData("bad:name.txt", false)]
-    [InlineData("dir./a.txt", false)]
-    [InlineData("trailing /a.txt", false)]
-    [InlineData(".env", false)]
-    [InlineData("node_modules/x.js", false)]
-    [InlineData("../escape.txt", false)]
-    public void SyncablePaths_FollowWorkspaceAndOneDriveRules(string path, bool expected)
-    {
-        Assert.Equal(expected, OneDrivePaths.IsSyncablePath(path));
-    }
-
-    [Fact]
-    public void FailedSyncJobs_BackOff_ThenStop()
-    {
-        var now = DateTimeOffset.UnixEpoch;
-        var scope = Ymir.VibeMaker.Domain.OneDriveSyncScope.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
-        scope.Enqueue(scope.ConversationId, now);
-
-        scope.AttemptFailed("x", retry: true, now);
-        Assert.Equal(now.AddMinutes(1), scope.NextAttemptAt);
-        Assert.True(scope.UploadPending);
-        for (var i = 1; i < Ymir.VibeMaker.Domain.OneDriveSyncScope.MaxAttempts; i++)
-        {
-            scope.AttemptFailed("x", retry: true, now);
-        }
-
-        Assert.False(scope.UploadPending);
-        Assert.Equal(Ymir.VibeMaker.Domain.OneDriveSyncState.Failed, scope.State);
-
-        // 手動重試重新開始計算；授權失效則不再自動重試。
-        scope.Enqueue(scope.ConversationId, now);
-        Assert.Equal(0, scope.Attempts);
-        scope.AttemptFailed("請重新連結", retry: false, now);
-        Assert.False(scope.UploadPending);
     }
 
     [Theory]

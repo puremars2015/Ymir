@@ -19,7 +19,6 @@ import {
   MyExtensions,
   OneDriveStatus,
   Plugin,
-  ConversationOneDrive,
   KnowledgeAnswer,
   PublishSiteRequest,
   SharedSite,
@@ -272,25 +271,8 @@ export class ApiService {
     return this.http.get<OneDriveStatus>('/api/connectors/onedrive');
   }
 
-  setOneDriveRoot(path: string): Observable<OneDriveStatus> {
-    return this.http.put<OneDriveStatus>('/api/connectors/onedrive/root', { path });
-  }
-
   disconnectOneDrive(): Observable<OneDriveStatus> {
     return this.http.delete<OneDriveStatus>('/api/connectors/onedrive');
-  }
-
-  /** 對話（工作目錄）的雲端保存狀態（ADR-0013 §4）。 */
-  getConversationOneDrive(conversationId: string): Observable<ConversationOneDrive> {
-    return this.http.get<ConversationOneDrive>(`/api/conversations/${conversationId}/onedrive`);
-  }
-
-  /** 手動同步 / 重試：排入背景同步。 */
-  syncConversationOneDrive(conversationId: string): Observable<ConversationOneDrive> {
-    return this.http.post<ConversationOneDrive>(
-      `/api/conversations/${conversationId}/onedrive/sync`,
-      null,
-    );
   }
 
   /** 目前使用者的擴充能力與自建擴充（只回自己的資料）。 */

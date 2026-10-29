@@ -63,6 +63,8 @@ public sealed class OneDriveLinkedFile
 {
     private OneDriveLinkedFile() { }
 
+    public const int PathMaxLength = 1024;
+
     public Guid Id { get; private set; }
     public Guid LinkId { get; private set; }
     public string Path { get; private set; } = string.Empty;

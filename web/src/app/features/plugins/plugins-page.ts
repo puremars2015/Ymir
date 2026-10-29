@@ -13,7 +13,7 @@ import { PersonalMcpCard } from '../settings/personal-mcp-card';
 
 /**
  * 外掛市集（ADR-0030）：管理員決定誰能用，使用者在這裡安裝（連結帳號）並決定要不要讓 Agent 使用。
- * OneDrive 的帳號連結與同步資料夾沿用 ADR-0013 的卡片；自訂外掛是個人 MCP（ADR-0028）。
+ * OneDrive 的帳號連結沿用 ADR-0013 的卡片（不同步工作目錄，ADR-0033）；自訂外掛是個人 MCP（ADR-0028）。
  */
 @Component({
   selector: 'app-plugins-page',

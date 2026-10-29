@@ -658,16 +658,6 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("protected_refresh_token");
 
-                    b.Property<string>("RootItemId")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("root_item_id");
-
-                    b.Property<string>("RootPath")
-                        .HasMaxLength(400)
-                        .HasColumnType("nvarchar(400)")
-                        .HasColumnName("root_path");
-
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -817,139 +807,6 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_onedrive_linked_items_user_id_scope_id_drive_id_item_id");
 
                     b.ToTable("onedrive_linked_items", "vibemaker");
-                });
-
-            modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveSyncItem", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("id");
-
-                    b.Property<string>("ETag")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("e_tag");
-
-                    b.Property<string>("ItemId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("item_id");
-
-                    b.Property<DateTimeOffset?>("LocalModifiedAt")
-                        .HasColumnType("datetimeoffset")
-                        .HasColumnName("local_modified_at");
-
-                    b.Property<long?>("LocalSize")
-                        .HasColumnType("bigint")
-                        .HasColumnName("local_size");
-
-                    b.Property<string>("Path")
-                        .IsRequired()
-                        .HasMaxLength(1024)
-                        .HasColumnType("nvarchar(1024)")
-                        .HasColumnName("path");
-
-                    b.Property<Guid>("ScopeId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("scope_id");
-
-                    b.Property<DateTimeOffset>("SyncedAt")
-                        .HasColumnType("datetimeoffset")
-                        .HasColumnName("synced_at");
-
-                    b.HasKey("Id")
-                        .HasName("pk_onedrive_sync_items");
-
-                    b.HasIndex("ScopeId")
-                        .HasDatabaseName("ix_onedrive_sync_items_scope_id");
-
-                    b.ToTable("onedrive_sync_items", "vibemaker");
-                });
-
-            modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveSyncScope", b =>
-                {
-                    b.Property<Guid>("ScopeId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("scope_id");
-
-                    b.Property<int>("Attempts")
-                        .HasColumnType("int")
-                        .HasColumnName("attempts");
-
-                    b.Property<int>("ConflictCount")
-                        .HasColumnType("int")
-                        .HasColumnName("conflict_count");
-
-                    b.Property<Guid>("ConversationId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("conversation_id");
-
-                    b.Property<string>("DriveId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("drive_id");
-
-                    b.Property<string>("FolderItemId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("folder_item_id");
-
-                    b.Property<string>("FolderPath")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("folder_path");
-
-                    b.Property<string>("LastError")
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)")
-                        .HasColumnName("last_error");
-
-                    b.Property<DateTimeOffset?>("LastSyncedAt")
-                        .HasColumnType("datetimeoffset")
-                        .HasColumnName("last_synced_at");
-
-                    b.Property<DateTimeOffset?>("NextAttemptAt")
-                        .HasColumnType("datetimeoffset")
-                        .HasColumnName("next_attempt_at");
-
-                    b.Property<string>("RootItemId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)")
-                        .HasColumnName("root_item_id");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)")
-                        .HasColumnName("state");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("datetimeoffset")
-                        .HasColumnName("updated_at");
-
-                    b.Property<bool>("UploadPending")
-                        .HasColumnType("bit")
-                        .HasColumnName("upload_pending");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("user_id");
-
-                    b.HasKey("ScopeId")
-                        .HasName("pk_onedrive_sync_scopes");
-
-                    b.HasIndex("UserId")
-                        .HasDatabaseName("ix_onedrive_sync_scopes_user_id");
-
-                    b.HasIndex("UploadPending", "NextAttemptAt")
-                        .HasDatabaseName("ix_onedrive_sync_scopes_upload_pending_next_attempt_at");
-
-                    b.ToTable("onedrive_sync_scopes", "vibemaker");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.PersonalMcpServer", b =>
@@ -1411,16 +1268,6 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_onedrive_linked_files_onedrive_linked_items_link_id");
-                });
-
-            modelBuilder.Entity("Ymir.VibeMaker.Domain.OneDriveSyncItem", b =>
-                {
-                    b.HasOne("Ymir.VibeMaker.Domain.OneDriveSyncScope", null)
-                        .WithMany()
-                        .HasForeignKey("ScopeId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("fk_onedrive_sync_items_onedrive_sync_scopes_scope_id");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.SiteShare", b =>

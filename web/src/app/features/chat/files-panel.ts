@@ -15,7 +15,6 @@ import { ApiService, describeApiError } from '../../core/api/api.service';
 import { ArtifactGroup, WorkspaceFile } from '../../core/api/api-types';
 import { Markdown } from '../../shared/markdown';
 import { ArtifactDownload } from '../../shared/artifact-download';
-import { OneDriveSync } from './onedrive-sync';
 import { PublishSite } from './publish-site';
 import { artifactDownloadUrl } from '../../core/files/artifact-files';
 import {
@@ -46,7 +45,7 @@ interface Preview {
  */
 @Component({
   selector: 'app-files-panel',
-  imports: [DatePipe, Markdown, ArtifactDownload, OneDriveSync, PublishSite],
+  imports: [DatePipe, Markdown, ArtifactDownload, PublishSite],
   template: `
     <aside class="panel" aria-label="檔案">
       <header>
@@ -76,7 +75,6 @@ interface Preview {
           專案檔案
         </button>
       </nav>
-      <app-onedrive-sync [conversationId]="conversationId()" [reloading]="loading()" />
       @if (tab() === 'workspace') {
         <p class="muted small">工作目錄內容，包含原始碼及上傳附件；這些檔案不一定是交付成果。</p>
       }

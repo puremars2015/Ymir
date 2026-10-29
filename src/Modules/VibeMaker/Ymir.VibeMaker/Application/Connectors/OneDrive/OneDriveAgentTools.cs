@@ -42,7 +42,7 @@ public sealed partial class OneDriveAgentTools(
     TimeProvider timeProvider,
     ILogger<OneDriveAgentTools> logger)
 {
-    /// <summary>單檔上限，與同步資料夾相同（ADR-0022 決定 6、ADR-0030 §4）。</summary>
+    /// <summary>單檔上限（ADR-0022 決定 6、ADR-0030 §4）。</summary>
     public const long MaxFileBytes = 100L * 1024 * 1024;
 
     // 結果是給模型讀的 MCP 文字內容（不會嵌進 HTML）：中文不跳脫成 \uXXXX，省 token 也比較好讀。

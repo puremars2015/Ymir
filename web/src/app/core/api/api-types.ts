@@ -79,7 +79,6 @@ export type MyExtensions = Schemas['MyExtensionsResponse'];
 export type RestrictedNetworkSupport = Schemas['RestrictedNetworkSupport'];
 export type OneDriveStatus = Schemas['OneDriveStatusResponse'];
 export type OneDriveLinkState = Schemas['OneDriveLinkState'];
-export type ConversationOneDrive = Schemas['ConversationOneDriveResponse'];
 export type Plugin = Schemas['PluginResponse'];
 export type PluginKind = Schemas['PluginKind'];
 export type PlatformMcpServers = Schemas['PlatformMcpServersResponse'];

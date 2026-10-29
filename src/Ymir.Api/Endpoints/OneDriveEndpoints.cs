@@ -14,7 +14,8 @@ using Ymir.VibeMaker.Domain;
 namespace Ymir.Api.Endpoints;
 
 /// <summary>
-/// OneDrive connector（ADR-0013）：連結 / 解除連結、根資料夾、狀態。只作用在目前使用者自己身上；
+/// OneDrive connector（ADR-0013）：連結 / 解除連結、狀態。只作用在目前使用者自己身上；連結後只提供 Agent 工具（ADR-0030），
+/// 不同步工作目錄（ADR-0033）。
 /// 需要管理員開放 <c>onedrive</c> 能力（ADR-0012 擴充政策）。token 不出現在任何回應。
 /// </summary>
 internal static class OneDriveEndpoints
@@ -31,46 +32,8 @@ internal static class OneDriveEndpoints
         // connect / callback 是瀏覽器整頁導向（GET），無法帶 XSRF header；以只能用一次、綁定使用者的 state cookie 防 CSRF。
         group.MapGet("/connect", ConnectAsync).WithName("ConnectOneDrive").ExcludeFromDescription();
         group.MapGet("/callback", CallbackAsync).WithName("OneDriveCallback").ExcludeFromDescription();
-        group.MapPut("/root", SetRootAsync).WithName("SetOneDriveRoot").RequireAntiforgeryHeader();
         group.MapDelete("/", DisconnectAsync).WithName("DisconnectOneDrive").RequireAntiforgeryHeader();
-
-        // 對話（工作目錄）的雲端保存狀態與手動同步（ADR-0013 §4）：只能存取自己的對話（SA §12）。
-        var conversations = endpoints.MapGroup("/api/conversations/{conversationId:guid}/onedrive").WithTags("Conversations").RequireAntiforgeryHeader();
-        conversations.MapGet("/", GetConversationStatusAsync).WithName("GetConversationOneDriveStatus");
-        conversations.MapPost("/sync", SyncConversationAsync).WithName("SyncConversationOneDrive");
         return endpoints;
-    }
-
-    private static async Task<Results<Ok<ConversationOneDriveResponse>, NotFound>> GetConversationStatusAsync(
-        Guid conversationId,
-        ICurrentUser currentUser,
-        OneDriveSyncService sync,
-        CancellationToken cancellationToken) =>
-        await sync.GetStatusAsync(currentUser.UserId, conversationId, cancellationToken) is { } status
-            ? TypedResults.Ok(ConversationOneDriveResponse.From(status))
-            : TypedResults.NotFound();
-
-    private static async Task<IResult> SyncConversationAsync(
-        Guid conversationId,
-        ICurrentUser currentUser,
-        OneDriveSyncService sync,
-        CancellationToken cancellationToken)
-    {
-        var status = await sync.RequestSyncAsync(currentUser.UserId, conversationId, cancellationToken);
-        if (status is null)
-        {
-            return TypedResults.NotFound();
-        }
-
-        return status.Availability == OneDriveAvailability.Ready
-            ? TypedResults.Accepted((string?)null, ConversationOneDriveResponse.From(status))
-            : ApiProblem.Create(StatusCodes.Status409Conflict, "ONEDRIVE_NOT_READY", status.Availability switch
-            {
-                OneDriveAvailability.NotAllowed => "管理員尚未開放 OneDrive 連結。",
-                OneDriveAvailability.NeedsReauth => "OneDrive 授權已失效，請到外掛市集重新連結。",
-                OneDriveAvailability.NoRoot => "請先到外掛市集的 OneDrive 卡片選擇同步資料夾。",
-                _ => "請先到外掛市集連結 OneDrive。",
-            });
     }
 
     private static async Task<OneDriveStatusResponse> GetStatusAsync(ICurrentUser currentUser, OneDriveConnectionService onedrive, CancellationToken cancellationToken) =>
@@ -162,25 +125,6 @@ internal static class OneDriveEndpoints
         }));
     }
 
-    private static async Task<IResult> SetRootAsync(
-        SetOneDriveRootRequest request,
-        ICurrentUser currentUser,
-        OneDriveConnectionService onedrive,
-        CancellationToken cancellationToken)
-    {
-        if (!await onedrive.IsAllowedAsync(currentUser.UserId, cancellationToken))
-        {
-            return NotAllowed();
-        }
-
-        if (await onedrive.SetRootAsync(currentUser.UserId, request.Path, currentUser.ActorName, cancellationToken) is { } problem)
-        {
-            return ApiProblem.Create(StatusCodes.Status400BadRequest, "ONEDRIVE_ROOT_INVALID", problem);
-        }
-
-        return TypedResults.Ok(OneDriveStatusResponse.From(await onedrive.GetStatusAsync(currentUser.UserId, cancellationToken)));
-    }
-
     /// <summary>解除連結不需要能力：被關閉的使用者也可以移除自己的連結與 token。</summary>
     private static async Task<OneDriveStatusResponse> DisconnectAsync(ICurrentUser currentUser, OneDriveConnectionService onedrive, CancellationToken cancellationToken)
     {
@@ -229,40 +173,17 @@ internal sealed class OidcOneDriveSettingsSource(IOidcSettingsSource oidc) : IOn
     }
 }
 
-public sealed record SetOneDriveRootRequest(string? Path);
-
 /// <param name="Allowed">管理員是否開放。</param>
 /// <param name="Available">是否已設定企業帳號登入（沒有時無法連結）。</param>
 /// <param name="Account">連結的 Microsoft 帳號（UPN）。</param>
-/// <param name="RootPath">同步的根資料夾；尚未設定時為 null。</param>
 public sealed record OneDriveStatusResponse(
     bool Allowed,
     bool Available,
     OneDriveLinkState State,
     string? Account,
-    string? RootPath,
     DateTimeOffset? ConnectedAt,
     string? LastError)
 {
     internal static OneDriveStatusResponse From(OneDriveStatus status) =>
-        new(status.Allowed, status.Available, status.State, status.Account, status.RootPath, status.ConnectedAt, status.LastError);
-}
-
-/// <summary>對話的雲端保存狀態（ADR-0013 §4）；沒有 token、item id 或 host 路徑。</summary>
-/// <param name="Availability">OneDrive 是否可用；不是 <c>Ready</c> 時不同步。</param>
-/// <param name="FolderPath">相對於同步根資料夾的位置；尚未同步過時為 null。</param>
-/// <param name="State">尚未同步過時為 null。</param>
-/// <param name="ConflictCount">最近一輪同步另存的衝突副本數。</param>
-/// <param name="LastError">失敗原因或略過檔案的摘要。</param>
-public sealed record ConversationOneDriveResponse(
-    OneDriveAvailability Availability,
-    string? RootPath,
-    string? FolderPath,
-    OneDriveSyncState? State,
-    DateTimeOffset? LastSyncedAt,
-    int ConflictCount,
-    string? LastError)
-{
-    internal static ConversationOneDriveResponse From(ConversationOneDriveStatus status) =>
-        new(status.Availability, status.RootPath, status.FolderPath, status.State, status.LastSyncedAt, status.ConflictCount, status.LastError);
+        new(status.Allowed, status.Available, status.State, status.Account, status.ConnectedAt, status.LastError);
 }
