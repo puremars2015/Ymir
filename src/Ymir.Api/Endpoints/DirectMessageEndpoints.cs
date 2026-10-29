@@ -1,6 +1,3 @@
-using System.Net.ServerSentEvents;
-using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Microsoft.Extensions.Options;
 using Ymir.Api.Auth;
 using Ymir.Api.Problems;
@@ -18,19 +15,13 @@ internal static class DirectMessageEndpoints
 {
     public const string NotFoundCode = "DIRECT_MESSAGE_PEER_NOT_FOUND";
 
-    /// <summary>
-    /// SSE 心跳間隔：Cloudflare 等代理會切斷閒置超過 100 秒的連線（ADR-0006）；
-    /// 每次心跳也重新確認帳號狀態，停用或改成訪客的帳號不會一直收到通知（ADR-0009、ADR-0027）。
-    /// </summary>
-    internal static TimeSpan HeartbeatInterval { get; set; } = TimeSpan.FromSeconds(25);
-
     public static IEndpointRouteBuilder MapDirectMessageEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/direct-messages").WithTags("DirectMessages").RequireAuthorization(AuthSetup.MessagingPolicy).RequireAntiforgeryHeader();
         group.MapGet("/contacts", ListContactsAsync).WithName("ListDirectContacts");
         group.MapGet("/events", StreamEvents)
             .WithName("StreamDirectMessageEvents")
-            .WithSummary("SSE：新訊息（message）、已讀（read）、群組訊息（group-message）、群組異動（group-updated）、群組已讀（group-read）；ready 表示已連線，ping 為心跳。");
+            .WithSummary("（舊路徑，請改用 /api/events）SSE：新訊息（message）、已讀（read）、群組訊息（group-message）、群組異動（group-updated）、群組已讀（group-read）；ready 表示已連線，ping 為心跳。");
         group.MapGet("/{peerId:guid}", GetHistoryAsync).WithName("ListDirectMessages").Produces<DirectMessagePageResponse>();
         group.MapPost("/{peerId:guid}", SendAsync)
             .WithName("SendDirectMessage")
@@ -67,6 +58,9 @@ internal static class DirectMessageEndpoints
             ? TypedResults.Ok(DirectMessagesReadResponse.From(read))
             : PeerNotFound();
 
+    /// <summary>
+    /// 舊路徑（ADR-0023）：保留一個版本作為 <c>/api/events</c> 的相容別名（ADR-0032 §2），只送私訊與群組事件。
+    /// </summary>
     private static Microsoft.AspNetCore.Http.HttpResults.ServerSentEventsResult<string> StreamEvents(
         HttpContext httpContext,
         ICurrentUser currentUser,
@@ -76,55 +70,7 @@ internal static class DirectMessageEndpoints
         CancellationToken cancellationToken)
     {
         httpContext.Response.Headers["X-Accel-Buffering"] = "no"; // 反向代理不要緩衝串流
-        return TypedResults.ServerSentEvents(ReadEventsAsync(currentUser.UserId, hub, users, jsonOptions.Value.SerializerOptions, cancellationToken));
-    }
-
-    private static async IAsyncEnumerable<SseItem<string>> ReadEventsAsync(
-        Guid userId,
-        IDirectMessageHub hub,
-        IUserDirectory users,
-        JsonSerializerOptions jsonOptions,
-        [EnumeratorCancellation] CancellationToken cancellationToken)
-    {
-        // 先訂閱再送 ready，ready 之後發生的訊息一定收得到；前端在 ready 時重新讀取資料，補齊斷線期間的訊息。
-        using var subscription = hub.Subscribe(userId);
-        yield return new SseItem<string>("{}", "ready");
-
-        await using var notifications = subscription.ReadAllAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
-        var next = notifications.MoveNextAsync().AsTask();
-        while (true)
-        {
-            using var heartbeat = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            var delay = Task.Delay(HeartbeatInterval, heartbeat.Token);
-            if (await Task.WhenAny(next, delay) != next)
-            {
-                if (await users.FindAsync(userId, cancellationToken) is not { Status: UserStatus.Active, Role: not UserRole.Guest })
-                {
-                    yield break;
-                }
-
-                yield return new SseItem<string>("{}", "ping");
-                continue;
-            }
-
-            await heartbeat.CancelAsync();
-            if (!await next)
-            {
-                yield break;
-            }
-
-            yield return notifications.Current switch
-            {
-                DirectMessageSentNotification sent => new SseItem<string>(JsonSerializer.Serialize(DirectMessageResponse.From(sent.Message), jsonOptions), "message"),
-                DirectMessagesReadNotification read => new SseItem<string>(JsonSerializer.Serialize(DirectMessagesReadResponse.From(read.Read), jsonOptions), "read"),
-                // 群組聊天（ADR-0026 §1）：同一條連線傳送群組的訊息、Bot 回覆更新、群組異動與已讀。
-                GroupMessageNotification group => new SseItem<string>(JsonSerializer.Serialize(GroupMessageResponse.From(group.Message), jsonOptions), "group-message"),
-                GroupUpdatedNotification updated => new SseItem<string>(JsonSerializer.Serialize(new GroupUpdatedResponse(updated.GroupId, updated.Removed), jsonOptions), "group-updated"),
-                GroupReadNotification groupRead => new SseItem<string>(JsonSerializer.Serialize(new GroupReadResponse(groupRead.Read.GroupId, groupRead.Read.ReaderId, groupRead.Read.ReadAt), jsonOptions), "group-read"),
-                _ => new SseItem<string>("{}", "ping"),
-            };
-            next = notifications.MoveNextAsync().AsTask();
-        }
+        return TypedResults.ServerSentEvents(UserEventEndpoints.ReadEventsAsync(currentUser.UserId, hub, users, jsonOptions.Value.SerializerOptions, messagingOnly: true, cancellationToken));
     }
 
     private static IResult PeerNotFound() => ApiProblem.Create(StatusCodes.Status404NotFound, NotFoundCode, "找不到這位使用者。");

@@ -118,3 +118,6 @@ export interface ApiProblem {
   detail?: string;
   code?: string;
 }
+export type Notification = Schemas['NotificationResponse'];
+export type NotificationPage = Schemas['NotificationPageResponse'];
+export type NotificationUnread = Schemas['NotificationUnreadResponse'];

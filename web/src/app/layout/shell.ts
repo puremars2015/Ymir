@@ -22,6 +22,9 @@ import { describeApiError } from '../core/api/api.service';
 import { AuthService } from '../core/auth/auth.service';
 import { BrandingStore } from '../core/branding/branding.store';
 import { DirectMessageStore } from '../core/messaging/direct-message.store';
+import { UserEventStream } from '../core/events/user-event-stream';
+import { NotificationStore } from '../core/notifications/notification.store';
+import { NotificationBell } from './notification-bell';
 import { NavigationStore } from '../core/navigation/navigation.store';
 import { normalizeTitle } from '../core/navigation/navigation-edits';
 import { parseActiveRoute } from './active-route';
@@ -48,6 +51,7 @@ type ItemKind = 'conversation' | 'project';
     ThemeSwitcher,
     PeoplePanel,
     PanelResizer,
+    NotificationBell,
   ],
   host: {
     '(document:click)': 'closeMenu($event)',
@@ -63,6 +67,8 @@ export class Shell implements OnInit {
   protected readonly branding = inject(BrandingStore);
   protected readonly store = inject(NavigationStore);
   protected readonly messages = inject(DirectMessageStore);
+  private readonly events = inject(UserEventStream);
+  private readonly notifications = inject(NotificationStore);
   protected readonly tools = inject(ToolStore);
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
@@ -126,7 +132,18 @@ export class Shell implements OnInit {
     effect(() => {
       if (this.auth.user()) untracked(() => this.tools.refresh());
     });
-    // 訪客沒有訊息與群組（ADR-0027），不連線。
+    // 使用者事件串流與通知（ADR-0032 §2）：所有登入者（含訪客）都連線；換帳號時重新連線。
+    effect(() => {
+      const user = this.auth.user();
+      if (user) {
+        this.events.connect(user.id);
+        this.notifications.connect();
+      } else {
+        this.notifications.disconnect();
+        this.events.disconnect();
+      }
+    });
+    // 訪客沒有訊息與群組（ADR-0027），不訂閱（伺服器也不會送這些事件給訪客）。
     effect(() => {
       const user = this.auth.user();
       if (user && this.auth.canUseMessaging()) this.messages.connect(user.id);

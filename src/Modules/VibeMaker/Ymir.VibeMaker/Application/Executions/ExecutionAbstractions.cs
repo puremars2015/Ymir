@@ -70,6 +70,11 @@ public sealed class ExecutionOptions
     /// <summary>container 內的背景程序能否以使用者自己的模型 key 呼叫模型（<c>BackgroundModelAccess</c>，ADR-0034）。</summary>
     public bool BackgroundModelAccess { get; set; } = true;
 
+    /// <summary>
+    /// 從送出到結束超過多久時，完成或失敗都通知使用者（<c>VibeMaker:Notifications:LongExecutionSeconds</c>，預設 60 秒，ADR-0032 §3）。
+    /// </summary>
+    public TimeSpan LongExecutionNotificationThreshold { get; set; } = TimeSpan.FromSeconds(60);
+
     /// <summary>閒置檢查的間隔（<c>IdleCheckIntervalSeconds</c>，測試可調短）。</summary>
     public TimeSpan IdleCheckInterval { get; set; } = TimeSpan.FromMinutes(1);
 }

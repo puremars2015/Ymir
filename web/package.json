@@ -32,7 +32,8 @@
     "e2e:groups": "node e2e/group-chat-flow.mjs",
     "e2e:dm": "node e2e/direct-messages-flow.mjs",
     "e2e:google": "node e2e/google-flow.mjs",
-    "e2e:connections": "node e2e/connections-flow.mjs"
+    "e2e:connections": "node e2e/connections-flow.mjs",
+    "e2e:notifications": "node e2e/notifications-flow.mjs"
   },
   "private": true,
   "packageManager": "npm@11.19.0",

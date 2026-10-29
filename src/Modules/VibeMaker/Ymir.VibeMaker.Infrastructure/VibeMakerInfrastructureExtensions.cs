@@ -94,6 +94,11 @@ public static class VibeMakerInfrastructureExtensions
                 options.MonthlyBudgetUsd = budget;
             }
 
+            if (configuration.GetValue<double?>("VibeMaker:Notifications:LongExecutionSeconds") is >= 0 and var longExecution)
+            {
+                options.LongExecutionNotificationThreshold = TimeSpan.FromSeconds(longExecution);
+            }
+
             if (runtime.GetValue<bool?>(nameof(RuntimeOptions.BackgroundModelAccess)) is { } background)
             {
                 options.BackgroundModelAccess = background;

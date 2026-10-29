@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Ymir.Platform.Messaging;
+using Ymir.Platform.Notifications;
 using Ymir.Platform.Settings;
 using Ymir.Platform.Users;
 
@@ -25,6 +26,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<ChatGroupMember> ChatGroupMembers => Set<ChatGroupMember>();
 
     public DbSet<ChatGroupMessage> ChatGroupMessages => Set<ChatGroupMessage>();
+
+    public DbSet<Notification> Notifications => Set<Notification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -96,6 +99,23 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             message.HasIndex(m => new { m.SenderId, m.RecipientId, m.CreatedAt });
             message.HasIndex(m => new { m.RecipientId, m.SenderId, m.CreatedAt });
             message.HasIndex(m => new { m.RecipientId, m.ReadAt });
+        });
+
+        // 站內通知（ADR-0032 §1）：只屬於一位使用者；使用者刪除只是標示 Deleted（ADR-0027），所以不串聯刪除。
+        modelBuilder.Entity<Notification>(notification =>
+        {
+            notification.ToTable("notifications");
+            notification.HasKey(n => n.Id);
+            notification.Property(n => n.Id).ValueGeneratedNever();
+            notification.Property(n => n.Kind).HasConversion<UpperSnakeCaseEnumConverter<NotificationKind>>().HasMaxLength(40);
+            notification.Property(n => n.Title).HasMaxLength(Notification.TitleMaxLength).IsRequired();
+            notification.Property(n => n.Body).HasMaxLength(Notification.BodyMaxLength);
+            notification.Property(n => n.Link).HasMaxLength(Notification.LinkMaxLength);
+            notification.HasOne<User>().WithMany().HasForeignKey(n => n.UserId).OnDelete(DeleteBehavior.NoAction);
+            // 清單（依 id 由新到舊）、未讀數與保存期限。
+            notification.HasIndex(n => new { n.UserId, n.CreatedAt });
+            notification.HasIndex(n => new { n.UserId, n.ReadAt });
+            notification.HasIndex(n => n.CreatedAt);
         });
 
         // 群組聊天（ADR-0026）；同一模組內可以建 FK。使用者刪除只是標示 Deleted（ADR-0027），所以不串聯刪除使用者。

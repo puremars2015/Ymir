@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Ymir.Platform.Auditing;
+using Ymir.Platform.Notifications;
 using Ymir.VibeMaker.Application.Executions;
 using Ymir.VibeMaker.Application.Models;
 using Ymir.VibeMaker.Application.Persistence;
@@ -10,7 +11,8 @@ using Ymir.VibeMaker.Domain;
 namespace Ymir.VibeMaker.Application.Users;
 
 /// <summary>
-/// 帳號停用後清理 Vibe Maker 的資源（SA §12、ADR-0009）：取消執行中的 execution、撤銷 LiteLLM virtual key（ADR-0004）、停止 runtime。
+/// 帳號停用後清理 Vibe Maker 的資源（SA §12、ADR-0009）：取消執行中的 execution、撤銷 LiteLLM virtual key（ADR-0004）、停止 runtime，
+/// 並刪除未讀通知（ADR-0032 §1；取消 execution 不會再產生通知）。
 /// 每一步獨立 best effort：任何一步失敗都只記錄 log，不影響停用本身（停用後的請求已經被擋下）。
 /// </summary>
 public sealed class UserDeactivationService(
@@ -18,6 +20,7 @@ public sealed class UserDeactivationService(
     ExecutionService executions,
     RuntimeCredentialService credentials,
     IAgentRuntimeManager runtimes,
+    INotificationService notifications,
     IAuditLog auditLog,
     TimeProvider timeProvider,
     ILogger<UserDeactivationService> logger)
@@ -33,6 +36,15 @@ public sealed class UserDeactivationService(
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to cancel executions for disabled user {UserId}", userId);
+        }
+
+        try
+        {
+            await notifications.DeleteUnreadForUserAsync(userId, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to delete unread notifications for disabled user {UserId}", userId);
         }
 
         try

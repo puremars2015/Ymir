@@ -27,6 +27,8 @@ import {
   Tools,
   UserSearchResult,
   DirectContact,
+  NotificationPage,
+  NotificationUnread,
   DirectMessage,
   ChatGroup,
   ChatGroupSummary,
@@ -544,6 +546,23 @@ export class ApiService {
   }
 
   /** 使用者之間的訊息（ADR-0023）。 */
+  /** 站內通知（ADR-0032 §1），由新到舊；`before` 是上一頁最後一則的 id。 */
+  listNotifications(before?: string): Observable<NotificationPage> {
+    const query = before ? `?before=${encodeURIComponent(before)}` : '';
+    return this.http.get<NotificationPage>(`/api/notifications${query}`);
+  }
+
+  markNotificationRead(id: string): Observable<NotificationUnread> {
+    return this.http.post<NotificationUnread>(
+      `/api/notifications/${encodeURIComponent(id)}/read`,
+      null,
+    );
+  }
+
+  markAllNotificationsRead(): Observable<NotificationUnread> {
+    return this.http.post<NotificationUnread>('/api/notifications/read-all', null);
+  }
+
   listDirectContacts(): Observable<DirectContact[]> {
     return this.http.get<DirectContact[]>('/api/direct-messages/contacts');
   }

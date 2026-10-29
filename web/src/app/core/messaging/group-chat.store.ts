@@ -24,7 +24,7 @@ import {
 } from './group-chat-state';
 
 /**
- * 群組聊天與 @bot（ADR-0026）。即時通知與一對一訊息共用 `/api/direct-messages/events`
+ * 群組聊天與 @bot（ADR-0026）。即時通知與一對一訊息共用 `/api/events`
  * （由 {@link DirectMessageStore} 轉給這裡）；Pending 的 Bot 訊息以群組的串流端點顯示即時回答。
  */
 @Injectable({ providedIn: 'root' })

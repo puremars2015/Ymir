@@ -8,6 +8,7 @@ import {
   GroupMessage,
   GroupRead,
 } from '../api/api-types';
+import { UserEventStream } from '../events/user-event-stream';
 import { GroupUpdated } from './group-events';
 import {
   applyMessageToContacts,
@@ -21,16 +22,16 @@ import {
 import { GroupChatStore } from './group-chat.store';
 
 /**
- * 使用者之間的訊息（ADR-0023）：右側成員名單、目前開啟的一對一對話，以及 `/api/direct-messages/events` 的即時通知。
- * 認證靠同源 cookie（ADR-0002），所以直接用原生 EventSource；斷線時瀏覽器會自動重連，
- * 每次連上（ready）都重新讀取名單與目前對話，補齊斷線期間的訊息。
+ * 使用者之間的訊息（ADR-0023）：右側成員名單、目前開啟的一對一對話，以及即時通知
+ * （共用的使用者事件串流 `/api/events`，ADR-0032 §2）。
  */
 @Injectable({ providedIn: 'root' })
 export class DirectMessageStore {
   private readonly api = inject(ApiService);
-  /** 群組聊天（ADR-0026）共用同一條 SSE 連線。 */
+  /** 群組聊天（ADR-0026）的事件也在同一條 SSE 連線。 */
   private readonly groups = inject(GroupChatStore);
-  private source: EventSource | null = null;
+  private readonly stream = inject(UserEventStream);
+  private unsubscribe: (() => void)[] = [];
   private myId: string | null = null;
 
   readonly contacts = signal<DirectContact[]>([]);
@@ -50,48 +51,44 @@ export class DirectMessageStore {
     () => this.contacts().find((c) => c.userId === this.openPeerId()) ?? null,
   );
 
-  /** 登入後呼叫；重複呼叫無作用。 */
+  /**
+   * 登入後呼叫（只限可以使用訊息的角色）；重複呼叫無作用。事件來自共用的 `/api/events`（ADR-0032 §2），
+   * 每次連上（ready）都重新讀取名單與目前對話，補齊斷線期間的訊息。
+   */
   connect(myId: string): void {
-    if (this.source && this.myId === myId) return;
+    if (this.unsubscribe.length && this.myId === myId) return;
     this.disconnect();
     this.myId = myId;
     this.groups.connect(myId);
-    if (typeof EventSource === 'undefined') {
+    this.unsubscribe = [
+      this.stream.on('ready', () => {
+        this.connected.set(true);
+        this.refreshContacts();
+        this.reloadOpenConversation();
+        this.groups.refresh();
+      }),
+      this.stream.on('message', (data) => this.onMessage(JSON.parse(data) as DirectMessage)),
+      this.stream.on('read', (data) => this.onRead(JSON.parse(data) as DirectMessagesRead)),
+      this.stream.on('group-message', (data) =>
+        this.groups.onMessage(JSON.parse(data) as GroupMessage),
+      ),
+      this.stream.on('group-updated', (data) =>
+        this.groups.onUpdated(JSON.parse(data) as GroupUpdated),
+      ),
+      this.stream.on('group-read', (data) => this.groups.onRead(JSON.parse(data) as GroupRead)),
+    ];
+    // 已經連上的串流不會再送 ready：直接讀一次。
+    if (this.stream.connected() || !this.stream.supported) {
+      this.connected.set(this.stream.connected());
       this.refreshContacts();
       this.groups.refresh();
-      return;
     }
-    const source = new EventSource('/api/direct-messages/events', { withCredentials: true });
-    this.source = source;
-    // zoneless：signal 更新即會觸發畫面更新，不需要 NgZone。
-    source.addEventListener('ready', () => {
-      this.connected.set(true);
-      this.refreshContacts();
-      this.reloadOpenConversation();
-      this.groups.refresh();
-    });
-    source.addEventListener('message', (event: MessageEvent<string>) =>
-      this.onMessage(JSON.parse(event.data) as DirectMessage),
-    );
-    source.addEventListener('read', (event: MessageEvent<string>) =>
-      this.onRead(JSON.parse(event.data) as DirectMessagesRead),
-    );
-    source.addEventListener('group-message', (event: MessageEvent<string>) =>
-      this.groups.onMessage(JSON.parse(event.data) as GroupMessage),
-    );
-    source.addEventListener('group-updated', (event: MessageEvent<string>) =>
-      this.groups.onUpdated(JSON.parse(event.data) as GroupUpdated),
-    );
-    source.addEventListener('group-read', (event: MessageEvent<string>) =>
-      this.groups.onRead(JSON.parse(event.data) as GroupRead),
-    );
-    source.onerror = () => this.connected.set(false);
   }
 
-  /** 登出時關閉連線並清掉資料。 */
+  /** 登出（或改成訪客）時取消訂閱並清掉資料；連線本身由 UserEventStream 管理。 */
   disconnect(): void {
-    this.source?.close();
-    this.source = null;
+    for (const off of this.unsubscribe) off();
+    this.unsubscribe = [];
     this.myId = null;
     this.groups.disconnect();
     this.connected.set(false);

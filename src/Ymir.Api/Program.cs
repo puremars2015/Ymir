@@ -107,6 +107,8 @@ app.MapBrandingEndpoints();
 app.MapAdminModelEndpoints();
 app.MapMakeTopicEndpoints();
 app.MapDirectMessageEndpoints();
+app.MapUserEventEndpoints();
+app.MapNotificationEndpoints();
 app.MapChatGroupEndpoints();
 app.MapDefaultEndpoints();
 

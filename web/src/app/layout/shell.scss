@@ -450,7 +450,7 @@ svg {
 /* 右側成員面板的開關（面板本身的版面在 people-panel.scss，ADR-0023） */
 .people-toggle {
   position: relative;
-  margin-left: auto;
+  margin-left: 0.5rem;
 }
 
 /* 拖曳中：不選取文字、游標一致、面板寬度不做動畫 */

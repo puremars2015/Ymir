@@ -276,6 +276,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/events': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** SSE：通知（notification、notification-read）；可以使用訊息的角色另有私訊（message、read）與群組（group-message、group-updated、group-read）。ready 表示已連線，ping 為心跳。 */
+    get: operations['StreamUserEvents'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/projects': {
     parameters: {
       query?: never;
@@ -1308,7 +1325,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** SSE：新訊息（message）、已讀（read）、群組訊息（group-message）、群組異動（group-updated）、群組已讀（group-read）；ready 表示已連線，ping 為心跳。 */
+    /** （舊路徑，請改用 /api/events）SSE：新訊息（message）、已讀（read）、群組訊息（group-message）、群組異動（group-updated）、群組已讀（group-read）；ready 表示已連線，ping 為心跳。 */
     get: operations['StreamDirectMessageEvents'];
     put?: never;
     post?: never;
@@ -1344,6 +1361,70 @@ export interface paths {
     get?: never;
     put?: never;
     post: operations['MarkDirectMessagesRead'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/notifications': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListNotifications'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/notifications/unread-count': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['CountUnreadNotifications'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/notifications/{id}/read': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['MarkNotificationRead'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/notifications/read-all': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['MarkAllNotificationsRead'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2029,6 +2110,30 @@ export interface components {
       skills: string[];
       mcpServers: string[];
       platformMcpServers: components['schemas']['PlatformMcpServerSummary'][];
+    };
+    /** @enum {unknown} */
+    NotificationKind: 'ExecutionCompleted' | 'ExecutionFailed';
+    NotificationPageResponse: {
+      items: components['schemas']['NotificationResponse'][];
+      hasMore: boolean;
+      /** Format: int32 */
+      unreadCount: number | string;
+    };
+    NotificationResponse: {
+      /** Format: uuid */
+      id: string;
+      kind: components['schemas']['NotificationKind'];
+      title: string;
+      body: null | string;
+      link: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      readAt: null | string;
+    };
+    NotificationUnreadResponse: {
+      /** Format: int32 */
+      unreadCount: number | string;
     };
     OidcSettingsResponse: {
       source: components['schemas']['OidcSettingsSource'];
@@ -3026,6 +3131,26 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['MakeTopicResponse'][];
+        };
+      };
+    };
+  };
+  StreamUserEvents: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/event-stream': components['schemas']['SseItemOfstring'];
         };
       };
     };
@@ -5149,6 +5274,91 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['DirectMessagesReadResponse'];
+        };
+      };
+    };
+  };
+  ListNotifications: {
+    parameters: {
+      query?: {
+        before?: string;
+        take?: number | string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationPageResponse'];
+        };
+      };
+    };
+  };
+  CountUnreadNotifications: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationUnreadResponse'];
+        };
+      };
+    };
+  };
+  MarkNotificationRead: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationUnreadResponse'];
+        };
+      };
+    };
+  };
+  MarkAllNotificationsRead: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['NotificationUnreadResponse'];
         };
       };
     };

@@ -9,6 +9,7 @@ using Ymir.Platform.Infrastructure.Persistence;
 using Ymir.Platform.Infrastructure.Settings;
 using Ymir.Platform.Infrastructure.Users;
 using Ymir.Platform.Messaging;
+using Ymir.Platform.Notifications;
 using Ymir.Platform.Settings;
 using Ymir.Platform.Users;
 
@@ -28,6 +29,7 @@ public static class PlatformInfrastructureExtensions
         services.AddSingleton<IDirectMessageHub, InMemoryDirectMessageHub>();
         services.AddScoped<IDirectMessageService, DirectMessageService>();
         services.AddScoped<IChatGroupService, ChatGroupService>();
+        services.AddScoped<INotificationService, Notifications.NotificationService>();
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
         services.AddSingleton(TimeProvider.System);

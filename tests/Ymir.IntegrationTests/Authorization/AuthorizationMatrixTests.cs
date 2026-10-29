@@ -267,6 +267,12 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
         "GET /api/direct-messages/{peerId:guid}",
         "POST /api/direct-messages/{peerId:guid}",
         "POST /api/direct-messages/{peerId:guid}/read",
+        // 使用者事件串流與站內通知（ADR-0032）：一律只讀寫目前使用者自己的通知；別人的通知回 404 在 NotificationTests 驗證。
+        "GET /api/events",
+        "GET /api/notifications/",
+        "GET /api/notifications/unread-count",
+        "POST /api/notifications/{id:guid}/read",
+        "POST /api/notifications/read-all",
         // 群組聊天（ADR-0026）：以成員資格授權，非成員 / 非擁有者的拒絕在 ChatGroupTests 驗證。
         "GET /api/chat-groups/",
         "POST /api/chat-groups/",

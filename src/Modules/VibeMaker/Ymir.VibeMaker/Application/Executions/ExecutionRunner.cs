@@ -35,6 +35,7 @@ public sealed class ExecutionRunner(
     Ymir.VibeMaker.Application.Extensions.PersonalMcpService personalMcp,
     SiteService sites,
     BackgroundCredentialService backgroundCredentials,
+    ExecutionNotifier notifier,
     IAuditLog auditLog,
     VibeMakerTelemetry telemetry,
     TimeProvider timeProvider,
@@ -366,6 +367,8 @@ public sealed class ExecutionRunner(
         _started = false;
         await auditLog.WriteAsync(new AuditEntry("system", "execution.finish", "execution", execution.Id.ToString("D"),
             execution.Status == ExecutionStatus.Completed ? AuditResult.Success : AuditResult.Failure, now, null), cancellationToken).ConfigureAwait(false);
+        // 終止事件之後才通知（ADR-0032 §3）：使用者點開通知時，對話已經是完成狀態。
+        await notifier.NotifyFinishedAsync(execution, (terminal as AgentFailed)?.Message, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<Message> AddAssistantMessageAsync(AgentExecution execution, string content, MessageType type, DateTimeOffset now, CancellationToken cancellationToken)

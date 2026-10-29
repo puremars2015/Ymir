@@ -25,6 +25,7 @@ public static class VibeMakerApplicationExtensions
         services.AddScoped<Application.Attachments.AttachmentService>();
         services.AddScoped<ExecutionEventWriter>();
         services.AddScoped<ExecutionRunner>();
+        services.AddScoped<ExecutionNotifier>();
         services.AddScoped<ExecutionReconciler>();
         services.AddScoped<ExecutionEventRetention>();
         services.AddScoped<Application.Runtime.RuntimeLifecycleService>();

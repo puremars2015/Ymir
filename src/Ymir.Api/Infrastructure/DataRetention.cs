@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Options;
 using Ymir.Platform.Auditing;
+using Ymir.Platform.Notifications;
 using Ymir.VibeMaker.Application.Executions;
 
 namespace Ymir.Api.Infrastructure;
@@ -18,6 +19,9 @@ public sealed class RetentionOptions
     /// <summary>已結束 execution 的事件保留天數（預設 90；只影響 SSE 重播，對話內容在 messages）。</summary>
     public int ExecutionEventDays { get; set; } = 90;
 
+    /// <summary>站內通知保留天數（預設 90，ADR-0032 §1）。</summary>
+    public int NotificationDays { get; set; } = 90;
+
     /// <summary>清理間隔（小時，預設 24）。</summary>
     public double IntervalHours { get; set; } = 24;
 
@@ -26,7 +30,7 @@ public sealed class RetentionOptions
 }
 
 /// <summary>
-/// 定期刪除超過保存期限的稽核紀錄與 execution 事件。跨模組的工作（Platform 稽核 + Vibe Maker 事件）在 Api 層組合（ADR-0001）。
+/// 定期刪除超過保存期限的稽核紀錄、execution 事件與站內通知。跨模組的工作（Platform 稽核 + Vibe Maker 事件）在 Api 層組合（ADR-0001）。
 /// 每次清理本身也寫一筆稽核（system.retention.purge），保留「刪了多少」的紀錄。
 /// </summary>
 internal sealed partial class DataRetentionWorker(
@@ -38,7 +42,7 @@ internal sealed partial class DataRetentionWorker(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var settings = options.Value;
-        if (settings.AuditLogDays <= 0 && settings.ExecutionEventDays <= 0)
+        if (settings.AuditLogDays <= 0 && settings.ExecutionEventDays <= 0 && settings.NotificationDays <= 0)
         {
             return;
         }
@@ -75,14 +79,17 @@ internal sealed partial class DataRetentionWorker(
                 var events = settings.ExecutionEventDays > 0
                     ? await scope.ServiceProvider.GetRequiredService<ExecutionEventRetention>().PurgeOlderThanAsync(now.AddDays(-settings.ExecutionEventDays), cancellationToken).ConfigureAwait(false)
                     : 0;
-                if (audits > 0 || events > 0)
+                var notifications = settings.NotificationDays > 0
+                    ? await scope.ServiceProvider.GetRequiredService<INotificationService>().PurgeOlderThanAsync(now.AddDays(-settings.NotificationDays), cancellationToken).ConfigureAwait(false)
+                    : 0;
+                if (audits > 0 || events > 0 || notifications > 0)
                 {
                     await scope.ServiceProvider.GetRequiredService<IAuditLog>().WriteAsync(
-                        new AuditEntry("system", "system.retention.purge", "retention", $"audit_log={audits};execution_events={events}", AuditResult.Success, now, null),
+                        new AuditEntry("system", "system.retention.purge", "retention", $"audit_log={audits};execution_events={events};notifications={notifications}", AuditResult.Success, now, null),
                         cancellationToken).ConfigureAwait(false);
                 }
 
-                LogPurged(logger, audits, events);
+                LogPurged(logger, audits, events, notifications);
                 return (audits, events);
             }
         }
@@ -95,8 +102,8 @@ internal sealed partial class DataRetentionWorker(
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Data retention purged {AuditLogs} audit log entries and {ExecutionEvents} execution events")]
-    private static partial void LogPurged(ILogger logger, int auditLogs, int executionEvents);
+    [LoggerMessage(Level = LogLevel.Information, Message = "Data retention purged {AuditLogs} audit log entries, {ExecutionEvents} execution events and {Notifications} notifications")]
+    private static partial void LogPurged(ILogger logger, int auditLogs, int executionEvents, int notifications);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Data retention purge failed; will retry next interval")]
     private static partial void LogPurgeFailed(ILogger logger, Exception exception);
