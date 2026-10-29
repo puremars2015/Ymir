@@ -231,6 +231,13 @@ public class AuthorizationMatrixTests(ApiFactory factory) : IClassFixture<ApiFac
     /// <summary>不以資源 id 存取的端點（只會操作目前使用者自己的資料，或是匿名端點）。</summary>
     private static readonly HashSet<string> NotResourceScoped =
     [
+        "GET /api/scheduled-tasks/",
+        "POST /api/scheduled-tasks/",
+        "PUT /api/scheduled-tasks/{id:guid}",
+        "POST /api/scheduled-tasks/{id:guid}/pause",
+        "POST /api/scheduled-tasks/{id:guid}/resume",
+        "POST /api/scheduled-tasks/{id:guid}/confirm",
+        "DELETE /api/scheduled-tasks/{id:guid}",
         "GET /api/me",
         "GET /api/sites/",
         "GET /api/tools",

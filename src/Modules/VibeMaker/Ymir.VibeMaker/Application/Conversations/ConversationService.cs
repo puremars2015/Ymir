@@ -111,6 +111,7 @@ public sealed class ConversationService(IVibeMakerDbContext db, ICurrentUser cur
 
         var now = timeProvider.GetUtcNow();
         conversation.Archive(now);
+        foreach (var task in await db.ScheduledTasks.Where(t => t.ConversationId == conversationId && t.Status != ScheduleStatus.Ended).ToListAsync(cancellationToken).ConfigureAwait(false)) task.End();
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         await auditLog.WriteAsync(new AuditEntry(currentUser.ActorName, "conversation.archive", "conversation", conversationId.ToString("D"), AuditResult.Success, now, null), cancellationToken)
             .ConfigureAwait(false);
@@ -152,7 +153,7 @@ public sealed class ConversationService(IVibeMakerDbContext db, ICurrentUser cur
             m.SequenceNo,
             m.ExecutionId,
             m.CreatedAt,
-            [.. attachments[m.Id].Select(AttachmentService.ToResponse)])).ToList();
+            [.. attachments[m.Id].Select(AttachmentService.ToResponse)], m.Source)).ToList();
     }
 
     private Task<Conversation?> FindOwnedAsync(Guid conversationId, CancellationToken cancellationToken)

@@ -560,6 +560,11 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("sequence_no");
 
+                    b.Property<string>("Source")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("source");
+
                     b.HasKey("Id")
                         .HasName("pk_messages");
 
@@ -896,6 +901,112 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_projects_user_id");
 
                     b.ToTable("projects", "vibemaker");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.ScheduledTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("id");
+
+                    b.Property<int>("ConsecutiveFailures")
+                        .HasColumnType("int")
+                        .HasColumnName("consecutive_failures");
+
+                    b.Property<Guid>("ConversationId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("conversation_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasColumnName("created_by");
+
+                    b.Property<string>("CronExpression")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("cron_expression");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid?>("LastExecutionId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("last_execution_id");
+
+                    b.Property<string>("LastResult")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("last_result");
+
+                    b.Property<DateTimeOffset?>("LastRunAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("last_run_at");
+
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("lease_until");
+
+                    b.Property<string>("ModelId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)")
+                        .HasColumnName("model_id");
+
+                    b.Property<DateTimeOffset?>("NextRunAt")
+                        .HasColumnType("datetimeoffset")
+                        .HasColumnName("next_run_at");
+
+                    b.Property<string>("Prompt")
+                        .IsRequired()
+                        .HasMaxLength(32000)
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("prompt");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int")
+                        .HasColumnName("status");
+
+                    b.Property<string>("ThinkingLevel")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)")
+                        .HasColumnName("thinking_level");
+
+                    b.Property<string>("TimeZone")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .HasColumnName("time_zone");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("user_id");
+
+                    b.Property<byte[]>("Version")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_scheduled_tasks");
+
+                    b.HasIndex("ConversationId")
+                        .HasDatabaseName("ix_scheduled_tasks_conversation_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_scheduled_tasks_user_id");
+
+                    b.HasIndex("Status", "NextRunAt")
+                        .HasDatabaseName("ix_scheduled_tasks_status_next_run_at");
+
+                    b.ToTable("scheduled_tasks", "vibemaker");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.Site", b =>
@@ -1268,6 +1379,16 @@ namespace Ymir.VibeMaker.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_onedrive_linked_files_onedrive_linked_items_link_id");
+                });
+
+            modelBuilder.Entity("Ymir.VibeMaker.Domain.ScheduledTask", b =>
+                {
+                    b.HasOne("Ymir.VibeMaker.Domain.Conversation", null)
+                        .WithMany()
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_scheduled_tasks_conversations_conversation_id");
                 });
 
             modelBuilder.Entity("Ymir.VibeMaker.Domain.SiteShare", b =>

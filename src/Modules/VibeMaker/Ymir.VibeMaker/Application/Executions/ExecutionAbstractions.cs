@@ -52,6 +52,11 @@ public interface IExecutionCancellationRegistry
 /// </summary>
 public sealed class ExecutionOptions
 {
+    /// <summary>每人有效排程上限（ADR-0032 N2）。</summary>
+    public int MaxScheduledTasksPerUser { get; set; } = 10;
+    /// <summary>重複排程的最短間隔，單位為分鐘（ADR-0032 N2）。</summary>
+    public int MinimumScheduleIntervalMinutes { get; set; } = 60;
+
     /// <summary>單次 Agent execution 的逾時（<c>ExecutionTimeoutMinutes</c>）。</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(30);
 

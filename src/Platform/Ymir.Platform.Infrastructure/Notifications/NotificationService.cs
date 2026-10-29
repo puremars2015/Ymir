@@ -11,9 +11,19 @@ internal sealed class NotificationService(PlatformDbContext db, IDirectMessageHu
 
     public async Task<NotificationItem> CreateAsync(Guid userId, NotificationKind kind, string title, string? body, string? link, Guid? sourceId, CancellationToken cancellationToken)
     {
+        if (kind == NotificationKind.Reminder && sourceId is not null &&
+            await db.Notifications.AsNoTracking().SingleOrDefaultAsync(n => n.UserId == userId && n.Kind == kind && n.SourceId == sourceId, cancellationToken).ConfigureAwait(false) is { } previous)
+            return NotificationItem.From(previous);
         var notification = Notification.Create(userId, kind, title, body, link, sourceId, timeProvider.GetUtcNow());
         db.Notifications.Add(notification);
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        try { await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false); }
+        catch (DbUpdateException) when (kind == NotificationKind.Reminder && sourceId is not null)
+        {
+            db.Entry(notification).State = EntityState.Detached;
+            var existing = await db.Notifications.AsNoTracking().SingleOrDefaultAsync(n => n.UserId == userId && n.Kind == kind && n.SourceId == sourceId, cancellationToken).ConfigureAwait(false);
+            if (existing is null) throw;
+            return NotificationItem.From(existing);
+        }
         var item = NotificationItem.From(notification);
         hub.Publish(userId, new NotificationCreatedNotification(item));
         return item;

@@ -107,6 +107,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             notification.ToTable("notifications");
             notification.HasKey(n => n.Id);
             notification.Property(n => n.Id).ValueGeneratedNever();
+            notification.HasIndex(n => new { n.UserId, n.Kind, n.SourceId }).IsUnique()
+                .HasFilter("[source_id] IS NOT NULL AND [kind] = 'REMINDER'");
             notification.Property(n => n.Kind).HasConversion<UpperSnakeCaseEnumConverter<NotificationKind>>().HasMaxLength(40);
             notification.Property(n => n.Title).HasMaxLength(Notification.TitleMaxLength).IsRequired();
             notification.Property(n => n.Body).HasMaxLength(Notification.BodyMaxLength);

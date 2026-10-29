@@ -9,10 +9,14 @@ export interface RuntimePolicyDraft {
   monthlyBudgetUsd: string;
   /** 背景程序能否以使用者自己的模型 key 呼叫模型（ADR-0034）。 */
   backgroundModelAccess: boolean;
+  maxScheduledTasksPerUser: string;
+  minimumScheduleIntervalMinutes: string;
 }
 
 /** 與後端 RuntimePolicySettings.Validate 相同的範圍。 */
 export const POLICY_LIMITS = {
+  maxScheduledTasksPerUser: { min: 1, max: 100 },
+  minimumScheduleIntervalMinutes: { min: 60, max: 10080 },
   idleTimeoutMinutes: { min: 0, max: 1440 },
   executionTimeoutMinutes: { min: 1, max: 240 },
   maxPendingExecutionsPerUser: { min: 1, max: 50 },
@@ -21,6 +25,8 @@ export const POLICY_LIMITS = {
 } as const;
 
 const LABELS: Record<keyof typeof POLICY_LIMITS, string> = {
+  maxScheduledTasksPerUser: '每人有效排程上限',
+  minimumScheduleIntervalMinutes: '排程最短間隔',
   idleTimeoutMinutes: '閒置停止時間',
   executionTimeoutMinutes: '單次執行上限',
   maxPendingExecutionsPerUser: '每人同時排隊的工作數',
@@ -39,6 +45,8 @@ export function policyDraftFrom(values: RuntimePolicyValues): RuntimePolicyDraft
     dailyExecutionLimit: round(values.dailyExecutionLimit, 0),
     monthlyBudgetUsd: String(Number(values.monthlyBudgetUsd)),
     backgroundModelAccess: values.backgroundModelAccess,
+    maxScheduledTasksPerUser: String(values.maxScheduledTasksPerUser ?? 10),
+    minimumScheduleIntervalMinutes: String(values.minimumScheduleIntervalMinutes ?? 60),
   };
 }
 
@@ -69,6 +77,8 @@ export const toSavePolicyRequest = (draft: RuntimePolicyDraft): SaveRuntimePolic
   dailyExecutionLimit: Number(draft.dailyExecutionLimit),
   monthlyBudgetUsd: Number(draft.monthlyBudgetUsd),
   backgroundModelAccess: draft.backgroundModelAccess,
+  maxScheduledTasksPerUser: Number(draft.maxScheduledTasksPerUser),
+  minimumScheduleIntervalMinutes: Number(draft.minimumScheduleIntervalMinutes),
 });
 
 /** 30 分鐘、1.5 小時、2 小時；0 → 「不自動停止」。 */

@@ -324,6 +324,11 @@ namespace Ymir.Platform.Infrastructure.Persistence.Migrations
                     b.HasIndex("UserId", "ReadAt")
                         .HasDatabaseName("ix_notifications_user_id_read_at");
 
+                    b.HasIndex("UserId", "Kind", "SourceId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_notifications_user_id_kind_source_id")
+                        .HasFilter("[source_id] IS NOT NULL AND [kind] = 'REMINDER'");
+
                     b.ToTable("notifications", "platform");
                 });
 

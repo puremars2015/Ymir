@@ -15,4 +15,4 @@ public sealed record UpdateConversationRequest(string? Title);
 /// <param name="Role">USER / ASSISTANT / SYSTEM / TOOL（SA §8）。</param>
 /// <param name="MessageType">TEXT / STATUS / TOOL_EVENT / ERROR（SA §8）。</param>
 /// <param name="Attachments">使用者附加的檔案（只有 USER 訊息會有）。</param>
-public sealed record MessageResponse(Guid Id, string Role, string MessageType, string Content, long SequenceNo, Guid? ExecutionId, DateTimeOffset CreatedAt, IReadOnlyList<AttachmentResponse> Attachments);
+public sealed record MessageResponse(Guid Id, string Role, string MessageType, string Content, long SequenceNo, Guid? ExecutionId, DateTimeOffset CreatedAt, IReadOnlyList<AttachmentResponse> Attachments, string? Source = null);

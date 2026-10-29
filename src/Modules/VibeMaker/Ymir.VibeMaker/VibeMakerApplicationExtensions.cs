@@ -11,6 +11,8 @@ public static class VibeMakerApplicationExtensions
 {
     public static IServiceCollection AddVibeMakerApplication(this IServiceCollection services)
     {
+        services.AddScoped<Application.Schedules.ScheduledTaskService>();
+        services.AddScoped<Application.Schedules.ScheduledTaskProcessor>();
         services.AddScoped<ProjectService>();
         services.AddScoped<RuntimeQueryService>();
         services.AddScoped<UserSettingsService>();

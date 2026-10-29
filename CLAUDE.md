@@ -228,3 +228,8 @@ API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:de
 5. **CI**：追蹤推送至 `main` 的 CI，失敗就直接在 `main` 修正、驗證、commit、看板留言，再依上一步同步與 push，直到通過；不得跳過或停用測試。不另建工作分支或 PR。
 
 `.claude/hooks/require-commit-push-progress.sh`（Stop hook）會在回合結束時檢查：有未 commit 的變更、最後一次更新 `docs/progress/` 之後還有其他 commit、或有未 push 的 commit，都會擋下要求補完。
+
+
+### ADR-0032 N2 排程與提醒
+
+`/api/scheduled-tasks` 只管目前登入者自己的私人對話排程；寫入需要 XSRF 與最新 `version`，衝突回 409。`ScheduledTaskWorker` 每 30 秒取得 rowversion 租約，保留預定時間直到副作用完成；相同 task／UTC 預定時間對應同一個 UUID v5。提醒通知有唯一索引去重；Agent 排程共用 `ExecutionService` 的權限／模型／配額／預算檢查。訊息 `Source=schedule`、短任務也通知，取消不通知；忙碌略過、連續失敗三次暫停。封存對話／專案、停用或刪除帳號會結束排程。管理端的 `MaxScheduledTasksPerUser`（10）與 `MinimumScheduleIntervalMinutes`（60）存於 `vibemaker.runtime_policy`。N3 Agent 通知工具與 N4 Web Push 尚未實作。

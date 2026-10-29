@@ -1,10 +1,12 @@
 namespace Ymir.Platform.Notifications;
 
-/// <summary>通知種類（ADR-0032 §1）。N1 只有 execution 結束；排程、提醒與 Agent 訊息在後續階段加入。</summary>
+/// <summary>通知種類（ADR-0032 §1）。N1 支援 execution 結束，N2 加入排程與提醒；Agent 訊息留待 N3。</summary>
 public enum NotificationKind
 {
     ExecutionCompleted,
     ExecutionFailed,
+    Reminder,
+    ScheduleFailed,
 }
 
 /// <summary>

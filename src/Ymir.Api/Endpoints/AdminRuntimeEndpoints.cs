@@ -44,7 +44,7 @@ internal static class AdminRuntimeEndpoints
         TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
-        var settings = new RuntimePolicySettings(request.IdleTimeoutMinutes, request.ExecutionTimeoutMinutes, request.MaxPendingExecutionsPerUser, request.DailyExecutionLimit, request.MonthlyBudgetUsd, request.BackgroundModelAccess);
+        var settings = new RuntimePolicySettings(request.IdleTimeoutMinutes, request.ExecutionTimeoutMinutes, request.MaxPendingExecutionsPerUser, request.DailyExecutionLimit, request.MonthlyBudgetUsd, request.BackgroundModelAccess, request.MaxScheduledTasksPerUser, request.MinimumScheduleIntervalMinutes);
         if (settings.Validate() is { } problem)
         {
             return ApiProblem.Create(StatusCodes.Status400BadRequest, "VALIDATION_FAILED", problem);
@@ -178,20 +178,20 @@ internal static class AdminRuntimeEndpoints
         policy.MaxPendingExecutionsPerUser,
         policy.DailyExecutionLimit,
         policy.MonthlyBudgetUsd,
-        policy.BackgroundModelAccess);
+        policy.BackgroundModelAccess, policy.MaxScheduledTasksPerUser, policy.MinimumScheduleIntervalMinutes);
 }
 
 /// <param name="IdleTimeoutMinutes">0 表示不自動停止。</param>
 /// <param name="DailyExecutionLimit">0 表示不限制。</param>
 /// <param name="MonthlyBudgetUsd">每人每月模型預算（美元），由 LiteLLM 強制；0 表示不限制。</param>
 /// <param name="BackgroundModelAccess">container 內的背景程序能否以使用者自己的模型 key 呼叫模型（ADR-0034）；省略時為 true。</param>
-public sealed record SaveRuntimePolicyRequest(int IdleTimeoutMinutes, int ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd = 0, bool BackgroundModelAccess = true);
+public sealed record SaveRuntimePolicyRequest(int IdleTimeoutMinutes, int ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd = 0, bool BackgroundModelAccess = true, int MaxScheduledTasksPerUser = 10, int MinimumScheduleIntervalMinutes = 60);
 
 /// <param name="IdleTimeoutMinutes">0 表示不自動停止。</param>
 /// <param name="DailyExecutionLimit">0 表示不限制。</param>
 /// <param name="MonthlyBudgetUsd">0 表示不限制。</param>
 /// <param name="BackgroundModelAccess">背景程序能否呼叫模型（ADR-0034）。</param>
-public sealed record RuntimePolicyValues(double IdleTimeoutMinutes, double ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd, bool BackgroundModelAccess);
+public sealed record RuntimePolicyValues(double IdleTimeoutMinutes, double ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd, bool BackgroundModelAccess, int MaxScheduledTasksPerUser = 10, int MinimumScheduleIntervalMinutes = 60);
 
 /// <param name="Effective">目前生效的值。</param>
 /// <param name="Deployment">部署設定（.env）的值；還原後使用。</param>

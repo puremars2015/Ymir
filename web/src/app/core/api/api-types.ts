@@ -2,6 +2,8 @@ import { components } from './schema';
 
 /** API 型別一律由 OpenAPI 產生（`npm run api:generate`），不要手寫重複的 DTO。 */
 type Schemas = components['schemas'];
+export type ScheduledTask = Schemas['ScheduledTaskResponse'];
+export type SaveScheduledTask = Schemas['SaveScheduledTask'];
 
 export type Me = Schemas['MeResponse'];
 export type UserRole = Schemas['UserRole'];

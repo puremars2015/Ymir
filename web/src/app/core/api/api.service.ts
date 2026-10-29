@@ -3,6 +3,8 @@ import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   ArtifactGroup,
+  ScheduledTask,
+  SaveScheduledTask,
   AdminMakeTopic,
   Attachment,
   AdminOverview,
@@ -394,6 +396,33 @@ export class ApiService {
   }
 
   /** 目前使用者的執行環境（一個使用者一個 container，ADR-0007）。 */
+  listScheduledTasks(): Observable<ScheduledTask[]> {
+    return this.http.get<ScheduledTask[]>('/api/scheduled-tasks');
+  }
+  saveScheduledTask(
+    task: SaveScheduledTask,
+    existing: ScheduledTask | null,
+  ): Observable<ScheduledTask> {
+    return existing
+      ? this.http.put<ScheduledTask>(`/api/scheduled-tasks/${existing.id}`, {
+          task,
+          version: existing.version,
+        })
+      : this.http.post<ScheduledTask>('/api/scheduled-tasks', task);
+  }
+  changeScheduledTask(
+    task: ScheduledTask,
+    action: 'pause' | 'resume' | 'confirm' | 'delete',
+  ): Observable<ScheduledTask> {
+    return action === 'delete'
+      ? this.http.delete<ScheduledTask>(`/api/scheduled-tasks/${task.id}`, {
+          params: { version: task.version },
+        })
+      : this.http.post<ScheduledTask>(`/api/scheduled-tasks/${task.id}/${action}`, {
+          version: task.version,
+        });
+  }
+
   getRuntime(): Observable<RuntimeStatus> {
     return this.http.get<RuntimeStatus>('/api/runtime');
   }

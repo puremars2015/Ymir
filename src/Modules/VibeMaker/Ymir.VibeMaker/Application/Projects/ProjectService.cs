@@ -92,6 +92,8 @@ public sealed class ProjectService(IVibeMakerDbContext db, ICurrentUser currentU
 
         var now = timeProvider.GetUtcNow();
         project.Archive(now);
+        var archivedIds = conversations.Select(c => c.Id).ToList();
+        foreach (var task in await db.ScheduledTasks.Where(t => archivedIds.Contains(t.ConversationId) && t.Status != ScheduleStatus.Ended).ToListAsync(cancellationToken).ConfigureAwait(false)) task.End();
         foreach (var conversation in conversations)
         {
             conversation.Archive(now);

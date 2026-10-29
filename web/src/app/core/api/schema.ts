@@ -1431,6 +1431,86 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/scheduled-tasks': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: operations['ListScheduledTasks'];
+    put?: never;
+    post: operations['CreateScheduledTask'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/scheduled-tasks/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: operations['UpdateScheduledTask'];
+    post?: never;
+    delete: operations['DeleteScheduledTask'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/scheduled-tasks/{id}/pause': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['pauseScheduledTask'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/scheduled-tasks/{id}/resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['resumeScheduledTask'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/scheduled-tasks/{id}/confirm': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: operations['confirmScheduledTask'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/chat-groups': {
     parameters: {
       query?: never;
@@ -2080,6 +2160,7 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
       attachments: components['schemas']['AttachmentResponse'][];
+      source?: null | string;
     };
     ModelAccessResponse: {
       models: components['schemas']['AdminModelOptionResponse'][];
@@ -2112,7 +2193,7 @@ export interface components {
       platformMcpServers: components['schemas']['PlatformMcpServerSummary'][];
     };
     /** @enum {unknown} */
-    NotificationKind: 'ExecutionCompleted' | 'ExecutionFailed';
+    NotificationKind: 'ExecutionCompleted' | 'ExecutionFailed' | 'Reminder' | 'ScheduleFailed';
     NotificationPageResponse: {
       items: components['schemas']['NotificationResponse'][];
       hasMore: boolean;
@@ -2360,6 +2441,16 @@ export interface components {
       /** Format: double */
       monthlyBudgetUsd: number | string;
       backgroundModelAccess: boolean;
+      /**
+       * Format: int32
+       * @default 10
+       */
+      maxScheduledTasksPerUser: number | string;
+      /**
+       * Format: int32
+       * @default 60
+       */
+      minimumScheduleIntervalMinutes: number | string;
     };
     /** @enum {unknown} */
     RuntimeStatus: 'NotCreated' | 'Created' | 'Running' | 'Busy' | 'Stopped' | 'Error' | 'Deleted';
@@ -2434,6 +2525,28 @@ export interface components {
       monthlyBudgetUsd: number | string;
       /** @default true */
       backgroundModelAccess: boolean;
+      /**
+       * Format: int32
+       * @default 10
+       */
+      maxScheduledTasksPerUser: number | string;
+      /**
+       * Format: int32
+       * @default 60
+       */
+      minimumScheduleIntervalMinutes: number | string;
+    };
+    SaveScheduledTask: {
+      /** Format: uuid */
+      conversationId: string;
+      kind: components['schemas']['ScheduleKind'];
+      prompt: string;
+      modelId: null | string;
+      thinkingLevel: null | string;
+      cronExpression: null | string;
+      timeZone: string;
+      /** Format: date-time */
+      runAt: null | string;
     };
     SaveUserExtensionsRequest: {
       skills: components['schemas']['ExtensionGrantSetting'];
@@ -2445,6 +2558,34 @@ export interface components {
       overrides: {
         [key: string]: boolean;
       };
+    };
+    ScheduledTaskResponse: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      conversationId: string;
+      kind: components['schemas']['ScheduleKind'];
+      prompt: string;
+      modelId: null | string;
+      thinkingLevel: null | string;
+      cronExpression: null | string;
+      timeZone: string;
+      status: components['schemas']['ScheduleStatus'];
+      /** Format: date-time */
+      nextRunAt: null | string;
+      /** Format: date-time */
+      lastRunAt: null | string;
+      lastResult: null | string;
+      /** Format: int32 */
+      consecutiveFailures: number | string;
+      version: string;
+    };
+    /** @enum {unknown} */
+    ScheduleKind: 'Reminder' | 'AgentRun';
+    /** @enum {unknown} */
+    ScheduleStatus: 'PendingConfirmation' | 'Active' | 'Paused' | 'Ended';
+    ScheduleVersion: {
+      version: string;
     };
     SendDirectMessageRequest: {
       text: null | string;
@@ -2614,6 +2755,10 @@ export interface components {
     UpdateProjectRequest: {
       name: null | string;
       systemPrompt: null | string;
+    };
+    UpdateScheduledTask: {
+      task: components['schemas']['SaveScheduledTask'];
+      version: string;
     };
     UpdateUserSettingsRequest: {
       systemPrompt: null | string;
@@ -5359,6 +5504,178 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['NotificationUnreadResponse'];
+        };
+      };
+    };
+  };
+  ListScheduledTasks: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduledTaskResponse'][];
+        };
+      };
+    };
+  };
+  CreateScheduledTask: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveScheduledTask'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduledTaskResponse'];
+        };
+      };
+    };
+  };
+  UpdateScheduledTask: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateScheduledTask'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduledTaskResponse'];
+        };
+      };
+    };
+  };
+  DeleteScheduledTask: {
+    parameters: {
+      query: {
+        version: string;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduledTaskResponse'];
+        };
+      };
+    };
+  };
+  pauseScheduledTask: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ScheduleVersion'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduledTaskResponse'];
+        };
+      };
+    };
+  };
+  resumeScheduledTask: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ScheduleVersion'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduledTaskResponse'];
+        };
+      };
+    };
+  };
+  confirmScheduledTask: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ScheduleVersion'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ScheduledTaskResponse'];
         };
       };
     };

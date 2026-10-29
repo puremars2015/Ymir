@@ -35,7 +35,7 @@
 | [0029](0029-make-tools-sidebar.md) | 左側「小工具」：/make 小工具自動發布並在 Ymir 內以 iframe 開啟 | 已採納 |
 | [0030](0030-plugin-marketplace-and-onedrive-agent-tools.md) | 外掛市集與 OneDrive Agent 工具 | 已採納（同步資料夾部分由 ADR-0033 修訂） |
 | [0031](0031-llm-auto-model-router.md) | 以 LLM 自動路由選擇回覆模型（Auto：輕／中／重，預設啟用） | 已採納（待實作） |
-| [0032](0032-proactive-notifications-and-scheduled-tasks.md) | 主動通知與排程任務（讓 Agent 能提醒使用者） | N1（通知、`/api/events`、長任務完成通知）已採納並實作；N2～N4 提議中 |
+| [0032](0032-proactive-notifications-and-scheduled-tasks.md) | 主動通知與排程任務（讓 Agent 能提醒使用者） | N1、N2（通知、長任務通知、排程任務與提醒）已實作；N3～N4 提議中 |
 | [0033](0033-persistent-runtime-and-onedrive-plugin-only.md) | Agent 執行環境常駐，OneDrive 只保留外掛（移除同步） | 已採納 |
 | [0034](0034-background-processes-and-model-access.md) | container 背景工作自動恢復（autostart、crontab）與背景模型存取 | 已採納 |
 

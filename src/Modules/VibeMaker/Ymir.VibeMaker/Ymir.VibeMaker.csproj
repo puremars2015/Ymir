@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Cronos" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\..\Platform\Ymir.Platform\Ymir.Platform.csproj" />

@@ -74,6 +74,12 @@ export const routes: Routes = [
               import('./features/settings/password-page').then((m) => m.PasswordPage),
             title: '變更密碼 · Vibe Maker',
           },
+          {
+            path: 'schedules',
+            loadComponent: () =>
+              import('./features/settings/schedules-page').then((m) => m.SchedulesPage),
+            title: '排程與提醒 · Vibe Maker',
+          },
           // 舊的「帳號連接」「MCP 與工具」分頁已併入外掛市集；保留網址相容（query 參數會一併帶過去）。
           { path: 'connections', redirectTo: '/plugins' },
           { path: 'tools', redirectTo: '/plugins' },

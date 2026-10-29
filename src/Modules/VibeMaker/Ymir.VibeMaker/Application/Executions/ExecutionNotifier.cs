@@ -35,7 +35,7 @@ public sealed class ExecutionNotifier(
 
         // 從送出算起：排隊等待也是使用者等待的時間。
         var elapsed = endedAt - execution.CreatedAt;
-        if (elapsed < options.Value.LongExecutionNotificationThreshold)
+        if (elapsed < options.Value.LongExecutionNotificationThreshold && !await db.Messages.AnyAsync(m => m.ExecutionId == execution.Id && m.Source == "schedule", cancellationToken).ConfigureAwait(false))
         {
             return;
         }

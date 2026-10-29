@@ -13,6 +13,8 @@ public interface IVibeMakerDbContext
     DbSet<PersonalMcpServer> PersonalMcpServers { get; }
     DbSet<ExecutionArtifact> ExecutionArtifacts { get; }
 
+    DbSet<ScheduledTask> ScheduledTasks { get; }
+
     DbSet<Project> Projects { get; }
 
     DbSet<Conversation> Conversations { get; }
@@ -56,6 +58,8 @@ public interface IVibeMakerDbContext
 
     EntityEntry<TEntity> Entry<TEntity>(TEntity entity)
         where TEntity : class;
+
+    Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginSerializableTransactionAsync(CancellationToken cancellationToken);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

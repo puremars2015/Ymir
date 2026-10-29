@@ -17,6 +17,8 @@ describe('runtime policy rules', () => {
     dailyExecutionLimit: 0,
     monthlyBudgetUsd: 0,
     backgroundModelAccess: true,
+    maxScheduledTasksPerUser: 10,
+    minimumScheduleIntervalMinutes: 60,
   };
 
   it('表單由目前的值產生，小數四捨五入且不低於下限', () => {
@@ -27,6 +29,8 @@ describe('runtime policy rules', () => {
       dailyExecutionLimit: '0',
       monthlyBudgetUsd: '0',
       backgroundModelAccess: true,
+      maxScheduledTasksPerUser: '10',
+      minimumScheduleIntervalMinutes: '60',
     });
     expect(
       policyDraftFrom({ ...values, executionTimeoutMinutes: 0.005 }).executionTimeoutMinutes,

@@ -109,6 +109,7 @@ app.MapMakeTopicEndpoints();
 app.MapDirectMessageEndpoints();
 app.MapUserEventEndpoints();
 app.MapNotificationEndpoints();
+app.MapScheduledTaskEndpoints();
 app.MapChatGroupEndpoints();
 app.MapDefaultEndpoints();
 

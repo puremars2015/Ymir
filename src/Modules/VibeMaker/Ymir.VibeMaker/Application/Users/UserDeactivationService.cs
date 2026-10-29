@@ -40,6 +40,8 @@ public sealed class UserDeactivationService(
 
         try
         {
+            foreach (var task in await db.ScheduledTasks.Where(t => t.UserId == userId && t.Status != ScheduleStatus.Ended).ToListAsync(cancellationToken).ConfigureAwait(false)) task.End();
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await notifications.DeleteUnreadForUserAsync(userId, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex)

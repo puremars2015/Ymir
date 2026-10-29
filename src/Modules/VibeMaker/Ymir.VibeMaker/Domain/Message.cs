@@ -25,6 +25,10 @@ public sealed class Message
     /// <summary>產生此訊息的 execution（開發規劃 §9 補強）。</summary>
     public Guid? ExecutionId { get; private set; }
 
+    public string? Source { get; private set; }
+
+    public void MarkScheduled() => Source = "schedule";
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public static Message CreateUser(Guid conversationId, string content, long sequenceNo, DateTimeOffset now) =>

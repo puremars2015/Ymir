@@ -68,6 +68,7 @@ export class SettingsLayout {
   protected readonly auth = inject(AuthService);
   protected readonly tabs = [
     { path: '/settings', label: '個人 System Prompt', exact: true },
+    { path: '/settings/schedules', label: '排程與提醒', exact: false },
     { path: '/settings/password', label: '變更密碼', exact: false },
   ];
 }

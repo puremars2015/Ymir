@@ -50,6 +50,28 @@ import { RuntimePolicy } from '../../core/api/api-types';
         <form class="stack" (ngSubmit)="save()">
           <div class="grid">
             <label
+              >每人有效排程上限
+              <input
+                name="maxScheduledTasksPerUser"
+                type="number"
+                min="1"
+                max="100"
+                [ngModel]="draft().maxScheduledTasksPerUser"
+                (ngModelChange)="patch({ maxScheduledTasksPerUser: $event + '' })"
+              />
+            </label>
+            <label
+              >排程最短間隔（分鐘）
+              <input
+                name="minimumScheduleIntervalMinutes"
+                type="number"
+                min="60"
+                max="10080"
+                [ngModel]="draft().minimumScheduleIntervalMinutes"
+                (ngModelChange)="patch({ minimumScheduleIntervalMinutes: $event + '' })"
+              />
+            </label>
+            <label
               >閒置停止時間（分鐘）
               <input
                 name="idleTimeoutMinutes"
@@ -227,6 +249,8 @@ export class RuntimeSettingsCard implements OnInit {
     dailyExecutionLimit: '',
     monthlyBudgetUsd: '',
     backgroundModelAccess: true,
+    maxScheduledTasksPerUser: '10',
+    minimumScheduleIntervalMinutes: '60',
   });
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);

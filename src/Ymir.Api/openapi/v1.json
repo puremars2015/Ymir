@@ -3419,6 +3419,258 @@
         }
       }
     },
+    "/api/scheduled-tasks": {
+      "get": {
+        "tags": [
+          "Schedules"
+        ],
+        "operationId": "ListScheduledTasks",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduledTaskResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Schedules"
+        ],
+        "operationId": "CreateScheduledTask",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveScheduledTask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledTaskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduled-tasks/{id}": {
+      "put": {
+        "tags": [
+          "Schedules"
+        ],
+        "operationId": "UpdateScheduledTask",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateScheduledTask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledTaskResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Schedules"
+        ],
+        "operationId": "DeleteScheduledTask",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledTaskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduled-tasks/{id}/pause": {
+      "post": {
+        "tags": [
+          "Schedules"
+        ],
+        "operationId": "pauseScheduledTask",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledTaskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduled-tasks/{id}/resume": {
+      "post": {
+        "tags": [
+          "Schedules"
+        ],
+        "operationId": "resumeScheduledTask",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledTaskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/scheduled-tasks/{id}/confirm": {
+      "post": {
+        "tags": [
+          "Schedules"
+        ],
+        "operationId": "confirmScheduledTask",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleVersion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduledTaskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chat-groups": {
       "get": {
         "tags": [
@@ -6011,6 +6263,12 @@
             "items": {
               "$ref": "#/components/schemas/AttachmentResponse"
             }
+          },
+          "source": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -6147,7 +6405,9 @@
       "NotificationKind": {
         "enum": [
           "ExecutionCompleted",
-          "ExecutionFailed"
+          "ExecutionFailed",
+          "Reminder",
+          "ScheduleFailed"
         ]
       },
       "NotificationPageResponse": {
@@ -7144,6 +7404,24 @@
           },
           "backgroundModelAccess": {
             "type": "boolean"
+          },
+          "maxScheduledTasksPerUser": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 10
+          },
+          "minimumScheduleIntervalMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 60
           }
         }
       },
@@ -7446,6 +7724,77 @@
           "backgroundModelAccess": {
             "type": "boolean",
             "default": true
+          },
+          "maxScheduledTasksPerUser": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 10
+          },
+          "minimumScheduleIntervalMinutes": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32",
+            "default": 60
+          }
+        }
+      },
+      "SaveScheduledTask": {
+        "required": [
+          "conversationId",
+          "kind",
+          "prompt",
+          "modelId",
+          "thinkingLevel",
+          "cronExpression",
+          "timeZone",
+          "runAt"
+        ],
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ScheduleKind"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "modelId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "thinkingLevel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cronExpression": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "runAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -7481,6 +7830,121 @@
             "additionalProperties": {
               "type": "boolean"
             }
+          }
+        }
+      },
+      "ScheduledTaskResponse": {
+        "required": [
+          "id",
+          "conversationId",
+          "kind",
+          "prompt",
+          "modelId",
+          "thinkingLevel",
+          "cronExpression",
+          "timeZone",
+          "status",
+          "nextRunAt",
+          "lastRunAt",
+          "lastResult",
+          "consecutiveFailures",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "conversationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ScheduleKind"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "modelId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "thinkingLevel": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cronExpression": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "timeZone": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ScheduleStatus"
+          },
+          "nextRunAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastRunAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          },
+          "lastResult": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "consecutiveFailures": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "ScheduleKind": {
+        "enum": [
+          "Reminder",
+          "AgentRun"
+        ]
+      },
+      "ScheduleStatus": {
+        "enum": [
+          "PendingConfirmation",
+          "Active",
+          "Paused",
+          "Ended"
+        ]
+      },
+      "ScheduleVersion": {
+        "required": [
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string"
           }
         }
       },
@@ -8195,6 +8659,21 @@
           }
         }
       },
+      "UpdateScheduledTask": {
+        "required": [
+          "task",
+          "version"
+        ],
+        "type": "object",
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/SaveScheduledTask"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
       "UpdateUserSettingsRequest": {
         "required": [
           "systemPrompt"
@@ -8763,6 +9242,9 @@
     },
     {
       "name": "Notifications"
+    },
+    {
+      "name": "Schedules"
     },
     {
       "name": "ChatGroups"

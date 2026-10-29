@@ -68,6 +68,9 @@
                 </button>
               </div>
             } @else {
+              @if (message.source === 'schedule') {
+                <span class="muted">排程執行 · </span>
+              }
               <span class="text">{{ content }}</span>
             }
             @if (message.role === 'ASSISTANT' && artifactByMessage().get(message.id); as group) {
@@ -119,6 +122,9 @@
 </div>
 
 <footer class="composer-area">
+  <a routerLink="/settings/schedules" [queryParams]="{ conversationId: conversationId() }"
+    >排程與提醒</a
+  >
   @if (error()) {
     <p class="error">{{ error() }}</p>
   }

@@ -34,7 +34,13 @@ public sealed class ExecutionService(
     /// 保存 USER 訊息並建立 QUEUED execution（同一個 transaction），交給背景 worker 執行（SA §11）。
     /// 相同 clientRequestId 重送回傳原本的結果；同一對話已有執行中的 execution 時回傳 Conflict（由 filtered unique index 保證）。
     /// </summary>
-    public async Task<SubmitMessageResult> SubmitAsync(Guid conversationId, SendMessageRequest request, CancellationToken cancellationToken)
+    public Task<SubmitMessageResult> SubmitAsync(Guid conversationId, SendMessageRequest request, CancellationToken cancellationToken) =>
+        SubmitCoreAsync(currentUser.UserId, currentUser.ActorName, conversationId, request, false, cancellationToken);
+
+    internal Task<SubmitMessageResult> SubmitScheduledAsync(Guid userId, Guid conversationId, SendMessageRequest request, CancellationToken cancellationToken) =>
+        SubmitCoreAsync(userId, "scheduler", conversationId, request, true, cancellationToken);
+
+    private async Task<SubmitMessageResult> SubmitCoreAsync(Guid userId, string actor, Guid conversationId, SendMessageRequest request, bool scheduled, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (request.ClientRequestId == Guid.Empty)
@@ -42,7 +48,6 @@ public sealed class ExecutionService(
             throw new DomainValidationException("clientRequestId is required.");
         }
 
-        var userId = currentUser.UserId;
         var user = await users.FindAsync(userId, cancellationToken).ConfigureAwait(false);
         if (user is null || user.Status != UserStatus.Active)
         {
@@ -127,6 +132,7 @@ public sealed class ExecutionService(
         var nextSequence = await db.Messages.Where(m => m.ConversationId == conversationId)
             .MaxAsync(m => (long?)m.SequenceNo, cancellationToken).ConfigureAwait(false) ?? 0;
         var message = Message.CreateUser(conversationId, request.Content, nextSequence + 1, now);
+        if (scheduled) message.MarkScheduled();
         if (request.ModelId is not null)
         {
             conversation.SelectModel(request.ModelId);
@@ -161,7 +167,7 @@ public sealed class ExecutionService(
         }
 
         await queue.EnqueueAsync(execution.Id, cancellationToken).ConfigureAwait(false);
-        await auditLog.WriteAsync(new AuditEntry(currentUser.ActorName, "execution.create", "execution", execution.Id.ToString("D"), AuditResult.Success, now, null), cancellationToken)
+        await auditLog.WriteAsync(new AuditEntry(actor, "execution.create", "execution", execution.Id.ToString("D"), AuditResult.Success, now, null), cancellationToken)
             .ConfigureAwait(false);
         return SubmitMessageResult.Accept(new SendMessageResponse(message.Id, execution.Id, EventStreamUrl(execution.Id)));
     }

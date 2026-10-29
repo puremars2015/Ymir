@@ -1,6 +1,6 @@
 # ADR-0032：主動通知與排程任務（讓 Agent 能提醒使用者）
 
-- 狀態：部分採納。N1（決策 1～3：通知、使用者事件串流、長任務完成通知）2026-10-29 經使用者確認並實作；N2～N4（排程、Agent 通知工具、Web Push）仍為提議中，「待決定」其餘各項待確認
+- 狀態：部分採納。N1（決策 1～3：通知、使用者事件串流、長任務完成通知）2026-10-29 經使用者確認並實作；N2（排程任務與提醒）2026-10-29 接續實作；N3～N4（Agent 通知工具、Web Push）仍為提議中，「待決定」其餘各項待確認
 - 日期：2026-10-28
 - 依據：使用者詢問「Agent 能不能主動提醒或推送訊息給使用者」，要求先寫 ADR 草稿。延伸 [ADR-0023](0023-user-direct-messages.md)（使用者即時通知 SSE）、[ADR-0030](0030-plugin-marketplace-and-onedrive-agent-tools.md)（經 MCP gateway 的內建工具）、[ADR-0011](0011-runtime-lifecycle-policy.md)（執行政策與配額）、[ADR-0002](0002-bff-cookie-auth-for-sse.md)（BFF + Cookie）。
 
@@ -92,7 +92,7 @@ Agent 工具 notify_me ┘       INotificationService          離線：Web Push
   | `agent_run` | 在綁定的對話建立 execution，結束後通知 | 計入呼叫者的配額與預算 |
 
 - **執行方式**（`ScheduledTaskWorker`，API 程序內的背景服務）：
-  - 每 30 秒找 `next_run_at <= now` 且 `Active` 的任務；以 rowversion 更新 `next_run_at` 取得這一輪的執行權，避免重複觸發。
+  - 每 30 秒找 `next_run_at <= now` 且 `Active` 的任務；以 rowversion 取得五分鐘租約，保留該輪預定時間，副作用完成後再推進 `next_run_at`，崩潰後以相同冪等鍵恢復（N2 實作補強）。
   - `agent_run` 一律走與使用者送出訊息**相同的檢查**：
     - 帳號有效、模型權限（ADR-0019 / 0020；`auto` 照 ADR-0031 路由）、擴充能力與外掛開關。
     - 每日次數、排隊上限、月預算（ADR-0011）。
@@ -176,7 +176,7 @@ Agent 工具 notify_me ┘       INotificationService          離線：Web Push
 | 階段 | 內容 | 前置 |
 |---|---|---|
 | N1 | 通知表、`INotificationService`、使用者事件串流、鈴鐺 UI、瀏覽器 Notification、長任務完成 / 失敗通知 | — |
-| N2 | 排程任務：`reminder` 與 `agent_run`、管理頁、執行政策上限 | N1 |
+| N2（已實作） | 排程任務：`reminder` 與 `agent_run`、管理頁、執行政策上限 | N1 |
 | N3 | 內建 MCP 服務 `notify`：`notify_me`、`schedule_reminder`、`propose_schedule`、`notify` 能力與外掛開關 | N2、MCP gateway |
 | N4 | Web Push：VAPID、訂閱、`sw.js` push 處理、端點允許清單 | N1 |
 
@@ -207,6 +207,17 @@ N1 單獨上線就能解決「離開頁面後不知道任務做完了」；N4 �
 - 前端：`UserEventStream` 由私訊、群組與通知共用一條 EventSource；頂列 `app-notification-bell`。分頁在背景且已授權時另以瀏覽器 Notification 顯示；正看著通知指向的對話時直接標為已讀。
 - 修正：SSE 結束時先取消等待中的讀取再釋放迭代器（原本斷線時會記錄 `NotSupportedException`）。
 
+## N2 實作紀錄（2026-10-29）
+
+- 使用者要求接續 ADR-0032，依階段順序完成 N2；沿用建議預設：每人 10 個有效排程、重複間隔至少 60 分鐘，管理端可調整。N3、N4 及其餘決策仍待後續階段。
+- `ScheduledTaskService` 提供登入者自己的新增、編輯、暫停、恢復、結束與確認端點；以 serializable transaction 避免並行新增超過上限，rowversion（API `version`）防止過期編輯覆寫。對話只接受目前登入者擁有的 Active 私人對話，不支援群組。
+- `ScheduledTaskWorker` 每 30 秒輪詢，每輪最多 100 個到期排程；Cronos 解析五欄 Cron 與 IANA 時區。API 停機後最多執行一輪，下一次由目前時間計算；最短間隔也以相鄰預定時間在觸發時重新限制。
+- 對原「先推進 next_run_at」的細節補強：rowversion 先取得五分鐘租約，保留該輪預定時間，副作用成功後才推進。崩潰後以相同 UUID v5（task id + 預定 UTC ticks）恢復；Agent 沿用 execution 冪等鍵，提醒則由 Platform filtered unique index 去重，避免遺失工作或重複通知。
+- Agent 排程共用 `ExecutionService` 的送出、預算、配額與模型檢查；訊息 `source=schedule`，前端標記「排程執行」。排程工作不受 60 秒通知門檻限制。忙碌對話略過該輪，建立失敗或 Agent 失敗連續三次自動暫停；worker 讀回 execution 結果更新最近結果。
+- 對話／專案封存及帳號停用、刪除時結束相關排程；worker 觸發前再次檢查。稽核不含 prompt。設定頁 `/settings/schedules` 管理所有排程，對話輸入區提供入口。
+- 新 migration：VibeMaker `ScheduledTasks`、Platform `ScheduledReminderDeduplication`。部署前需套用；未部署正式環境。
+- N2 確認端點先保留給 N3；目前僅使用者自己建立排程，不提供 Agent 建立入口。N3 會再加入 `PendingConfirmation` 建議與能力／外掛管制。
+
 ## 待決定（請使用者確認）
 
 | # | 項目 | 建議 |
@@ -215,6 +226,6 @@ N1 單獨上線就能解決「離開頁面後不知道任務做完了」；N4 �
 | 2 | 使用者事件串流 | ✅ 已確認：泛化成 `/api/events`，取代 `/api/direct-messages/events`（保留一版別名） |
 | 3 | Agent 能不能直接建立會啟動 Agent 的排程 | **不能**：只能 `propose_schedule`，使用者確認後才生效 |
 | 4 | Web Push 內容 | 預設只放泛用標題，內容要點開後才讀取（`IncludeBody=false`） |
-| 5 | 預設上限 | 長任務門檻 60 秒 ✅ 已確認；每人 10 個有效排程、cron 最短 1 小時、`notify_me` 每次執行 3 則待確認 |
+| 5 | 預設上限 | 長任務門檻 60 秒 ✅ 已確認；N2 沿用每人 10 個有效排程、cron 最短 1 小時；`notify_me` 每次執行 3 則待 N3 確認 |
 | 6 | `notify` 能力預設 | 全域預設允許、使用者可在外掛市集關閉 |
 | 7 | Email / Teams | 這次不做，另立 ADR |

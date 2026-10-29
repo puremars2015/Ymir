@@ -43,6 +43,7 @@ public static class VibeMakerInfrastructureExtensions
         services.AddHostedService<ExecutionWorker>();
         services.AddHostedService<RuntimeLifecycleWorker>();
         services.AddHostedService<BackgroundCredentialWorker>();
+        services.AddHostedService<ScheduledTaskWorker>();
         services.AddHttpClient(nameof(Health.LiteLlmHealthCheck)).AddLiteLlmTransport();
 
         // OneDrive connector（ADR-0013）：只有後端連 Graph 與 Entra；token 不保存在 HttpClient。
@@ -69,6 +70,8 @@ public static class VibeMakerInfrastructureExtensions
         {
             // 部署設定的預設值；管理介面儲存的執行政策優先（ADR-0011）。
             var runtime = configuration.GetSection(RuntimeOptions.SectionName);
+            options.MaxScheduledTasksPerUser = Math.Clamp(runtime.GetValue("MaxScheduledTasksPerUser", 10), 1, 100);
+            options.MinimumScheduleIntervalMinutes = Math.Clamp(runtime.GetValue("MinimumScheduleIntervalMinutes", 60), 60, 10080);
             if (runtime.GetValue<double?>(nameof(RuntimeOptions.ExecutionTimeoutMinutes)) is > 0 and var minutes)
             {
                 options.Timeout = TimeSpan.FromMinutes(minutes);

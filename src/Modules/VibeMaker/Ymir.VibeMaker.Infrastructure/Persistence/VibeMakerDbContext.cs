@@ -13,6 +13,8 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
 
     public DbSet<ExecutionArtifact> ExecutionArtifacts => Set<ExecutionArtifact>();
 
+    public DbSet<ScheduledTask> ScheduledTasks => Set<ScheduledTask>();
+
     public DbSet<Project> Projects => Set<Project>();
 
     public DbSet<Conversation> Conversations => Set<Conversation>();
@@ -53,6 +55,9 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
     public DbSet<SiteShare> SiteShares => Set<SiteShare>();
 
     public DbSet<SiteTicket> SiteTickets => Set<SiteTicket>();
+
+    public Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginSerializableTransactionAsync(CancellationToken cancellationToken) =>
+        Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -338,6 +343,22 @@ public sealed class VibeMakerDbContext(DbContextOptions<VibeMakerDbContext> opti
             ticket.HasOne<Site>().WithMany().HasForeignKey(t => t.SiteId).OnDelete(DeleteBehavior.Cascade);
         });
 
+        modelBuilder.Entity<Message>().Property(m => m.Source).HasMaxLength(20);
+        modelBuilder.Entity<ScheduledTask>(task =>
+        {
+            task.ToTable("scheduled_tasks"); task.HasKey(t => t.Id);
+            task.Property(t => t.Id).ValueGeneratedNever();
+            task.Property(t => t.Version).IsRowVersion();
+            task.Property(t => t.Prompt).HasMaxLength(Message.ContentMaxLength).IsRequired();
+            task.Property(t => t.ModelId).HasMaxLength(200);
+            task.Property(t => t.ThinkingLevel).HasMaxLength(30);
+            task.Property(t => t.CronExpression).HasMaxLength(100);
+            task.Property(t => t.TimeZone).HasMaxLength(100);
+            task.Property(t => t.CreatedBy).HasMaxLength(20);
+            task.Property(t => t.LastResult).HasMaxLength(200);
+            task.HasIndex(t => new { t.Status, t.NextRunAt }); task.HasIndex(t => t.UserId);
+            task.HasOne<Conversation>().WithMany().HasForeignKey(t => t.ConversationId).OnDelete(DeleteBehavior.Cascade);
+        });
         modelBuilder.ApplySnakeCaseNames();
     }
 }
