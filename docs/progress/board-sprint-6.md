@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-28 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-29 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -38,7 +38,7 @@
 | A2 | MCP Gateway（ADR-0012 第二階段）：<br>• 獨立專案 `Ymir.McpGateway`<br>• 每人短期 token、`deploy/mcp/servers.json` 服務目錄、存取清單<br>• echo 服務、稽核與 rate limit、部署文件 | ✅ | 見 #013 |
 | O0 | **插單** OneDrive connector ADR（[ADR-0013](../adr/0013-onedrive-connector.md)） | ✅ | — |
 | O1 | OneDrive 連結 / 解除連結：<br>• `onedrive` 能力<br>• 授權碼 + PKCE 連結流程、refresh token 加密保存<br>• 根資料夾、設定頁<br>• FakeGraph 測試替身 | ✅ | — |
-| O2 | OneDrive 同步：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | ✅ | — |
+| O2 | OneDrive 同步（2026-10-29 由 ADR-0033 移除，見 #108）：<br>• `IWorkspaceFileWriter`<br>• 執行前下載、執行後上傳（持久化工作）<br>• eTag 衝突保留兩份<br>• 雲端保存狀態與重試、使用指南 | ✅ | — |
 | R0 | RAG ADR（ADR-0014）：服務與 volume 邊界、Embedding 抽象、向量儲存介面、SQLite 部署、權限 | ✅ | 使用者 2026-10-08 決定：Embedding 經 LiteLLM；回答模型由管理員標記可用於知識庫 |
 | R1 | RAG 最小索引：知識庫、文件儲存、背景索引、Fake Embedding、每專案一份 SQLite | ✅ | 見 #015 |
 | R2 | RAG 問答：檢索、回答、引用、資料不足提示、UI | ✅ | 見 #016 |
@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| ARC1 | 架構調整（[ADR-0033](../adr/0033-persistent-runtime-and-onedrive-plugin-only.md)）：Agent 執行環境常駐、OneDrive 只保留外掛 | 🔬 | 閒置停止預設 0、只由 Admin 停止、重啟後自動啟動；移除 OneDrive 同步與資料表；沙箱驗證通過，Podman 實機重開機待使用者環境，見 #108 |
 | LLM1 | 外部 LiteLLM（`llm.webpromaterial.com`）：模型走 llm、管理走 llm-admin（Cloudflare Access） | 🔬 | Ymir 端完成、遠端 8 模型範本、切換腳本 `apply-remote-litellm.sh`（含 `--check`、自動還原）；**正式主機尚未切換**，見 #107 |
 | NTF0 | 主動通知與排程任務 ADR（[ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)） | 📝 | 草稿，提議中；7 項待使用者決定（建議先做 N1 長任務完成通知），尚未實作，見 #106 |
 | DEP7 | 這台 Ubuntu 的單一手動重新部署入口與安全回復 | 🔬 | 補強既有 redeploy-ubuntu.sh，不重複新增入口；38 項隔離回歸＋8 開機測試通過，腳本／文件已納入版控，未執行新正式部署，見 #104 |
@@ -196,6 +197,64 @@
 
 - 正式唯讀預檢在呼叫 `runuser` 時停止：子程序的隔離 PATH 不含 `/usr/sbin`，而此主機的 `runuser` 位於 `/usr/sbin/runuser`。尚未部署或停止服務。
 - 部署器先解析 `runuser` 的絕對路徑，再建立隔離環境；回歸測試固定模擬 `/usr/sbin/runuser`，38 項測試及 shell 語法檢查通過。正式預檢、部署與後續清理仍待完成。
+
+### #108 · 架構調整：Agent 執行環境常駐、OneDrive 只保留外掛（ADR-0033） `🔬待驗證`
+
+> 👤 **Claude（AI）** · 🕒 2026-10-29 · `✨功能` `🔬待驗證`
+
+- **需求**：
+  1. 每人的 Pi agent container 不再閒置 30 分鐘就停止，改成只有人為才關閉，讓使用者能跑長任務，或在 container 內做排程提醒、自動查找、自動回覆。
+  2. OneDrive 不再同步對話紀錄與工作目錄，只保留外掛：啟用 connector 時，Agent 可以讀寫使用者自己的 OneDrive。
+- **使用者決定**：
+  - 閒置停止保留選項、預設 0；
+  - 人為停止只有 Admin；
+  - 重啟後自動啟動非人為停止的 runtime；
+  - 同步相關程式與資料表全部移除。
+- **常駐 runtime**（`d751f1e`）：
+  - `IdleTimeoutMinutes` 預設 30 → 0（RuntimeOptions、ExecutionOptions、appsettings）；管理介面說明改為「預設 0：常駐」，摘要顯示「執行環境常駐」。
+  - `agent_runtimes.stop_requested`（migration `RuntimeStopRequested`）：Admin 停止、帳號停用／刪除、閒置停止時設為 true（`MarkStopped`），下一次 execution 的 EnsureRuntime 清除。
+  - `ReconcileAsync` 對帳後：
+    - Active 使用者、非 stop_requested 的 Stopped runtime → 依擴充能力的網路模式 EnsureRuntime，寫稽核 `runtime.autostart`；
+    - 非 Active 使用者仍在執行的 runtime → 停止。
+    - 取不到使用者鎖、群組 runtime、NotCreated 都不處理。
+- **移除 OneDrive 同步**（`09616cc`）：
+  - 後端：`OneDriveSyncService`／Worker／Options、ExecutionRunner 的執行前下載與執行後上傳、對話 `/onedrive`、`/onedrive/sync` 端點、根資料夾 `PUT /api/connectors/onedrive/root` 與 `rootPath`、只給同步用的 Graph／路徑 helper。
+  - 資料表：migration `RemoveOneDriveSync` drop `onedrive_sync_scopes`、`onedrive_sync_items` 與 root 欄位。
+  - 前端：移除檔案面板的雲端保存狀態與外掛卡片的同步資料夾表單；OpenAPI 快照與 `schema.ts` 重新產生；`e2e/onedrive-flow.mjs` 改成驗證「不同步」。
+  - Agent 工具（ADR-0030）不變。
+- **文件**（`f7e3699`）：
+  - 新增 ADR-0033，ADR-0011、0013、0030 加上補充／取代註記，並更新 ADR 索引；
+  - `docs/guides/onedrive.md` 改寫成外掛指南；
+  - 更新 CLAUDE.md、SA 設定表、personal-connections 與 windows-11 指南。
+- **驗證**：
+  - `dotnet build Ymir.slnx` 0 警告；`dotnet format --verify-no-changes` 通過；`dotnet test --solution Ymir.slnx` 1049/1049 通過。
+  - 新增測試：
+    - `RuntimeLifecycleTests.Reconcile_StartsRuntimesStoppedByAHostRestart`；
+    - `Reconcile_DoesNotStartRuntimesStoppedByAnAdmin_UntilTheNextExecution`（以包裝 Local runtime 的替身模擬重開機後的 Stopped）；
+    - `RuntimePolicySettingsTests.IdleStop_IsDisabledByDefault`；
+    - `OneDrivePluginTests.Run_WithOneDriveEnabled_DoesNotSyncTheWorkspace`。
+  - 前端 `npm run lint`、`npm test`（219 個）、`npm run build` 通過。
+- **未驗證、待使用者環境確認**：
+  - rootless Podman 主機實際重開機後，API 對帳自動啟動 container；
+  - `e2e:onedrive`（需要 Fake OIDC + Fake Graph 的完整環境）。
+- **部署注意**：
+  - 兩個 migration 中，`RemoveOneDriveSync` 會刪除同步紀錄，部署前先備份。
+  - 已在「管理 → 系統設定」存過執行政策的部署，資料庫值優先：要常駐，請把閒置停止時間改成 0，或按還原。
+  - 部署設定中的 `Ymir__Connectors__OneDrive__MaxFileBytes`／`MaxFiles`／`PollInterval` 已不再使用。
+- **提醒**：
+  - container 常駐會持續占用主機記憶體，請留意主機容量。
+  - container 內自行啟動的背景程序在 Admin 停止或重開機後會結束；重開機後 container 會自動啟動，但程序不會。
+  - Agent 的模型 key 只在每次執行時帶入，背景程序拿不到；平台級排程仍待 ADR-0032 決定。
+- **開發分支**：依本 session 指定推送到 `claude/nice-hypatia-kobaun`，尚未合併到 main。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #107 · 外部 LiteLLM 的管理端點經 Cloudflare Access `🔬待驗證`
 
