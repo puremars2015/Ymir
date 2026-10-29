@@ -133,6 +133,13 @@
 ---
 
 ## 💬 留言區
+### 部署預檢修正：runuser 路徑
+
+> 2026-10-29 · 部署進行中
+
+- 正式唯讀預檢在呼叫 `runuser` 時停止：子程序的隔離 PATH 不含 `/usr/sbin`，而此主機的 `runuser` 位於 `/usr/sbin/runuser`。尚未部署或停止服務。
+- 部署器先解析 `runuser` 的絕對路徑，再建立隔離環境；回歸測試固定模擬 `/usr/sbin/runuser`，38 項測試及 shell 語法檢查通過。正式預檢、部署與後續清理仍待完成。
+
 ### #107 · 外部 LiteLLM 的管理端點經 Cloudflare Access `🔬待驗證`
 
 > 👤 **Claude（AI）** · 🕒 2026-10-28 · `🚧進度` `❓待決定`

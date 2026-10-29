@@ -410,9 +410,9 @@ class RedeployTests(unittest.TestCase):
         obj = self.instance()
         account = types.SimpleNamespace(pw_dir=str(self.temporary()), pw_uid=1234)
         result = types.SimpleNamespace(returncode=0, stdout='fixture-ok', stderr='')
-        with patch.object(deploy.pwd, 'getpwnam', return_value=account), patch.dict(os.environ, {'PRIVATE_FIXTURE_KEY': 'do-not-forward'}), patch.object(deploy.subprocess, 'run', return_value=result) as run:
+        with patch.object(deploy.pwd, 'getpwnam', return_value=account), patch.object(deploy.shutil, 'which', return_value='/usr/sbin/runuser'), patch.dict(os.environ, {'PRIVATE_FIXTURE_KEY': 'do-not-forward'}), patch.object(deploy.subprocess, 'run', return_value=result) as run:
             self.assertEqual(obj.command(['dotnet', '--version'], user='fixture-user'), 'fixture-ok')
-        self.assertEqual(run.call_args.args[0][:4], ['runuser', '-u', 'fixture-user', '--'])
+        self.assertEqual(run.call_args.args[0][:4], ['/usr/sbin/runuser', '-u', 'fixture-user', '--'])
         self.assertNotIn('PRIVATE_FIXTURE_KEY', run.call_args.kwargs['env'])
         self.assertNotIn('do-not-forward', run.call_args.args[0])
 

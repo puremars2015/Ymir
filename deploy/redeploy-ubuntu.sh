@@ -122,13 +122,15 @@ class Deployment:
         env = dict(os.environ)
         # 子程序不得持有部署鎖；不把 master key／連線字串當程序參數。
         if user:
+            runuser = shutil.which('runuser')
+            require(runuser, '找不到 runuser')
             account = pwd.getpwnam(user)
             env = {'HOME': account.pw_dir, 'PATH': account.pw_dir + '/.dotnet:/usr/local/bin:/usr/bin:/bin',
                    'DOTNET_CLI_TELEMETRY_OPTOUT': '1', 'DOTNET_NOLOGO': '1',
                    'XDG_RUNTIME_DIR': '/run/user/' + str(account.pw_uid)}
             if (Path(account.pw_dir) / '.dotnet/dotnet').is_file():
                 env['DOTNET_ROOT'] = account.pw_dir + '/.dotnet'
-            args = ['runuser', '-u', user, '--', 'env', *[f'{k}={v}' for k, v in env.items()], *map(str, args)]
+            args = [runuser, '-u', user, '--', 'env', *[f'{k}={v}' for k, v in env.items()], *map(str, args)]
         try:
             result = subprocess.run(list(map(str, args)), input=data, capture_output=True,
                                     text=not binary, timeout=timeout, cwd=cwd, env=env)
