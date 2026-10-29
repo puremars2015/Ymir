@@ -133,6 +133,13 @@
 ---
 
 ## 💬 留言區
+### 外部模型思考深度設定
+
+> 2026-10-29 · 設定待套用
+
+- 使用者要求 GPT、Opus、MiniMax 開放思考深度。先前對 Opus 與四個 GPT 發送 `high` 測試皆 HTTP 200，但四個 GPT 雖設 64 token 上限，實際各回報約 1,638 tokens；不再重複 GPT 推論。MiniMax 原先因 LiteLLM UnsupportedParamsError 回 400；使用者重設外部服務後，其模型資訊列出五個深度，`high` 重測 HTTP 200。HTTP 200 不單獨證明參數已傳達上游或改變實際推論。
+- 範本開放 Opus `high`；GPT `high`、遠端資訊標示的 `xhigh`／`max`；MiniMax 依官方文件與遠端資訊開放 `low`～`max`，預設 max。新增級別除 high 外尚未逐一推論，Pi／SSE 端到端亦待驗收；不顯示可能與 Pi 自動混淆的 none。17 項隔離測試通過。正式設定與 CI 尚待套用／確認。
+
 ### 外部 LiteLLM 正式切換
 
 > 2026-10-29 · 切換完成，待使用者驗收

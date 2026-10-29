@@ -67,6 +67,22 @@ class FakeRemote:
 
 
 class RemoteLiteLlmSwitchTests(unittest.TestCase):
+    def test_remote_thinking_levels_are_explicit_and_do_not_offer_none(self):
+        values, ids = switch.template_settings(rendered())
+        expected = {
+            'claude-opus-5.5': ['high'],
+            'gpt-6.1-sol': ['high', 'xhigh', 'max'],
+            'gpt-6.1-terra': ['high', 'xhigh', 'max'],
+            'gpt-6-astra': ['high', 'xhigh', 'max'],
+            'gpt-6-luna': ['high', 'xhigh', 'max'],
+            'minimax-m3.1-flash': ['low', 'medium', 'high', 'xhigh', 'max'],
+        }
+        for model, levels in expected.items():
+            prefix = f'VibeMaker__Models__{ids.index(model)}__Thinking__'
+            self.assertEqual(values[prefix + 'Parameter'], 'reasoning_effort')
+            self.assertEqual([values[prefix + f'Levels__{i}'] for i in range(len(levels))], levels)
+            self.assertNotIn(prefix + f'Levels__{len(levels)}', values)
+
     def test_secrets_use_controlling_terminal_even_with_heredoc_stdin(self):
         with patch.object(switch.os, 'open', return_value=123) as opened, \
              patch.object(switch.os, 'isatty', return_value=True), \
