@@ -54,7 +54,8 @@
 | ARC2 | 背景工作自動恢復與背景模型存取（[ADR-0034](../adr/0034-background-processes-and-model-access.md)） | 🔬 | `ymir-runtime-init`（autostart + crontab）、背景模型 key 經 stdin 寫入 tmpfs；Podman 實機驗證恢復，完整 image build 與重開機待使用者環境，見 #109 |
 | ARC1 | 架構調整（[ADR-0033](../adr/0033-persistent-runtime-and-onedrive-plugin-only.md)）：Agent 執行環境常駐、OneDrive 只保留外掛 | 🔬 | 閒置停止預設 0、只由 Admin 停止、重啟後自動啟動；移除 OneDrive 同步與資料表；沙箱驗證通過，Podman 實機重開機待使用者環境，見 #108 |
 | LLM1 | 外部 LiteLLM（`llm.webpromaterial.com`）：模型走 llm、管理走 llm-admin（Cloudflare Access） | 🔬 | Ymir 端完成、遠端 8 模型範本、切換腳本 `apply-remote-litellm.sh`（含 `--check`、自動還原）；**正式主機尚未切換**，見 #107 |
-| NTF0 | 主動通知與排程任務 ADR（[ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)） | 📝 | 草稿，提議中；7 項待使用者決定（建議先做 N1 長任務完成通知），尚未實作，見 #106 |
+| NTF1 | 長任務完成通知（ADR-0032 N1）：站內通知、`/api/events`、頂列鈴鐺、瀏覽器通知 | 🔬 | 後端、前端、整合測試與瀏覽器 e2e 通過；正式站需套 Platform migration `Notifications`，見 #110 |
+| NTF0 | 主動通知與排程任務 ADR（[ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)） | 📝 | N1 已確認並實作（NTF1）；N2～N4 與待決定 3、4、6、7 及其餘上限仍待使用者決定，見 #106、#110 |
 | DEP7 | 這台 Ubuntu 的單一手動重新部署入口與安全回復 | 🔬 | 補強既有 redeploy-ubuntu.sh，不重複新增入口；38 項隔離回歸＋8 開機測試通過，腳本／文件已納入版控，未執行新正式部署，見 #104 |
 | SEC1 | 密鑰集中保管至 private ymir-secret-keys | 🚧 | 本機三份 .env 已收存並推送；正式主機設定／keyring 尚未取得，見 #105 |
 | DEP6 | 最新 main 8e47b6e／Pi 啟動準備加速正式部署 | ⛔ | 10/20 讀回 sudo 等候逾時、exit 1，正式切換未執行；產物與原驗證保留，Gateway 仍未安裝，改交付手動入口，見 #102、#104 |
@@ -198,6 +199,46 @@
 
 - 正式唯讀預檢在呼叫 `runuser` 時停止：子程序的隔離 PATH 不含 `/usr/sbin`，而此主機的 `runuser` 位於 `/usr/sbin/runuser`。尚未部署或停止服務。
 - 部署器先解析 `runuser` 的絕對路徑，再建立隔離環境；回歸測試固定模擬 `/usr/sbin/runuser`，38 項測試及 shell 語法檢查通過。正式預檢、部署與後續清理仍待完成。
+
+### #110 · ADR-0032 N1：長任務完成通知 `🔬待驗證`
+
+> 👤 **Claude（AI）** · 🕒 2026-10-29 · `✨功能` `🔬待驗證`
+
+- **使用者決定**：
+  - 先做 N1；
+  - 事件串流泛化成 `/api/events`；
+  - 長任務門檻 60 秒。
+- **後端**：
+  - 共用核心：`platform.notifications`（migration `Notifications`）與 `INotificationService`，先寫資料庫再推送；連結只接受伺服器產生的站內相對路徑。
+  - `/api/events`（所有登入者含訪客）：送 `notification` / `notification-read` 事件；私訊與群組事件依角色過濾。`/api/direct-messages/events` 保留一版當別名。
+  - `/api/notifications`：清單、未讀數、單則 / 全部已讀；別人的通知回 404，並已加入授權矩陣。
+  - `ExecutionNotifier`：從送出到結束 ≥ `VibeMaker:Notifications:LongExecutionSeconds`（60 秒）時，完成 / 失敗都通知；取消不通知；群組只通知呼叫者。
+  - 停用 / 刪除帳號時刪除未讀通知；`Ymir:Retention:NotificationDays` 為 90 天。
+  - 順便修正：SSE 斷線時釋放迭代器會記錄 `NotSupportedException`（舊的私訊串流也有），改成先取消讀取再釋放。
+- **前端**：
+  - `UserEventStream`：私訊、群組、通知共用一條 EventSource。
+  - `NotificationStore` 與頂列 `app-notification-bell`：未讀數、清單、全部已讀、啟用瀏覽器通知。
+  - 分頁在背景且已授權時跳出瀏覽器通知；正看著同一個對話時直接標為已讀。
+- **驗證**：
+  - 後端：`dotnet build` 0 警告、`dotnet format` 通過；`dotnet test --solution` 1064/1064 通過。新增 `NotificationTests`（6 項：推送、已讀同步、失敗摘要、取消不通知、隔離與分頁、訪客、停用清理與保存期限）與 `ShortExecutionNotificationTests`。
+  - 前端：`npm run lint`、`npm test`（225 個，新增 `notification-state.spec.ts`）、`npm run build` 通過；元件樣式預算沒有超過。
+  - 瀏覽器 e2e（Development API + Scripted harness + 門檻 0）：
+    - 新增的 `e2e:notifications`：另一個分頁即時出現未讀、點選前往對話並標已讀、正在看的對話直接已讀；
+    - 回歸：`e2e:dm`、`e2e:groups` 都通過，API log 沒有 `NotSupportedException`。
+- **未驗證、待使用者環境確認**：
+  - 正式站經 Cloudflare 的 `/api/events` 長連線；
+  - 各瀏覽器的 Notification 權限與行動裝置行為（離線推送是 N4 的 Web Push）。
+- **部署注意**：先套 Platform migration `Notifications`（新資料表），API 與前端一起更新。
+- **待決定（N2 之後）**：ADR-0032 待決定 3、4、6、7，以及排程上限。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #109 · 背景工作自動恢復與背景模型存取（ADR-0034） `🔬待驗證`
 

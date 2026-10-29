@@ -106,6 +106,8 @@ cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:resources -- <截�
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:groups -- <截圖目錄> [baseUrl]
 # 使用者之間的訊息（ADR-0023；同 e2e 的前置，Scripted harness 即可）
 cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:dm -- <截圖目錄>
+# 站內通知（ADR-0032 N1；同 e2e 的前置，API 另設 VibeMaker__Notifications__LongExecutionSeconds=0）
+cd web && CHROMIUM_PATH=/opt/pw-browsers/chromium npm run e2e:notifications -- <截圖目錄>
 
 # 本機一鍵啟動（SQL Server container + Fake LLM + API + Angular；podman 請設定 ASPIRE_CONTAINER_RUNTIME=podman）
 dotnet run --project src/Ymir.AppHost
@@ -160,7 +162,9 @@ RAG 知識庫（ADR-0014）：專案擁有者在專案頁上傳文件（`/api/pr
 
 群組聊天與 @bot（ADR-0026）：共用核心 `platform.chat_groups` / `chat_group_members` / `chat_group_messages`、`IChatGroupService`；端點 `/api/chat-groups`（任何人建立、擁有者管理、成員可退出；非成員 / 已封存一律 404），通知走同一條 `/api/direct-messages/events`（`group-message` / `group-updated` / `group-read`，`group-updated` 的內容在前端 `core/messaging/group-events.ts` 手寫，與後端 `GroupUpdatedResponse` 同步）。訊息以 `@bot` 開頭時（`GroupPromptBuilder.ParseBotRequest`）由 `ExecutionService.SubmitForGroupAsync` 在群組的 Agent 對話（`Conversation.UserId` = 群組 id，不會出現在任何人的對話清單）建立 execution，`AgentExecution.UserId` 是呼叫者：**runtime 擁有者 = 對話擁有者**（container、workspace、執行鎖、閒置停止（Admin 開啟時）都以群組 id），費用、配額、模型與擴充能力以呼叫者計算；群組執行一律不帶 OneDrive 與個人 system prompt，模型 key 用 `RuntimeCredentialService.IssueForExecutionAsync`（只給這次、結束即撤銷）。背景以最近 30 則群組訊息放在 `<group-chat>` 資料區塊。群組附件 `POST /api/chat-groups/{id}/attachments` 寫進群組 Agent 對話的 `uploads/`（上傳者記為呼叫者），只能隨自己的 @bot 訊息以 `attachmentIds` 綁定（ADR-0026 補充）。Bot 回覆先存 Pending，`GroupBotWorker` 依 execution 結果補齊（重啟後仍會補）；成員看即時回答用 `/api/chat-groups/{id}/executions/{executionId}/events`（成員 + 該群組的 execution 才可讀）。runtime host 協定不變。
 
-使用者之間的訊息（ADR-0023）：共用核心 `platform.direct_messages`、`IDirectMessageService` / `IDirectMessageHub`（程序內，只支援單一 API 程序）；端點 `/api/direct-messages`（`contacts`、`{peerId}`、`{peerId}/read`、SSE `events`），一律以目前使用者為其中一方，收件者不存在 / 停用 / 自己都回 404；訊息不寫稽核。前端 shell 右側 `app-people-panel`（`DirectMessageStore`，每次 SSE `ready` 重新讀取補齊），訊息只以文字綁定顯示。
+使用者之間的訊息（ADR-0023）：共用核心 `platform.direct_messages`、`IDirectMessageService` / `IDirectMessageHub`（程序內，只支援單一 API 程序）；端點 `/api/direct-messages`（`contacts`、`{peerId}`、`{peerId}/read`、SSE `events`，已由 `/api/events` 取代、保留一版別名），一律以目前使用者為其中一方，收件者不存在 / 停用 / 自己都回 404；訊息不寫稽核。前端 shell 右側 `app-people-panel`（`DirectMessageStore`，每次 SSE `ready` 重新讀取補齊），訊息只以文字綁定顯示。
+
+站內通知與使用者事件串流（ADR-0032 N1）：共用核心 `platform.notifications`、`INotificationService`（先寫資料庫再經 `IDirectMessageHub` 推送；連結只能是伺服器產生的站內相對路徑，內容只有摘要）。`/api/events`（`UserEventEndpoints`，所有登入者含訪客）是每個分頁唯一的使用者 SSE：`notification` / `notification-read`，私訊與群組事件依角色過濾；`notification-read` 的內容在前端 `core/notifications/notification-state.ts` 手寫，與後端 `NotificationsReadResponse` 同步。端點 `/api/notifications`（清單、`unread-count`、`{id}/read`、`read-all`，別人的通知 404）。`ExecutionNotifier` 在終止事件之後，從送出到結束超過 `VibeMaker:Notifications:LongExecutionSeconds`（預設 60）的完成 / 失敗通知呼叫者（取消不通知；群組只通知呼叫者、沒有連結）。停用 / 刪除帳號時刪除未讀通知，`Ymir:Retention:NotificationDays`（預設 90）。前端 `UserEventStream`（私訊、群組、通知共用一條 EventSource）、`NotificationStore`、頂列 `app-notification-bell`；瀏覽器 Notification 只在分頁在背景且已授權時顯示。
 
 使用者管理與訪客（ADR-0027）：Admin 在「管理 → 使用者」改顯示名稱（`display_name_overridden`，之後登入不被 IdP 覆寫）、變更角色、刪除帳號。角色 `User` / `Admin` / `Guest`；企業帳號與 Google 帳號的 IdP 只同步「是否為 Admin」（`User.SyncRole`），Ymir 只能在使用者與訪客之間切換（`AdminEndpoints.CanChangeRole`），不能改自己的角色、不能刪除自己。訪客與使用者相同，但 `/api/direct-messages/*`、`/api/chat-groups/*` 套 `AuthSetup.MessagingPolicy`（訪客 403），不出現在聯絡人、不能被加入群組，前端 `canUseMessaging` 隱藏成員面板。刪除是 `UserStatus.Deleted`（資料列保留給歷史紀錄，`(issuer, subject)` 釋放、本機密碼刪除，同一身分可重新建立成新使用者），並與停用一樣清理 runtime；檢查帳號有效一律用 `Status == Active`。
 

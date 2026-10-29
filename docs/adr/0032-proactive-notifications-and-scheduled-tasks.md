@@ -1,6 +1,6 @@
 # ADR-0032：主動通知與排程任務（讓 Agent 能提醒使用者）
 
-- 狀態：提議中（草稿，「待決定」各項需使用者確認後才改為已採納）
+- 狀態：部分採納。N1（決策 1～3：通知、使用者事件串流、長任務完成通知）2026-10-29 經使用者確認並實作；N2～N4（排程、Agent 通知工具、Web Push）仍為提議中，「待決定」其餘各項待確認
 - 日期：2026-10-28
 - 依據：使用者詢問「Agent 能不能主動提醒或推送訊息給使用者」，要求先寫 ADR 草稿。延伸 [ADR-0023](0023-user-direct-messages.md)（使用者即時通知 SSE）、[ADR-0030](0030-plugin-marketplace-and-onedrive-agent-tools.md)（經 MCP gateway 的內建工具）、[ADR-0011](0011-runtime-lifecycle-policy.md)（執行政策與配額）、[ADR-0002](0002-bff-cookie-auth-for-sse.md)（BFF + Cookie）。
 
@@ -195,14 +195,26 @@ N1 單獨上線就能解決「離開頁面後不知道任務做完了」；N4 �
   - N3 需要更新 MCP gateway 以支援內建服務 `notify`。
 - **runtime host 協定不變**：排程只是另一個建立 execution 的入口。
 
+## N1 實作紀錄（2026-10-29）
+
+使用者確認：先做 N1（待決定 1）、泛化成 `/api/events`（待決定 2）、長任務門檻 60 秒（待決定 5 的這一項）。
+
+- 共用核心：`platform.notifications`（migration `Notifications`）、`Notification` 實體（連結只接受站內相對路徑）、`INotificationService`（先寫資料庫再經 `IDirectMessageHub` 推送）。`kind` 目前只有 `ExecutionCompleted` / `ExecutionFailed`，其餘種類隨 N2、N3 加入。
+- `/api/events`（`UserEventEndpoints`）：所有登入者（含訪客）；事件 `notification`、`notification-read`，私訊與群組事件依角色過濾。`/api/direct-messages/events` 保留為只送訊息事件的別名，下一版移除。`IDirectMessageHub` 暫不改名，新增的通知事件繼承同一個基底型別。
+- `/api/notifications`：清單（以 `created_at` 當游標，SQL Server 的 uniqueidentifier 排序不是時間順序）、未讀數、單則 / 全部已讀；別人的通知回 404。
+- 觸發：`ExecutionNotifier` 在終止事件之後，從**送出**到結束超過 `VibeMaker:Notifications:LongExecutionSeconds`（預設 60）的完成 / 失敗通知 execution 的使用者；取消不通知。群組 @bot 只通知呼叫者，沒有連結（群組對話不在任何人的對話清單）。
+- 清理：帳號停用 / 刪除時刪除未讀通知（`UserDeactivationService`）；`Ymir:Retention:NotificationDays`（預設 90）。
+- 前端：`UserEventStream` 由私訊、群組與通知共用一條 EventSource；頂列 `app-notification-bell`。分頁在背景且已授權時另以瀏覽器 Notification 顯示；正看著通知指向的對話時直接標為已讀。
+- 修正：SSE 結束時先取消等待中的讀取再釋放迭代器（原本斷線時會記錄 `NotSupportedException`）。
+
 ## 待決定（請使用者確認）
 
 | # | 項目 | 建議 |
 |---|---|---|
-| 1 | 第一個要上線的階段 | N1（長任務完成通知）先上，風險最低、立即有感 |
-| 2 | 使用者事件串流 | 泛化成 `/api/events`，取代 `/api/direct-messages/events`（保留一版別名），不另開第二條 SSE |
+| 1 | 第一個要上線的階段 | ✅ 已確認：N1 先上（2026-10-29 實作） |
+| 2 | 使用者事件串流 | ✅ 已確認：泛化成 `/api/events`，取代 `/api/direct-messages/events`（保留一版別名） |
 | 3 | Agent 能不能直接建立會啟動 Agent 的排程 | **不能**：只能 `propose_schedule`，使用者確認後才生效 |
 | 4 | Web Push 內容 | 預設只放泛用標題，內容要點開後才讀取（`IncludeBody=false`） |
-| 5 | 預設上限 | 每人 10 個有效排程、cron 最短 1 小時、長任務門檻 60 秒、`notify_me` 每次執行 3 則 |
+| 5 | 預設上限 | 長任務門檻 60 秒 ✅ 已確認；每人 10 個有效排程、cron 最短 1 小時、`notify_me` 每次執行 3 則待確認 |
 | 6 | `notify` 能力預設 | 全域預設允許、使用者可在外掛市集關閉 |
 | 7 | Email / Teams | 這次不做，另立 ADR |
