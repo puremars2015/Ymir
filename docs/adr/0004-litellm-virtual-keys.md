@@ -1,6 +1,6 @@
 # ADR-0004：Container 內使用 LiteLLM Virtual Key
 
-- 狀態：已採納（2026-10-05 實作，見下方「實作細節」）
+- 狀態：已採納（2026-10-05 實作，見下方「實作細節」）；第 3 點由 [ADR-0034](0034-background-processes-and-model-access.md) 修訂：背景程序另有一把經 stdin 寫進 container tmpfs 的 key
 - 日期：2026-10-02
 
 ## 背景

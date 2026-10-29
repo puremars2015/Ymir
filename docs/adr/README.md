@@ -37,6 +37,7 @@
 | [0031](0031-llm-auto-model-router.md) | 以 LLM 自動路由選擇回覆模型（Auto：輕／中／重，預設啟用） | 已採納（待實作） |
 | [0032](0032-proactive-notifications-and-scheduled-tasks.md) | 主動通知與排程任務（讓 Agent 能提醒使用者） | 提議中（待使用者確認） |
 | [0033](0033-persistent-runtime-and-onedrive-plugin-only.md) | Agent 執行環境常駐，OneDrive 只保留外掛（移除同步） | 已採納 |
+| [0034](0034-background-processes-and-model-access.md) | container 背景工作自動恢復（autostart、crontab）與背景模型存取 | 已採納 |
 
 新增 ADR 時複製以下格式：
 

@@ -9,7 +9,7 @@ Ymir 是企業內部 AI 平台；第一個子產品 **Vibe Maker**：企業帳�
 |---|---|
 | `docs/sa/vibe-maker-core-mvp-sa.md` | SA（需求、資料模型、API、SSE 契約、驗收條件），以章節編號引用，例如「SA §10」 |
 | `docs/planning/development-plan.md` | 對 SA 的修訂建議、路線圖、待確認事項 |
-| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0033；索引見 `docs/adr/README.md`） |
+| `docs/adr/` | 已定案的架構決策；**不得在沒有新 ADR 的情況下推翻**（目前到 ADR-0034；索引見 `docs/adr/README.md`） |
 | `spikes/pi-rpc-poc/README.md` | Pi / Podman / LiteLLM 的實測結果與發現 |
 | `docs/progress/` | **開發進度留言版**：開工前先讀目前 Sprint 的看板，收工前依規則留言回報 |
 
@@ -128,7 +128,7 @@ Development 環境預設 `VibeMaker:Harness=Scripted`（假 Agent）。要接真
 
 對話與專案的「刪除」一律是封存（`Status = Archived`，資料與 runtime 內的檔案保留；封存後所有端點回 404，執行中的對話不能封存）。`ConversationResponse.ActiveExecutionId` 讓前端重新整理後接回執行中的 SSE（`resumeTurnFrom`）；檔案面板的預覽只用文字綁定或 blob URL 的 `<img>`，不得以 innerHTML 或 iframe 顯示 Agent 產生的內容。
 
-Runtime 生命週期（ADR-0011、ADR-0033）：runtime **預設常駐**（`IdleTimeoutMinutes` 預設 0），只有 Admin 停止、帳號停用 / 刪除時停止，這些路徑以 `AgentRuntimeRecord.MarkStopped` 設 `stop_requested`（下一次 execution 的 EnsureRuntime 清除）；`RuntimeLifecycleWorker` 啟動時對帳，之後把 Active 使用者、非 `stop_requested` 的 Stopped runtime 啟動回來（稽核 `runtime.autostart`，網路模式依擴充能力、受限網路不得退回對外）並停止非 Active 使用者的 runtime；Admin 把閒置時間設為大於 0 時才定期停止閒置的 runtime（跳過執行中的使用者）。執行政策（閒置時間、單次執行上限、每人排隊上限、每日次數）由 `RuntimePolicyService` 提供，管理介面的值（`vibemaker.runtime_policy`）優先於 `VibeMaker__Runtime__*`；超過配額回 429 `QUOTA_EXCEEDED`。生命週期操作（停止、查詢、對帳）一律以 user id 呼叫 `StopForUserAsync` / `GetStatusForUserAsync`，不要用 runtime id（服務重啟後會變）。
+Runtime 生命週期（ADR-0011、ADR-0033）：runtime **預設常駐**（`IdleTimeoutMinutes` 預設 0），只有 Admin 停止、帳號停用 / 刪除時停止，這些路徑以 `AgentRuntimeRecord.MarkStopped` 設 `stop_requested`（下一次 execution 的 EnsureRuntime 清除）；`RuntimeLifecycleWorker` 啟動時對帳，之後把 Active 使用者、非 `stop_requested` 的 Stopped runtime 啟動回來（稽核 `runtime.autostart`，網路模式依擴充能力、受限網路不得退回對外）並停止非 Active 使用者的 runtime；Admin 把閒置時間設為大於 0 時才定期停止閒置的 runtime（跳過執行中的使用者）。背景工作（ADR-0034）：image 的 CMD 是 `ymir-runtime-init`（`runtime/agent/scripts/`），container 每次啟動時恢復 `/workspace/.ymir/autostart/*.sh`（退避重啟）與 `/workspace/.ymir/crontab`（supercronic）；`ContainerCommandBuilder` 不指定指令、加 label `ymir.runtime-init=1`，缺 label 的 container 只在指定 network 的 EnsureRuntime（持有執行鎖）重建。背景模型 key（`RuntimeCredentialPurpose.Background`，`BackgroundCredentialService` / `BackgroundCredentialWorker` 每 5 分鐘）只給 Active、執行中、非 `stop_requested` 的個人 runtime，經 stdin 寫進 tmpfs `/tmp/.ymir/model-key`，`ymir-env` 讀取；群組、Local 不給，執行政策 `BackgroundModelAccess` 關閉時刪除。執行政策（閒置時間、單次執行上限、每人排隊上限、每日次數）由 `RuntimePolicyService` 提供，管理介面的值（`vibemaker.runtime_policy`）優先於 `VibeMaker__Runtime__*`；超過配額回 429 `QUOTA_EXCEEDED`。生命週期操作（停止、查詢、對帳）一律以 user id 呼叫 `StopForUserAsync` / `GetStatusForUserAsync`，不要用 runtime id（服務重啟後會變）。
 
 維運（Sprint 5 強化）：
 - runtime 的 create / start / stop / reconcile 都寫稽核：`RuntimeInfo.Transition` 由 EnsureRuntime 回報。
@@ -189,7 +189,7 @@ API image：`podman build -f src/Ymir.Api/Containerfile -t localhost/ymir/api:de
 - 所有 Project / Conversation / Message / Execution API 必須在 server 端驗證擁有者；不得信任前端傳入的 user id（SA §12）。新 API 必須加入授權矩陣測試。
 - Host 路徑只能由 user id 推導（`UserDirectories`）；Agent 工作目錄只能是 `RuntimePaths` 由 Guid 產生的 `/workspace/projects/{id}`、`/workspace/chats/{id}`（ADR-0007）。API 不接受任何外部傳入的路徑。讀取檔案時必須解析 realpath 並拒絕 `..` 與 symlink 逃逸。
 - Container 不得 `--privileged`、不得掛載 container runtime socket 或 host 敏感路徑；改動 `ContainerCommandBuilder` 時同步更新 `ContainerCommandBuilderTests`（Podman 與 Docker 兩種 engine 都要符合）。
-- Container 內不得出現 LiteLLM master key、DB 連線字串或 AD 憑證（ADR-0004）。環境變數以 `podman exec --env NAME` 傳遞，值不得出現在程序參數。
+- Container 內不得出現 LiteLLM master key、DB 連線字串或 AD 憑證（ADR-0004）。環境變數以 `podman exec --env NAME` 傳遞，值不得出現在程序參數；唯一例外是背景程序的模型 key（ADR-0034），只能經 stdin 寫進 container tmpfs，不得寫 workspace、host 磁碟或程序參數。
 - 回給瀏覽器的錯誤與 tool 事件只能是摘要：不得含 stack trace、host path、token、完整 command output（SA §10、§12）。原始細節只寫 server log。
 - `LocalRuntimeManager` 沒有隔離，只允許 Development 環境（DI 會在其他環境拒絕啟動）。
 - API container 不得掛載 container runtime socket（podman.sock / docker.sock）或使用者 workspace，只能經由 runtime host（ADR-0008）。Runtime host 的端點只接受 user id 與 runtime 內的程序規格，不得新增接受 host 路徑、image、掛載或資源設定的端點；改動協定時同步更新 `RuntimeHostProtocolTests` 與 `RuntimeHostTests`。Runtime host token 只放在部署 secret，不得進版控；不得用 rootless Podman 帳號 `ymir` 跑 API container。

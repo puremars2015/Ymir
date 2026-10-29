@@ -1,6 +1,6 @@
 # ADR-0033：Agent 執行環境常駐，OneDrive 只保留外掛
 
-- 狀態：已採納（使用者 2026-10-29 要求調整架構並確認選項）
+- 狀態：已採納（使用者 2026-10-29 要求調整架構並確認選項）；背景程序的自動恢復與模型存取見 [ADR-0034](0034-background-processes-and-model-access.md)
 - 日期：2026-10-29
 - 補充：[ADR-0011](0011-runtime-lifecycle-policy.md)。閒置停止預設改為 0（常駐）、新增「人為停止」標記、對帳後自動啟動。
 - 取代：[ADR-0013](0013-onedrive-connector.md) §3、§4（OneDrive 同步資料夾與工作目錄雙向同步）。ADR-0013 §1、§2（授權、憑證保存）不變。
@@ -84,7 +84,7 @@
 - **資源**：container 常駐會持續占用主機記憶體與 PID，同時在線的 container 數等於用過 Agent 的使用者數。
   - 每人上限（`MemoryLimit`、`CpuLimit`、`PidsLimit`）與主機容量規劃更重要。
   - 資源不足時，Admin 可以停止個別使用者，或把閒置停止改回大於 0。
-- **container 內的長任務與排程**：
+- **container 內的長任務與排程**（已由 [ADR-0034](0034-background-processes-and-model-access.md) 處理：autostart / crontab 自動恢復、背景模型 key）：
   - 只在 container 執行期間有效。
   - Admin 停止、帳號停用、主機重開機後，container 內自行啟動的背景程序都會結束。重開機後 container 會自動啟動，但程序不會。
   - Agent 的模型 key 只在每次 execution 以環境變數帶入（ADR-0004），container 內的背景程序拿不到。
