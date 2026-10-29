@@ -133,6 +133,14 @@
 ---
 
 ## 💬 留言區
+### 思考深度正式設定套用
+
+> 2026-10-29 · 正式設定已套用，待實際對話驗收
+
+- 依使用者提供的上游清單套用 `029c654` 範本；切換腳本成功、原設定私有備份 `/var/backups/ymir/remote-litellm-20261029-140009-9c3a2f`。容器有效環境讀回：Sonnet、Haiku、Opus、MiniMax、Sol、Astra 為 low／medium／high／xhigh／max；Terra 與 Luna 另有 none。MiniMax 預設 max 且必須思考。保留現有 LiteLLM 憑證與其他服務。
+- CI `40825994032` 通過；17 個切換腳本隔離測試、Pi 模型設定 4 項與程序規格 8 項通過。遠端 high 請求曾回 HTTP 200，不足以證明上游確實採用檔位；各新增檔位、none 與真 Pi SSE／回覆仍需使用者驗收。
+- 套用後一次獨立檢查短暫無法連線、登入頁 502，systemd 顯示 API 重啟一次；隨後 API health Healthy、登入頁 HTTP 200，遮蔽後日誌只顯示 createdump 權限不足，重啟原因尚未查明，需持續觀察，不宣稱問題已排除。
+
 ### 外部模型上游思考檔位補充
 
 > 2026-10-29 · 設定待套用
