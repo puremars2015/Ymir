@@ -51,6 +51,7 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| ARC2 | 背景工作自動恢復與背景模型存取（[ADR-0034](../adr/0034-background-processes-and-model-access.md)） | 🔬 | `ymir-runtime-init`（autostart + crontab）、背景模型 key 經 stdin 寫入 tmpfs；Podman 實機驗證恢復，完整 image build 與重開機待使用者環境，見 #109 |
 | ARC1 | 架構調整（[ADR-0033](../adr/0033-persistent-runtime-and-onedrive-plugin-only.md)）：Agent 執行環境常駐、OneDrive 只保留外掛 | 🔬 | 閒置停止預設 0、只由 Admin 停止、重啟後自動啟動；移除 OneDrive 同步與資料表；沙箱驗證通過，Podman 實機重開機待使用者環境，見 #108 |
 | LLM1 | 外部 LiteLLM（`llm.webpromaterial.com`）：模型走 llm、管理走 llm-admin（Cloudflare Access） | 🔬 | Ymir 端完成、遠端 8 模型範本、切換腳本 `apply-remote-litellm.sh`（含 `--check`、自動還原）；**正式主機尚未切換**，見 #107 |
 | NTF0 | 主動通知與排程任務 ADR（[ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)） | 📝 | 草稿，提議中；7 項待使用者決定（建議先做 N1 長任務完成通知），尚未實作，見 #106 |
@@ -197,6 +198,64 @@
 
 - 正式唯讀預檢在呼叫 `runuser` 時停止：子程序的隔離 PATH 不含 `/usr/sbin`，而此主機的 `runuser` 位於 `/usr/sbin/runuser`。尚未部署或停止服務。
 - 部署器先解析 `runuser` 的絕對路徑，再建立隔離環境；回歸測試固定模擬 `/usr/sbin/runuser`，38 項測試及 shell 語法檢查通過。正式預檢、部署與後續清理仍待完成。
+
+### #109 · 背景工作自動恢復與背景模型存取（ADR-0034） `🔬待驗證`
+
+> 👤 **Claude（AI）** · 🕒 2026-10-29 · `✨功能` `🔬待驗證`
+
+- **需求**：使用者問 container 內自己啟動的背景程序，在 Admin 停止或主機重開機後能不能自動恢復。
+- **使用者決定**：
+  - 支援常駐程序 + 排程；
+  - 給背景程序使用者自己的模型 key。
+- **自動恢復**：
+  - image 的 CMD 改為 `ymir-runtime-init`（`runtime/agent/scripts/`），container 每次啟動時執行：
+    - `/workspace/.ymir/autostart/*.sh`：結束後退避重啟，每 30 秒掃描新增 / 修改 / 刪除；
+    - `/workspace/.ymir/crontab`：supercronic v0.2.33，以 sha256 鎖定；
+    - log 寫到 `/workspace/.ymir/logs/`，超過上限截斷。
+  - `ContainerCommandBuilder` 不再指定 `sleep infinity`，改用 image 的 CMD（舊 image 仍可啟動），並加 label `ymir.runtime-init=1`。缺這個 label 的 container 只在指定 network 的 EnsureRuntime（持有執行鎖）時重建。
+- **背景模型 key**：
+  - `RuntimeCredentialPurpose.Background`：獨立快取，模型權限與每月預算和一般執行相同。
+  - `BackgroundCredentialService` 經 stdin 寫進 container tmpfs `/tmp/.ymir/model-key`：
+    - 寫入時機：container 啟動、對帳自動啟動，以及 `BackgroundCredentialWorker` 每 5 分鐘一輪；
+    - 只給 Active 使用者、執行中而且不是人為停止的個人 runtime；
+    - 群組與 Local 不給。
+  - `ymir-env <指令>` 讀 key 後執行，例如 `ymir-env pi -p "..."`。
+  - 執行政策新增「背景程序可以呼叫模型」（`BackgroundModelAccess`，預設允許）；關閉時刪除 key。
+- **Agent 提示**：system prompt 加入 `BackgroundWork.PersonalPrompt` / `GroupPrompt`。
+- **文件**：
+  - 新增 ADR-0034，ADR-0004、0033 加註記，並更新 ADR 索引；
+  - 更新 CLAUDE.md（含安全紅線的 key 例外）與 `runtime/agent/README.md`。
+- **驗證**：
+  - Podman 實機（以只含新腳本的測試 image，並套用 Ymir 的 hardening 旗標）：
+    - autostart 程序在 container 啟動時執行，`podman stop` 期間停止，`podman start` 後自動恢復；
+    - 寫入 tmpfs 的 key 檔權限是 600，`ymir-env` 讀得到，container 停止後消失。
+  - 單元測試：
+    - `RuntimeInitScriptTests`：啟動、重啟、刪除後停止、名稱過濾、`ymir-env`；
+    - `ContainerCommandBuilderTests`：image CMD、label、inspect 解析。
+  - 整合測試：
+    - `BackgroundCredentialTests`：key 只經 stdin、不在參數；人為停止 / 停用 / 群組不給；政策關閉時送出空 stdin；
+    - `RuntimeLifecycleTests` 政策欄位。
+  - 全套：`dotnet build` 0 警告、`dotnet format --verify-no-changes` 通過；單元測試 719/719、整合測試全數通過（含既有網路重建測試改為驗證缺 label 的舊 container 重建一次）。
+  - 前端：`npm run lint`、`npm test`（219 個）、`npm run build` 通過。
+- **未驗證、待使用者環境確認**：
+  - 完整 Agent image build：沙箱的 `podman build` 在既有的 `pip install python-pptx` 步驟連不到 PyPI，與本次變更無關；
+  - supercronic 在 container 內實際執行：沙箱不允許執行下載的 binary；
+  - 真實 LiteLLM 下以背景 key 呼叫模型；
+  - rootless Podman 主機重開機後的完整流程。
+- **部署注意**：
+  - 重新 build Agent image（多了 supercronic 下載步驟），並同時更新 API 與 runtime host；
+  - 既有 container 在使用者下次執行時重建，檔案保留；
+  - 背景 key 會產生額外的 LiteLLM key（每人一把，24 小時換發）。
+- **開發分支**：`claude/nice-hypatia-kobaun`。
+
+<details>
+<summary>💬 回覆（0）</summary>
+
+（尚無回覆）
+
+</details>
+
+---
 
 ### #108 · 架構調整：Agent 執行環境常駐、OneDrive 只保留外掛（ADR-0033） `🔬待驗證`
 
