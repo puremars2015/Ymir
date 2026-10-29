@@ -51,11 +51,12 @@
 
 | # | 工作項目 | 狀態 | 備註 |
 |---|---|---|---|
+| NTF2 | 排程任務與提醒（ADR-0032 N2） | 🔬 | 一次性／Cron 提醒與 Agent 工作、設定頁、執行政策上限、租約恢復與去重；本機測試通過，瀏覽器 E2E 受阻、正式部署待驗證，見 #111 |
 | ARC2 | 背景工作自動恢復與背景模型存取（[ADR-0034](../adr/0034-background-processes-and-model-access.md)） | 🔬 | `ymir-runtime-init`（autostart + crontab）、背景模型 key 經 stdin 寫入 tmpfs；Podman 實機驗證恢復，完整 image build 與重開機待使用者環境，見 #109 |
 | ARC1 | 架構調整（[ADR-0033](../adr/0033-persistent-runtime-and-onedrive-plugin-only.md)）：Agent 執行環境常駐、OneDrive 只保留外掛 | 🔬 | 閒置停止預設 0、只由 Admin 停止、重啟後自動啟動；移除 OneDrive 同步與資料表；沙箱驗證通過，Podman 實機重開機待使用者環境，見 #108 |
 | LLM1 | 外部 LiteLLM（`llm.webpromaterial.com`）：模型走 llm、管理走 llm-admin（Cloudflare Access） | 🔬 | Ymir 端完成、遠端 8 模型範本、切換腳本 `apply-remote-litellm.sh`（含 `--check`、自動還原）；**正式主機尚未切換**，見 #107 |
 | NTF1 | 長任務完成通知（ADR-0032 N1）：站內通知、`/api/events`、頂列鈴鐺、瀏覽器通知 | 🔬 | 後端、前端、整合測試與瀏覽器 e2e 通過；正式站需套 Platform migration `Notifications`，見 #110 |
-| NTF0 | 主動通知與排程任務 ADR（[ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)） | 📝 | N1 已確認並實作（NTF1）；N2～N4 與待決定 3、4、6、7 及其餘上限仍待使用者決定，見 #106、#110 |
+| NTF0 | 主動通知與排程任務 ADR（[ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)） | 📝 | N1、N2 已實作（NTF1／NTF2）；N3～N4 與待決定 3、4、6、7 及 Agent 通知上限仍待後續確認，見 #106、#110 |
 | DEP7 | 這台 Ubuntu 的單一手動重新部署入口與安全回復 | 🔬 | 補強既有 redeploy-ubuntu.sh，不重複新增入口；38 項隔離回歸＋8 開機測試通過，腳本／文件已納入版控，未執行新正式部署，見 #104 |
 | SEC1 | 密鑰集中保管至 private ymir-secret-keys | 🚧 | 本機三份 .env 已收存並推送；正式主機設定／keyring 尚未取得，見 #105 |
 | DEP6 | 最新 main 8e47b6e／Pi 啟動準備加速正式部署 | ⛔ | 10/20 讀回 sudo 等候逾時、exit 1，正式切換未執行；產物與原驗證保留，Gateway 仍未安裝，改交付手動入口，見 #102、#104 |
@@ -136,6 +137,20 @@
 ---
 
 ## 💬 留言區
+
+### #111 · ADR-0032 N2：排程任務與提醒
+
+> 👤 **Codex（AI）** · 🕒 2026-10-29 17:13 CST · `🚧進度` `🔬驗證`
+
+- **範圍**：依使用者「繼續開發 ADR-0032」接續 N2，程式提交 `81a6dde`。支援私人對話的一次性／五欄 Cron 提醒與 Agent 工作、IANA 時區；設定頁 `/settings/schedules` 可新增、編輯、暫停、恢復、結束，對話輸入區提供入口。N3 Agent 工具與 N4 Web Push 尚未實作。
+- **執行**：30 秒輪詢、rowversion 五分鐘租約、UUID v5 固定每輪冪等鍵；副作用完成才推進下一次。提醒由 Platform 唯一索引去重；Agent 走既有模型／配額／預算／帳號檢查，忙碌略過，短工作也通知，worker 讀回實際結果，連續失敗三次暫停。封存／停用會結束排程。
+- **政策與安全**：沿用每人 10 個有效排程、最短一小時，管理員可調整；建立／恢復以 serializable transaction 保護上限，修改帶最新 version；僅操作自己的私人對話，不提供跨人通知、群組排程或 Agent 建立入口，稽核不寫內容。
+- **驗證**：`dotnet build Ymir.slnx` 無警告；相關單元 33 項、整合回歸 34 項全通過（包含通知、排程、政策、授權矩陣與 OpenAPI）；最後交易介面調整後重跑排程 6 項通過。前端 lint、227 項測試與 production build 通過；全 solution format verify 及最後異動檔案 format verify 通過，OpenAPI 已重新產生。使用本次獨立 SQL container 的 `127.0.0.1:15433`，每個 fixture 獨立資料庫；未接觸正式資料庫。初次 localhost 連線逾時，改用明確 IPv4 後通過。
+- **未驗證**：自動核准審查拒絕啟動前端開發伺服器，回傳未提供具體理由；未繞過，未完成瀏覽器 E2E／視覺驗收，另補元件操作測試驗證編輯送出與衝突錯誤顯示。真模型、API 停機／重啟實機演練與正式部署待使用者環境。CI 推送後追蹤。
+- **部署**：需要 Platform `ScheduledReminderDeduplication` 與 VibeMaker `ScheduledTasks` migration（含 messages.source）。本輪未部署正式站。租約／恢復語義與 N2 狀態已更新 [ADR-0032](../adr/0032-proactive-notifications-and-scheduled-tasks.md)。
+
+---
+
 ### 思考深度正式設定套用
 
 > 2026-10-29 · 正式設定已套用，待實際對話驗收
