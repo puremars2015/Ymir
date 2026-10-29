@@ -243,13 +243,28 @@ public class ContainerCommandBuilderTests
     }
 
     [Theory]
-    [InlineData("running|restricted", "running", "restricted")]
-    [InlineData("exited|", "exited", null)]
-    [InlineData("running|<no value>", "running", null)]
-    [InlineData("created\n", "created", null)]
-    public void Inspect_ParsesStateAndNetworkLabel(string output, string state, string? label)
+    [InlineData("running|restricted|1", "running", "restricted", "1")]
+    [InlineData("exited||", "exited", null, null)]
+    [InlineData("running|<no value>|<no value>", "running", null, null)]
+    [InlineData("running|internet", "running", "internet", null)]
+    [InlineData("created\n", "created", null, null)]
+    public void Inspect_ParsesStateAndLabels(string output, string state, string? network, string? init)
     {
-        Assert.Equal((state, label), ContainerRuntimeManager.ParseInspect(output.Replace("\\n", "\n", StringComparison.Ordinal)));
+        Assert.Equal((state, network, init), ContainerRuntimeManager.ParseInspect(output.Replace("\\n", "\n", StringComparison.Ordinal)));
+    }
+
+    /// <summary>ADR-0034：主程序用 image 的 CMD（ymir-runtime-init），並以 label 標記，舊 container 才能被辨識並重建。</summary>
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public void Run_UsesTheImageInit_AndLabelsIt(RuntimeProvider provider)
+    {
+        var options = new RuntimeOptions { Provider = provider, WorkspaceRoot = "/srv/ymir/workspaces" };
+        var args = RunArguments(options);
+
+        Assert.Equal(options.Image, args[^1]);
+        Assert.DoesNotContain("sleep", args);
+        Assert.Contains($"{ContainerCommandBuilder.RuntimeInitLabel}={ContainerCommandBuilder.RuntimeInitLabelValue}", ValuesAfter(args, "--label"));
+        Assert.Contains($"{{{{index .Config.Labels \"{ContainerCommandBuilder.RuntimeInitLabel}\"}}}}", ContainerCommandBuilder.BuildInspectStatusArguments(UserId)[3], StringComparison.Ordinal);
     }
 
     [Fact]

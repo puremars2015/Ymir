@@ -7,6 +7,8 @@ export interface RuntimePolicyDraft {
   maxPendingExecutionsPerUser: string;
   dailyExecutionLimit: string;
   monthlyBudgetUsd: string;
+  /** 背景程序能否以使用者自己的模型 key 呼叫模型（ADR-0034）。 */
+  backgroundModelAccess: boolean;
 }
 
 /** 與後端 RuntimePolicySettings.Validate 相同的範圍。 */
@@ -18,7 +20,7 @@ export const POLICY_LIMITS = {
   monthlyBudgetUsd: { min: 0, max: 100000 },
 } as const;
 
-const LABELS: Record<keyof RuntimePolicyDraft, string> = {
+const LABELS: Record<keyof typeof POLICY_LIMITS, string> = {
   idleTimeoutMinutes: '閒置停止時間',
   executionTimeoutMinutes: '單次執行上限',
   maxPendingExecutionsPerUser: '每人同時排隊的工作數',
@@ -36,6 +38,7 @@ export function policyDraftFrom(values: RuntimePolicyValues): RuntimePolicyDraft
     maxPendingExecutionsPerUser: round(values.maxPendingExecutionsPerUser, 1),
     dailyExecutionLimit: round(values.dailyExecutionLimit, 0),
     monthlyBudgetUsd: String(Number(values.monthlyBudgetUsd)),
+    backgroundModelAccess: values.backgroundModelAccess,
   };
 }
 
@@ -47,11 +50,11 @@ export function policyDraftProblem(draft: RuntimePolicyDraft): string | null {
   }
   const integers = Object.keys(POLICY_LIMITS).filter(
     (key) => key !== 'monthlyBudgetUsd',
-  ) as (keyof RuntimePolicyDraft)[];
+  ) as (keyof typeof POLICY_LIMITS)[];
   for (const key of integers) {
     const text = draft[key].trim();
     const value = Number(text);
-    const { min, max } = POLICY_LIMITS[key as keyof typeof POLICY_LIMITS];
+    const { min, max } = POLICY_LIMITS[key];
     if (!/^\d+$/.test(text) || value < min || value > max) {
       return `${LABELS[key]}必須是 ${min}～${max} 的整數。`;
     }
@@ -65,6 +68,7 @@ export const toSavePolicyRequest = (draft: RuntimePolicyDraft): SaveRuntimePolic
   maxPendingExecutionsPerUser: Number(draft.maxPendingExecutionsPerUser),
   dailyExecutionLimit: Number(draft.dailyExecutionLimit),
   monthlyBudgetUsd: Number(draft.monthlyBudgetUsd),
+  backgroundModelAccess: draft.backgroundModelAccess,
 });
 
 /** 30 分鐘、1.5 小時、2 小時；0 → 「不自動停止」。 */
@@ -101,5 +105,6 @@ export function policySummary(policy: RuntimePolicy): string {
     `每人排隊 ${e.maxPendingExecutionsPerUser} 個`,
     `每日 ${formatLimit(e.dailyExecutionLimit, '次')}`,
     `每月預算 ${formatBudget(e.monthlyBudgetUsd)}`,
+    e.backgroundModelAccess ? '背景可呼叫模型' : '背景不可呼叫模型',
   ].join(' · ');
 }

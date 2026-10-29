@@ -10,7 +10,8 @@ namespace Ymir.VibeMaker.Application.Runtime;
 
 /// <summary>目前生效的執行政策（ADR-0011）。<see cref="TimeSpan.Zero"/> / 0 表示不限制。</summary>
 /// <param name="MonthlyBudgetUsd">每人每月模型預算（美元），由 LiteLLM 強制（ADR-0004）；0 表示不限制。</param>
-public sealed record RuntimePolicy(TimeSpan IdleTimeout, TimeSpan ExecutionTimeout, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd = 0)
+/// <param name="BackgroundModelAccess">container 內的背景程序能否以使用者自己的模型 key 呼叫模型（ADR-0034）。</param>
+public sealed record RuntimePolicy(TimeSpan IdleTimeout, TimeSpan ExecutionTimeout, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd = 0, bool BackgroundModelAccess = true)
 {
     /// <summary>給模型入口的預算；0 → null（不限制）。</summary>
     public decimal? MonthlyBudget => MonthlyBudgetUsd > 0 ? MonthlyBudgetUsd : null;
@@ -18,7 +19,8 @@ public sealed record RuntimePolicy(TimeSpan IdleTimeout, TimeSpan ExecutionTimeo
 
 /// <summary>管理介面編輯的值（分鐘 / 次數 / 美元）；存在 <c>platform.system_settings</c>（ADR-0010），不含機密。</summary>
 /// <param name="MonthlyBudgetUsd">預設 0：較早儲存、沒有這個欄位的設定仍然有效（視為不限制）。</param>
-public sealed record RuntimePolicySettings(int IdleTimeoutMinutes, int ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd = 0)
+/// <param name="BackgroundModelAccess">預設 true：較早儲存、沒有這個欄位的設定視為允許（ADR-0034）。</param>
+public sealed record RuntimePolicySettings(int IdleTimeoutMinutes, int ExecutionTimeoutMinutes, int MaxPendingExecutionsPerUser, int DailyExecutionLimit, decimal MonthlyBudgetUsd = 0, bool BackgroundModelAccess = true)
 {
     public const int MaxIdleTimeoutMinutes = 24 * 60;
     public const int MaxExecutionTimeoutMinutes = 240;
@@ -41,7 +43,8 @@ public sealed record RuntimePolicySettings(int IdleTimeoutMinutes, int Execution
         TimeSpan.FromMinutes(ExecutionTimeoutMinutes),
         MaxPendingExecutionsPerUser,
         DailyExecutionLimit,
-        MonthlyBudgetUsd);
+        MonthlyBudgetUsd,
+        BackgroundModelAccess);
 }
 
 /// <param name="Stored">管理介面儲存的值（沒有則為 null，使用部署設定）。</param>
@@ -73,7 +76,8 @@ public sealed partial class RuntimePolicyService(
         deployment.Value.Timeout,
         deployment.Value.MaxPendingExecutionsPerUser,
         deployment.Value.DailyExecutionLimit,
-        deployment.Value.MonthlyBudgetUsd);
+        deployment.Value.MonthlyBudgetUsd,
+        deployment.Value.BackgroundModelAccess);
 
     public async Task<RuntimePolicy> GetAsync(CancellationToken cancellationToken) =>
         (await GetStateAsync(cancellationToken).ConfigureAwait(false)).Effective;

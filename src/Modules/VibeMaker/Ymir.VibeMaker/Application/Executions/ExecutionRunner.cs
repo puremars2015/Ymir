@@ -34,6 +34,7 @@ public sealed class ExecutionRunner(
     Ymir.VibeMaker.Application.Plugins.PluginService plugins,
     Ymir.VibeMaker.Application.Extensions.PersonalMcpService personalMcp,
     SiteService sites,
+    BackgroundCredentialService backgroundCredentials,
     IAuditLog auditLog,
     VibeMakerTelemetry telemetry,
     TimeProvider timeProvider,
@@ -128,6 +129,11 @@ public sealed class ExecutionRunner(
             runtime = await runtimeManager.EnsureRuntimeAsync(_runtimeOwnerId, extensions.NetworkAccess, runToken).ConfigureAwait(false);
             await RecordRuntimeAsync(runtime, stoppingToken).ConfigureAwait(false);
             await AuditRuntimeTransitionAsync(runtime, stoppingToken).ConfigureAwait(false);
+            if (runtime.Transition != RuntimeTransition.None && !IsGroupRun(execution))
+            {
+                // container 剛建立或啟動，tmpfs 是空的：立即寫入背景程序的模型 key（ADR-0034，best effort）。
+                await backgroundCredentials.SyncAfterStartAsync(execution.UserId, runToken).ConfigureAwait(false);
+            }
             session = await GetOrCreateSessionAsync(execution, runtime, stoppingToken).ConfigureAwait(false);
             // 使用者的 LiteLLM virtual key（ADR-0004）：只放進 Agent 程序的環境變數，container 內不會有 master key。
             // 群組 Agent：只給這次執行用、結束即撤銷的 key（container 與 workspace 是成員共用的，ADR-0026 §3）。
@@ -422,6 +428,8 @@ public sealed class ExecutionRunner(
         }
 
         prompts.Add(ArtifactService.PromptFor(execution.Id));
+        // 背景工作的登記方式（ADR-0034）；群組的背景程序沒有模型 key。
+        prompts.Add(IsGroupRun(execution) ? BackgroundWork.GroupPrompt : BackgroundWork.PersonalPrompt);
         return prompts;
     }
 

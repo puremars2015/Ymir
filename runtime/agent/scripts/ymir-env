@@ -1,0 +1,20 @@
+#!/bin/sh
+# 讓背景程序使用自己的模型 key（ADR-0034）：讀 container tmpfs 內由平台寫入的 key，設定 LITELLM_API_KEY 後執行指令。
+#   ymir-env pi -p "整理今天的待辦"
+# Pi 的 models.json 已經以 ${LITELLM_API_KEY} 引用 key、指向平台的模型入口。
+file="${YMIR_MODEL_KEY_FILE:-/tmp/.ymir/model-key}"
+if [ "$#" -eq 0 ]; then
+  echo "usage: ymir-env <command> [args...]" >&2
+  exit 64
+fi
+if [ ! -r "$file" ]; then
+  echo "ymir-env: 背景模型 key 尚未就緒（container 剛啟動，或管理員已關閉背景模型存取）" >&2
+  exit 78
+fi
+IFS= read -r LITELLM_API_KEY <"$file" || [ -n "${LITELLM_API_KEY:-}" ]
+if [ -z "${LITELLM_API_KEY:-}" ]; then
+  echo "ymir-env: 背景模型 key 尚未就緒" >&2
+  exit 78
+fi
+export LITELLM_API_KEY
+exec "$@"

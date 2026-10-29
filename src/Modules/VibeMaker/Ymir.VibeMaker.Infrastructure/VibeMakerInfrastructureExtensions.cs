@@ -42,6 +42,7 @@ public static class VibeMakerInfrastructureExtensions
             .ConfigurePrimaryHttpMessageHandler(PersonalMcpProbe.Handler);
         services.AddHostedService<ExecutionWorker>();
         services.AddHostedService<RuntimeLifecycleWorker>();
+        services.AddHostedService<BackgroundCredentialWorker>();
         services.AddHttpClient(nameof(Health.LiteLlmHealthCheck)).AddLiteLlmTransport();
 
         // OneDrive connector（ADR-0013）：只有後端連 Graph 與 Entra；token 不保存在 HttpClient。
@@ -91,6 +92,11 @@ public static class VibeMakerInfrastructureExtensions
             if (configuration.GetSection(ModelCredentialOptions.SectionName).GetValue<decimal?>(nameof(ExecutionOptions.MonthlyBudgetUsd)) is >= 0 and var budget)
             {
                 options.MonthlyBudgetUsd = budget;
+            }
+
+            if (runtime.GetValue<bool?>(nameof(RuntimeOptions.BackgroundModelAccess)) is { } background)
+            {
+                options.BackgroundModelAccess = background;
             }
 
             if (runtime.GetValue<double?>(nameof(RuntimeOptions.IdleCheckIntervalSeconds)) is > 0 and var interval)

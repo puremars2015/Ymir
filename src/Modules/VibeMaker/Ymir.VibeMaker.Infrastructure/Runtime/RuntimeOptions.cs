@@ -55,6 +55,9 @@ public sealed partial class RuntimeOptions
     /// <summary>每位使用者過去 24 小時可建立的 execution 數；0 表示不限制。</summary>
     public int DailyExecutionLimit { get; set; }
 
+    /// <summary>container 內的背景程序能否以使用者自己的模型 key 呼叫模型（ADR-0034）；管理介面的執行政策優先。</summary>
+    public bool BackgroundModelAccess { get; set; } = true;
+
     /// <summary>閒置檢查間隔（秒）。</summary>
     public double IdleCheckIntervalSeconds { get; set; } = 60;
 

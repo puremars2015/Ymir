@@ -10,7 +10,7 @@ using Ymir.VibeMaker.Infrastructure.Runtime;
 namespace Ymir.VibeMaker.Infrastructure.Containers;
 
 /// <summary>
-/// Container runtime（Rootless Podman；開發 / 驗證時可用 Docker，ADR-0005）：一個使用者一個長駐 container（ADR-0007）（主程序 <c>sleep infinity</c>），
+/// Container runtime（Rootless Podman；開發 / 驗證時可用 Docker，ADR-0005）：一個使用者一個長駐 container（ADR-0007）（主程序 <c>ymir-runtime-init</c>，ADR-0034），
 /// Agent 以 <c>exec -i</c> 執行（ADR-0003）。
 /// Sprint 0 狀態只存在記憶體；Sprint 1/4 改存 AGENT_RUNTIME 並加入 idle stop 與 reconciliation。
 /// </summary>
@@ -40,12 +40,16 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
             var runtimeId = _runtimesByUser.TryGetValue(userId, out var known) ? known.RuntimeId : Guid.NewGuid();
             var inspected = await InspectAsync(userId, cancellationToken).ConfigureAwait(false);
             var state = inspected?.State;
-            var recreate = network is { } desired && inspected is { } existing && ContainerCommandBuilder.NetworkOfLabel(existing.NetworkLabel) != desired;
+            // 只在呼叫端指定 network 時重建（ExecutionRunner 與對帳自動啟動都持有使用者的執行鎖），
+            // 讀檔等其他呼叫不會中斷執行中的 Agent。
+            var recreate = network is { } desired && inspected is { } existing
+                && (ContainerCommandBuilder.NetworkOfLabel(existing.NetworkLabel) != desired || existing.InitLabel != ContainerCommandBuilder.RuntimeInitLabelValue);
             if (recreate)
             {
-                // Network 只能在建立時決定：移除 container 後重建，使用者目錄是掛載的，檔案與 Pi session 都保留（SA §15）。
+                // Network 與主程序只能在建立時決定（ADR-0012 A.8、ADR-0034）：移除 container 後重建，
+                // 使用者目錄是掛載的，檔案、Pi session 與登記的背景工作都保留（SA §15）。
                 await RunContainerCliAsync(ContainerCommandBuilder.BuildRemoveArguments(userId), cancellationToken).ConfigureAwait(false);
-                logger.LogInformation("Removed runtime container for user {UserId} to apply network policy {Network}", userId, network);
+                logger.LogInformation("Removed runtime container for user {UserId} to apply network policy {Network} and the runtime init", userId, network);
                 state = null;
             }
 
@@ -212,20 +216,22 @@ internal sealed class ContainerRuntimeManager(IOptions<RuntimeOptions> options, 
         }
     }
 
-    private async Task<(string State, string? NetworkLabel)?> InspectAsync(Guid userId, CancellationToken cancellationToken)
+    private async Task<(string State, string? NetworkLabel, string? InitLabel)?> InspectAsync(Guid userId, CancellationToken cancellationToken)
     {
         var (exitCode, output, _) = await ExecuteContainerCliAsync(ContainerCommandBuilder.BuildInspectStatusArguments(userId), cancellationToken)
             .ConfigureAwait(false);
         return exitCode == 0 ? ParseInspect(output) : null;
     }
 
-    internal static (string State, string? NetworkLabel) ParseInspect(string output)
+    internal static (string State, string? NetworkLabel, string? InitLabel) ParseInspect(string output)
     {
-        var parts = output.Trim().Split('|', 2);
-        // Go template 對不存在的 label 輸出空字串或 "<no value>"，都視為沒有 label。
-        var label = parts.Length > 1 && parts[1] is { Length: > 0 } value && value != "<no value>" ? value : null;
-        return (parts[0], label);
+        var parts = output.Trim().Split('|', 3);
+        return (parts[0], LabelAt(parts, 1), LabelAt(parts, 2));
     }
+
+    // Go template 對不存在的 label 輸出空字串或 "<no value>"，都視為沒有 label。
+    private static string? LabelAt(string[] parts, int index) =>
+        parts.Length > index && parts[index] is { Length: > 0 } value && value != "<no value>" ? value : null;
 
     private async Task RunContainerCliAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {

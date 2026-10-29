@@ -28,6 +28,14 @@ internal static class ContainerCommandBuilder
 
     public const string ReclaimableLabel = "ymir.reclaimable=agent-runtime";
 
+    /// <summary>
+    /// 以 image 的 CMD（<c>ymir-runtime-init</c>）當主程序建立的 container（ADR-0034）。沒有這個 label 的既有 container
+    /// 主程序是 <c>sleep infinity</c>，背景工作不會自動恢復；持有使用者執行鎖的 EnsureRuntime 會把它重建。
+    /// </summary>
+    public const string RuntimeInitLabel = "ymir.runtime-init";
+
+    public const string RuntimeInitLabelValue = "1";
+
     /// <summary>沒有 label 的既有 container（A1b 之前建立）視為可以對外連線。</summary>
     public static RuntimeNetworkAccess NetworkOfLabel(string? value) =>
         value == "restricted" ? RuntimeNetworkAccess.Restricted : RuntimeNetworkAccess.Internet;
@@ -62,13 +70,14 @@ internal static class ContainerCommandBuilder
             "--detach",
             "--name", ContainerName(userId),
             "--hostname", "ymir-runtime",
-            // 主程序 sleep 不處理 SIGTERM；--init 讓 init 程序當 PID 1，stop 才能立即結束。
+            // 主程序（ymir-runtime-init 或舊 image 的 sleep）以 --init 當 PID 1：轉送 SIGTERM、回收背景工作的孤兒程序。
             "--init",
             "--label", $"ymir.user-id={userId:D}",
             "--label", $"ymir.runtime-id={runtimeId:D}",
             "--label", $"{NetworkLabel}={NetworkLabelValue(network)}",
             "--label", ManagedLabel,
             "--label", ReclaimableLabel,
+            "--label", $"{RuntimeInitLabel}={RuntimeInitLabelValue}",
             .. userMapping,
             "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges",
@@ -81,8 +90,9 @@ internal static class ContainerCommandBuilder
             "--network", networkName,
             "--mount", $"type=bind,source={directories.Workspace},target={RuntimePaths.Workspace}{relabel}",
             "--mount", $"type=bind,source={directories.AgentState},target={RuntimePaths.AgentState}{relabel}",
+            // 不指定指令：使用 image 的 CMD。新 image 是 ymir-runtime-init（ADR-0034），舊 image 是 sleep infinity，
+            // 所以 image 與 API / runtime host 的部署順序不會讓 container 起不來。
             options.Image,
-            "sleep", "infinity",
         ];
     }
 
@@ -138,9 +148,9 @@ internal static class ContainerCommandBuilder
         return ["exec", ContainerName(userId), "mkdir", "-p", runtimeDirectory];
     }
 
-    /// <summary>輸出 <c>狀態|network label</c>；Podman 與 Docker 的 Go template 對不存在的 label 都輸出空字串。</summary>
+    /// <summary>輸出 <c>狀態|network label|runtime-init label</c>；Podman 與 Docker 的 Go template 對不存在的 label 都輸出空字串。</summary>
     public static IReadOnlyList<string> BuildInspectStatusArguments(Guid userId) =>
-        ["container", "inspect", "--format", $"{{{{.State.Status}}}}|{{{{index .Config.Labels \"{NetworkLabel}\"}}}}", ContainerName(userId)];
+        ["container", "inspect", "--format", $"{{{{.State.Status}}}}|{{{{index .Config.Labels \"{NetworkLabel}\"}}}}|{{{{index .Config.Labels \"{RuntimeInitLabel}\"}}}}", ContainerName(userId)];
 
     public static IReadOnlyList<string> BuildStartArguments(Guid userId) => ["start", ContainerName(userId)];
 

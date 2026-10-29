@@ -1,0 +1,126 @@
+#!/bin/bash
+# Ymir Agent runtime 的主程序（ADR-0034）：取代 sleep infinity，讓使用者登記的背景工作在 container 每次啟動時自動恢復。
+#
+#   /workspace/.ymir/autostart/<名稱>.sh  常駐程序：結束後以退避重啟；新增 / 修改 / 刪除在下一輪掃描生效
+#   /workspace/.ymir/crontab              排程：由 supercronic 執行；檔案修改後重新啟動
+#   /workspace/.ymir/logs/<名稱>.log      輸出（超過上限只保留尾段）
+#
+# 以 agent 使用者執行；PID 1 是 --init。單一腳本錯誤不會讓這個程序結束（否則整個 container 會停止）。
+set -u
+
+root="${YMIR_BACKGROUND_ROOT:-/workspace/.ymir}"
+interval="${YMIR_AUTOSTART_SCAN_SECONDS:-30}"
+max_log="${YMIR_BACKGROUND_LOG_BYTES:-5242880}"
+cron_bin="${YMIR_SUPERCRONIC:-/opt/ymir/bin/supercronic}"
+autostart="$root/autostart"
+logs="$root/logs"
+
+# 每個背景工作在自己的程序群組，停止時連同子程序一起結束。
+set -m
+
+declare -A pids=()
+declare -A stamps=()
+
+now() { date '+%Y-%m-%dT%H:%M:%S%z'; }
+
+# 在原檔截斷（寫入端以 append 開檔，不能用 mv 換檔）。
+trim_log() {
+  local file=$1 size
+  size=$(stat -c %s "$file" 2>/dev/null || echo 0)
+  if [ "$size" -gt "$max_log" ]; then
+    tail -c $((max_log / 2)) "$file" >"$file.trim" 2>/dev/null && cat "$file.trim" >"$file" 2>/dev/null
+    rm -f "$file.trim"
+  fi
+}
+
+supervise() {
+  # 子 shell 繼承了主程序的 trap 與工作表；還原成預設，收到 TERM 就和子程序一起結束。
+  trap - TERM INT
+  local name=$1 delay=5 started code
+  shift
+  local log="$logs/$name.log"
+  while true; do
+    trim_log "$log"
+    printf '[%s] ymir: start\n' "$(now)" >>"$log"
+    started=$(date +%s)
+    "$@" >>"$log" 2>&1 </dev/null
+    code=$?
+    printf '[%s] ymir: exited with %s\n' "$(now)" "$code" >>"$log"
+    # 跑超過 60 秒視為正常結束後的重啟，退避重新計算；連續失敗最多每 5 分鐘重試一次。
+    if [ $(($(date +%s) - started)) -ge 60 ]; then delay=5; fi
+    sleep "$delay"
+    delay=$((delay * 2 > 300 ? 300 : delay * 2))
+  done
+}
+
+start_job() {
+  local key=$1 stamp=$2
+  shift 2
+  supervise "$key" "$@" &
+  pids[$key]=$!
+  stamps[$key]=$stamp
+}
+
+stop_job() {
+  local key=$1 pid=${pids[$1]:-}
+  if [ -n "$pid" ]; then
+    kill -TERM -- "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
+    wait "$pid" 2>/dev/null
+  fi
+  unset 'pids[$key]' 'stamps[$key]'
+}
+
+stop_all() {
+  local key
+  for key in "${!pids[@]}"; do stop_job "$key"; done
+}
+
+ensure_job() {
+  local key=$1 stamp=$2
+  shift 2
+  local pid=${pids[$key]:-}
+  if [ -n "$pid" ] && [ "${stamps[$key]:-}" = "$stamp" ] && kill -0 "$pid" 2>/dev/null; then
+    return
+  fi
+  [ -n "$pid" ] && stop_job "$key"
+  start_job "$key" "$stamp" "$@"
+}
+
+scan() {
+  mkdir -p "$autostart" "$logs" 2>/dev/null
+  local -A seen=()
+  local file name stamp
+  for file in "$autostart"/*.sh; do
+    [ -f "$file" ] || continue
+    name=$(basename -- "$file" .sh)
+    # 名稱只接受安全字元：log 檔名由它組成。
+    [[ "$name" =~ ^[A-Za-z0-9._-]{1,64}$ ]] || continue
+    stamp=$(stat -c '%Y:%s' "$file" 2>/dev/null) || continue
+    seen[$name]=1
+    ensure_job "$name" "$stamp" bash "$file"
+  done
+
+  if [ -f "$root/crontab" ] && [ -x "$cron_bin" ]; then
+    stamp=$(stat -c '%Y:%s' "$root/crontab" 2>/dev/null) && {
+      seen[crontab]=1
+      ensure_job crontab "$stamp" "$cron_bin" "$root/crontab"
+    }
+  fi
+
+  local key
+  for key in "${!pids[@]}"; do
+    [ -n "${seen[$key]:-}" ] || stop_job "$key"
+  done
+
+  for file in "$logs"/*.log; do
+    [ -f "$file" ] && trim_log "$file"
+  done
+}
+
+trap 'stop_all; exit 0' TERM INT
+
+while true; do
+  scan
+  sleep "$interval" &
+  wait $! 2>/dev/null
+done

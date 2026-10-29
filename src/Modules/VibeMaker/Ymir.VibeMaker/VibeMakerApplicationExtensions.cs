@@ -28,6 +28,7 @@ public static class VibeMakerApplicationExtensions
         services.AddScoped<ExecutionReconciler>();
         services.AddScoped<ExecutionEventRetention>();
         services.AddScoped<Application.Runtime.RuntimeLifecycleService>();
+        services.AddScoped<Application.Runtime.BackgroundCredentialService>();
         services.AddSingleton<Application.Runtime.RuntimePolicyService>();
         services.AddSingleton<Application.Extensions.ExtensionPolicyService>();
         services.AddSingleton<Application.Extensions.IExtensionPolicy>(sp => sp.GetRequiredService<Application.Extensions.ExtensionPolicyService>());

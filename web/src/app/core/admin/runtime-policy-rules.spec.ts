@@ -16,6 +16,7 @@ describe('runtime policy rules', () => {
     maxPendingExecutionsPerUser: 5,
     dailyExecutionLimit: 0,
     monthlyBudgetUsd: 0,
+    backgroundModelAccess: true,
   };
 
   it('表單由目前的值產生，小數四捨五入且不低於下限', () => {
@@ -25,6 +26,7 @@ describe('runtime policy rules', () => {
       maxPendingExecutionsPerUser: '5',
       dailyExecutionLimit: '0',
       monthlyBudgetUsd: '0',
+      backgroundModelAccess: true,
     });
     expect(
       policyDraftFrom({ ...values, executionTimeoutMinutes: 0.005 }).executionTimeoutMinutes,
@@ -66,8 +68,10 @@ describe('runtime policy rules', () => {
         updatedAt: null,
         updatedByName: null,
       }),
-    ).toBe('閒置 30 分鐘後停止 · 單次最長 30 分鐘 · 每人排隊 5 個 · 每日 不限制 · 每月預算 不限制');
-    const persistent = { ...values, idleTimeoutMinutes: 0 };
+    ).toBe(
+      '閒置 30 分鐘後停止 · 單次最長 30 分鐘 · 每人排隊 5 個 · 每日 不限制 · 每月預算 不限制 · 背景可呼叫模型',
+    );
+    const persistent = { ...values, idleTimeoutMinutes: 0, backgroundModelAccess: false };
     expect(
       policySummary({
         effective: persistent,
@@ -76,7 +80,9 @@ describe('runtime policy rules', () => {
         updatedAt: null,
         updatedByName: null,
       }),
-    ).toBe('執行環境常駐 · 單次最長 30 分鐘 · 每人排隊 5 個 · 每日 不限制 · 每月預算 不限制');
+    ).toBe(
+      '執行環境常駐 · 單次最長 30 分鐘 · 每人排隊 5 個 · 每日 不限制 · 每月預算 不限制 · 背景不可呼叫模型',
+    );
     expect(formatUsd(12.5)).toBe('US$12.50');
     expect(formatUsd(0.004)).toBe('< US$0.01');
     expect(formatBudget(0)).toBe('不限制');

@@ -25,6 +25,7 @@ public sealed class RuntimeLifecycleService(
     UserExecutionLocks userLocks,
     RuntimePolicyService policies,
     ExtensionPolicyService extensionPolicy,
+    BackgroundCredentialService backgroundCredentials,
     IUserDirectory users,
     VibeMakerTelemetry telemetry,
     IAuditLog auditLog,
@@ -130,6 +131,8 @@ public sealed class RuntimeLifecycleService(
                 record.MarkStatus(runtime.Status, timeProvider.GetUtcNow());
                 await SaveAndAuditAsync("runtime.autostart", record.UserId, cancellationToken).ConfigureAwait(false);
                 logger.LogInformation("Runtime of user {UserId} started after reconcile", record.UserId);
+                // container 的 tmpfs 已清空：立即寫回背景程序的模型 key（ADR-0034）；失敗時背景 worker 下一輪再寫。
+                await backgroundCredentials.SyncAfterStartAsync(record.UserId, cancellationToken).ConfigureAwait(false);
                 changed++;
             }
 #pragma warning disable CA1031 // 單一使用者啟動 / 停止失敗只記錄，不影響其他使用者；下一次 API 啟動再試。

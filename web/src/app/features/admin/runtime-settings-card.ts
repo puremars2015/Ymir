@@ -135,6 +135,23 @@ import { RuntimePolicy } from '../../core/api/api-types';
                 表示不限制。部署設定：{{ budget(p.deployment.monthlyBudgetUsd) }}</span
               >
             </label>
+            <label class="check"
+              ><span
+                ><input
+                  name="backgroundModelAccess"
+                  type="checkbox"
+                  [ngModel]="draft().backgroundModelAccess"
+                  (ngModelChange)="patch({ backgroundModelAccess: $event })"
+                />
+                背景程序可以呼叫模型</span
+              >
+              <span class="muted small"
+                >允許使用者在執行環境內登記的常駐程序與排程，以自己的模型 key
+                呼叫模型（費用計入每月預算；群組不適用）。 關閉後約 5 分鐘內移除 key。部署設定：{{
+                  p.deployment.backgroundModelAccess ? '允許' : '不允許'
+                }}</span
+              >
+            </label>
           </div>
           <div class="row">
             <button type="submit" [disabled]="busy() || !!problem()">儲存</button>
@@ -184,6 +201,11 @@ import { RuntimePolicy } from '../../core/api/api-types';
       flex-direction: column;
       gap: 0.25rem;
     }
+    .check > span:first-child {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
     .row {
       display: flex;
       flex-wrap: wrap;
@@ -204,6 +226,7 @@ export class RuntimeSettingsCard implements OnInit {
     maxPendingExecutionsPerUser: '',
     dailyExecutionLimit: '',
     monthlyBudgetUsd: '',
+    backgroundModelAccess: true,
   });
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);

@@ -112,9 +112,11 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
 
         try
         {
-            var saved = await SavePolicyAsync(admin, new SaveRuntimePolicyRequest(45, 20, 3, 100));
+            Assert.True(initial.Effective.BackgroundModelAccess); // ADR-0034 預設允許
+            var saved = await SavePolicyAsync(admin, new SaveRuntimePolicyRequest(45, 20, 3, 100, BackgroundModelAccess: false));
             Assert.Equal(OidcSettingsSource.Database, saved.Source);
-            Assert.Equal(new RuntimePolicyValues(45, 20, 3, 100, 0), saved.Effective);
+            Assert.Equal(new RuntimePolicyValues(45, 20, 3, 100, 0, false), saved.Effective);
+            Assert.True(saved.Deployment.BackgroundModelAccess);
             Assert.Equal(0.001, saved.Deployment.IdleTimeoutMinutes, 6);
             Assert.NotNull(saved.UpdatedByName);
 

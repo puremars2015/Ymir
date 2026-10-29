@@ -2254,6 +2254,7 @@ export interface components {
       dailyExecutionLimit: number | string;
       /** Format: double */
       monthlyBudgetUsd: number | string;
+      backgroundModelAccess: boolean;
     };
     /** @enum {unknown} */
     RuntimeStatus: 'NotCreated' | 'Created' | 'Running' | 'Busy' | 'Stopped' | 'Error' | 'Deleted';
@@ -2326,6 +2327,8 @@ export interface components {
        * @default 0
        */
       monthlyBudgetUsd: number | string;
+      /** @default true */
+      backgroundModelAccess: boolean;
     };
     SaveUserExtensionsRequest: {
       skills: components['schemas']['ExtensionGrantSetting'];

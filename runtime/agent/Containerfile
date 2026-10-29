@@ -2,7 +2,8 @@
 #
 #   podman build -t localhost/ymir/agent-runtime:dev -f runtime/agent/Containerfile runtime/agent
 #
-# 一個使用者一個長駐 container（CMD sleep infinity，ADR-0007），API 以 `podman exec -i` 啟動 `pi --mode rpc`。
+# 一個使用者一個長駐 container（ADR-0007、ADR-0033），API 以 `podman exec -i` 啟動 `pi --mode rpc`。
+# 主程序是 ymir-runtime-init（ADR-0034）：container 每次啟動時恢復使用者登記的常駐程序與排程。
 FROM docker.io/library/node:24-bookworm-slim
 
 # 主機維護服務只把有這個 label 的 image 視為 Ymir 的（ADR-0025 §2）。
@@ -21,6 +22,26 @@ ENV PATH="/opt/ymir/python/bin:${PATH}"
 
 RUN npm install -g --ignore-scripts "@earendil-works/pi-coding-agent@${PI_VERSION}" \
  && npm cache clean --force
+
+# 排程工具 supercronic（ADR-0034）：非 root 執行使用者的 /workspace/.ymir/crontab。版本與 sha256 鎖定，
+# 升級時重新下載官方 release 並更新雜湊（SHA-1 可與 supercronic README 公布值核對）。
+ARG SUPERCRONIC_VERSION=v0.2.33
+ARG TARGETARCH
+RUN set -eu; \
+    arch="${TARGETARCH:-$(dpkg --print-architecture)}"; \
+    case "$arch" in \
+      amd64) sha=feefa310da569c81b99e1027b86b27b51e6ee9ab647747b49099645120cfc671 ;; \
+      arm64) sha=f1f8585c66de020fef494dd636058f99949d108f569fef00016a1c8b9eb145b3 ;; \
+      *) echo "unsupported architecture: $arch" >&2; exit 1 ;; \
+    esac; \
+    mkdir -p /opt/ymir/bin; \
+    curl -fsSL -o /opt/ymir/bin/supercronic "https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-${arch}"; \
+    echo "$sha  /opt/ymir/bin/supercronic" | sha256sum -c -; \
+    chmod 0755 /opt/ymir/bin/supercronic
+
+# 背景工作的啟動程式與模型 key 輔助指令（ADR-0034）；唯讀，不在使用者 workspace。
+COPY --chmod=0755 scripts/ymir-runtime-init scripts/ymir-env /opt/ymir/bin/
+ENV PATH="/opt/ymir/bin:${PATH}"
 
 # 平台模板唯讀，不放在使用者 workspace，避免被誤列為成果或遭修改。
 COPY templates/ /opt/ymir/templates/
@@ -43,4 +64,4 @@ ENV HOME=/home/agent \
 
 USER agent
 WORKDIR /workspace
-CMD ["sleep", "infinity"]
+CMD ["/opt/ymir/bin/ymir-runtime-init"]

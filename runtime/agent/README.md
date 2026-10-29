@@ -2,6 +2,18 @@
 
 每個使用者一個長駐 container（[ADR-0007](../../docs/adr/0007-one-runtime-per-user.md)），API 以 `podman exec -i` 啟動 `pi --mode rpc`（[ADR-0003](../../docs/adr/0003-pi-rpc-via-podman-exec.md)）。
 專案是 container 內的目錄 `/workspace/projects/{id}`，未分組的對話在 `/workspace/chats/{id}`。
+
+## 背景工作（[ADR-0034](../../docs/adr/0034-background-processes-and-model-access.md)）
+
+主程序是 `scripts/ymir-runtime-init`（安裝到 `/opt/ymir/bin/`），container 每次啟動時恢復使用者登記的背景工作：
+
+| 位置 | 行為 |
+|---|---|
+| `/workspace/.ymir/autostart/<名稱>.sh` | 常駐程序：結束後以 5 秒～5 分鐘退避重啟；每 30 秒掃描新增 / 修改 / 刪除 |
+| `/workspace/.ymir/crontab` | 排程：supercronic（v0.2.33，sha256 鎖定）以 agent 使用者執行，時區 UTC |
+| `/workspace/.ymir/logs/<名稱>.log` | 輸出，超過 5 MB 只保留後半段 |
+
+背景程序呼叫模型：`ymir-env pi -p "..."`。`ymir-env` 讀平台寫入 tmpfs 的 `/tmp/.ymir/model-key`（API 經 stdin 寫入、每 5 分鐘更新；群組與管理員關閉時沒有 key）。
 參數的唯一來源是 `src/Modules/VibeMaker/Ymir.VibeMaker.Infrastructure/Containers/ContainerCommandBuilder.cs`，並有單元測試保護。
 正式環境使用 Rootless Podman；沒有 Linux 主機時可以用 Docker 開發與驗證（[ADR-0005](../../docs/adr/0005-docker-for-development.md)、[Windows 指南](../../docs/guides/windows-docker.md)）。
 
@@ -34,7 +46,7 @@ Host 路徑只由 user id 推導（`UserDirectories`：`{WorkspaceRoot}/users/{u
 | `--cap-drop ALL`、`--security-opt no-new-privileges` | 移除所有 capabilities，禁止提權 |
 | `--read-only` + tmpfs | root filesystem 唯讀，只有 `/workspace`、`/agent-state`、tmpfs 可寫 |
 | `--pids-limit`、`--memory`、`--cpus` | 資源限制（**需要 cgroups v2 + delegation，見下方**） |
-| `--init` | `sleep infinity` 不處理 SIGTERM；用 catatonit 當 PID 1，`podman stop` 才能立即結束 |
+| `--init` | catatonit 當 PID 1：轉送 SIGTERM 給 `ymir-runtime-init`、回收背景工作的孤兒程序，`podman stop` 才能立即結束 |
 | 不掛載 container runtime socket、不使用 `--privileged` | 由單元測試 `ContainerCommandBuilderTests` 檢查 |
 | `podman exec --env NAME`（只傳名稱） | LiteLLM key 不會出現在 host 的 `ps` 輸出 |
 

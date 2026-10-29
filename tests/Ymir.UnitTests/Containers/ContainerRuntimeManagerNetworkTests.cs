@@ -8,13 +8,14 @@ namespace Ymir.UnitTests.Containers;
 
 /// <summary>
 /// ADR-0012 A.8：network 只能在建立 container 時決定，政策改變時 EnsureRuntime 依 label 重建。
+/// ADR-0034：主程序（ymir-runtime-init）也只能在建立時決定，缺 label 的既有 container 同樣重建。
 /// 以模擬 container CLI 的 shell script 驗證實際執行的指令（不需要真的 Podman）。
 /// </summary>
 public sealed class ContainerRuntimeManagerNetworkTests : IDisposable
 {
     private const string FakeCli = """
         #!/bin/sh
-        # 模擬 podman：container 狀態存在 $STATE（「狀態|network label」），每次呼叫記錄在 $LOG。
+        # 模擬 podman：container 狀態存在 $STATE（「狀態|network label|runtime-init label」），每次呼叫記錄在 $LOG。
         dir=$(dirname "$0"); state="$dir/state"; log="$dir/log"
         echo "$*" >> "$log"
         case "$1" in
@@ -22,9 +23,9 @@ public sealed class ContainerRuntimeManagerNetworkTests : IDisposable
             [ -f "$state" ] || exit 1
             cat "$state"; exit 0 ;;
           run)
-            label=internet
-            for a in "$@"; do case "$a" in ymir.network=*) label=${a#ymir.network=} ;; esac; done
-            echo "running|$label" > "$state"; echo id; exit 0 ;;
+            label=internet; init=
+            for a in "$@"; do case "$a" in ymir.network=*) label=${a#ymir.network=} ;; ymir.runtime-init=*) init=${a#ymir.runtime-init=} ;; esac; done
+            echo "running|$label|$init" > "$state"; echo id; exit 0 ;;
           rm) rm -f "$state"; exit 0 ;;
           start) sed -i 's/^[a-z]*|/running|/' "$state"; exit 0 ;;
           stop) sed -i 's/^[a-z]*|/exited|/' "$state"; exit 0 ;;
@@ -90,21 +91,37 @@ public sealed class ContainerRuntimeManagerNetworkTests : IDisposable
 
         Assert.Equal(RuntimeTransition.Recreated, runtime.Transition);
         Assert.Contains(Calls, c => c.StartsWith("rm --force", StringComparison.Ordinal));
-        Assert.Equal("running|restricted", File.ReadAllText(StatePath).Trim());
+        Assert.Equal("running|restricted|1", File.ReadAllText(StatePath).Trim());
     }
 
     [Fact]
-    public async Task LegacyContainerWithoutLabel_IsTreatedAsInternet()
+    public async Task LegacyContainerWithoutLabels_IsRecreatedOnce_ForTheRuntimeInit()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "uses a shell script as the container CLI");
-        await File.WriteAllTextAsync(StatePath, "running|\n", Ct);
+        // A1b 之前、ADR-0034 之前建立的 container：沒有 network 與 runtime-init label（主程序是 sleep infinity）。
+        await File.WriteAllTextAsync(StatePath, "running||\n", Ct);
         var manager = CreateManager();
 
+        var recreated = await manager.EnsureRuntimeAsync(UserId, RuntimeNetworkAccess.Internet, Ct);
         var unchanged = await manager.EnsureRuntimeAsync(UserId, RuntimeNetworkAccess.Internet, Ct);
-        var recreated = await manager.EnsureRuntimeAsync(UserId, RuntimeNetworkAccess.Restricted, Ct);
 
-        Assert.Equal(RuntimeTransition.None, unchanged.Transition);
         Assert.Equal(RuntimeTransition.Recreated, recreated.Transition);
+        Assert.Equal(RuntimeTransition.None, unchanged.Transition);
+        Assert.Equal("running|internet|1", File.ReadAllText(StatePath).Trim());
+    }
+
+    [Fact]
+    public async Task ContainerWithoutRuntimeInit_IsNotRecreated_WithoutANetworkPreference()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "uses a shell script as the container CLI");
+        await File.WriteAllTextAsync(StatePath, "running|internet|\n", Ct);
+        var manager = CreateManager();
+
+        // 例如讀取檔案：呼叫端沒有持有執行鎖，不能中斷可能正在執行的 Agent。
+        var runtime = await manager.EnsureRuntimeAsync(UserId, network: null, Ct);
+
+        Assert.Equal(RuntimeTransition.None, runtime.Transition);
+        Assert.DoesNotContain(Calls, c => c.StartsWith("rm ", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -120,14 +137,14 @@ public sealed class ContainerRuntimeManagerNetworkTests : IDisposable
 
         Assert.Equal(RuntimeTransition.Started, runtime.Transition);
         Assert.DoesNotContain(Calls, c => c.StartsWith("rm ", StringComparison.Ordinal));
-        Assert.Equal("running|restricted", File.ReadAllText(StatePath).Trim());
+        Assert.Equal("running|restricted|1", File.ReadAllText(StatePath).Trim());
     }
 
     [Fact]
     public async Task RestrictedWithoutConfiguredNetwork_FailsWithoutTouchingTheContainer()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "uses a shell script as the container CLI");
-        await File.WriteAllTextAsync(StatePath, "running|internet\n", Ct);
+        await File.WriteAllTextAsync(StatePath, "running|internet|1\n", Ct);
         var manager = CreateManager(restrictedNetwork: null);
 
         await Assert.ThrowsAsync<RuntimeNetworkUnavailableException>(() => manager.EnsureRuntimeAsync(UserId, RuntimeNetworkAccess.Restricted, Ct));

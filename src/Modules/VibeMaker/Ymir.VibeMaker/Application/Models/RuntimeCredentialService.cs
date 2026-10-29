@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 
 namespace Ymir.VibeMaker.Application.Models;
 
-public enum RuntimeCredentialPurpose { Agent, KnowledgeEmbedding, KnowledgeAnswer }
+public enum RuntimeCredentialPurpose { Agent, KnowledgeEmbedding, KnowledgeAnswer, Background }
 
 /// <summary>
 /// 每位使用者依 Agent、知識庫索引與回答用途分別快取 virtual key，並在到期前換發（ADR-0004）。

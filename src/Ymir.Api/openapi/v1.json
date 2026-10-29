@@ -6867,7 +6867,8 @@
           "executionTimeoutMinutes",
           "maxPendingExecutionsPerUser",
           "dailyExecutionLimit",
-          "monthlyBudgetUsd"
+          "monthlyBudgetUsd",
+          "backgroundModelAccess"
         ],
         "type": "object",
         "properties": {
@@ -6910,6 +6911,9 @@
               "string"
             ],
             "format": "double"
+          },
+          "backgroundModelAccess": {
+            "type": "boolean"
           }
         }
       },
@@ -7208,6 +7212,10 @@
             ],
             "format": "double",
             "default": 0
+          },
+          "backgroundModelAccess": {
+            "type": "boolean",
+            "default": true
           }
         }
       },
