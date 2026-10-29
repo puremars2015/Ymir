@@ -133,6 +133,14 @@
 ---
 
 ## 💬 留言區
+### 3c5a543 正式部署與核准清理
+
+> 2026-10-29 · 正式部署完成
+
+- 經使用者終端 sudo 與 SHA 確認，`3c5a543` 部署成功，Release 單元測試、CI、備份、image 非 root 檢查、兩個 Agent 網路探針及部署健康檢查通過。API image `483e8ad7fe0e8cefe4e4c488d24bce46b51ba2f743da143f7f24f79043d41924`；RuntimeHost `/opt/ymir/releases/redeploy-20261029T034307Z-3c5a54395413-1308557a/runtime-host`；私有備份／紀錄 `/var/lib/ymir-deploy/20261029T034307Z-3c5a54395413-1308557a`。使用者外掛 migration 已於前次回復前套用。
+- 依使用者確認、取得部署與生命週期鎖並檢查狀態／引用後，刪除 itadmin store 已停止的舊 `ymir-web` 與 root store 五個舊 API image tag `e7cf9f9`、`3855dd6`、`0e16583`、`4d7d4c0`、`4b8a3af`。未刪 volume、資料庫、使用者 Agent、前版 `348b64c`、現行 image 或備份；清理後四個正式 unit active、API health Healthy。
+- 外部 LiteLLM 新憑證的遠端預檢通過，但正式 API 設定尚未切換；Gateway／SiteHost／MaintenanceHost 未安裝，真登入、真模型／Pi SSE、Graph、冷開機和還原仍待驗收。
+
 ### Agent 探針辨識固定 image ID
 
 > 2026-10-29 · 部署進行中
