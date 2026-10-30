@@ -1,10 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Ymir.Api.Auth;
 using Ymir.Api.Endpoints;
 using Ymir.IntegrationTests.Api;
@@ -12,6 +14,8 @@ using Ymir.IntegrationTests.Executions;
 using Ymir.Platform.Auditing;
 using Ymir.Platform.Users;
 using Ymir.VibeMaker.Application.Admin;
+using Ymir.VibeMaker.Application.Agents;
+using Ymir.VibeMaker.Application.Executions;
 using Ymir.VibeMaker.Application.Persistence;
 using Ymir.VibeMaker.Application.Runtime;
 using Ymir.VibeMaker.Contracts.Executions;
@@ -30,11 +34,20 @@ public sealed class RuntimeLifecycleApiFactory : ApiFactory
         builder.UseSetting("VibeMaker:Runtime:IdleCheckIntervalSeconds", "3600");
         builder.ConfigureTestServices(services =>
         {
+            // 本 fixture 直接驗證生命週期用例；排除會競爭同一使用者鎖的背景維護，改由測試明確觸發。
+            foreach (var worker in services.Where(d => d.ServiceType == typeof(IHostedService)
+                && d.ImplementationType?.FullName is "Ymir.VibeMaker.Infrastructure.Runtime.RuntimeLifecycleWorker"
+                    or "Ymir.VibeMaker.Infrastructure.Runtime.BackgroundCredentialWorker").ToArray())
+                services.Remove(worker);
             // Local runtime 沒有「已停止」狀態：包一層模擬主機重開機後 container 停在 Stopped（ADR-0033）。
             var descriptor = services.Last(d => d.ServiceType == typeof(IAgentRuntimeManager));
             services.Remove(descriptor);
             services.AddSingleton(sp => new RebootableRuntimeManager((IAgentRuntimeManager)ActivatorUtilities.CreateInstance(sp, descriptor.ImplementationType!)));
             services.AddSingleton<IAgentRuntimeManager>(sp => sp.GetRequiredService<RebootableRuntimeManager>());
+            var harness = services.Last(d => d.ServiceType == typeof(IAgentHarness));
+            services.Remove(harness);
+            services.AddSingleton(sp => new GatedLifecycleHarness((IAgentHarness)ActivatorUtilities.CreateInstance(sp, harness.ImplementationType!)));
+            services.AddSingleton<IAgentHarness>(sp => sp.GetRequiredService<GatedLifecycleHarness>());
         });
     }
 }
@@ -42,13 +55,15 @@ public sealed class RuntimeLifecycleApiFactory : ApiFactory
 /// <summary>測試替身：<see cref="SimulateReboot"/> 後該使用者的 container 狀態為 Stopped，直到下一次 EnsureRuntime。</summary>
 public sealed class RebootableRuntimeManager(IAgentRuntimeManager inner) : IAgentRuntimeManager
 {
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, bool> _stopped = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Guid, RuntimeStatus> _simulated = new();
 
-    public void SimulateReboot(Guid userId) => _stopped[userId] = true;
+    public void SimulateReboot(Guid userId) => _simulated[userId] = RuntimeStatus.Stopped;
+
+    public void SimulateRemoval(Guid userId) => _simulated[userId] = RuntimeStatus.NotCreated;
 
     public Task<RuntimeInfo> EnsureRuntimeAsync(Guid userId, RuntimeNetworkAccess? network, CancellationToken cancellationToken)
     {
-        _stopped.TryRemove(userId, out _);
+        _simulated.TryRemove(userId, out _);
         return inner.EnsureRuntimeAsync(userId, network, cancellationToken);
     }
 
@@ -63,12 +78,34 @@ public sealed class RebootableRuntimeManager(IAgentRuntimeManager inner) : IAgen
     public Task<RuntimeInfo> GetStatusAsync(Guid runtimeId, CancellationToken cancellationToken) => inner.GetStatusAsync(runtimeId, cancellationToken);
 
     public async Task<RuntimeStatus> GetStatusForUserAsync(Guid userId, CancellationToken cancellationToken) =>
-        _stopped.ContainsKey(userId) ? RuntimeStatus.Stopped : await inner.GetStatusForUserAsync(userId, cancellationToken);
+        _simulated.TryGetValue(userId, out var status) ? status : await inner.GetStatusForUserAsync(userId, cancellationToken);
 
     public Task<bool> StopForUserAsync(Guid userId, CancellationToken cancellationToken) => inner.StopForUserAsync(userId, cancellationToken);
 
     public Task<IRuntimeProcess> StartProcessAsync(Guid runtimeId, RuntimeProcessSpec spec, CancellationToken cancellationToken) =>
         inner.StartProcessAsync(runtimeId, spec, cancellationToken);
+}
+
+/// <summary>以訊號控制長任務，讓閒置掃描確實發生在 execution 執行中，不依賴主機速度。</summary>
+public sealed class GatedLifecycleHarness(IAgentHarness inner) : IAgentHarness
+{
+    private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public Task WaitUntilRunningAsync(CancellationToken ct) => _entered.Task.WaitAsync(TimeSpan.FromSeconds(30), ct);
+    public void Release() => _release.TrySetResult();
+    public async IAsyncEnumerable<AgentEvent> RunAsync(AgentRunRequest request, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        if (request.Prompt != "long task")
+        {
+            await foreach (var item in inner.RunAsync(request, cancellationToken)) yield return item;
+            yield break;
+        }
+        yield return new AgentStarted();
+        _entered.TrySetResult();
+        try { await _release.Task.WaitAsync(cancellationToken); }
+        catch (OperationCanceledException) { /* 取消也以終止事件結束 */ }
+        yield return cancellationToken.IsCancellationRequested ? new AgentCancelled("") : new AgentCompleted("done");
+    }
 }
 
 /// <summary>執行政策（ADR-0011）：管理介面設定、配額、閒置停止、啟動時對帳與自動啟動（ADR-0033）、用量。</summary>
@@ -94,6 +131,13 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
     {
         await using var scope = factory.Services.CreateAsyncScope();
         return await action(scope.ServiceProvider);
+    }
+
+    private async Task WaitForExecutionCleanupAsync(Guid userId)
+    {
+        // 終止 SSE 先於通知與 finally 清理；等 runner 釋放使用者鎖後，才模擬重開機／操作 runtime。
+        // 否則 Reconcile 會正確地跳過仍持鎖的使用者，測試卻誤判自動啟動失敗。
+        using var userLock = await factory.Services.GetRequiredService<UserExecutionLocks>().AcquireAsync(userId, Ct);
     }
 
     private Task<AgentRuntimeRecord> RuntimeRecordAsync(Guid userId) =>
@@ -167,6 +211,7 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
         var conversation = await client.CreateConversationAsync(null, "idle");
         var (_, sent) = await client.SendMessageAsync(conversation.Id, "hello");
         await client.ReadEventsAsync(sent!.EventStreamUrl);
+        await WaitForExecutionCleanupAsync(userId);
         Assert.Equal(RuntimeStatus.Running, (await RuntimeRecordAsync(userId)).Status);
 
         await Task.Delay(TimeSpan.FromMilliseconds(200), Ct); // 超過 0.001 分鐘的閒置時間
@@ -199,11 +244,14 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
         var (_, first) = await client.SendMessageAsync(conversation.Id, "warm up");
         await client.ReadEventsAsync(first!.EventStreamUrl);
         var (_, slow) = await client.SendMessageAsync(conversation.Id, "long task");
-        await Task.Delay(TimeSpan.FromMilliseconds(300), Ct);
-
-        await InScopeAsync(sp => sp.GetRequiredService<RuntimeLifecycleService>().StopIdleAsync(Ct));
-
-        Assert.NotEqual(RuntimeStatus.Stopped, (await RuntimeRecordAsync(userId)).Status);
+        var harness = factory.Services.GetRequiredService<GatedLifecycleHarness>();
+        await harness.WaitUntilRunningAsync(Ct);
+        try
+        {
+            await InScopeAsync(sp => sp.GetRequiredService<RuntimeLifecycleService>().StopIdleAsync(Ct));
+            Assert.NotEqual(RuntimeStatus.Stopped, (await RuntimeRecordAsync(userId)).Status);
+        }
+        finally { harness.Release(); }
         await client.ReadEventsAsync(slow!.EventStreamUrl);
     }
 
@@ -215,9 +263,12 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
         var conversation = await client.CreateConversationAsync(null, "reconcile");
         var (_, sent) = await client.SendMessageAsync(conversation.Id, "hello");
         await client.ReadEventsAsync(sent!.EventStreamUrl);
+        await WaitForExecutionCleanupAsync(userId);
 
         // 模擬 container 在 Ymir 不知道的情況下消失（例如主機重開機）
         await InScopeAsync(sp => sp.GetRequiredService<IAgentRuntimeManager>().StopForUserAsync(userId, Ct));
+        // Docker 停止仍保留 container，Local 停止則變成 NotCreated；用替身明確模擬「消失」，兩種引擎驗收相同語義。
+        factory.Services.GetRequiredService<RebootableRuntimeManager>().SimulateRemoval(userId);
         var changed = await InScopeAsync(sp => sp.GetRequiredService<RuntimeLifecycleService>().ReconcileAsync(Ct));
 
         Assert.True(changed >= 1);
@@ -235,6 +286,7 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
         var conversation = await client.CreateConversationAsync(null, "autostart");
         var (_, sent) = await client.SendMessageAsync(conversation.Id, "hello");
         await client.ReadEventsAsync(sent!.EventStreamUrl);
+        await WaitForExecutionCleanupAsync(userId);
         var manager = factory.Services.GetRequiredService<RebootableRuntimeManager>();
         var lastActive = (await RuntimeRecordAsync(userId)).LastActiveAt;
 
@@ -260,6 +312,7 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
         var conversation = await client.CreateConversationAsync(null, "manual stop");
         var (_, sent) = await client.SendMessageAsync(conversation.Id, "hello");
         await client.ReadEventsAsync(sent!.EventStreamUrl);
+        await WaitForExecutionCleanupAsync(userId);
         var manager = factory.Services.GetRequiredService<RebootableRuntimeManager>();
 
         using var admin = await factory.LoginAsync($"manual-stop-admin-{Guid.NewGuid():N}", UserRole.Admin);
@@ -291,6 +344,7 @@ public class RuntimeLifecycleTests(RuntimeLifecycleApiFactory factory) : IClassF
         {
             var (_, sent) = await client.SendMessageAsync(conversation.Id, $"hello {i}");
             await client.ReadEventsAsync(sent!.EventStreamUrl);
+            await WaitForExecutionCleanupAsync(userId);
         }
 
         using var admin = await factory.LoginAsync($"usage-admin-{Guid.NewGuid():N}", UserRole.Admin);
