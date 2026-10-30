@@ -6,7 +6,7 @@
 
 ## 📌 置頂：狀態總覽
 
-> 最後更新：2026-10-29 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
+> 最後更新：2026-10-30 ・ 狀態：**🚧 進行中**（原計畫 A0～A2、O0～O2、R0～R2、H0～H2 已完成並整合回 main（#034）；P0 維持僅計畫；其餘為插單、使用者回報與維運項目）
 
 **目標**：
 - 讓 Agent 的能力可以在管理員的管制下擴充：使用者可自建 skill / MCP，開發人員則維護平台 MCP（[ADR-0012](../adr/0012-agent-extensions-and-platform-mcp.md)）；
@@ -137,6 +137,18 @@
 ---
 
 ## 💬 留言區
+
+### #112 · N2 CI：runtime 生命週期測試同步與跨平台修正
+
+> 👤 **Codex（AI）** · 🕒 2026-10-30 · `🔬驗證`
+
+- N2 提交後 CI `40847743523` 的前端與 runtime image 通過，後端 1079 項中 1 項失敗：重啟恢復測試在收到終止 SSE 後立刻模擬重開機，但 execution 尚在通知／清理階段持有使用者鎖，對帳因而正確略過該使用者。
+- 測試現在等待 runner 釋放鎖才操作 runtime；「執行中不可閒置停止」以明確訊號控制開始與結束，取代固定延遲。此 fixture 直接呼叫生命週期服務，排除會競爭使用者鎖的背景生命週期／憑證同步 worker；產品註冊及其他 fixture 不變，不跳過任何測試。
+- Windows Docker 重跑另發現原測試把「停止」當成「container 消失」，與 Local 行為不同；改由既有 runtime 替身明確模擬 NotCreated，兩種引擎驗收相同情境。
+- `dotnet test --project tests/Ymir.IntegrationTests -- --filter-class '*RuntimeLifecycleTests'`：8 項全部通過、無略過；異動檔案的 `dotnet format --verify-no-changes --no-restore` 與 `git diff --check` 通過。修正後重新推送並追蹤完整 CI；N3／N4 與正式部署狀態不變，瀏覽器 E2E 限制見 #111。
+
+---
+
 
 ### #111 · ADR-0032 N2：排程任務與提醒
 
